@@ -1,5 +1,5 @@
 // src/app/dashboard/vehicles/add/page.js
-// FIXED VERSION - Matches your actual database schema
+// CORRECTED - Remove updated_by, let trigger handle it
 
 'use client'
 
@@ -69,15 +69,16 @@ export default function AddVehiclePage() {
         return
       }
 
-      // Step 2: Insert vehicle - MATCHES YOUR SCHEMA
+      // Step 2: Insert vehicle
+      // IMPORTANT: Do NOT include updated_by - the trigger sets it automatically
       const vehicleData = {
         plate_number: vehicleForm.plateNumber.toUpperCase(),
         make: vehicleForm.make,
         model: vehicleForm.model,
-        year_of_manufacture: parseInt(vehicleForm.year), // ← Changed from 'year'
+        year_of_manufacture: parseInt(vehicleForm.year),
         color: vehicleForm.color,
-        vin: vehicleForm.vin.toUpperCase() || null,
-        updated_by: user.id // ← Added this field
+        vin: vehicleForm.vin.toUpperCase() || null
+        // updated_by is set automatically by database trigger
       }
 
       console.log('Inserting vehicle:', vehicleData)
