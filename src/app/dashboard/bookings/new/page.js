@@ -244,6 +244,9 @@ export default function NewBookingPage() {
     return tomorrow.toISOString().split('T')[0]
   }
 
+  // ⭐ CRITICAL: Define selectedShop BEFORE the return statement
+  const selectedShop = shops.find(shop => shop.id === formData.shop_id)
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -313,6 +316,7 @@ export default function NewBookingPage() {
 
       {/* Booking Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
+        
         {/* Shop Selection */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -352,9 +356,9 @@ export default function NewBookingPage() {
           )}
         </div>
 
-        {/* MAP SECTION - Add after provider info, before shop selection */}
-        {selectedShop && (selectedShop.latitude && selectedShop.longitude) && (
-          <div className="mb-8">
+        {/* MAP SECTION - Show after shop is selected */}
+        {selectedShop?.latitude && selectedShop?.longitude && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Shop Location
             </h2>
@@ -487,7 +491,7 @@ export default function NewBookingPage() {
         </div>
 
         {/* Submit */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
             <div className="text-sm text-blue-800">
