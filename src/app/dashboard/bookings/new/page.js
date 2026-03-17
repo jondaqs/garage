@@ -352,9 +352,9 @@ export default function NewBookingPage() {
           )}
         </div>
 
-        {/* MAP SECTION - Show after shop is selected */}
-        {selectedShop?.latitude && selectedShop?.longitude && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
+        {/* MAP SECTION - Add after provider info, before shop selection */}
+        {selectedShop && (selectedShop.latitude && selectedShop.longitude) && (
+          <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Shop Location
             </h2>
