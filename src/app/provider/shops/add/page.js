@@ -4,17 +4,15 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, AlertCircle, MapPin } from 'lucide-react'
-
-const KENYA_COUNTIES = [
-  'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Malindi',
-  'Kitale', 'Garissa', 'Kakamega', 'Machakos', 'Meru', 'Nyeri', 'Kiambu',
-  'Kajiado', 'Kilifi', 'Kwale', 'Lamu', 'Taita Taveta', 'Tana River',
-  'Baringo', 'Bomet', 'Bungoma', 'Busia', 'Elgeyo Marakwet', 'Embu',
-  'Homa Bay', 'Isiolo', 'Kericho', 'Kirinyaga', 'Kisii', 'Laikipia',
-  'Makueni', 'Mandera', 'Marsabit', 'Migori', 'Murang\'a', 'Nandi',
-  'Narok', 'Nyandarua', 'Nyamira', 'Samburu', 'Siaya', 'Trans Nzoia',
-  'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot'
-]
+import { 
+  EAST_AFRICA, 
+  SOUTHERN_AFRICA, 
+  WEST_AFRICA, 
+  NORTH_AFRICA, 
+  CENTRAL_AFRICA, 
+  INTERNATIONAL,
+  KENYA_COUNTIES 
+} from '@/lib/constants/countries'
 
 export default function AddShopPage() {
   const router = useRouter()
@@ -25,19 +23,19 @@ export default function AddShopPage() {
   const [success, setSuccess] = useState('')
 
   const [formData, setFormData] = useState({
-            name: '',
-            description: '',
-            phone: '',
-            email: '',
-            country: 'Kenya', // Default to Kenya
-            county: '',
-            town: '',
-            street: '',
-            latitude: '',
-            longitude: '',
-            opening_time: '08:00',
-            closing_time: '17:00'
-        })
+    name: '',
+    description: '',
+    phone: '',
+    email: '',
+    country: 'Kenya',
+    county: '',
+    town: '',
+    street: '',
+    latitude: '',
+    longitude: '',
+    opening_time: '08:00',
+    closing_time: '17:00'
+  })
 
   useEffect(() => {
     loadProvider()
@@ -89,7 +87,8 @@ export default function AddShopPage() {
         description: formData.description || null,
         phone: formData.phone,
         email: formData.email || null,
-        county: formData.county,
+        country: formData.country,
+        county: formData.county || null,
         town: formData.town,
         street: formData.street || null,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -126,8 +125,6 @@ export default function AddShopPage() {
       [e.target.name]: e.target.value
     })
   }
-
-  
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -235,129 +232,136 @@ export default function AddShopPage() {
             </div>
           </div>
 
-        {/* Location */}
-        <div className="mb-8">
+          {/* Location */}
+          <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin size={20} />
-                Location
+              <MapPin size={20} />
+              Location
             </h2>
             
             <div className="space-y-4">
-                {/* Country */}
-                <div>
+              {/* Country */}
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Country *
+                  Country *
                 </label>
                 <select
-                    name="country"
-                    value={formData.country}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                    <option value="">Select Country</option>
-                    <optgroup label="East Africa">
-                    <option value="Kenya">Kenya</option>
-                    <option value="Uganda">Uganda</option>
-                    <option value="Tanzania">Tanzania</option>
-                    <option value="Rwanda">Rwanda</option>
-                    <option value="Burundi">Burundi</option>
-                    <option value="South Sudan">South Sudan</option>
-                    <option value="Ethiopia">Ethiopia</option>
-                    <option value="Somalia">Somalia</option>
-                    <option value="Eritrea">Eritrea</option>
-                    <option value="Djibouti">Djibouti</option>
-                    </optgroup>
-                    <optgroup label="Other African Countries">
-                    <option value="South Africa">South Africa</option>
-                    <option value="Nigeria">Nigeria</option>
-                    <option value="Egypt">Egypt</option>
-                    <option value="Ghana">Ghana</option>
-                    {/* Add more as needed */}
-                    </optgroup>
-                    <optgroup label="International">
-                    <option value="United States">United States</option>
-                    <option value="United Kingdom">United Kingdom</option>
-                    <option value="Canada">Canada</option>
-                    <option value="Australia">Australia</option>
-                    {/* Add more as needed */}
-                    </optgroup>
+                  <option value="">Select Country</option>
+                  
+                  <optgroup label="East Africa">
+                    {EAST_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="Southern Africa">
+                    {SOUTHERN_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="West Africa">
+                    {WEST_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="North Africa">
+                    {NORTH_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="Central Africa">
+                    {CENTRAL_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="International">
+                    {INTERNATIONAL.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
                 </select>
-                </div>
+              </div>
 
-                {/* Show County dropdown only if Kenya is selected */}
-                {formData.country === 'Kenya' && (
+              {/* County/State - Conditional */}
+              {formData.country === 'Kenya' ? (
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     County *
-                    </label>
-                    <select
+                  </label>
+                  <select
                     name="county"
                     value={formData.county}
                     onChange={handleChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
+                  >
                     <option value="">Select County</option>
                     {KENYA_COUNTIES.map(county => (
-                        <option key={county} value={county}>{county}</option>
+                      <option key={county} value={county}>{county}</option>
                     ))}
-                    </select>
+                  </select>
                 </div>
-                )}
-
-                {/* For non-Kenya, show State/Region text input */}
-                {formData.country && formData.country !== 'Kenya' && (
+              ) : formData.country && (
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     State/Region/Province (Optional)
-                    </label>
-                    <input
+                  </label>
+                  <input
                     type="text"
                     name="county"
                     value={formData.county}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="State or Region"
-                    />
+                  />
                 </div>
-                )}
+              )}
 
-                <div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Town/City *
+                  Town/City *
                 </label>
                 <input
-                    type="text"
-                    name="town"
-                    value={formData.town}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nairobi"
+                  type="text"
+                  name="town"
+                  value={formData.town}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nairobi"
                 />
-                </div>
+              </div>
 
-                <div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Street Address (Optional)
+                  Street Address (Optional)
                 </label>
                 <input
-                    type="text"
-                    name="street"
-                    value={formData.street}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="123 Main Street, CBD"
+                  type="text"
+                  name="street"
+                  value={formData.street}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="123 Main Street, CBD"
                 />
-                </div>
+              </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Latitude (Optional)
-                    </label>
-                    <input
+                  </label>
+                  <input
                     type="number"
                     step="any"
                     name="latitude"
@@ -365,14 +369,14 @@ export default function AddShopPage() {
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="-1.2921"
-                    />
+                  />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Longitude (Optional)
-                    </label>
-                    <input
+                  </label>
+                  <input
                     type="number"
                     step="any"
                     name="longitude"
@@ -380,17 +384,15 @@ export default function AddShopPage() {
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="36.8219"
-                    />
+                  />
                 </div>
-                </div>
+              </div>
 
-                <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500">
                 💡 Tip: You can get coordinates from Google Maps by right-clicking on your location
-                </p>
+              </p>
             </div>
-        </div>
-
-        
+          </div>
 
           {/* Operating Hours */}
           <div className="mb-8">
