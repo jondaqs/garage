@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Calendar, MapPin, Car, Phone, Mail, MessageSquare, XCircle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Car, Phone, Mail, MessageSquare, XCircle, AlertCircle, Navigation, ExternalLink } from 'lucide-react'
 import StatusBadge from '@/components/bookings/StatusBadge'
+import { useUserLocation } from '@/hooks/useUserLocation'
 
 export default function BookingDetailPage() {
   const router = useRouter()
@@ -17,6 +18,12 @@ export default function BookingDetailPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+
+  // Add user location hook
+  const { 
+    location: userLocation, 
+    requestLocation 
+  } = useUserLocation()
 
   useEffect(() => {
     if (params.id) {
@@ -239,8 +246,37 @@ export default function BookingDetailPage() {
                 <p className="text-sm text-gray-600">
                   {booking.shop?.town}, {booking.shop?.county}
                 </p>
+                {booking.shop?.street && (
+                  <p className="text-sm text-gray-600 mt-1">{booking.shop?.street}</p>
+                )}
               </div>
             </div>
+            
+            {/* Directions Button */}
+            {booking.shop?.latitude && booking.shop?.longitude && (
+              <div className="mt-3 space-y-2">
+                {userLocation ? (
+                  <a
+                    href={`https://www.google.com/maps/dir/${userLocation.latitude},${userLocation.longitude}/${booking.shop.latitude},${booking.shop.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition"
+                  >
+                    <Navigation size={14} />
+                    Get Directions
+                    <ExternalLink size={12} />
+                  </a>
+                ) : (
+                  <button
+                    onClick={requestLocation}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition"
+                  >
+                    <Navigation size={14} />
+                    Enable Location for Directions
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

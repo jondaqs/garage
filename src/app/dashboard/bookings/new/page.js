@@ -7,7 +7,7 @@ import { Navigation } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, Clock, FileText, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, FileText, AlertCircle, ExternalLink } from 'lucide-react'
 
 // Dynamic import to avoid SSR issues with Leaflet
 const ShopLocationMap = dynamic(
@@ -359,13 +359,44 @@ export default function NewBookingPage() {
         {/* MAP SECTION - Show after shop is selected */}
         {selectedShop?.latitude && selectedShop?.longitude && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Shop Location
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Shop Location
+              </h2>
+              
+              {/* DIRECTIONS BUTTON - Shows when user location is available */}
+              {userLocation && (
+                <a
+                  href={`https://www.google.com/maps/dir/${userLocation.latitude},${userLocation.longitude}/${selectedShop.latitude},${selectedShop.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition"
+                >
+                  <Navigation size={16} />
+                  Get Directions
+                  <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+            
             <ShopLocationMap 
               shop={selectedShop}
               userLocation={userLocation}
             />
+            
+            {/* Shop Address */}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-2">{selectedShop.name}</h3>
+              <p className="text-sm text-gray-600">
+                {selectedShop.street && `${selectedShop.street}, `}
+                {selectedShop.town}, {selectedShop.county}
+              </p>
+              {selectedShop.phone && (
+                <p className="text-sm text-gray-600 mt-1">
+                  📞 {selectedShop.phone}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
