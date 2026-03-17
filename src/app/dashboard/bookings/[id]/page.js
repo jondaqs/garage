@@ -2,27 +2,34 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, MapPin, Car, Phone, Mail, MessageSquare, XCircle } from 'lucide-react'
+import { useRouter, useParams } from 'next/navigation'
+import { ArrowLeft, Calendar, MapPin, Car, Phone, Mail, MessageSquare, XCircle, AlertCircle } from 'lucide-react'
 import StatusBadge from '@/components/bookings/StatusBadge'
 
-export default function BookingDetailPage({ params }) {
+export default function BookingDetailPage() {
   const router = useRouter()
+  const params = useParams()
   const supabase = createClient()
+  
   const [booking, setBooking] = useState(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    loadBooking()
-    loadMessages()
+    if (params.id) {
+      loadBooking()
+      loadMessages()
+    }
   }, [params.id])
 
   const loadBooking = async () => {
     try {
-      const { data, error } = await supabase
+      setError('')
+      
+      const { data, error: fetchError } = await supabase
         .from('bookings')
         .select(`
           *,
@@ -35,10 +42,21 @@ export default function BookingDetailPage({ params }) {
         .eq('id', params.id)
         .single()
 
-      if (error) throw error
+      if (fetchError) {
+        console.error('Error loading booking:', fetchError)
+        setError(fetchError.message || 'Failed to load booking')
+        return
+      }
+
+      if (!data) {
+        setError('Booking not found')
+        return
+      }
+
       setBooking(data)
     } catch (error) {
       console.error('Error loading booking:', error)
+      setError('An unexpected error occurred')
     } finally {
       setLoading(false)
     }
@@ -81,6 +99,7 @@ export default function BookingDetailPage({ params }) {
       loadMessages()
     } catch (error) {
       console.error('Error sending message:', error)
+      alert('Failed to send message')
     } finally {
       setSending(false)
     }
@@ -118,24 +137,83 @@ export default function BookingDetailPage({ params }) {
     }
   }
 
-  if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>
-  if (!booking) return <div className="text-center py-12">Booking not found</div>
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <button 
+          onClick={() => router.back()} 
+          className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ArrowLeft size={20} className="mr-2" />
+          Back to Bookings
+        </button>
+        
+        <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+          <AlertCircle className="mx-auto text-red-600 mb-4" size={48} />
+          <h2 className="text-xl font-semibold text-red-900 mb-2">Booking Not Found</h2>
+          <p className="text-red-700 mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/dashboard/bookings')}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            View All Bookings
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!booking) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <button 
+          onClick={() => router.back()} 
+          className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ArrowLeft size={20} className="mr-2" />
+          Back to Bookings
+        </button>
+        
+        <div className="text-center py-12">
+          <p className="text-gray-600">Booking not found</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <button onClick={() => router.back()} className="flex items-center text-gray-600 hover:text-gray-900 mb-6">
-        <ArrowLeft size={20} className="mr-2" />Back to Bookings
+      <button 
+        onClick={() => router.back()} 
+        className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+      >
+        <ArrowLeft size={20} className="mr-2" />
+        Back to Bookings
       </button>
 
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Booking #{booking.booking_number}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Booking #{booking.booking_number}
+            </h1>
             <StatusBadge status={booking.status} />
           </div>
           {booking.status?.code === 'pending' && (
-            <button onClick={cancelBooking} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2">
-              <XCircle size={20} />Cancel Booking
+            <button 
+              onClick={cancelBooking} 
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+            >
+              <XCircle size={20} />
+              Cancel Booking
             </button>
           )}
         </div>
@@ -145,7 +223,10 @@ export default function BookingDetailPage({ params }) {
             <h3 className="font-semibold text-gray-900 mb-3">Service Provider</h3>
             <div className="space-y-2">
               <p className="text-gray-700">{booking.service_provider?.name}</p>
-              <div className="flex items-center text-sm text-gray-600"><Phone size={16} className="mr-2" />{booking.service_provider?.phone}</div>
+              <div className="flex items-center text-sm text-gray-600">
+                <Phone size={16} className="mr-2" />
+                {booking.service_provider?.phone}
+              </div>
             </div>
           </div>
 
@@ -153,7 +234,12 @@ export default function BookingDetailPage({ params }) {
             <h3 className="font-semibold text-gray-900 mb-3">Location</h3>
             <div className="flex items-start text-gray-700">
               <MapPin size={16} className="mr-2 mt-1 flex-shrink-0" />
-              <div><p>{booking.shop?.name}</p><p className="text-sm text-gray-600">{booking.shop?.town}, {booking.shop?.county}</p></div>
+              <div>
+                <p>{booking.shop?.name}</p>
+                <p className="text-sm text-gray-600">
+                  {booking.shop?.town}, {booking.shop?.county}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -161,7 +247,12 @@ export default function BookingDetailPage({ params }) {
             <h3 className="font-semibold text-gray-900 mb-3">Appointment</h3>
             <div className="flex items-center text-gray-700">
               <Calendar size={16} className="mr-2" />
-              <div><p>{new Date(booking.booking_date).toLocaleDateString()}</p><p className="text-sm text-gray-600">{booking.booking_time_start} - {booking.booking_time_end}</p></div>
+              <div>
+                <p>{new Date(booking.booking_date).toLocaleDateString()}</p>
+                <p className="text-sm text-gray-600">
+                  {booking.booking_time_start} - {booking.booking_time_end}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -169,7 +260,12 @@ export default function BookingDetailPage({ params }) {
             <h3 className="font-semibold text-gray-900 mb-3">Vehicle</h3>
             <div className="flex items-center text-gray-700">
               <Car size={16} className="mr-2" />
-              <div><p>{booking.vehicle?.plate_number}</p><p className="text-sm text-gray-600">{booking.vehicle?.make} {booking.vehicle?.model}</p></div>
+              <div>
+                <p>{booking.vehicle?.plate_number}</p>
+                <p className="text-sm text-gray-600">
+                  {booking.vehicle?.make} {booking.vehicle?.model}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -178,33 +274,73 @@ export default function BookingDetailPage({ params }) {
           <h3 className="font-semibold text-gray-900 mb-3">Requested Services</h3>
           <div className="flex flex-wrap gap-2">
             {booking.booking_services?.map((bs, idx) => (
-              <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">{bs.service?.name}</span>
+              <span 
+                key={idx} 
+                className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+              >
+                {bs.service?.name}
+              </span>
             ))}
           </div>
         </div>
 
-        <div className="mt-6">
-          <h3 className="font-semibold text-gray-900 mb-2">Problem Description</h3>
-          <p className="text-gray-700">{booking.problem_description}</p>
-        </div>
+        {booking.problem_description && (
+          <div className="mt-6">
+            <h3 className="font-semibold text-gray-900 mb-2">Problem Description</h3>
+            <p className="text-gray-700">{booking.problem_description}</p>
+          </div>
+        )}
+
+        {booking.special_instructions && (
+          <div className="mt-6">
+            <h3 className="font-semibold text-gray-900 mb-2">Special Instructions</h3>
+            <p className="text-gray-700">{booking.special_instructions}</p>
+          </div>
+        )}
       </div>
 
+      {/* Messages Section */}
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><MessageSquare size={20} />Messages</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <MessageSquare size={20} />
+          Messages
+        </h2>
+        
         <div className="space-y-4 mb-4 max-h-96 overflow-y-auto">
-          {messages.length === 0 ? <p className="text-gray-500 text-center py-8">No messages yet</p> : messages.map((msg) => (
-            <div key={msg.id} className="bg-gray-50 rounded-lg p-4">
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-medium text-gray-900">{msg.sender?.first_name} {msg.sender?.last_name}</span>
-                <span className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleString()}</span>
+          {messages.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No messages yet</p>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-medium text-gray-900">
+                    {msg.sender?.first_name} {msg.sender?.last_name}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(msg.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-gray-700">{msg.message}</p>
               </div>
-              <p className="text-gray-700">{msg.message}</p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
+
         <form onSubmit={sendMessage} className="flex gap-2">
-          <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type your message..." className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-          <button type="submit" disabled={sending || !newMessage.trim()} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Send</button>
+          <input 
+            type="text" 
+            value={newMessage} 
+            onChange={(e) => setNewMessage(e.target.value)} 
+            placeholder="Type your message..." 
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+          />
+          <button 
+            type="submit" 
+            disabled={sending || !newMessage.trim()} 
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {sending ? 'Sending...' : 'Send'}
+          </button>
         </form>
       </div>
     </div>
