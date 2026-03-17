@@ -25,18 +25,19 @@ export default function AddShopPage() {
   const [success, setSuccess] = useState('')
 
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    phone: '',
-    email: '',
-    county: '',
-    town: '',
-    street: '',
-    latitude: '',
-    longitude: '',
-    opening_time: '08:00',
-    closing_time: '17:00'
-  })
+            name: '',
+            description: '',
+            phone: '',
+            email: '',
+            country: 'Kenya', // Default to Kenya
+            county: '',
+            town: '',
+            street: '',
+            latitude: '',
+            longitude: '',
+            opening_time: '08:00',
+            closing_time: '17:00'
+        })
 
   useEffect(() => {
     loadProvider()
@@ -125,6 +126,8 @@ export default function AddShopPage() {
       [e.target.name]: e.target.value
     })
   }
+
+  
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -387,20 +390,7 @@ export default function AddShopPage() {
             </div>
         </div>
 
-        const [formData, setFormData] = useState({
-            name: '',
-            description: '',
-            phone: '',
-            email: '',
-            country: 'Kenya', // Default to Kenya
-            county: '',
-            town: '',
-            street: '',
-            latitude: '',
-            longitude: '',
-            opening_time: '08:00',
-            closing_time: '17:00'
-        })
+        
 
           {/* Operating Hours */}
           <div className="mb-8">
