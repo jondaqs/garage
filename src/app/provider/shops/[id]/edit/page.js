@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, AlertCircle, MapPin } from 'lucide-react'
 
 const KENYA_COUNTIES = [
@@ -16,8 +16,9 @@ const KENYA_COUNTIES = [
   'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot'
 ]
 
-export default function EditShopPage({ params }) {
+export default function EditShopPage() {
   const router = useRouter()
+  const params = useParams()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -39,18 +40,33 @@ export default function EditShopPage({ params }) {
   })
 
   useEffect(() => {
-    loadShop()
+    console.log('Params:', params)
+    console.log('Shop ID:', params.id)
+    
+    if (params.id) {
+      loadShop()
+    } else {
+      setError('Shop ID is missing')
+      setLoading(false)
+    }
   }, [params.id])
 
   const loadShop = async () => {
     try {
+      console.log('Loading shop with ID:', params.id)
+      
       const { data, error: fetchError } = await supabase
         .from('shops')
         .select('*')
         .eq('id', params.id)
         .single()
 
-      if (fetchError) throw fetchError
+      if (fetchError) {
+        console.error('Supabase error:', fetchError)
+        throw fetchError
+      }
+
+      console.log('Shop loaded:', data)
 
       setFormData({
         name: data.name || '',
@@ -68,7 +84,7 @@ export default function EditShopPage({ params }) {
 
     } catch (err) {
       console.error('Error loading shop:', err)
-      setError('Failed to load shop details')
+      setError('Failed to load shop details: ' + (err.message || 'Unknown error'))
     } finally {
       setLoading(false)
     }
@@ -97,6 +113,8 @@ export default function EditShopPage({ params }) {
         closing_time: formData.closing_time,
         updated_by: user.id
       }
+
+      console.log('Updating shop:', params.id, shopData)
 
       const { error: updateError } = await supabase
         .from('shops')

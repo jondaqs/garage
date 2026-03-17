@@ -97,6 +97,12 @@ export default function ProviderShopsPage() {
     }
   }
 
+  const handleEdit = (shopId) => {
+    console.log('Editing shop ID:', shopId)
+    // Navigate to edit page with shop ID in URL
+    router.push(`/provider/shops/${shopId}/edit`)
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -210,7 +216,7 @@ export default function ProviderShopsPage() {
                 {/* Actions */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => router.push(`/provider/shops/${shop.id}/edit`)}
+                    onClick={() => handleEdit(shop.id)}
                     className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2 text-sm"
                   >
                     <Edit size={16} />
