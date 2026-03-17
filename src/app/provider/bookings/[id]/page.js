@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, CheckCircle, XCircle, PlayCircle, Flag, AlertCircle, Calendar, MapPin, Car, Phone, Mail } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, PlayCircle, Flag, AlertCircle, Calendar, MapPin, Car, Phone, Mail, MessageSquare } from 'lucide-react'
 import StatusBadge from '@/components/bookings/StatusBadge'
 
 export default function ManageBookingPage() {
@@ -12,13 +12,17 @@ export default function ManageBookingPage() {
   const supabase = createClient()
   
   const [booking, setBooking] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (params.id) {
       loadBooking()
+      loadMessages()
     }
   }, [params.id])
 
@@ -56,6 +60,65 @@ export default function ManageBookingPage() {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMessages = async () => {
+    try {
+      const { data } = await supabase
+        .from('booking_messages')
+        .select('*, sender:user_profiles(first_name, last_name)')
+        .eq('booking_id', params.id)
+        .order('created_at', { ascending: true })
+
+      setMessages(data || [])
+    } catch (error) {
+      console.error('Error loading messages:', error)
+    }
+  }
+
+  const sendMessage = async (e) => {
+    e.preventDefault()
+    if (!newMessage.trim()) return
+
+    setSending(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      const { error: insertError } = await supabase
+        .from('booking_messages')
+        .insert({
+          booking_id: params.id,
+          sender_user_id: profile.id,
+          message: newMessage
+        })
+
+      if (insertError) throw insertError
+
+      setNewMessage('')
+      loadMessages()
+      
+      // Send notification to customer
+      await supabase
+        .from('notifications')
+        .insert({
+          recipient_user_id: booking.customer_user_id,
+          notification_type: 'new_message',
+          title: 'New Message',
+          message: `New message on booking #${booking.booking_number}`,
+          reference_id: params.id,
+          reference_type: 'booking'
+        })
+    } catch (error) {
+      console.error('Error sending message:', error)
+      alert('Failed to send message: ' + error.message)
+    } finally {
+      setSending(false)
     }
   }
 
@@ -301,7 +364,7 @@ export default function ManageBookingPage() {
       </div>
 
       {/* Actions Card */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Booking Actions</h2>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -389,6 +452,51 @@ export default function ManageBookingPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Messages Section */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <MessageSquare size={20} />
+          Messages with Customer
+        </h2>
+        
+        <div className="space-y-4 mb-4 max-h-96 overflow-y-auto">
+          {messages.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No messages yet</p>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-medium text-gray-900">
+                    {msg.sender?.first_name} {msg.sender?.last_name}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(msg.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-gray-700">{msg.message}</p>
+              </div>
+            ))
+          )}
+        </div>
+
+        <form onSubmit={sendMessage} className="flex gap-2">
+          <input 
+            type="text" 
+            value={newMessage} 
+            onChange={(e) => setNewMessage(e.target.value)} 
+            placeholder="Type your message to customer..." 
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+          />
+          <button 
+            type="submit" 
+            disabled={sending || !newMessage.trim()} 
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {sending ? 'Sending...' : 'Send'}
+          </button>
+        </form>
       </div>
     </div>
   )
