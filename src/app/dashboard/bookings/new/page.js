@@ -244,9 +244,6 @@ export default function NewBookingPage() {
     return tomorrow.toISOString().split('T')[0]
   }
 
-  // Get selected shop object for map
-  const selectedShop = shops.find(shop => shop.id === formData.shop_id)
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -316,7 +313,6 @@ export default function NewBookingPage() {
 
       {/* Booking Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        
         {/* Shop Selection */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -369,7 +365,158 @@ export default function NewBookingPage() {
           </div>
         )}
 
-        {/* Rest of form continues... */}
+        {/* Date & Time */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Date & Time</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Calendar className="inline mr-2" size={16} />
+                Booking Date *
+              </label>
+              <input
+                type="date"
+                min={getMinDate()}
+                value={formData.booking_date}
+                onChange={(e) => setFormData({ ...formData, booking_date: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Clock className="inline mr-2" size={16} />
+                Preferred Time *
+              </label>
+              <select
+                value={formData.booking_time}
+                onChange={(e) => setFormData({ ...formData, booking_time: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                {Array.from({ length: 9 }, (_, i) => i + 8).map(hour => (
+                  <option key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                    {hour}:00 - {hour + 2}:00
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Services */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Select Services *</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {services.map(service => (
+              <label
+                key={service.id}
+                className={`flex items-center p-3 border rounded-lg cursor-pointer transition ${
+                  formData.requested_services.includes(service.id)
+                    ? 'border-blue-600 bg-blue-50'
+                    : 'border-gray-200 hover:border-blue-300'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={formData.requested_services.includes(service.id)}
+                  onChange={() => handleServiceToggle(service.id)}
+                  className="mr-3"
+                />
+                <div className="text-sm font-medium text-gray-900">{service.name}</div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Problem Description */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <FileText className="inline mr-2" size={16} />
+            Problem Description *
+          </label>
+          <textarea
+            value={formData.problem_description}
+            onChange={(e) => setFormData({ ...formData, problem_description: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            rows="4"
+            placeholder="Describe the issue with your vehicle..."
+            required
+          />
+        </div>
+
+        {/* Special Instructions */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Special Instructions (Optional)
+          </label>
+          <textarea
+            value={formData.special_instructions}
+            onChange={(e) => setFormData({ ...formData, special_instructions: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            rows="3"
+            placeholder="Any special requests or instructions..."
+          />
+        </div>
+
+        {/* Contact Info */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Contact Information</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+              <input
+                type="tel"
+                value={formData.customer_phone}
+                onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+              <input
+                type="email"
+                value={formData.customer_email}
+                onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Submit */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">Important Notes:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Booking requests are subject to provider confirmation</li>
+                <li>You will receive a notification once confirmed</li>
+                <li>Please arrive 10 minutes before your scheduled time</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+          >
+            {submitting ? 'Creating Booking...' : 'Confirm Booking'}
+          </button>
+        </div>
       </form>
     </div>
   )
