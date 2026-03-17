@@ -1,9 +1,26 @@
 'use client'
 
+import dynamic from 'next/dynamic'
+import { useUserLocation } from '@/hooks/useUserLocation'
+import { Navigation } from 'lucide-react'
+
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Calendar, Clock, FileText, AlertCircle } from 'lucide-react'
+
+// Dynamic import to avoid SSR issues with Leaflet
+const ShopLocationMap = dynamic(
+  () => import('@/components/maps/ShopLocationMap'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-80 bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-gray-500">Loading map...</div>
+      </div>
+    )
+  }
+)
 
 export default function NewBookingPage() {
   const router = useRouter()
@@ -30,6 +47,15 @@ export default function NewBookingPage() {
     customer_phone: '',
     customer_email: ''
   })
+
+  // Add user location hook
+  const { 
+    location: userLocation, 
+    loading: locationLoading, 
+    error: locationError,
+    permissionDenied,
+    requestLocation 
+  } = useUserLocation()
 
   useEffect(() => {
     if (providerId && vehicleId) {
@@ -232,6 +258,43 @@ export default function NewBookingPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">New Booking</h1>
         <p className="text-gray-600">Book a service appointment</p>
       </div>
+      {/* LOCATION PERMISSION BANNER - Add after header */}
+      {selectedProvider && selectedShop && selectedShop.latitude && selectedShop.longitude && !userLocation && !permissionDenied && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              <Navigation className="text-blue-600 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-1">
+                  See Shop Location on Map
+                </h4>
+                <p className="text-blue-700 text-sm mb-3">
+                  Share your location to see the distance and route to the shop
+                </p>
+                <button
+                  onClick={requestLocation}
+                  disabled={locationLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+                >
+                  {locationLoading ? 'Getting Location...' : 'Share My Location'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+ 
+      {/* LOCATION ERROR MESSAGE */}
+      {locationError && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-700 text-sm">{locationError}</p>
+          {permissionDenied && (
+            <p className="text-red-600 text-xs mt-2">
+              To enable location access, please check your browser settings
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Provider & Vehicle Info */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -251,6 +314,20 @@ export default function NewBookingPage() {
 
       {/* Booking Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* MAP SECTION - Add after provider info, before shop selection */}
+        {selectedShop && (selectedShop.latitude && selectedShop.longitude) && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Shop Location
+            </h2>
+            <ShopLocationMap 
+              shop={selectedShop}
+              userLocation={userLocation}
+            />
+          </div>
+        )}
+        
         {/* Shop Selection */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">
