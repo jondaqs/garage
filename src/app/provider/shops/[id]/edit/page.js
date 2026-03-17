@@ -4,17 +4,15 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, AlertCircle, MapPin } from 'lucide-react'
-
-const KENYA_COUNTIES = [
-  'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Malindi',
-  'Kitale', 'Garissa', 'Kakamega', 'Machakos', 'Meru', 'Nyeri', 'Kiambu',
-  'Kajiado', 'Kilifi', 'Kwale', 'Lamu', 'Taita Taveta', 'Tana River',
-  'Baringo', 'Bomet', 'Bungoma', 'Busia', 'Elgeyo Marakwet', 'Embu',
-  'Homa Bay', 'Isiolo', 'Kericho', 'Kirinyaga', 'Kisii', 'Laikipia',
-  'Makueni', 'Mandera', 'Marsabit', 'Migori', 'Murang\'a', 'Nandi',
-  'Narok', 'Nyandarua', 'Nyamira', 'Samburu', 'Siaya', 'Trans Nzoia',
-  'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot'
-]
+import { 
+  EAST_AFRICA, 
+  SOUTHERN_AFRICA, 
+  WEST_AFRICA, 
+  NORTH_AFRICA, 
+  CENTRAL_AFRICA, 
+  INTERNATIONAL,
+  KENYA_COUNTIES 
+} from '@/lib/constants/countries'
 
 export default function EditShopPage() {
   const router = useRouter()
@@ -30,6 +28,7 @@ export default function EditShopPage() {
     description: '',
     phone: '',
     email: '',
+    country: 'Kenya',
     county: '',
     town: '',
     street: '',
@@ -40,39 +39,27 @@ export default function EditShopPage() {
   })
 
   useEffect(() => {
-    console.log('Params:', params)
-    console.log('Shop ID:', params.id)
-    
     if (params.id) {
       loadShop()
-    } else {
-      setError('Shop ID is missing')
-      setLoading(false)
     }
   }, [params.id])
 
   const loadShop = async () => {
     try {
-      console.log('Loading shop with ID:', params.id)
-      
       const { data, error: fetchError } = await supabase
         .from('shops')
         .select('*')
         .eq('id', params.id)
         .single()
 
-      if (fetchError) {
-        console.error('Supabase error:', fetchError)
-        throw fetchError
-      }
-
-      console.log('Shop loaded:', data)
+      if (fetchError) throw fetchError
 
       setFormData({
         name: data.name || '',
         description: data.description || '',
         phone: data.phone || '',
         email: data.email || '',
+        country: data.country || 'Kenya',
         county: data.county || '',
         town: data.town || '',
         street: data.street || '',
@@ -84,7 +71,7 @@ export default function EditShopPage() {
 
     } catch (err) {
       console.error('Error loading shop:', err)
-      setError('Failed to load shop details: ' + (err.message || 'Unknown error'))
+      setError('Failed to load shop details')
     } finally {
       setLoading(false)
     }
@@ -104,7 +91,8 @@ export default function EditShopPage() {
         description: formData.description || null,
         phone: formData.phone,
         email: formData.email || null,
-        county: formData.county,
+        country: formData.country,
+        county: formData.county || null,
         town: formData.town,
         street: formData.street || null,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -113,8 +101,6 @@ export default function EditShopPage() {
         closing_time: formData.closing_time,
         updated_by: user.id
       }
-
-      console.log('Updating shop:', params.id, shopData)
 
       const { error: updateError } = await supabase
         .from('shops')
@@ -202,7 +188,6 @@ export default function EditShopPage() {
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Main Branch"
                 />
               </div>
 
@@ -216,7 +201,6 @@ export default function EditShopPage() {
                   onChange={handleChange}
                   rows="3"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Brief description of this shop location..."
                 />
               </div>
             </div>
@@ -238,7 +222,6 @@ export default function EditShopPage() {
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="0712345678"
                 />
               </div>
 
@@ -252,7 +235,6 @@ export default function EditShopPage() {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="shop@example.com"
                 />
               </div>
             </div>
@@ -266,7 +248,60 @@ export default function EditShopPage() {
             </h2>
             
             <div className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              {/* Country */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country *
+                </label>
+                <select
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Country</option>
+                  
+                  <optgroup label="East Africa">
+                    {EAST_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="Southern Africa">
+                    {SOUTHERN_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="West Africa">
+                    {WEST_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="North Africa">
+                    {NORTH_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="Central Africa">
+                    {CENTRAL_AFRICA.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                  
+                  <optgroup label="International">
+                    {INTERNATIONAL.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* County/State - Conditional */}
+              {formData.country === 'Kenya' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     County *
@@ -284,21 +319,34 @@ export default function EditShopPage() {
                     ))}
                   </select>
                 </div>
-
+              ) : formData.country && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Town/City *
+                    State/Region/Province (Optional)
                   </label>
                   <input
                     type="text"
-                    name="town"
-                    value={formData.town}
+                    name="county"
+                    value={formData.county}
                     onChange={handleChange}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nairobi"
+                    placeholder="State or Region"
                   />
                 </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Town/City *
+                </label>
+                <input
+                  type="text"
+                  name="town"
+                  value={formData.town}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div>
@@ -311,7 +359,6 @@ export default function EditShopPage() {
                   value={formData.street}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="123 Main Street, CBD"
                 />
               </div>
 
@@ -327,7 +374,6 @@ export default function EditShopPage() {
                     value={formData.latitude}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="-1.2921"
                   />
                 </div>
 
@@ -342,7 +388,6 @@ export default function EditShopPage() {
                     value={formData.longitude}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="36.8219"
                   />
                 </div>
               </div>
