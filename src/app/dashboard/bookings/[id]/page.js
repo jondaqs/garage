@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Calendar, MapPin, Car, Phone, Mail, MessageSquare, XCircle, AlertCircle, Navigation, ExternalLink } from 'lucide-react'
 import StatusBadge from '@/components/bookings/StatusBadge'
 import { useUserLocation } from '@/hooks/useUserLocation'
+import AddToCalendarButton from '@/components/calendar/AddToCalendarButton'
 
 export default function BookingDetailPage() {
   const router = useRouter()
@@ -214,15 +215,24 @@ export default function BookingDetailPage() {
             </h1>
             <StatusBadge status={booking.status} />
           </div>
-          {booking.status?.code === 'pending' && (
-            <button 
-              onClick={cancelBooking} 
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-            >
-              <XCircle size={20} />
-              Cancel Booking
-            </button>
-          )}
+          
+          <div className="flex gap-3">
+            {/* Add to Calendar Button */}
+            {!['cancelled'].includes(booking.status?.code) && (
+              <AddToCalendarButton booking={booking} variant="dropdown" />
+            )}
+            
+            {/* Cancel Button */}
+            {booking.status?.code === 'pending' && (
+              <button 
+                onClick={cancelBooking} 
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              >
+                <XCircle size={20} />
+                Cancel Booking
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

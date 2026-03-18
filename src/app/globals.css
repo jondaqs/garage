@@ -1,5 +1,45 @@
 @import "tailwindcss";
 @import 'leaflet/dist/leaflet.css';
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+/* Custom calendar styles */
+.rbc-calendar {
+  font-family: inherit;
+}
+
+.rbc-header {
+  padding: 10px 3px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.rbc-today {
+  background-color: #eff6ff;
+}
+
+.rbc-event {
+  padding: 2px 5px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.rbc-toolbar button {
+  color: #374151;
+  border: 1px solid #d1d5db;
+  margin: 0 2px;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.rbc-toolbar button:hover {
+  background-color: #f3f4f6;
+}
+
+.rbc-toolbar button.rbc-active {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
 
 :root {
   --background: #ffffff;

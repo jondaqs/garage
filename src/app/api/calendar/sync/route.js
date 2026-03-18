@@ -1,0 +1,171 @@
+// FILE LOCATION: src/app/api/calendar/sync/route.js
+// API route for syncing bookings with Google Calendar
+
+import { NextResponse } from 'next/server'
+
+export async function POST(request) {
+  try {
+    const { token, bookings } = await request.json()
+
+    if (!token || !bookings) {
+      return NextResponse.json(
+        { error: 'Missing required parameters' },
+        { status: 400 }
+      )
+    }
+
+    // Sync each booking to Google Calendar
+    const results = []
+    
+    for (const booking of bookings) {
+      try {
+        const event = {
+          summary: `GariCare - ${booking.vehicle?.plate_number}`,
+          description: `Booking at ${booking.service_provider?.name}\n\n` +
+                      `Vehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\n\n` +
+                      `Services: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\n\n` +
+                      `Problem: ${booking.problem_description}`,
+          location: `${booking.shop?.name}, ${booking.shop?.town}, ${booking.shop?.county}${booking.shop?.street ? ', ' + booking.shop?.street : ''}`,
+          start: {
+            dateTime: `${booking.booking_date}T${booking.booking_time_start}:00`,
+            timeZone: 'Africa/Nairobi'
+          },
+          end: {
+            dateTime: `${booking.booking_date}T${booking.booking_time_end}:00`,
+            timeZone: 'Africa/Nairobi'
+          },
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: 'email', minutes: 60 },
+              { method: 'popup', minutes: 30 }
+            ]
+          },
+          status: booking.status?.code === 'confirmed' ? 'confirmed' : 'tentative',
+          extendedProperties: {
+            private: {
+              gariCareBookingId: booking.id,
+              gariCareBookingNumber: booking.booking_number
+            }
+          }
+        }
+
+        // Create event in Google Calendar
+        const response = await fetch(
+          'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(event)
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Failed to create event: ${response.statusText}`)
+        }
+
+        const createdEvent = await response.json()
+        results.push({ bookingId: booking.id, eventId: createdEvent.id, success: true })
+      } catch (error) {
+        console.error(`Error syncing booking ${booking.id}:`, error)
+        results.push({ bookingId: booking.id, success: false, error: error.message })
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length
+
+    return NextResponse.json({
+      success: true,
+      count: successCount,
+      total: bookings.length,
+      results
+    })
+  } catch (error) {
+    console.error('Error in sync API:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Update event in Google Calendar
+export async function PUT(request) {
+  try {
+    const { token, eventId, booking } = await request.json()
+
+    const event = {
+      summary: `GariCare - ${booking.vehicle?.plate_number}`,
+      description: `Booking at ${booking.service_provider?.name}\n\n` +
+                  `Vehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\n\n` +
+                  `Services: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\n\n` +
+                  `Problem: ${booking.problem_description}`,
+      location: `${booking.shop?.name}, ${booking.shop?.town}, ${booking.shop?.county}`,
+      start: {
+        dateTime: `${booking.booking_date}T${booking.booking_time_start}:00`,
+        timeZone: 'Africa/Nairobi'
+      },
+      end: {
+        dateTime: `${booking.booking_date}T${booking.booking_time_end}:00`,
+        timeZone: 'Africa/Nairobi'
+      },
+      status: booking.status?.code === 'confirmed' ? 'confirmed' : 'tentative'
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(event)
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`Failed to update event: ${response.statusText}`)
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error updating event:', error)
+    return NextResponse.json(
+      { error: 'Failed to update event' },
+      { status: 500 }
+    )
+  }
+}
+
+// Delete event from Google Calendar
+export async function DELETE(request) {
+  try {
+    const { token, eventId } = await request.json()
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    )
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Failed to delete event: ${response.statusText}`)
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting event:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete event' },
+      { status: 500 }
+    )
+  }
+}
