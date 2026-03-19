@@ -118,9 +118,8 @@ export default function BookingsCalendarPage() {
     const dateStr = moment(start).format('YYYY-MM-DD')
     sessionStorage.setItem('selectedBookingDate', dateStr)
     
-    // Navigate to bookings page to start the proper flow
-    // User will select vehicle → provider → date will be pre-filled
-    router.push('/dashboard/bookings')
+    // Navigate to book service page (has vehicle + provider selection)
+    router.push('/dashboard/bookings/book')
   }
 
   const exportCalendar = () => {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Calendar, Plus, Filter, X, CalendarDays } from 'lucide-react'
+import { Calendar, Plus, Filter } from 'lucide-react'
 import BookingCard from '@/components/bookings/BookingCard'
 
 export default function BookingsPage() {
@@ -12,16 +12,9 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [selectedDate, setSelectedDate] = useState(null)
 
   useEffect(() => {
     loadBookings()
-    
-    // Check if user selected a date from calendar
-    const storedDate = sessionStorage.getItem('selectedBookingDate')
-    if (storedDate) {
-      setSelectedDate(storedDate)
-    }
   }, [])
 
   const loadBookings = async () => {
@@ -58,11 +51,6 @@ export default function BookingsPage() {
     }
   }
 
-  const clearSelectedDate = () => {
-    sessionStorage.removeItem('selectedBookingDate')
-    setSelectedDate(null)
-  }
-
   const filteredBookings = statusFilter === 'all'
     ? bookings
     : bookings.filter(b => b.status?.code === statusFilter)
@@ -77,46 +65,13 @@ export default function BookingsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Selected Date Banner */}
-      {selectedDate && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
-              <CalendarDays className="text-blue-600 mt-0.5 flex-shrink-0" size={24} />
-              <div>
-                <h3 className="font-semibold text-blue-900 mb-1">
-                  Booking Date Selected: {new Date(selectedDate).toLocaleDateString('en-US', { 
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </h3>
-                <p className="text-blue-700 text-sm">
-                  Select a vehicle below to create a booking for this date. The date will be automatically filled in the booking form.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={clearSelectedDate}
-              className="text-blue-600 hover:text-blue-800"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Bookings</h1>
           <p className="text-gray-600">{bookings.length} total bookings</p>
         </div>
         <button
-          onClick={() => {
-            clearSelectedDate()
-            router.push('/dashboard/bookings/book')
-          }}
+          onClick={() => router.push('/dashboard/bookings/book')}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
           <Plus size={20} />
@@ -155,10 +110,7 @@ export default function BookingsPage() {
           </p>
           {statusFilter === 'all' && (
             <button
-              onClick={() => {
-                clearSelectedDate()
-                router.push('/dashboard/bookings/book')
-              }}
+              onClick={() => router.push('/dashboard/bookings/book')}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Create First Booking
@@ -171,7 +123,7 @@ export default function BookingsPage() {
             <BookingCard 
               key={booking.id} 
               booking={booking}
-              selectedDate={selectedDate}
+              onClick={() => router.push(`/dashboard/bookings/${booking.id}`)}
             />
           ))}
         </div>

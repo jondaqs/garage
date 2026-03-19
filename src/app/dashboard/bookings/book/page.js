@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Calendar, Clock, MapPin, Search, Star, Filter } from 'lucide-react'
+import { Calendar, Clock, MapPin, Search, Star, Filter, X, CalendarDays } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function BookServicePage() {
@@ -12,6 +12,7 @@ export default function BookServicePage() {
   const [vehicles, setVehicles] = useState([])
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [selectedProvider, setSelectedProvider] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(null) // ← ADD THIS
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState('all')
@@ -19,7 +20,18 @@ export default function BookServicePage() {
 
   useEffect(() => {
     loadData()
+    
+    // Check for pre-selected date from calendar
+    const storedDate = sessionStorage.getItem('selectedBookingDate')
+    if (storedDate) {
+      setSelectedDate(storedDate)
+    }
   }, [])
+
+  const clearSelectedDate = () => {
+    sessionStorage.removeItem('selectedBookingDate')
+    setSelectedDate(null)
+  }
 
   const loadData = async () => {
     try {
@@ -99,6 +111,7 @@ export default function BookServicePage() {
       return
     }
     setSelectedProvider(provider)
+    // Date will be preserved in sessionStorage
     router.push(`/dashboard/bookings/new?provider=${provider.id}&vehicle=${selectedVehicle}`)
   }
 
@@ -117,6 +130,36 @@ export default function BookServicePage() {
         <p className="text-gray-600">Find and book trusted service providers</p>
       </div>
 
+      {/* DATE SELECTION BANNER - ADD THIS */}
+      {selectedDate && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <CalendarDays className="text-blue-600 mt-1 flex-shrink-0" size={32} />
+              <div>
+                <h3 className="font-semibold text-blue-900 text-lg mb-2">
+                  📅 Booking Date Selected: {new Date(selectedDate).toLocaleDateString('en-US', { 
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </h3>
+                <p className="text-blue-700">
+                  Select your vehicle and service provider below. The date will be automatically filled in the booking form.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={clearSelectedDate}
+              className="text-blue-600 hover:text-blue-800 p-2"
+            >
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Vehicle Selection */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Select Vehicle</h2>
@@ -124,7 +167,10 @@ export default function BookServicePage() {
           <div className="text-center py-8">
             <p className="text-gray-500 mb-4">No vehicles added yet</p>
             <button
-              onClick={() => router.push('/dashboard/vehicles/add')}
+              onClick={() => {
+                clearSelectedDate()
+                router.push('/dashboard/vehicles/add')
+              }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Add Vehicle
@@ -184,67 +230,44 @@ export default function BookServicePage() {
         </div>
       </div>
 
-      {/* Provider List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Service Providers */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold mb-4">Select Service Provider</h2>
         {filteredProviders.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <p className="text-gray-500">No providers found</p>
+          <div className="text-center py-12">
+            <p className="text-gray-500">No service providers found</p>
           </div>
         ) : (
-          filteredProviders.map((provider) => (
-            <div key={provider.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{provider.name}</h3>
-                    <p className="text-sm text-blue-600 mb-2">{provider.provider_type?.display_name}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredProviders.map((provider) => (
+              <div
+                key={provider.id}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                onClick={() => handleBookProvider(provider)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{provider.name}</h3>
+                    <p className="text-sm text-gray-600">{provider.provider_type?.display_name}</p>
                   </div>
-                  {provider.is_verified && (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                      Verified
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <Star className="text-yellow-400 fill-yellow-400" size={16} />
+                    <span className="text-sm font-semibold">{provider.avgRating.toFixed(1)}</span>
+                    <span className="text-xs text-gray-500">({provider.reviewCount})</span>
+                  </div>
                 </div>
-
-                {/* Rating */}
-                {provider.avgRating > 0 && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center">
-                      <Star className="text-yellow-400 fill-current" size={16} />
-                      <span className="ml-1 text-sm font-medium">{provider.avgRating.toFixed(1)}</span>
-                    </div>
-                    <span className="text-sm text-gray-500">({provider.reviewCount} reviews)</span>
-                  </div>
+                {provider.description && (
+                  <p className="text-sm text-gray-600 mb-2">{provider.description}</p>
                 )}
-
-                {/* Description */}
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                  {provider.description || 'Professional service provider'}
-                </p>
-
-                {/* Location */}
-                {provider.shops?.[0] && (
-                  <div className="flex items-center text-sm text-gray-500 mb-4">
-                    <MapPin size={16} className="mr-1" />
+                {provider.shops && provider.shops.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <MapPin size={14} />
                     <span>{provider.shops[0].town}, {provider.shops[0].county}</span>
                   </div>
                 )}
-
-                {/* Book Button */}
-                <button
-                  onClick={() => handleBookProvider(provider)}
-                  disabled={!selectedVehicle}
-                  className={`w-full py-2 rounded-lg font-medium transition ${
-                    selectedVehicle
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  {selectedVehicle ? 'Book Service' : 'Select Vehicle First'}
-                </button>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
