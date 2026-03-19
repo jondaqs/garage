@@ -231,43 +231,66 @@ export default function BookServicePage() {
       </div>
 
       {/* Service Providers */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">Select Service Provider</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProviders.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No service providers found</p>
+          <div className="col-span-full text-center py-12">
+            <p className="text-gray-500">No providers found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredProviders.map((provider) => (
-              <div
-                key={provider.id}
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
-                onClick={() => handleBookProvider(provider)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{provider.name}</h3>
-                    <p className="text-sm text-gray-600">{provider.provider_type?.display_name}</p>
+          filteredProviders.map((provider) => (
+            <div key={provider.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{provider.name}</h3>
+                    <p className="text-sm text-blue-600 mb-2">{provider.provider_type?.display_name}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Star className="text-yellow-400 fill-yellow-400" size={16} />
-                    <span className="text-sm font-semibold">{provider.avgRating.toFixed(1)}</span>
-                    <span className="text-xs text-gray-500">({provider.reviewCount})</span>
-                  </div>
+                  {provider.is_verified && (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                      Verified
+                    </span>
+                  )}
                 </div>
-                {provider.description && (
-                  <p className="text-sm text-gray-600 mb-2">{provider.description}</p>
+
+                {/* Rating */}
+                {provider.avgRating > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center">
+                      <Star className="text-yellow-400 fill-yellow-400" size={16} />
+                      <span className="ml-1 text-sm font-medium">{provider.avgRating.toFixed(1)}</span>
+                    </div>
+                    <span className="text-sm text-gray-500">({provider.reviewCount} reviews)</span>
+                  </div>
                 )}
-                {provider.shops && provider.shops.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <MapPin size={14} />
+
+                {/* Description */}
+                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  {provider.description || 'Professional service provider'}
+                </p>
+
+                {/* Location */}
+                {provider.shops?.[0] && (
+                  <div className="flex items-center text-sm text-gray-500 mb-4">
+                    <MapPin size={16} className="mr-1" />
                     <span>{provider.shops[0].town}, {provider.shops[0].county}</span>
                   </div>
                 )}
+
+                {/* Book Button */}
+                <button
+                  onClick={() => handleBookProvider(provider)}
+                  disabled={!selectedVehicle}
+                  className={`w-full py-2 rounded-lg font-medium transition ${
+                    selectedVehicle
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {selectedVehicle ? 'Book Service' : 'Select Vehicle First'}
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))
         )}
       </div>
     </div>
