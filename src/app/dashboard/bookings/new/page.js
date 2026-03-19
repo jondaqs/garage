@@ -39,7 +39,7 @@ export default function NewBookingPage() {
 
   const [formData, setFormData] = useState({
     shop_id: '',
-    booking_date: '',
+    booking_date: '', // Will be filled from sessionStorage if available
     booking_time: '09:00',
     requested_services: [],
     problem_description: '',
@@ -60,6 +60,17 @@ export default function NewBookingPage() {
   useEffect(() => {
     if (providerId && vehicleId) {
       loadBookingData()
+      
+      // Check for pre-selected date from calendar (stored in sessionStorage)
+      const storedDate = sessionStorage.getItem('selectedBookingDate')
+      if (storedDate) {
+        setFormData(prev => ({
+          ...prev,
+          booking_date: storedDate
+        }))
+        // Clear after using so it doesn't persist
+        sessionStorage.removeItem('selectedBookingDate')
+      }
     }
   }, [providerId, vehicleId])
 

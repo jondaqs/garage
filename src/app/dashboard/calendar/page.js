@@ -114,9 +114,13 @@ export default function BookingsCalendarPage() {
   }
 
   const handleSelectSlot = ({ start }) => {
-    // Navigate to create booking with pre-selected date
+    // Store selected date in sessionStorage for the booking flow
     const dateStr = moment(start).format('YYYY-MM-DD')
-    router.push(`/dashboard/bookings/book?date=${dateStr}`)
+    sessionStorage.setItem('selectedBookingDate', dateStr)
+    
+    // Navigate to bookings page to start the proper flow
+    // User will select vehicle → provider → date will be pre-filled
+    router.push('/dashboard/bookings')
   }
 
   const exportCalendar = () => {
@@ -175,7 +179,7 @@ export default function BookingsCalendarPage() {
               Export Calendar
             </button>
             <button
-              onClick={() => router.push('/dashboard/bookings/book')}
+              onClick={() => router.push('/dashboard/bookings')}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
             >
               <Plus size={20} />
@@ -264,8 +268,8 @@ export default function BookingsCalendarPage() {
       {/* Help Text */}
       <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
-          <strong>💡 Tip:</strong> Click on any booking to view details. Click on an empty date to create a new booking.
-          Use the toolbar to switch between Month, Week, Day, and Agenda views.
+          <strong>💡 Tip:</strong> Click on a booking to view details. Click on an empty date to create a new booking for that day 
+          (you'll select your vehicle and provider, then the date will be pre-filled).
         </p>
       </div>
     </div>
