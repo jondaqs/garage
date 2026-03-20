@@ -4,7 +4,7 @@
 'use client'
 
 import { Search, Menu } from 'lucide-react'
-import NotificationBell from '@/components/Notificationbell'
+import NotificationBell from '@/components/NotificationBell'
 
 export default function ProviderHeader({ user, provider }) {
   return (
