@@ -39,6 +39,8 @@ export default function ProviderHeader({ user, provider }) {
               <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white" />
             </button>
 
+            <NotificationBell />
+
             {/* Profile */}
             <div className="ml-3 relative">
               <div className="flex items-center">

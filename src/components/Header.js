@@ -27,6 +27,7 @@ export default function Header({ user }) {
           </div>
         </div>
       </div>
+      <NotificationBell />
     </header>
   )
 }
