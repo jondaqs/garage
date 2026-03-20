@@ -126,8 +126,18 @@ export async function POST(request) {
 
       if (mechanicError) {
         console.error('Mechanic creation error:', mechanicError)
+        console.error('Error details:', {
+          message: mechanicError.message,
+          code: mechanicError.code,
+          details: mechanicError.details,
+          hint: mechanicError.hint
+        })
         return NextResponse.json(
-          { error: 'Failed to create team member record' },
+          { 
+            error: 'Failed to create team member record',
+            details: mechanicError.message,
+            code: mechanicError.code
+          },
           { status: 500 }
         )
       }
