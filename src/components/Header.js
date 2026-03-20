@@ -1,6 +1,7 @@
 'use client'
 
 import { Bell, User } from 'lucide-react'
+import NotificationBell from '@/components/NotificationBell'
 
 export default function Header({ user }) {
   const userName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'User'

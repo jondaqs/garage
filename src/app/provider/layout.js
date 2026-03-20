@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ProviderSidebar from '@/components/provider/ProviderSidebar'
 import ProviderHeader from '@/components/provider/ProviderHeader'
-import NotificationBell from '@/components/NotificationBell'
+
 
 export default function ProviderLayout({ children }) {
   const router = useRouter()

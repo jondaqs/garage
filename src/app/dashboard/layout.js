@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import 'leaflet/dist/leaflet.css'
-import NotificationBell from '@/components/NotificationBell'
 
 export default function DashboardLayout({ children }) {
   const router = useRouter()
