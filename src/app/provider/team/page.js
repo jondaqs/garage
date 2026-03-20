@@ -60,8 +60,8 @@ export default function ProviderTeamPage() {
 
       setProvider(providerData)
 
-      // Load team members
-      await loadTeamMembers(providerData.id)
+      // Load team members using the new approach
+      await loadTeamMembers(user.id)
       
       // Load invitations
       await loadInvitations(providerData.id)
@@ -73,13 +73,13 @@ export default function ProviderTeamPage() {
     }
   }
 
-  const loadTeamMembers = async (providerId) => {
+  const loadTeamMembers = async (authUserId) => {
     try {
-      // Get ALL mechanics (both active and inactive) - don't filter by is_active
+      // Get mechanics data first
       const { data: mechanicsData, error: mechanicsError } = await supabase
         .from('mechanics')
         .select('*')
-        .eq('service_provider_id', providerId)
+        .eq('service_provider_id', provider?.id || (await getProviderId()))
         .order('created_at', { ascending: false })
 
       if (mechanicsError) {
@@ -92,14 +92,19 @@ export default function ProviderTeamPage() {
         return
       }
 
-      // Get unique user IDs
-      const userIds = [...new Set(mechanicsData.map(m => m.user_id).filter(Boolean))]
+      // Use the security definer function to get user profiles
+      const { data: userProfiles, error: profilesError } = await supabase
+        .rpc('get_team_member_profiles', {
+          provider_owner_auth_id: authUserId
+        })
 
-      if (userIds.length === 0) {
+      if (profilesError) {
+        console.error('Error loading profiles via function:', profilesError)
+        // Fallback: show mechanics with "Unknown User"
         setTeamMembers(mechanicsData.map(m => ({
           ...m,
           user: {
-            id: null,
+            id: m.user_id,
             first_name: 'Unknown',
             last_name: 'User',
             phone: null,
@@ -109,23 +114,19 @@ export default function ProviderTeamPage() {
         return
       }
 
-      // Fetch user profiles separately
-      const { data: usersData, error: usersError } = await supabase
-        .from('user_profiles')
-        .select('id, first_name, last_name, phone, email')
-        .in('id', userIds)
-
-      if (usersError) {
-        console.error('Error loading users:', usersError)
-      }
-
-      // Combine the data with better null handling
+      // Combine mechanics with user profiles
       const membersWithUsers = mechanicsData.map(mechanic => {
-        const userProfile = usersData?.find(u => u.id === mechanic.user_id)
+        const userProfile = userProfiles?.find(up => up.user_id_from_mechanics === mechanic.user_id)
         
         return {
           ...mechanic,
-          user: userProfile || {
+          user: userProfile ? {
+            id: userProfile.id,
+            first_name: userProfile.first_name,
+            last_name: userProfile.last_name,
+            phone: userProfile.phone,
+            email: userProfile.email
+          } : {
             id: mechanic.user_id,
             first_name: 'Unknown',
             last_name: 'User',
@@ -141,6 +142,23 @@ export default function ProviderTeamPage() {
       console.error('Error in loadTeamMembers:', error)
       setTeamMembers([])
     }
+  }
+
+  const getProviderId = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+    
+    const { data: providerData } = await supabase
+      .from('service_providers')
+      .select('id')
+      .eq('owner_user_id', profile.id)
+      .single()
+    
+    return providerData?.id
   }
 
   const loadInvitations = async (providerId) => {
@@ -227,7 +245,7 @@ export default function ProviderTeamPage() {
         return
       }
 
-      // Update local state immediately for better UX
+      // Update local state immediately
       setTeamMembers(prevMembers => 
         prevMembers.map(member => 
           member.id === mechanicId 
@@ -237,9 +255,7 @@ export default function ProviderTeamPage() {
       )
 
       alert(`Team member ${!currentStatus ? 'activated' : 'deactivated'}`)
-      
-      // Reload to ensure data consistency
-      await loadTeamMembers(provider.id)
+
     } catch (error) {
       console.error('Toggle status error:', error)
       alert('Failed to update status')
@@ -259,7 +275,6 @@ export default function ProviderTeamPage() {
         return
       }
 
-      // Update local state immediately
       setTeamMembers(prevMembers => 
         prevMembers.map(member => 
           member.id === mechanicId 
@@ -291,7 +306,8 @@ export default function ProviderTeamPage() {
       }
 
       alert('Team member removed')
-      await loadTeamMembers(provider.id)
+      const { data: { user } } = await supabase.auth.getUser()
+      await loadTeamMembers(user.id)
     } catch (error) {
       console.error('Remove error:', error)
       alert('Failed to remove member')
@@ -475,7 +491,7 @@ export default function ProviderTeamPage() {
         )}
       </div>
 
-      {/* Invitations */}
+      {/* Invitations - keeping same as before */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-semibold mb-4">Invitations</h2>
 
@@ -524,7 +540,7 @@ export default function ProviderTeamPage() {
         )}
       </div>
 
-      {/* Invite Modal */}
+      {/* Invite Modal - keeping same as before */}
       {showInviteModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
