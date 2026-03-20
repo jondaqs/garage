@@ -18,8 +18,6 @@ export default function ProviderTeamPage() {
   const [teamMembers, setTeamMembers] = useState([])
   const [invitations, setInvitations] = useState([])
   const [searchEmail, setSearchEmail] = useState('')
-  const [searchResults, setSearchResults] = useState([])
-  const [searching, setSearching] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   
@@ -114,7 +112,8 @@ export default function ProviderTeamPage() {
       .from('team_invitations')
       .select(`
         *,
-        invited_user:user_profiles(first_name, last_name)
+        invited_user:user_profiles!team_invitations_invited_user_id_fkey(first_name, last_name),
+        invited_by:user_profiles!team_invitations_invited_by_user_id_fkey(first_name, last_name)
       `)
       .eq('service_provider_id', providerId)
       .in('status', ['pending', 'accepted', 'rejected'])
@@ -126,30 +125,6 @@ export default function ProviderTeamPage() {
     }
 
     setInvitations(data || [])
-  }
-
-  const handleSearch = async () => {
-    if (!searchEmail || searchEmail.length < 3) {
-      alert('Please enter at least 3 characters')
-      return
-    }
-
-    setSearching(true)
-    try {
-      const response = await fetch(`/api/team/search-users?email=${encodeURIComponent(searchEmail)}`)
-      const data = await response.json()
-
-      if (response.ok) {
-        setSearchResults(data.users || [])
-      } else {
-        alert(data.error || 'Search failed')
-      }
-    } catch (error) {
-      console.error('Search error:', error)
-      alert('Failed to search users')
-    } finally {
-      setSearching(false)
-    }
   }
 
   const handleInviteUser = (user) => {
@@ -177,7 +152,6 @@ export default function ProviderTeamPage() {
         setShowInviteModal(false)
         setSelectedUser(null)
         setSearchEmail('')
-        setSearchResults([])
         setInviteForm({ role: 'mechanic', specialization: '', experience_years: 0 })
         await loadInvitations(provider.id)
       } else {
@@ -323,60 +297,39 @@ export default function ProviderTeamPage() {
           Invite Team Member
         </h2>
 
-        <div className="flex gap-4 mb-4">
-          <div className="flex-1 relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="email"
-              placeholder="Search by email address..."
-              value={searchEmail}
-              onChange={(e) => setSearchEmail(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Enter the email address of the user you want to invite. They must have a registered account on the platform.
+          </p>
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="email"
+                placeholder="user@example.com"
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (searchEmail && searchEmail.includes('@')) {
+                  handleInviteUser({ email: searchEmail, can_invite: true })
+                } else {
+                  alert('Please enter a valid email address')
+                }
+              }}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <UserPlus size={20} />
+              Send Invite
+            </button>
           </div>
-          <button
-            onClick={handleSearch}
-            disabled={searching}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
-          >
-            <Search size={20} />
-            {searching ? 'Searching...' : 'Search'}
-          </button>
+          <p className="text-xs text-gray-500 mt-2">
+            The user must be registered on the platform with this email address.
+          </p>
         </div>
-
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600 font-medium">Search Results:</p>
-            {searchResults.map((user, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <p className="font-medium">
-                    {user.first_name} {user.last_name}
-                    {!user.can_invite && (
-                      <span className="ml-2 text-xs text-red-600">(Inactive/Suspended)</span>
-                    )}
-                  </p>
-                  <p className="text-sm text-gray-600">{user.email}</p>
-                  {user.is_team_member && (
-                    <span className="text-xs text-green-600">Already a team member</span>
-                  )}
-                  {user.has_pending_invite && (
-                    <span className="text-xs text-yellow-600">Pending invitation</span>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleInviteUser(user)}
-                  disabled={!user.can_invite || user.is_team_member || user.has_pending_invite}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  Invite
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Team Members */}
