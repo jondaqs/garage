@@ -1,7 +1,10 @@
+// FILE LOCATION: src/components/provider/ProviderHeader.js
+// UPDATED: Added working NotificationBell component
+
 'use client'
 
-import { Bell, Search, Menu } from 'lucide-react'
-import NotificationBell from '@/components/NotificationBell'
+import { Search, Menu } from 'lucide-react'
+import NotificationBell from '@/components/Notificationbell'
 
 export default function ProviderHeader({ user, provider }) {
   return (
@@ -33,17 +36,12 @@ export default function ProviderHeader({ user, provider }) {
           </div>
 
           {/* Right side */}
-          <div className="ml-4 flex items-center md:ml-6">
-            {/* Notifications */}
-            <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 relative">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white" />
-            </button>
-
+          <div className="ml-4 flex items-center md:ml-6 gap-3">
+            {/* Notifications - Now functional! */}
             <NotificationBell />
 
             {/* Profile */}
-            <div className="ml-3 relative">
+            <div className="relative">
               <div className="flex items-center">
                 <div className="h-8 w-8 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold">
                   {user?.email?.charAt(0).toUpperCase()}

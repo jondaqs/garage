@@ -1,7 +1,10 @@
+// FILE LOCATION: src/components/Header.js
+// UPDATED: Added working NotificationBell component
+
 'use client'
 
-import { Bell, User } from 'lucide-react'
-import NotificationBell from '@/components/NotificationBell'
+import { User } from 'lucide-react'
+import NotificationBell from '@/components/Notificationbell'
 
 export default function Header({ user }) {
   const userName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'User'
@@ -12,10 +15,8 @@ export default function Header({ user }) {
         <div className="lg:hidden" />
         
         <div className="flex items-center space-x-4 ml-auto">
-          <button className="relative p-2 hover:bg-gray-100 rounded-lg transition">
-            <Bell size={20} className="text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          {/* Notification Bell - Now functional! */}
+          <NotificationBell />
 
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -28,7 +29,6 @@ export default function Header({ user }) {
           </div>
         </div>
       </div>
-      <NotificationBell />
     </header>
   )
 }

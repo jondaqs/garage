@@ -1,9 +1,9 @@
 // FILE LOCATION: src/components/Sidebar.js
-// UPDATED: Added Calendar view link
+// UPDATED: Added My Teams link for team management
 
 'use client'
 
-import { Car, User, Plus, Calendar, CalendarDays, History, Settings, LogOut, Menu, X } from 'lucide-react'
+import { Car, User, Plus, Calendar, CalendarDays, History, Settings, LogOut, Menu, X, Users } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
@@ -24,7 +24,8 @@ export default function Sidebar({ user }) {
     { icon: User, label: 'Dashboard', path: '/dashboard' },
     { icon: Plus, label: 'Add Vehicle', path: '/dashboard/vehicles/add' },
     { icon: Calendar, label: 'Bookings', path: '/dashboard/bookings' },
-    { icon: CalendarDays, label: 'Calendar', path: '/dashboard/calendar' }, // ← NEW: Calendar view
+    { icon: CalendarDays, label: 'Calendar', path: '/dashboard/calendar' },
+    { icon: Users, label: 'My Teams', path: '/dashboard/my-teams' }, // ← NEW: Team management
     { icon: History, label: 'History', path: '/dashboard/history' },
     { icon: Settings, label: 'Profile', path: '/dashboard/profile' },
   ]
