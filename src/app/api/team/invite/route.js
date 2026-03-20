@@ -1,12 +1,14 @@
 // src/app/api/team/invite/route.js
-// MINIMAL VERSION - Works without notifications table
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 
 export async function POST(request) {
   try {
-    const supabase = createClient()
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    
     const body = await request.json()
     const { email, role, specialization, experience_years } = body
 
@@ -20,6 +22,7 @@ export async function POST(request) {
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

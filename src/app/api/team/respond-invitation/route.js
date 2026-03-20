@@ -1,10 +1,13 @@
 // src/app/api/team/respond-invitation/route.js
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
   try {
-    const supabase = createClient()
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    
     const body = await request.json()
     const { invitation_id, action, rejection_reason } = body
 
@@ -50,11 +53,7 @@ export async function POST(request) {
     // Get invitation
     const { data: invitation, error: inviteError } = await supabase
       .from('team_invitations')
-      .select(`
-        *,
-        service_provider:service_providers(id, name),
-        invited_by:user_profiles!invited_by_user_id(first_name, last_name)
-      `)
+      .select('*')
       .eq('id', invitation_id)
       .single()
 
@@ -84,7 +83,6 @@ export async function POST(request) {
 
     // Check if invitation has expired
     if (new Date(invitation.expires_at) < new Date()) {
-      // Auto-expire
       await supabase
         .from('team_invitations')
         .update({ status: 'expired' })
@@ -123,7 +121,7 @@ export async function POST(request) {
           role: invitation.role,
           invited_via_invitation_id: invitation_id,
           is_active: true,
-          is_verified: false // Provider needs to verify
+          is_verified: false
         })
         .select()
         .single()
@@ -137,7 +135,7 @@ export async function POST(request) {
       }
 
       // Update invitation
-      const { error: updateError } = await supabase
+      await supabase
         .from('team_invitations')
         .update({
           status: 'accepted',
@@ -147,32 +145,15 @@ export async function POST(request) {
         })
         .eq('id', invitation_id)
 
-      if (updateError) {
-        console.error('Invitation update error:', updateError)
-      }
-
-      // Create notification for provider owner
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: invitation.invited_by_user_id,
-          type: 'team_invitation_accepted',
-          title: 'Team Invitation Accepted',
-          message: `${profile.first_name} ${profile.last_name} has accepted your team invitation`,
-          reference_id: mechanic.id,
-          reference_type: 'mechanic'
-        })
-
       return NextResponse.json({
         success: true,
         action: 'accepted',
-        mechanic_id: mechanic.id,
-        provider_name: invitation.service_provider.name
+        mechanic_id: mechanic.id
       })
 
     } else if (action === 'reject') {
       // Update invitation
-      const { error: updateError } = await supabase
+      await supabase
         .from('team_invitations')
         .update({
           status: 'rejected',
@@ -181,26 +162,6 @@ export async function POST(request) {
           rejection_reason
         })
         .eq('id', invitation_id)
-
-      if (updateError) {
-        console.error('Invitation update error:', updateError)
-        return NextResponse.json(
-          { error: 'Failed to update invitation' },
-          { status: 500 }
-        )
-      }
-
-      // Create notification for provider owner
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: invitation.invited_by_user_id,
-          type: 'team_invitation_rejected',
-          title: 'Team Invitation Rejected',
-          message: `${profile.first_name} ${profile.last_name} has declined your team invitation`,
-          reference_id: invitation_id,
-          reference_type: 'team_invitation'
-        })
 
       return NextResponse.json({
         success: true,
@@ -211,7 +172,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Respond invitation error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error: ' + error.message },
       { status: 500 }
     )
   }
