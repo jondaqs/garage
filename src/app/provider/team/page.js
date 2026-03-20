@@ -78,7 +78,7 @@ export default function ProviderTeamPage() {
       .from('mechanics')
       .select(`
         *,
-        user:user_profiles(id, first_name, last_name, phone, email:auth_user_id)
+        user:user_profiles(id, first_name, last_name, phone)
       `)
       .eq('service_provider_id', providerId)
       .order('created_at', { ascending: false })
@@ -88,33 +88,13 @@ export default function ProviderTeamPage() {
       return
     }
 
-    // Get email for each user
-    const membersWithEmail = await Promise.all(
-      data.map(async (member) => {
-        const { data: authUser } = await supabase.auth.admin.getUserById(
-          member.user.email
-        )
-        return {
-          ...member,
-          user: {
-            ...member.user,
-            email: authUser?.user?.email
-          }
-        }
-      })
-    )
-
-    setTeamMembers(membersWithEmail)
+    setTeamMembers(data || [])
   }
 
   const loadInvitations = async (providerId) => {
     const { data, error } = await supabase
       .from('team_invitations')
-      .select(`
-        *,
-        invited_user:user_profiles!team_invitations_invited_user_id_fkey(first_name, last_name),
-        invited_by:user_profiles!team_invitations_invited_by_user_id_fkey(first_name, last_name)
-      `)
+      .select('*')
       .eq('service_provider_id', providerId)
       .in('status', ['pending', 'accepted', 'rejected'])
       .order('invited_at', { ascending: false })
@@ -362,7 +342,9 @@ export default function ProviderTeamPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600">{member.user.email}</p>
+                  {member.user.phone && (
+                    <p className="text-sm text-gray-600">📞 {member.user.phone}</p>
+                  )}
                   {member.specialization && (
                     <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                       <Award size={14} />
@@ -426,16 +408,17 @@ export default function ProviderTeamPage() {
                       {invite.status}
                     </span>
                   </div>
-                  {invite.invited_user && (
-                    <p className="text-sm text-gray-600">
-                      {invite.invited_user.first_name} {invite.invited_user.last_name}
-                    </p>
-                  )}
                   <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                     <Clock size={12} />
                     Sent {new Date(invite.invited_at).toLocaleDateString()}
                     {invite.status === 'pending' && ` • Expires ${new Date(invite.expires_at).toLocaleDateString()}`}
                   </p>
+                  {invite.role && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Role: {invite.role}
+                      {invite.specialization && ` • ${invite.specialization}`}
+                    </p>
+                  )}
                 </div>
 
                 {invite.status === 'pending' && (
