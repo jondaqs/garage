@@ -21,21 +21,17 @@ export default function PendingInvitationsCard() {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('id')
+        .select('id, email')
         .eq('auth_user_id', user.id)
         .single()
 
       if (!profile) return
 
-      // Get pending invitations
+      // Get pending invitations - don't join user_profiles to avoid RLS issues
       const { data, error } = await supabase
         .from('team_invitations')
-        .select(`
-          *,
-          service_provider:service_providers(id, name, phone),
-          invited_by:user_profiles!invited_by_user_id(first_name, last_name)
-        `)
-        .or(`invited_user_id.eq.${profile.id},invited_email.eq.${user.email}`)
+        .select('*')
+        .or(`invited_user_id.eq.${profile.id},invited_email.eq.${profile.email || user.email}`)
         .eq('status', 'pending')
         .order('invited_at', { ascending: false })
 
@@ -49,7 +45,24 @@ export default function PendingInvitationsCard() {
         new Date(inv.expires_at) > new Date()
       )
 
-      setInvitations(validInvitations)
+      // Get service provider names separately
+      if (validInvitations.length > 0) {
+        const providerIds = [...new Set(validInvitations.map(inv => inv.service_provider_id))]
+        const { data: providers } = await supabase
+          .from('service_providers')
+          .select('id, name, phone')
+          .in('id', providerIds)
+
+        // Attach provider info to invitations
+        const invitationsWithProviders = validInvitations.map(inv => ({
+          ...inv,
+          service_provider: providers?.find(p => p.id === inv.service_provider_id) || { name: 'Unknown Provider' }
+        }))
+
+        setInvitations(invitationsWithProviders)
+      } else {
+        setInvitations([])
+      }
 
     } catch (error) {
       console.error('Error:', error)
@@ -58,9 +71,9 @@ export default function PendingInvitationsCard() {
     }
   }
 
-  const handleResponse = async (invitationId, action, inviteName) => {
+  const handleResponse = async (invitationId, action, providerName) => {
     const confirmMessage = action === 'accept'
-      ? `Are you sure you want to join ${inviteName} as a team member?`
+      ? `Are you sure you want to join ${providerName} as a team member?`
       : `Are you sure you want to decline this invitation?`
 
     if (!confirm(confirmMessage)) return
@@ -81,7 +94,7 @@ export default function PendingInvitationsCard() {
 
       if (response.ok) {
         alert(action === 'accept' 
-          ? `Successfully joined ${inviteName}!` 
+          ? `Successfully joined ${providerName}!` 
           : 'Invitation declined')
         
         // Reload invitations
@@ -136,18 +149,22 @@ export default function PendingInvitationsCard() {
                 <div className="flex items-center gap-2 mb-2">
                   <Building2 className="text-blue-600" size={20} />
                   <h3 className="font-semibold text-gray-900">
-                    {invitation.service_provider.name}
+                    {invitation.service_provider?.name || 'Service Provider'}
                   </h3>
                 </div>
                 
-                <p className="text-sm text-gray-600 mb-2">
-                  Invited by: {invitation.invited_by.first_name} {invitation.invited_by.last_name}
-                </p>
+                {invitation.service_provider?.phone && (
+                  <p className="text-sm text-gray-600 mb-2">
+                    📞 {invitation.service_provider.phone}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap gap-2 mb-2">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                    {invitation.role || 'Mechanic'}
-                  </span>
+                  {invitation.role && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+                      {invitation.role}
+                    </span>
+                  )}
                   
                   {invitation.specialization && (
                     <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded flex items-center gap-1">
@@ -173,7 +190,7 @@ export default function PendingInvitationsCard() {
 
             <div className="flex gap-2">
               <button
-                onClick={() => handleResponse(invitation.id, 'accept', invitation.service_provider.name)}
+                onClick={() => handleResponse(invitation.id, 'accept', invitation.service_provider?.name || 'this provider')}
                 disabled={responding === invitation.id}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
               >
@@ -182,7 +199,7 @@ export default function PendingInvitationsCard() {
               </button>
               
               <button
-                onClick={() => handleResponse(invitation.id, 'reject', invitation.service_provider.name)}
+                onClick={() => handleResponse(invitation.id, 'reject', invitation.service_provider?.name || 'this provider')}
                 disabled={responding === invitation.id}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
               >
