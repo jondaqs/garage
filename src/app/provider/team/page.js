@@ -74,21 +74,54 @@ export default function ProviderTeamPage() {
   }
 
   const loadTeamMembers = async (providerId) => {
-    const { data, error } = await supabase
-      .from('mechanics')
-      .select(`
-        *,
-        user:user_profiles(id, first_name, last_name, phone)
-      `)
-      .eq('service_provider_id', providerId)
-      .order('created_at', { ascending: false })
+    try {
+      // First, get mechanics without the user join
+      const { data: mechanicsData, error: mechanicsError } = await supabase
+        .from('mechanics')
+        .select('*')
+        .eq('service_provider_id', providerId)
+        .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error loading team members:', error)
-      return
+      if (mechanicsError) {
+        console.error('Error loading mechanics:', mechanicsError)
+        return
+      }
+
+      if (!mechanicsData || mechanicsData.length === 0) {
+        setTeamMembers([])
+        return
+      }
+
+      // Get unique user IDs
+      const userIds = [...new Set(mechanicsData.map(m => m.user_id).filter(Boolean))]
+
+      // Fetch user profiles separately
+      const { data: usersData, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name, phone, email')
+        .in('id', userIds)
+
+      if (usersError) {
+        console.error('Error loading users:', usersError)
+      }
+
+      // Combine the data
+      const membersWithUsers = mechanicsData.map(mechanic => ({
+        ...mechanic,
+        user: usersData?.find(u => u.id === mechanic.user_id) || {
+          id: mechanic.user_id,
+          first_name: 'Unknown',
+          last_name: 'User',
+          phone: null,
+          email: null
+        }
+      }))
+
+      setTeamMembers(membersWithUsers)
+
+    } catch (error) {
+      console.error('Error in loadTeamMembers:', error)
     }
-
-    setTeamMembers(data || [])
   }
 
   const loadInvitations = async (providerId) => {
@@ -329,7 +362,7 @@ export default function ProviderTeamPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <p className="font-medium">
-                      {member.user.first_name} {member.user.last_name}
+                      {member.user?.first_name || 'Unknown'} {member.user?.last_name || 'User'}
                     </p>
                     {member.is_verified && (
                       <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
@@ -342,8 +375,11 @@ export default function ProviderTeamPage() {
                       </span>
                     )}
                   </div>
-                  {member.user.phone && (
+                  {member.user?.phone && (
                     <p className="text-sm text-gray-600">📞 {member.user.phone}</p>
+                  )}
+                  {member.user?.email && (
+                    <p className="text-sm text-gray-600">✉️ {member.user.email}</p>
                   )}
                   {member.specialization && (
                     <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
@@ -351,6 +387,9 @@ export default function ProviderTeamPage() {
                       {member.specialization}
                       {member.experience_years > 0 && ` • ${member.experience_years} years experience`}
                     </p>
+                  )}
+                  {member.bio && (
+                    <p className="text-sm text-gray-500 mt-1 italic">"{member.bio}"</p>
                   )}
                 </div>
 
@@ -444,9 +483,6 @@ export default function ProviderTeamPage() {
             <div className="mb-4">
               <p className="text-sm text-gray-600">Email:</p>
               <p className="font-medium">{selectedUser.email}</p>
-              <p className="text-sm text-gray-600 mt-1">
-                {selectedUser.first_name} {selectedUser.last_name}
-              </p>
             </div>
 
             <div className="space-y-4">
