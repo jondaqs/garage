@@ -75,7 +75,7 @@ export default function ProviderTeamPage() {
 
   const loadTeamMembers = async (providerId) => {
     try {
-      // First, get mechanics without the user join
+      // Get ALL mechanics (both active and inactive) - don't filter by is_active
       const { data: mechanicsData, error: mechanicsError } = await supabase
         .from('mechanics')
         .select('*')
@@ -95,6 +95,20 @@ export default function ProviderTeamPage() {
       // Get unique user IDs
       const userIds = [...new Set(mechanicsData.map(m => m.user_id).filter(Boolean))]
 
+      if (userIds.length === 0) {
+        setTeamMembers(mechanicsData.map(m => ({
+          ...m,
+          user: {
+            id: null,
+            first_name: 'Unknown',
+            last_name: 'User',
+            phone: null,
+            email: null
+          }
+        })))
+        return
+      }
+
       // Fetch user profiles separately
       const { data: usersData, error: usersError } = await supabase
         .from('user_profiles')
@@ -105,22 +119,27 @@ export default function ProviderTeamPage() {
         console.error('Error loading users:', usersError)
       }
 
-      // Combine the data
-      const membersWithUsers = mechanicsData.map(mechanic => ({
-        ...mechanic,
-        user: usersData?.find(u => u.id === mechanic.user_id) || {
-          id: mechanic.user_id,
-          first_name: 'Unknown',
-          last_name: 'User',
-          phone: null,
-          email: null
+      // Combine the data with better null handling
+      const membersWithUsers = mechanicsData.map(mechanic => {
+        const userProfile = usersData?.find(u => u.id === mechanic.user_id)
+        
+        return {
+          ...mechanic,
+          user: userProfile || {
+            id: mechanic.user_id,
+            first_name: 'Unknown',
+            last_name: 'User',
+            phone: null,
+            email: null
+          }
         }
-      }))
+      })
 
       setTeamMembers(membersWithUsers)
 
     } catch (error) {
       console.error('Error in loadTeamMembers:', error)
+      setTeamMembers([])
     }
   }
 
@@ -202,9 +221,24 @@ export default function ProviderTeamPage() {
         .update({ is_active: !currentStatus })
         .eq('id', mechanicId)
 
-      if (error) throw error
+      if (error) {
+        console.error('Toggle error:', error)
+        alert('Failed to update status')
+        return
+      }
+
+      // Update local state immediately for better UX
+      setTeamMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.id === mechanicId 
+            ? { ...member, is_active: !currentStatus }
+            : member
+        )
+      )
 
       alert(`Team member ${!currentStatus ? 'activated' : 'deactivated'}`)
+      
+      // Reload to ensure data consistency
       await loadTeamMembers(provider.id)
     } catch (error) {
       console.error('Toggle status error:', error)
@@ -219,10 +253,22 @@ export default function ProviderTeamPage() {
         .update({ is_verified: true })
         .eq('id', mechanicId)
 
-      if (error) throw error
+      if (error) {
+        console.error('Verify error:', error)
+        alert('Failed to verify member')
+        return
+      }
+
+      // Update local state immediately
+      setTeamMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.id === mechanicId 
+            ? { ...member, is_verified: true }
+            : member
+        )
+      )
 
       alert('Team member verified')
-      await loadTeamMembers(provider.id)
     } catch (error) {
       console.error('Verify error:', error)
       alert('Failed to verify member')
@@ -238,7 +284,11 @@ export default function ProviderTeamPage() {
         .delete()
         .eq('id', mechanicId)
 
-      if (error) throw error
+      if (error) {
+        console.error('Remove error:', error)
+        alert('Failed to remove member')
+        return
+      }
 
       alert('Team member removed')
       await loadTeamMembers(provider.id)
