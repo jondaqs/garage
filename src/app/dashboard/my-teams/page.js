@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, X } from 'lucide-react'
+import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin } from 'lucide-react'
 
 export default function MyTeamsPage() {
   const supabase = createClient()
@@ -29,13 +29,27 @@ export default function MyTeamsPage() {
 
       if (!profile) return
 
-      // Get all team memberships
+      // Get all team memberships with provider info
       const { data, error } = await supabase
         .from('mechanics')
         .select(`
-          *,
-          service_provider:service_providers(id, name, phone, email, city, country),
-          invitation:team_invitations!invited_via_invitation_id(invited_at, role, specialization)
+          id,
+          user_id,
+          service_provider_id,
+          specialization,
+          experience_years,
+          bio,
+          is_verified,
+          is_active,
+          role,
+          created_at,
+          service_provider:service_providers(
+            id,
+            name,
+            phone,
+            email,
+            country
+          )
         `)
         .eq('user_id', profile.id)
         .eq('is_active', true)
@@ -46,7 +60,26 @@ export default function MyTeamsPage() {
         return
       }
 
-      setTeams(data || [])
+      // Now fetch shop details for each provider
+      const teamsWithShops = await Promise.all(
+        (data || []).map(async (mechanic) => {
+          // Get primary shop details (first active shop)
+          const { data: shop } = await supabase
+            .from('shops')
+            .select('id, name, phone, email, town, county, street, country')
+            .eq('service_provider_id', mechanic.service_provider_id)
+            .eq('is_active', true)
+            .limit(1)
+            .single()
+
+          return {
+            ...mechanic,
+            shop: shop
+          }
+        })
+      )
+
+      setTeams(teamsWithShops)
 
     } catch (error) {
       console.error('Error:', error)
@@ -180,10 +213,25 @@ export default function MyTeamsPage() {
                         <h2 className="text-xl font-bold text-gray-900">
                           {team.service_provider?.name || 'Unknown Provider'}
                         </h2>
-                        {team.service_provider?.city && (
+                        {team.service_provider?.country && (
                           <p className="text-gray-600 mt-1">
-                            📍 {team.service_provider.city}, {team.service_provider.country}
+                            📍 {team.service_provider.country}
                           </p>
+                        )}
+                        {team.shop && (
+                          <div className="mt-2 space-y-1">
+                            {team.shop.name && (
+                              <p className="text-sm text-gray-600">
+                                🏪 {team.shop.name}
+                              </p>
+                            )}
+                            {(team.shop.town || team.shop.county) && (
+                              <p className="text-sm text-gray-600 flex items-center gap-1">
+                                <MapPin size={14} />
+                                {[team.shop.town, team.shop.county, team.shop.country].filter(Boolean).join(', ')}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -320,7 +368,7 @@ export default function MyTeamsPage() {
                         </div>
                       )}
 
-                      {/* Contact Info */}
+                      {/* Contact Info - Provider Level */}
                       <div className="flex flex-wrap gap-4 mb-4 pt-4 border-t">
                         {team.service_provider?.phone && (
                           <div className="flex items-center gap-2 text-gray-700">
@@ -332,6 +380,19 @@ export default function MyTeamsPage() {
                           <div className="flex items-center gap-2 text-gray-700">
                             <Mail size={16} />
                             <span className="text-sm">{team.service_provider.email}</span>
+                          </div>
+                        )}
+                        {/* Shop Contact (if different from provider) */}
+                        {team.shop?.phone && team.shop.phone !== team.service_provider?.phone && (
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Phone size={16} />
+                            <span className="text-sm">{team.shop.phone} (Shop)</span>
+                          </div>
+                        )}
+                        {team.shop?.email && team.shop.email !== team.service_provider?.email && (
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Mail size={16} />
+                            <span className="text-sm">{team.shop.email} (Shop)</span>
                           </div>
                         )}
                       </div>
