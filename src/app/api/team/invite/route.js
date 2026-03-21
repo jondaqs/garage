@@ -10,6 +10,8 @@ export async function POST(request) {
     const body = await request.json()
     const { email, role, specialization, experience_years } = body
 
+    console.log('📨 Invite route called for:', email)
+
     // Validate email
     if (!email || !email.includes('@')) {
       return NextResponse.json(
@@ -97,6 +99,52 @@ export async function POST(request) {
       )
     }
 
+    console.log('✅ Invitation created:', invitation.id)
+
+    // ============================================
+    // THIS WAS MISSING - SEND EMAIL NOTIFICATION
+    // ============================================
+    
+    // Construct the email API URL
+    const protocol = request.headers.get('x-forwarded-proto') || 'https'
+    const host = request.headers.get('host')
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+                    `${protocol}://${host}`
+
+    const emailApiUrl = `${baseUrl}/api/team/send-invitation-email`
+
+    console.log('📧 Calling email API at:', emailApiUrl)
+    console.log('📧 Invitation ID:', invitation.id)
+
+    try {
+      const emailResponse = await fetch(emailApiUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          invitation_id: invitation.id 
+        })
+      })
+
+      console.log('📧 Email API response status:', emailResponse.status)
+      
+      const emailResult = await emailResponse.json()
+      console.log('📧 Email API result:', JSON.stringify(emailResult))
+
+      if (!emailResponse.ok) {
+        console.error('❌ Email sending failed:', emailResult)
+        // Don't fail the whole invitation if email fails
+        // The invitation is already created
+      } else {
+        console.log('✅ Email notification sent successfully')
+      }
+    } catch (emailError) {
+      console.error('❌ Error calling email API:', emailError)
+      // Don't fail the whole invitation if email fails
+    }
+
     return NextResponse.json({
       success: true,
       invitation: {
@@ -108,7 +156,7 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('Unexpected error:', error)
+    console.error('💥 Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error: ' + error.message },
       { status: 500 }
