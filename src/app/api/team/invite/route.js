@@ -105,26 +105,9 @@ export async function POST(request) {
     // SEND EMAIL NOTIFICATION
     // ============================================
     
-    // Construct the email API URL - FIX THE DOUBLE SLASH ISSUE
-    const protocol = request.headers.get('x-forwarded-proto') || 'https'
-    const host = request.headers.get('host')
-    
-    // Build base URL without trailing slash
-    let baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    
-    if (!baseUrl) {
-      if (process.env.VERCEL_URL) {
-        baseUrl = `https://${process.env.VERCEL_URL}`
-      } else {
-        baseUrl = `${protocol}://${host}`
-      }
-    }
-    
-    // Remove trailing slash if present
-    baseUrl = baseUrl.replace(/\/$/, '')
-    
-    // Construct email API URL (no double slash)
-    const emailApiUrl = `${baseUrl}/api/team/send-invitation-email`
+    // Get the current URL from request
+    const url = new URL(request.url)
+    const emailApiUrl = `${url.origin}/api/team/send-invitation-email`
 
     console.log('📧 Calling email API at:', emailApiUrl)
     console.log('📧 Invitation ID:', invitation.id)
@@ -142,27 +125,43 @@ export async function POST(request) {
 
       console.log('📧 Email API response status:', emailResponse.status)
       
-      // Try to parse response
+      // Clone the response before reading to avoid "body already read" error
+      const emailResponseClone = emailResponse.clone()
+      
+      // Check content type to determine how to parse
+      const contentType = emailResponse.headers.get('content-type')
       let emailResult
+      
       try {
-        emailResult = await emailResponse.json()
-        console.log('📧 Email API result:', JSON.stringify(emailResult))
+        if (contentType && contentType.includes('application/json')) {
+          emailResult = await emailResponse.json()
+          console.log('📧 Email API result:', JSON.stringify(emailResult))
+        } else {
+          // Non-JSON response (probably HTML error page)
+          const responseText = await emailResponseClone.text()
+          console.error('❌ Email API returned non-JSON response')
+          console.error('Content-Type:', contentType)
+          console.error('Status:', emailResponse.status)
+          console.error('Response (first 500 chars):', responseText.substring(0, 500))
+          emailResult = { 
+            error: 'Email API returned non-JSON response',
+            status: emailResponse.status,
+            contentType: contentType
+          }
+        }
       } catch (parseError) {
-        const responseText = await emailResponse.text()
-        console.error('❌ Could not parse email response as JSON')
-        console.error('Response text:', responseText.substring(0, 200))
-        emailResult = { error: 'Invalid response format' }
+        console.error('❌ Failed to parse email response:', parseError.message)
+        emailResult = { error: 'Failed to parse response' }
       }
 
       if (!emailResponse.ok) {
-        console.error('❌ Email sending failed:', emailResult)
+        console.error('❌ Email sending failed')
         // Don't fail the whole invitation if email fails
       } else {
         console.log('✅ Email notification sent successfully')
       }
     } catch (emailError) {
       console.error('❌ Error calling email API:', emailError.message)
-      console.error('Full error:', emailError)
       // Don't fail the whole invitation if email fails
     }
 
