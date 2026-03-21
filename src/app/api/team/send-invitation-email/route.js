@@ -1,26 +1,25 @@
 // src/app/api/team/send-invitation-email/route.js
-// Uses Mailjet to send team invitation emails
+// Enhanced version with database queue and better logging
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
+  console.log('📧 Email route called')
+  
   try {
-    // Verify webhook secret if called from Supabase webhook
-    const webhookSecret = request.headers.get('x-webhook-secret')
-    if (webhookSecret && webhookSecret !== process.env.WEBHOOK_SECRET) {
-      return NextResponse.json({ error: 'Invalid webhook secret' }, { status: 401 })
-    }
-
     const body = await request.json()
-    const invitation_id = body.invitation_id || body.record?.id
+    const invitation_id = body.invitation_id
 
     if (!invitation_id) {
+      console.error('❌ No invitation_id provided')
       return NextResponse.json(
         { error: 'Invitation ID required' },
         { status: 400 }
       )
     }
+
+    console.log('📋 Invitation ID:', invitation_id)
 
     const supabase = await createClient()
 
@@ -29,15 +28,53 @@ export async function POST(request) {
       .from('team_invitations')
       .select(`
         *,
-        service_provider:service_providers(name, phone)
+        service_provider:service_providers(name, phone, email)
       `)
       .eq('id', invitation_id)
       .single()
 
     if (inviteError || !invitation) {
+      console.error('❌ Invitation not found:', inviteError)
       return NextResponse.json(
         { error: 'Invitation not found' },
         { status: 404 }
+      )
+    }
+
+    console.log('✅ Invitation loaded for:', invitation.invited_email)
+
+    // Check environment variables
+    const mailjetApiKey = process.env.MAILJET_API_KEY
+    const mailjetSecretKey = process.env.MAILJET_SECRET_KEY
+    const mailjetFromEmail = process.env.MAILJET_FROM_EMAIL || 
+                            process.env.MAILJET_SENDER_EMAIL || 
+                            'noreply@garicare.com'
+    const mailjetFromName = process.env.MAILJET_FROM_NAME || 
+                           process.env.MAILJET_SENDER_NAME || 
+                           'GariCare'
+
+    console.log('🔑 Checking Mailjet credentials...')
+    console.log('Has API Key:', !!mailjetApiKey, mailjetApiKey ? `(${mailjetApiKey.substring(0, 5)}...)` : '')
+    console.log('Has Secret:', !!mailjetSecretKey)
+    console.log('From Email:', mailjetFromEmail)
+    console.log('From Name:', mailjetFromName)
+
+    if (!mailjetApiKey || !mailjetSecretKey) {
+      console.error('❌ Mailjet credentials not configured')
+      
+      // Still queue the email for later processing
+      await queueEmail(supabase, {
+        recipient_email: invitation.invited_email,
+        subject: `${invitation.service_provider.name} invited you to join their team`,
+        body_html: `Invitation from ${invitation.service_provider.name}`,
+        body_text: `Invitation from ${invitation.service_provider.name}`,
+        status: 'failed',
+        error_message: 'Mailjet credentials not configured'
+      })
+
+      return NextResponse.json(
+        { error: 'Email service not configured' },
+        { status: 500 }
       )
     }
 
@@ -50,27 +87,35 @@ export async function POST(request) {
       invitation.experience_years
     )
 
-    // Send email via Mailjet
-    const mailjetApiKey = process.env.MAILJET_API_KEY
-    const mailjetSecretKey = process.env.MAILJET_SECRET_KEY
-    const mailjetFromEmail = process.env.MAILJET_FROM_EMAIL || 'noreply@garicare.com'
-    const mailjetFromName = process.env.MAILJET_FROM_NAME || 'GariCare'
+    console.log('📝 Email content generated')
+    console.log('Subject:', emailContent.subject)
 
-    if (!mailjetApiKey || !mailjetSecretKey) {
-      console.error('Mailjet credentials not configured')
-      return NextResponse.json(
-        { error: 'Email service not configured' },
-        { status: 500 }
-      )
+    // Queue email in database BEFORE sending
+    const { data: queuedEmail, error: queueError } = await supabase
+      .from('email_queue')
+      .insert({
+        recipient_email: invitation.invited_email,
+        subject: emailContent.subject,
+        body_html: emailContent.html,
+        body_text: emailContent.text,
+        status: 'pending'
+      })
+      .select()
+      .single()
+
+    if (queueError) {
+      console.error('⚠️ Failed to queue email:', queueError)
+      // Continue anyway - try to send even if queuing fails
+    } else {
+      console.log('✅ Email queued in database:', queuedEmail.id)
     }
 
-    // Mailjet API endpoint
+    // Send email via Mailjet
     const mailjetUrl = 'https://api.mailjet.com/v3.1/send'
-    
-    // Create Basic Auth header
     const auth = Buffer.from(`${mailjetApiKey}:${mailjetSecretKey}`).toString('base64')
 
-    // Send email via Mailjet API
+    console.log('🚀 Sending to Mailjet...')
+
     const mailjetResponse = await fetch(mailjetUrl, {
       method: 'POST',
       headers: {
@@ -100,29 +145,74 @@ export async function POST(request) {
 
     const mailjetData = await mailjetResponse.json()
 
+    console.log('📬 Mailjet response status:', mailjetResponse.status)
+    console.log('📬 Mailjet response:', JSON.stringify(mailjetData, null, 2))
+
     if (!mailjetResponse.ok) {
-      console.error('Mailjet error:', mailjetData)
+      console.error('❌ Mailjet error:', mailjetData)
+      
+      // Update queue status to failed
+      if (queuedEmail) {
+        await supabase
+          .from('email_queue')
+          .update({
+            status: 'failed',
+            error_message: JSON.stringify(mailjetData)
+          })
+          .eq('id', queuedEmail.id)
+      }
+
       return NextResponse.json(
-        { error: 'Failed to send email', details: mailjetData },
+        { 
+          error: 'Failed to send email', 
+          details: mailjetData,
+          queued: !!queuedEmail
+        },
         { status: 500 }
       )
     }
 
-    console.log('✅ Email sent via Mailjet:', mailjetData)
+    console.log('✅ Email sent successfully via Mailjet!')
+
+    // Update queue status to sent
+    if (queuedEmail) {
+      await supabase
+        .from('email_queue')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString()
+        })
+        .eq('id', queuedEmail.id)
+      
+      console.log('✅ Email queue updated to sent')
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Invitation email sent successfully',
       email: invitation.invited_email,
-      mailjet_message_id: mailjetData.Messages?.[0]?.To?.[0]?.MessageID
+      mailjet_message_id: mailjetData.Messages?.[0]?.To?.[0]?.MessageID,
+      queued_email_id: queuedEmail?.id
     })
 
   } catch (error) {
-    console.error('Send email error:', error)
+    console.error('💥 Send email error:', error)
     return NextResponse.json(
       { error: 'Internal server error: ' + error.message },
       { status: 500 }
     )
+  }
+}
+
+// Helper function to queue email
+async function queueEmail(supabase, emailData) {
+  try {
+    await supabase
+      .from('email_queue')
+      .insert(emailData)
+    console.log('✅ Email queued:', emailData.recipient_email)
+  } catch (err) {
+    console.error('⚠️ Failed to queue email:', err)
   }
 }
 
@@ -139,7 +229,7 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.6; 
       color: #333; 
       margin: 0;
@@ -157,104 +247,7 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
       padding: 40px 30px; 
       text-align: center;
     }
-    .header h1 {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 700;
-    }
-    .header p {
-      margin: 10px 0 0 0;
-      opacity: 0.95;
-      font-size: 16px;
-    }
-    .content { 
-      padding: 40px 30px;
-    }
-    .content h2 {
-      color: #1f2937;
-      font-size: 24px;
-      margin-top: 0;
-    }
-    .info-box {
-      background-color: #eff6ff;
-      border-left: 4px solid #2563eb;
-      padding: 20px;
-      margin: 25px 0;
-      border-radius: 4px;
-    }
-    .info-box p {
-      margin: 0;
-      color: #1e40af;
-    }
-    .steps-box { 
-      background-color: #f9fafb; 
-      padding: 25px; 
-      border-radius: 8px; 
-      margin: 25px 0;
-    }
-    .steps-box h3 {
-      margin-top: 0;
-      color: #1f2937;
-      font-size: 18px;
-    }
-    .step { 
-      position: relative; 
-      padding-left: 45px; 
-      margin: 20px 0;
-      counter-increment: step;
-    }
-    .step:before { 
-      content: counter(step); 
-      position: absolute; 
-      left: 0; 
-      top: 0; 
-      background: #2563eb; 
-      color: white; 
-      width: 32px; 
-      height: 32px; 
-      border-radius: 50%; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      font-weight: bold;
-      font-size: 16px;
-    }
-    .step strong {
-      display: block;
-      color: #1f2937;
-      margin-bottom: 5px;
-      font-size: 16px;
-    }
-    .step span {
-      color: #6b7280;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    .step .highlight {
-      color: #2563eb;
-      font-weight: 600;
-    }
-    .warning-box { 
-      background-color: #fffbeb; 
-      border-left: 4px solid #f59e0b;
-      padding: 20px;
-      margin: 25px 0;
-      border-radius: 4px;
-    }
-    .warning-box p {
-      margin: 0 0 10px 0;
-      font-weight: 600;
-      color: #92400e;
-      font-size: 16px;
-    }
-    .warning-box ul {
-      margin: 10px 0 0 0;
-      padding-left: 20px;
-      color: #78350f;
-    }
-    .warning-box li {
-      margin: 8px 0;
-    }
+    .content { padding: 40px 30px; }
     .button { 
       display: inline-block; 
       background-color: #2563eb; 
@@ -264,53 +257,12 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
       border-radius: 8px; 
       margin: 30px 0;
       font-weight: 600;
-      font-size: 16px;
-      text-align: center;
-    }
-    .button:hover {
-      background-color: #1d4ed8;
-    }
-    .help-box {
-      background-color: #f0fdf4;
-      border-left: 4px solid #10b981;
-      padding: 20px;
-      margin: 25px 0;
-      border-radius: 4px;
-    }
-    .help-box p {
-      margin: 0;
-      color: #065f46;
-    }
-    .help-box a {
-      color: #059669;
-      font-weight: 600;
     }
     .footer {
       text-align: center;
       padding: 30px;
       color: #6b7280;
       font-size: 14px;
-      border-top: 1px solid #e5e7eb;
-    }
-    .footer-small {
-      color: #9ca3af;
-      font-size: 12px;
-      margin-top: 15px;
-    }
-    .badge {
-      display: inline-block;
-      background-color: #dbeafe;
-      color: #1e40af;
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 600;
-      margin: 5px 5px 5px 0;
-    }
-    @media only screen and (max-width: 600px) {
-      .content { padding: 30px 20px; }
-      .header { padding: 30px 20px; }
-      .header h1 { font-size: 24px; }
     }
   </style>
 </head>
@@ -324,60 +276,28 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
     <div class="content">
       <h2>Hello!</h2>
       
-      <p style="font-size: 16px;"><strong style="color: #2563eb; font-size: 18px;">${providerName}</strong> has invited you to join their team${role ? ` as a ${role}` : ''}.</p>
+      <p><strong style="color: #2563eb;">${providerName}</strong> has invited you to join their team${role ? ` as a ${role}` : ''}.</p>
       
-      ${specialization || experienceYears ? `
-      <div class="info-box">
-        ${specialization ? `<p style="margin-bottom: 8px;"><strong>🎯 Specialization:</strong> ${specialization}</p>` : ''}
-        ${experienceYears ? `<p><strong>📅 Experience:</strong> ${experienceYears} years</p>` : ''}
-      </div>
-      ` : ''}
+      ${specialization ? `<p><strong>Specialization:</strong> ${specialization}</p>` : ''}
+      ${experienceYears ? `<p><strong>Experience:</strong> ${experienceYears} years</p>` : ''}
       
-      <div class="steps-box">
-        <h3>📝 How to Accept This Invitation</h3>
-        <div style="counter-reset: step;">
-          <div class="step">
-            <strong>Register or Log In</strong>
-            <span>Visit GariCare and use this email address:<br><span class="highlight">${recipientEmail}</span></span>
-          </div>
-          <div class="step">
-            <strong>Confirm Your Email</strong>
-            <span>Check your inbox for the confirmation email and verify your account</span>
-          </div>
-          <div class="step">
-            <strong>Complete Your Profile</strong>
-            <span>Make sure your profile is filled out and your account is active</span>
-          </div>
-          <div class="step">
-            <strong>View Your Invitation</strong>
-            <span>Go to your dashboard to see and accept the invitation</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="warning-box">
-        <p>⚠️ Important Requirements:</p>
-        <ul>
-          <li>You must register using this exact email address: <strong>${recipientEmail}</strong></li>
-          <li>Your email must be confirmed (check your inbox for verification email)</li>
-          <li>Your account must be active and not suspended</li>
-          <li>This invitation will expire in <strong>7 days</strong></li>
-        </ul>
-      </div>
+      <p>To accept this invitation:</p>
+      <ol>
+        <li>Log in to GariCare using this email: <strong>${recipientEmail}</strong></li>
+        <li>Go to your dashboard</li>
+        <li>View and accept the invitation</li>
+      </ol>
       
       <div style="text-align: center;">
-        <a href="${appUrl}" class="button">Go to GariCare Dashboard</a>
+        <a href="${appUrl}/auth/login" class="button">Go to GariCare</a>
       </div>
       
-      <div class="help-box">
-        <p style="font-weight: 600; margin-bottom: 8px;">💡 Don't have an account yet?</p>
-        <p>No problem! Register at <a href="${appUrl}/auth/register">${appUrl}/auth/register</a> using the email address above, then check your dashboard for the invitation.</p>
-      </div>
+      <p><strong>Note:</strong> This invitation will expire in 7 days.</p>
     </div>
     
     <div class="footer">
-      <p>If you didn't expect this invitation, you can safely ignore this email<br>or decline it from your dashboard after logging in.</p>
-      <p class="footer-small">This is an automated message from GariCare</p>
+      <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+      <p style="font-size: 12px; color: #9ca3af;">This is an automated message from GariCare</p>
     </div>
   </div>
 </body>
@@ -393,30 +313,14 @@ ${providerName} has invited you to join their team${role ? ` as a ${role}` : ''}
 
 ${specialization ? `Specialization: ${specialization}\n` : ''}${experienceYears ? `Experience: ${experienceYears} years\n` : ''}
 
-HOW TO ACCEPT THIS INVITATION:
+To accept this invitation:
+1. Log in to GariCare using this email: ${recipientEmail}
+2. Go to your dashboard
+3. View and accept the invitation
 
-1. Register or Log In
-   Visit ${appUrl} and use this email address: ${recipientEmail}
+Visit: ${appUrl}/auth/login
 
-2. Confirm Your Email
-   Check your inbox for the confirmation email and verify your account
-
-3. Complete Your Profile
-   Make sure your profile is filled out and your account is active
-
-4. View Your Invitation
-   Go to your dashboard to see and accept the invitation
-
-IMPORTANT REQUIREMENTS:
-- You must register using this exact email address: ${recipientEmail}
-- Your email must be confirmed (check your inbox for verification email)
-- Your account must be active and not suspended
-- This invitation will expire in 7 days
-
-DON'T HAVE AN ACCOUNT?
-No problem! Register at ${appUrl}/auth/register using the email address above, then check your dashboard for the invitation.
-
-If you didn't expect this invitation, you can safely ignore this email or decline it from your dashboard after logging in.
+This invitation will expire in 7 days.
 
 ---
 This is an automated message from GariCare
