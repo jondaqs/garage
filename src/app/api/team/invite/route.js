@@ -107,7 +107,7 @@ export async function POST(request) {
     
     // Get the current URL from request
     const url = new URL(request.url)
-    const emailApiUrl = `${url.origin}/api/team/send-invitation-email`
+    const emailApiUrl = `/api/team/send-invitation-email`
 
     console.log('📧 Calling email API at:', emailApiUrl)
     console.log('📧 Invitation ID:', invitation.id)
