@@ -1,7 +1,7 @@
 // src/app/api/team/send-invitation-email/route.js
-// Enhanced version with database queue and better logging
+// Email sending route - NO AUTH REQUIRED (internal API call)
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
@@ -21,7 +21,17 @@ export async function POST(request) {
 
     console.log('📋 Invitation ID:', invitation_id)
 
-    const supabase = await createClient()
+    // Create Supabase client with service role key (bypasses RLS)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY, // Use service role key
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
     // Get invitation details
     const { data: invitation, error: inviteError } = await supabase
@@ -62,7 +72,7 @@ export async function POST(request) {
     if (!mailjetApiKey || !mailjetSecretKey) {
       console.error('❌ Mailjet credentials not configured')
       
-      // Still queue the email for later processing
+      // Queue the email for later processing
       await queueEmail(supabase, {
         recipient_email: invitation.invited_email,
         subject: `${invitation.service_provider.name} invited you to join their team`,
@@ -217,7 +227,7 @@ async function queueEmail(supabase, emailData) {
 }
 
 function generateInvitationEmail(providerName, recipientEmail, role, specialization, experienceYears) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://garicare-projects.vercel.app'
   
   const subject = `${providerName} has invited you to join their team`
   
@@ -226,20 +236,21 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.6; 
       color: #333; 
       margin: 0;
-      padding: 0;
+      padding: 20px;
       background-color: #f5f5f5;
     }
     .container { 
       max-width: 600px; 
       margin: 0 auto; 
       background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
     }
     .header { 
       background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
@@ -258,46 +269,57 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
       margin: 30px 0;
       font-weight: 600;
     }
+    .info { 
+      background: #eff6ff; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px 0;
+    }
     .footer {
       text-align: center;
       padding: 30px;
       color: #6b7280;
       font-size: 14px;
+      border-top: 1px solid #e5e7eb;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>🔧 Team Invitation</h1>
-      <p>You've been invited to join a service provider team</p>
+      <h1 style="margin: 0;">🔧 Team Invitation</h1>
+      <p style="margin: 10px 0 0 0;">You've been invited to join a team</p>
     </div>
     
     <div class="content">
-      <h2>Hello!</h2>
+      <h2 style="color: #1f2937;">Hello!</h2>
       
-      <p><strong style="color: #2563eb;">${providerName}</strong> has invited you to join their team${role ? ` as a ${role}` : ''}.</p>
+      <p style="font-size: 16px;"><strong style="color: #2563eb;">${providerName}</strong> has invited you to join their team${role ? ` as a <strong>${role}</strong>` : ''}.</p>
       
-      ${specialization ? `<p><strong>Specialization:</strong> ${specialization}</p>` : ''}
-      ${experienceYears ? `<p><strong>Experience:</strong> ${experienceYears} years</p>` : ''}
+      ${(specialization || experienceYears) ? `
+      <div class="info">
+        ${specialization ? `<p style="margin: 5px 0;"><strong>Specialization:</strong> ${specialization}</p>` : ''}
+        ${experienceYears ? `<p style="margin: 5px 0;"><strong>Experience:</strong> ${experienceYears} years</p>` : ''}
+      </div>
+      ` : ''}
       
-      <p>To accept this invitation:</p>
+      <p><strong>To accept this invitation:</strong></p>
       <ol>
         <li>Log in to GariCare using this email: <strong>${recipientEmail}</strong></li>
         <li>Go to your dashboard</li>
-        <li>View and accept the invitation</li>
+        <li>You'll see the invitation - click Accept</li>
       </ol>
       
       <div style="text-align: center;">
         <a href="${appUrl}/auth/login" class="button">Go to GariCare</a>
       </div>
       
-      <p><strong>Note:</strong> This invitation will expire in 7 days.</p>
+      <p style="color: #dc2626; font-weight: 600;">⏰ This invitation expires in 7 days</p>
     </div>
     
     <div class="footer">
       <p>If you didn't expect this invitation, you can safely ignore this email.</p>
-      <p style="font-size: 12px; color: #9ca3af;">This is an automated message from GariCare</p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">This is an automated message from GariCare</p>
     </div>
   </div>
 </body>
@@ -316,11 +338,13 @@ ${specialization ? `Specialization: ${specialization}\n` : ''}${experienceYears 
 To accept this invitation:
 1. Log in to GariCare using this email: ${recipientEmail}
 2. Go to your dashboard
-3. View and accept the invitation
+3. You'll see the invitation - click Accept
 
 Visit: ${appUrl}/auth/login
 
-This invitation will expire in 7 days.
+⏰ This invitation expires in 7 days
+
+If you didn't expect this invitation, you can safely ignore this email.
 
 ---
 This is an automated message from GariCare

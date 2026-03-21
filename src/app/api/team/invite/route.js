@@ -102,16 +102,28 @@ export async function POST(request) {
     console.log('✅ Invitation created:', invitation.id)
 
     // ============================================
-    // THIS WAS MISSING - SEND EMAIL NOTIFICATION
+    // SEND EMAIL NOTIFICATION
     // ============================================
     
-    // Construct the email API URL
+    // Construct the email API URL - FIX THE DOUBLE SLASH ISSUE
     const protocol = request.headers.get('x-forwarded-proto') || 'https'
     const host = request.headers.get('host')
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-                    `${protocol}://${host}`
-
+    
+    // Build base URL without trailing slash
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    
+    if (!baseUrl) {
+      if (process.env.VERCEL_URL) {
+        baseUrl = `https://${process.env.VERCEL_URL}`
+      } else {
+        baseUrl = `${protocol}://${host}`
+      }
+    }
+    
+    // Remove trailing slash if present
+    baseUrl = baseUrl.replace(/\/$/, '')
+    
+    // Construct email API URL (no double slash)
     const emailApiUrl = `${baseUrl}/api/team/send-invitation-email`
 
     console.log('📧 Calling email API at:', emailApiUrl)
@@ -130,18 +142,27 @@ export async function POST(request) {
 
       console.log('📧 Email API response status:', emailResponse.status)
       
-      const emailResult = await emailResponse.json()
-      console.log('📧 Email API result:', JSON.stringify(emailResult))
+      // Try to parse response
+      let emailResult
+      try {
+        emailResult = await emailResponse.json()
+        console.log('📧 Email API result:', JSON.stringify(emailResult))
+      } catch (parseError) {
+        const responseText = await emailResponse.text()
+        console.error('❌ Could not parse email response as JSON')
+        console.error('Response text:', responseText.substring(0, 200))
+        emailResult = { error: 'Invalid response format' }
+      }
 
       if (!emailResponse.ok) {
         console.error('❌ Email sending failed:', emailResult)
         // Don't fail the whole invitation if email fails
-        // The invitation is already created
       } else {
         console.log('✅ Email notification sent successfully')
       }
     } catch (emailError) {
-      console.error('❌ Error calling email API:', emailError)
+      console.error('❌ Error calling email API:', emailError.message)
+      console.error('Full error:', emailError)
       // Don't fail the whole invitation if email fails
     }
 
