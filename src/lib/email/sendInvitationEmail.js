@@ -201,12 +201,128 @@ async function queueEmail(supabase, emailData) {
 function generateInvitationEmail(providerName, recipientEmail, role, specialization, experienceYears) {
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
-    'https://garicare-projects.vercel.app'
+    'https://garage-mu-two.vercel.app'
 
   const subject = `${providerName} has invited you to join their team`
 
-  const html = `...YOUR FULL HTML (UNCHANGED)...`
-  const text = `...YOUR FULL TEXT (UNCHANGED)...`
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6; 
+      color: #333; 
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container { 
+      max-width: 600px; 
+      margin: 0 auto; 
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .header { 
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
+      color: white; 
+      padding: 40px 30px; 
+      text-align: center;
+    }
+    .content { padding: 40px 30px; }
+    .button { 
+      display: inline-block; 
+      background-color: #2563eb; 
+      color: white !important; 
+      padding: 16px 40px; 
+      text-decoration: none; 
+      border-radius: 8px; 
+      margin: 30px 0;
+      font-weight: 600;
+    }
+    .info { 
+      background: #eff6ff; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px 0;
+    }
+    .footer {
+      text-align: center;
+      padding: 30px;
+      color: #6b7280;
+      font-size: 14px;
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0;">🔧 Team Invitation</h1>
+      <p style="margin: 10px 0 0 0;">You've been invited to join a team</p>
+    </div>
+    
+    <div class="content">
+      <h2 style="color: #1f2937;">Hello!</h2>
+      
+      <p style="font-size: 16px;"><strong style="color: #2563eb;">${providerName}</strong> has invited you to join their team${role ? ` as a <strong>${role}</strong>` : ''}.</p>
+      
+      ${(specialization || experienceYears) ? `
+      <div class="info">
+        ${specialization ? `<p style="margin: 5px 0;"><strong>Specialization:</strong> ${specialization}</p>` : ''}
+        ${experienceYears ? `<p style="margin: 5px 0;"><strong>Experience:</strong> ${experienceYears} years</p>` : ''}
+      </div>
+      ` : ''}
+      
+      <p><strong>To accept this invitation:</strong></p>
+      <ol>
+        <li>Log in to GariCare using this email: <strong>${recipientEmail}</strong></li>
+        <li>Go to your dashboard</li>
+        <li>You'll see the invitation - click Accept</li>
+      </ol>
+      
+      <div style="text-align: center;">
+        <a href="${appUrl}/auth/login" class="button">Go to GariCare</a>
+      </div>
+      
+      <p style="color: #dc2626; font-weight: 600;">⏰ This invitation expires in 7 days</p>
+    </div>
+    
+    <div class="footer">
+      <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">This is an automated message from GariCare</p>
+    </div>
+  </div>
+</body>
+</html>
+  `
+  
+  const text = `
+TEAM INVITATION FROM ${providerName.toUpperCase()}
+
+Hello!
+
+${providerName} has invited you to join their team${role ? ` as a ${role}` : ''}.
+
+${specialization ? `Specialization: ${specialization}\n` : ''}${experienceYears ? `Experience: ${experienceYears} years\n` : ''}
+
+To accept this invitation:
+1. Log in to GariCare using this email: ${recipientEmail}
+2. Go to your dashboard
+3. You'll see the invitation - click Accept
+
+Visit: ${appUrl}/auth/login
+
+⏰ This invitation expires in 7 days
+
+If you didn't expect this invitation, you can safely ignore this email.
+
+---
+This is an automated message from GariCare
+  `
 
   return { subject, html, text }
 }

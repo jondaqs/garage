@@ -227,7 +227,7 @@ async function queueEmail(supabase, emailData) {
 }
 
 function generateInvitationEmail(providerName, recipientEmail, role, specialization, experienceYears) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://garicare-projects.vercel.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
   
   const subject = `${providerName} has invited you to join their team`
   
