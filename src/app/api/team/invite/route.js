@@ -124,9 +124,11 @@ export async function POST(request) {
         })
       })*/
 
-      const { invitation_id } = await request.json()
+      //const { invitation_id } = JSON.stringify({ 
+          //invitation_id: invitation.id 
+        //})
 
-      const emailResponse = await sendInvitationEmail(invitation_id)
+      const emailResponse = await sendInvitationEmail(invitation.id)
 
       console.log('📧 Email API response status:', emailResponse.status)
       
