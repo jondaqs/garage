@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { sendInvitationEmail } from '@/lib/email/sendInvitationEmail'
 
 export async function POST(request) {
   try {
@@ -113,7 +114,7 @@ export async function POST(request) {
     console.log('📧 Invitation ID:', invitation.id)
 
     try {
-      const emailResponse = await fetch(emailApiUrl, {
+      /*const emailResponse = await fetch(emailApiUrl, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -121,7 +122,11 @@ export async function POST(request) {
         body: JSON.stringify({ 
           invitation_id: invitation.id 
         })
-      })
+      })*/
+
+      const { invitation_id } = await request.json()
+
+      const emailResponse = await sendInvitationEmail(invitation_id)
 
       console.log('📧 Email API response status:', emailResponse.status)
       
