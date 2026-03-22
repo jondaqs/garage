@@ -170,6 +170,8 @@ export async function sendInvitationEmail(invitation_id) {
         .eq('id', queuedEmail.id)
     }
 
+    console.log('📧 Email record updated in queue' ) 
+
     return {
       success: true,
       email: invitation.invited_email,
