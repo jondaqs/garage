@@ -17,6 +17,7 @@ export default function AdminSidebar() {
     { name: 'Pending Providers', href: '/admin/providers', icon: Clock, badge: true },
     { name: 'All Providers', href: '/admin/providers/all', icon: CheckCircle },
     { name: 'Users', href: '/admin/users', icon: Users },
+    {name: 'Email Queue',href: '/admin/email-queue',icon: '📧',badge: 'New'},
     { name: 'Admin Management', href: '/admin/admins', icon: Shield },
     { name: 'Reports', href: '/admin/reports', icon: FileText },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
@@ -33,8 +34,8 @@ export default function AdminSidebar() {
         <div className="flex items-center flex-shrink-0 px-4">
           <Shield className="text-blue-400 mr-2" size={32} />
           <div>
-            <h2 className="text-lg font-bold text-white">GariCare Admin</h2>
-            <p className="text-xs text-gray-400">Admin Portal</p>
+            <h2 className="text-lg font-bold text-white">Motiifix Admin</h2>
+            <p className="text-xs text-gray-400">Admin Panel</p>
           </div>
         </div>
 

@@ -35,7 +35,8 @@ export async function sendInvitationEmail(invitation_id) {
 
     if (inviteError || !invitation) {
       console.error('❌ Invitation not found:', inviteError)
-      return { error: 'Invitation not found', status: 404 }
+      //return { error: 'Invitation not found', status: 404 }
+      throw new Error('Invitation not found', { status: 404 })
     }
 
     console.log('✅ Invitation loaded for:', invitation.invited_email)
@@ -46,12 +47,12 @@ export async function sendInvitationEmail(invitation_id) {
     const mailjetFromEmail =
       process.env.MAILJET_FROM_EMAIL ||
       process.env.MAILJET_SENDER_EMAIL ||
-      'noreply@garicare.com'
+      'noreply@survlinx.com'
 
     const mailjetFromName =
       process.env.MAILJET_FROM_NAME ||
       process.env.MAILJET_SENDER_NAME ||
-      'GariCare'
+      'Motiifix'
 
     console.log('🔑 Checking Mailjet credentials...')
     console.log('Has API Key:', !!mailjetApiKey)
@@ -60,16 +61,18 @@ export async function sendInvitationEmail(invitation_id) {
     if (!mailjetApiKey || !mailjetSecretKey) {
       console.error('❌ Mailjet credentials not configured')
 
+      // Queue the email as failed for later retry
       await queueEmail(supabase, {
         recipient_email: invitation.invited_email,
         subject: `${invitation.service_provider.name} invited you to join their team`,
-        body_html: `Invitation from ${invitation.service_provider.name}`,
-        body_text: `Invitation from ${invitation.service_provider.name}`,
+        body_html: `Invitation from ${invitation.service_provider.name} Email content pending`,
+        body_text: `Invitation from ${invitation.service_provider.name} Email content pending`,
         status: 'failed',
         error_message: 'Mailjet credentials not configured'
       })
 
-      return { error: 'Email service not configured', status: 500 }
+      //return { error: 'Email service not configured', status: 500 }
+      throw new Error('Email service not configured', { status: 500 })
     }
 
     // Generate email
@@ -83,23 +86,30 @@ export async function sendInvitationEmail(invitation_id) {
 
     console.log('📝 Email content generated')
 
-    // Queue BEFORE sending
-    const { data: queuedEmail, error: queueError } = await supabase
-      .from('email_queue')
-      .insert({
-        recipient_email: invitation.invited_email,
-        subject: emailContent.subject,
-        body_html: emailContent.html,
-        body_text: emailContent.text,
-        status: 'pending'
-      })
-      .select()
-      .single()
-
-    if (queueError) {
-      console.error('⚠️ Failed to queue email:', queueError)
-    } else {
-      console.log('✅ Email queued:', queuedEmail.id)
+    // Queue email in database BEFORE sending
+    // This is non-blocking - if it fails, we still try to send
+    let queuedEmailId = null
+    try {
+      const { data: queuedEmail, error: queueError } = await supabase
+        .from('email_queue')
+        .insert({
+          recipient_email: invitation.invited_email,
+          subject: emailContent.subject,
+          body_html: emailContent.html,
+          body_text: emailContent.text,
+          status: 'pending'
+        })
+        .select()
+        .single()
+ 
+      if (queueError) {
+        console.warn('⚠️ Failed to queue email (non-blocking):', queueError.message)
+      } else {
+        queuedEmailId = queuedEmail.id
+        console.log('✅ Email queued in database:', queuedEmailId)
+      }
+    } catch (queueErr) {
+      console.warn('⚠️ Queue error (non-blocking):', queueErr.message)
     }
 
     // Send via Mailjet
@@ -140,37 +150,43 @@ export async function sendInvitationEmail(invitation_id) {
 
     if (!mailjetResponse.ok) {
       console.error('❌ Mailjet error:', mailjetData)
-
-      if (queuedEmail) {
-        await supabase
-          .from('email_queue')
-          .update({
-            status: 'failed',
-            error_message: JSON.stringify(mailjetData)
-          })
-          .eq('id', queuedEmail.id)
+      
+      // Update queue status to failed (non-blocking)
+      if (queuedEmailId) {
+        try {
+          await supabase
+            .from('email_queue')
+            .update({
+              status: 'failed',
+              error_message: JSON.stringify(mailjetData)
+            })
+            .eq('id', queuedEmailId)
+        } catch (updateErr) {
+          console.warn('⚠️ Failed to update queue status:', updateErr.message)
+        }
       }
-
-      return {
-        error: 'Failed to send email',
-        details: mailjetData,
-        status: 500
-      }
+ 
+      throw new Error('Failed to send email via Mailjet', { status: 500 })
     }
 
     console.log('✅ Email sent successfully')
 
-    if (queuedEmail) {
-      await supabase
-        .from('email_queue')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString()
-        })
-        .eq('id', queuedEmail.id)
+    // Update queue status to sent (non-blocking)
+    if (queuedEmailId) {
+      try {
+        await supabase
+          .from('email_queue')
+          .update({
+            status: 'sent',
+            sent_at: new Date().toISOString()
+          })
+          .eq('id', queuedEmailId)
+        
+        console.log('✅ Email queue updated to sent')
+      } catch (updateErr) {
+        console.warn('⚠️ Failed to update queue status:', updateErr.message)
+      }
     }
-
-    console.log('📧 Email record updated in queue' ) 
 
     return {
       success: true,
@@ -182,21 +198,25 @@ export async function sendInvitationEmail(invitation_id) {
 
   } catch (error) {
     console.error('💥 Email error:', error)
-    return {
+    /*return {
       error: 'Internal server error',
       details: error.message,
       status: 500
-    }
+    }*/
+    throw new Error('Internal server error: ' + error.message, { status: 500 })
   }
 }
 
-// Helpers (UNCHANGED)
+// Helper function to queue email (non-blocking)
 async function queueEmail(supabase, emailData) {
   try {
-    await supabase.from('email_queue').insert(emailData)
+    await supabase
+      .from('email_queue')
+      .insert(emailData)
     console.log('✅ Email queued:', emailData.recipient_email)
   } catch (err) {
-    console.error('⚠️ Queue failed:', err)
+    console.warn('⚠️ Failed to queue email (non-blocking):', err.message)
+    // Don't throw - this is non-blocking
   }
 }
 
@@ -281,13 +301,13 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
       
       <p><strong>To accept this invitation:</strong></p>
       <ol>
-        <li>Log in to GariCare using this email: <strong>${recipientEmail}</strong></li>
+        <li>Log in to Motiifix using this email: <strong>${recipientEmail}</strong></li>
         <li>Go to your dashboard</li>
         <li>You'll see the invitation - click Accept</li>
       </ol>
       
       <div style="text-align: center;">
-        <a href="${appUrl}/auth/login" class="button">Go to GariCare</a>
+        <a href="${appUrl}/auth/login" class="button">Go to Motiifix</a>
       </div>
       
       <p style="color: #dc2626; font-weight: 600;">⏰ This invitation expires in 7 days</p>
@@ -295,7 +315,7 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
     
     <div class="footer">
       <p>If you didn't expect this invitation, you can safely ignore this email.</p>
-      <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">This is an automated message from GariCare</p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">This is an automated message from Motiifix</p>
     </div>
   </div>
 </body>
@@ -323,7 +343,7 @@ Visit: ${appUrl}/auth/login
 If you didn't expect this invitation, you can safely ignore this email.
 
 ---
-This is an automated message from GariCare
+This is an automated message from Motiifix
   `
 
   return { subject, html, text }
