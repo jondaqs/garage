@@ -6,6 +6,7 @@ import {
   Calendar, DollarSign, Users, TrendingUp, Clock,
   CheckCircle, AlertCircle, Star
 } from 'lucide-react'
+import LowStockAlerts from '@/components/provider/LowStockAlerts'
 
 export default function ProviderDashboard() {
   const supabase = createClient()
@@ -190,6 +191,11 @@ export default function ProviderDashboard() {
           <p>No recent activity to display</p>
           <p className="text-sm mt-2">Activity will appear here once you start receiving bookings</p>
         </div>
+      </div>
+
+      {/* Low Stock Alerts */ }
+      <div>
+        <LowStockAlerts />
       </div>
     </div>
   )
