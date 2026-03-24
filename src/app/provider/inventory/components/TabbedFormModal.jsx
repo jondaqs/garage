@@ -5,6 +5,7 @@
 
 import { useState } from 'react'
 import { TabContainer, TabPanel, AutocompleteInput, InputField, TextAreaField, SelectField, CheckboxField, calculateProfitMargin } from './FormUtilities'
+import { TagInput, RadioGroup } from './FormUtilities'
 
 export default function TabbedFormModal({ 
   mode = 'add', 
@@ -483,3 +484,318 @@ function NotesTab({ formData, onChange }) {
     </div>
   )
 }
+
+// ==================================================
+// TAB 5: BRAND & MANUFACTURER
+// ==================================================
+function BrandTab({ formData, onChange }) {
+  return (
+    <div className="space-y-6">
+      {/* Brand, Manufacturer, Model */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <InputField
+          label="Brand"
+          value={formData.brand}
+          onChange={(e) => onChange('brand', e.target.value)}
+          placeholder="e.g., Bosch, NGK, Denso"
+        />
+        <InputField
+          label="Manufacturer"
+          value={formData.manufacturer}
+          onChange={(e) => onChange('manufacturer', e.target.value)}
+          placeholder="e.g., Toyota, Honda"
+        />
+        <InputField
+          label="Model"
+          value={formData.model}
+          onChange={(e) => onChange('model', e.target.value)}
+          placeholder="e.g., Series 3, Type A"
+        />
+      </div>
+ 
+      {/* Warranty & OEM */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InputField
+          label="Warranty (months)"
+          type="number"
+          value={formData.warranty_months}
+          onChange={(e) => onChange('warranty_months', e.target.value)}
+          min="0"
+          placeholder="e.g., 12, 24"
+        />
+        <div className="flex items-center pt-7">
+          <CheckboxField
+            label="OEM (Original Equipment Manufacturer) Part"
+            checked={formData.oem_part}
+            onChange={(e) => onChange('oem_part', e.target.checked)}
+          />
+        </div>
+      </div>
+ 
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> OEM parts are original manufacturer parts, often higher quality and price.
+        </p>
+      </div>
+    </div>
+  )
+}
+ 
+// ==================================================
+// TAB 6: SUPPLIER (ENHANCED)
+// ==================================================
+function SupplierTab({ formData, onChange, existingSuppliers }) {
+  return (
+    <div className="space-y-6">
+      {/* Supplier Name & Contact */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <AutocompleteInput
+          label="Supplier Name"
+          value={formData.supplier_name}
+          onChange={(value) => onChange('supplier_name', value)}
+          suggestions={existingSuppliers}
+          placeholder="e.g., Auto Parts Co."
+        />
+        <InputField
+          label="Supplier Contact"
+          value={formData.supplier_contact}
+          onChange={(e) => onChange('supplier_contact', e.target.value)}
+          placeholder="Phone or Email"
+        />
+      </div>
+ 
+      {/* Supplier Part Number */}
+      <InputField
+        label="Supplier Part Number"
+        value={formData.supplier_part_number}
+        onChange={(e) => onChange('supplier_part_number', e.target.value)}
+        placeholder="Their part number (may differ from yours)"
+      />
+ 
+      {/* Supplier Price & Lead Time */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InputField
+          label="Supplier Price"
+          type="number"
+          value={formData.supplier_price}
+          onChange={(e) => onChange('supplier_price', e.target.value)}
+          min="0"
+          step="0.01"
+          placeholder="What they charge you"
+        />
+        <InputField
+          label="Lead Time (days)"
+          type="number"
+          value={formData.supplier_lead_time_days}
+          onChange={(e) => onChange('supplier_lead_time_days', e.target.value)}
+          min="0"
+          placeholder="Delivery time"
+        />
+      </div>
+ 
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Track supplier prices and lead times to optimize reordering.
+        </p>
+      </div>
+    </div>
+  )
+}
+ 
+// ==================================================
+// TAB 7: PHYSICAL PROPERTIES
+// ==================================================
+function PhysicalTab({ formData, onChange }) {
+  return (
+    <div className="space-y-6">
+      {/* Weight & Unit */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <InputField
+          label="Weight"
+          type="number"
+          value={formData.weight}
+          onChange={(e) => onChange('weight', e.target.value)}
+          min="0"
+          step="0.01"
+          placeholder="e.g., 2.5"
+        />
+        <SelectField
+          label="Weight Unit"
+          value={formData.weight_unit}
+          onChange={(e) => onChange('weight_unit', e.target.value)}
+          options={[
+            { value: 'kg', label: 'Kilograms (kg)' },
+            { value: 'g', label: 'Grams (g)' },
+            { value: 'lbs', label: 'Pounds (lbs)' },
+            { value: 'oz', label: 'Ounces (oz)' }
+          ]}
+        />
+        <InputField
+          label="Dimensions"
+          value={formData.dimensions}
+          onChange={(e) => onChange('dimensions', e.target.value)}
+          placeholder="e.g., 10x5x3 cm"
+        />
+      </div>
+ 
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Physical properties help with shipping calculations and storage planning.
+        </p>
+      </div>
+    </div>
+  )
+}
+ 
+// ==================================================
+// TAB 8: AUTOMOTIVE
+// ==================================================
+function AutomotiveTab({ formData, onChange }) {
+  return (
+    <div className="space-y-6">
+      {/* Compatible Vehicles */}
+      <TagInput
+        label="Compatible Vehicles"
+        value={formData.compatible_vehicles}
+        onChange={(tags) => onChange('compatible_vehicles', tags)}
+        placeholder="e.g., Toyota Corolla 2015-2020"
+      />
+ 
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>How to use:</strong> Type a vehicle make/model and press Enter to add it as a tag.
+          Click the × to remove.
+        </p>
+        <p className="text-sm text-blue-700 mt-2">
+          <strong>Examples:</strong>
+        </p>
+        <ul className="text-sm text-blue-700 list-disc list-inside mt-1">
+          <li>Toyota Corolla 2015-2020</li>
+          <li>Honda Civic 2016+</li>
+          <li>Ford F-150 2018-2022</li>
+        </ul>
+      </div>
+    </div>
+  )
+}
+ 
+// ==================================================
+// TAB 9: QUALITY & CERTIFICATIONS
+// ==================================================
+function QualityTab({ formData, onChange }) {
+  return (
+    <div className="space-y-6">
+      {/* Condition */}
+      <RadioGroup
+        label="Condition"
+        value={formData.condition}
+        onChange={(value) => onChange('condition', value)}
+        options={[
+          { value: 'new', label: 'New' },
+          { value: 'refurbished', label: 'Refurbished' },
+          { value: 'used', label: 'Used' }
+        ]}
+      />
+ 
+      {/* Consumable & OEM */}
+      <div className="space-y-3 pt-4 border-t border-gray-200">
+        <CheckboxField
+          label="Consumable Item (e.g., oil, filters, fluids)"
+          checked={formData.is_consumable}
+          onChange={(e) => onChange('is_consumable', e.target.checked)}
+        />
+        <CheckboxField
+          label="OEM (Original Equipment Manufacturer) Part"
+          checked={formData.oem_part}
+          onChange={(e) => onChange('oem_part', e.target.checked)}
+        />
+      </div>
+ 
+      {/* Certifications */}
+      <div className="pt-4 border-t border-gray-200">
+        <TagInput
+          label="Certification Standards"
+          value={formData.certification_standards}
+          onChange={(tags) => onChange('certification_standards', tags)}
+          placeholder="e.g., ISO 9001"
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          Common: ISO 9001, SAE Certified, CE Marked, IATF 16949
+        </p>
+      </div>
+ 
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Quality indicators and certifications help justify premium pricing.
+        </p>
+      </div>
+    </div>
+  )
+}
+ 
+// ==================================================
+// TAB 10: MEDIA (IMAGES)
+// ==================================================
+function MediaTab({ formData, onChange }) {
+  // Helper to convert textarea to array
+  const imageUrlsText = Array.isArray(formData.image_urls) 
+    ? formData.image_urls.join('\n') 
+    : formData.image_urls || ''
+ 
+  const handleImageUrlsChange = (e) => {
+    const text = e.target.value
+    const urls = text.split('\n').filter(url => url.trim())
+    onChange('image_urls', urls)
+  }
+ 
+  return (
+    <div className="space-y-6">
+      {/* Primary Image */}
+      <InputField
+        label="Primary Image URL"
+        value={formData.primary_image_url}
+        onChange={(e) => onChange('primary_image_url', e.target.value)}
+        placeholder="https://example.com/images/part-main.jpg"
+      />
+ 
+      {/* Preview Primary Image */}
+      {formData.primary_image_url && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+          <img 
+            src={formData.primary_image_url} 
+            alt="Primary preview" 
+            className="w-32 h-32 object-cover rounded border"
+            onError={(e) => e.target.style.display = 'none'}
+          />
+        </div>
+      )}
+ 
+      {/* Additional Images */}
+      <TextAreaField
+        label="Additional Image URLs (one per line)"
+        value={imageUrlsText}
+        onChange={handleImageUrlsChange}
+        rows={5}
+        placeholder="https://example.com/images/part-side.jpg
+https://example.com/images/part-back.jpg
+https://example.com/images/part-detail.jpg"
+      />
+ 
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Enter one image URL per line. Images help customers identify the correct part.
+        </p>
+      </div>
+    </div>
+  )
+}
+ 
+// Export all new tabs
+export { BrandTab, SupplierTab, PhysicalTab, AutomotiveTab, QualityTab, MediaTab }

@@ -1,5 +1,5 @@
 // src/app/provider/inventory/components/FormUtilities.jsx
-// Reusable form components and utilities
+// ENHANCED - Added TagInput and MultiCheckbox for Phase 2
 
 'use client'
 
@@ -10,8 +10,8 @@ export function TabContainer({ tabs, activeTab, onChange, children }) {
   return (
     <div>
       {/* Tab Headers */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-4 overflow-x-auto">
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="-mb-px flex space-x-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -115,6 +115,70 @@ export function AutocompleteInput({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// Tag Input Component (NEW for Phase 2)
+export function TagInput({ 
+  value = [], 
+  onChange, 
+  placeholder = 'Type and press Enter',
+  label = ''
+}) {
+  const [inputValue, setInputValue] = useState('')
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      e.preventDefault()
+      if (!value.includes(inputValue.trim())) {
+        onChange([...value, inputValue.trim()])
+      }
+      setInputValue('')
+    }
+  }
+
+  const handleRemove = (tagToRemove) => {
+    onChange(value.filter(tag => tag !== tagToRemove))
+  }
+
+  return (
+    <div>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label}
+        </label>
+      )}
+      
+      {/* Tags Display */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {value.map((tag, index) => (
+          <span
+            key={index}
+            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => handleRemove(tag)}
+              className="hover:text-blue-900"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {/* Input */}
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+      <p className="text-xs text-gray-500 mt-1">Press Enter to add</p>
     </div>
   )
 }
@@ -227,5 +291,30 @@ export function CheckboxField({ label, checked, onChange }) {
       />
       <span className="text-sm font-medium text-gray-700">{label}</span>
     </label>
+  )
+}
+
+// Radio Group Component (NEW for Phase 2)
+export function RadioGroup({ label, value, onChange, options }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label}
+      </label>
+      <div className="space-y-2">
+        {options.map((option) => (
+          <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              value={option.value}
+              checked={value === option.value}
+              onChange={(e) => onChange(e.target.value)}
+              className="text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
   )
 }
