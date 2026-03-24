@@ -1,7 +1,7 @@
 'use client'
 
-// src/app/provider/inventory/page.js
-// Main Inventory Page - Modular Architecture
+// FIXED VERSION with Debug Logging and Safety Checks
+// This version has console.log statements to help diagnose the UUID error
 
 import { useState, useEffect } from 'react'
 import TabbedFormModal from './components/TabbedFormModal'
@@ -33,6 +33,8 @@ export default function ProviderInventoryPage() {
       const data = await response.json()
 
       if (response.ok) {
+        console.log('✅ Loaded inventory:', data.inventory?.length, 'items') // DEBUG
+        console.log('Sample item:', data.inventory?.[0]) // DEBUG - Check if ID exists
         setInventory(data.inventory || [])
         setStats(data.stats)
         setReadOnly(data.readOnly || false)
@@ -48,7 +50,14 @@ export default function ProviderInventoryPage() {
   }
 
   async function deleteItem(id) {
+    if (!id) {
+      console.error('❌ Delete called with undefined ID')
+      alert('Error: Item ID is missing')
+      return
+    }
+
     try {
+      console.log('🗑️ Deleting item with ID:', id) // DEBUG
       const response = await fetch(`/api/inventory/${id}`, { method: 'DELETE' })
       if (response.ok) {
         loadInventory()
@@ -62,12 +71,60 @@ export default function ProviderInventoryPage() {
     }
   }
 
-  // Extract autocomplete data from existing inventory
+  // Safe handlers with validation
+  const handleView = (item) => {
+    console.log('👁️ View clicked, item:', item) // DEBUG
+    console.log('Item ID:', item?.id) // DEBUG
+    if (!item || !item.id) {
+      console.error('❌ Invalid item for view:', item)
+      alert('Error: Invalid item data (missing ID)')
+      return
+    }
+    setSelectedItem(item)
+    setShowDetailsModal(true)
+  }
+
+  const handleEdit = (item) => {
+    console.log('✏️ Edit clicked, item:', item) // DEBUG
+    console.log('Item ID:', item?.id) // DEBUG
+    if (!item || !item.id) {
+      console.error('❌ Invalid item for edit:', item)
+      alert('Error: Invalid item data (missing ID)')
+      return
+    }
+    setSelectedItem(item)
+    setShowEditModal(true)
+  }
+
+  const handleAdjust = (item) => {
+    console.log('📊 Adjust clicked, item:', item) // DEBUG
+    console.log('Item ID:', item?.id) // DEBUG
+    if (!item || !item.id) {
+      console.error('❌ Invalid item for adjust:', item)
+      alert('Error: Invalid item data (missing ID)')
+      return
+    }
+    setSelectedItem(item)
+    setShowAdjustModal(true)
+  }
+
+  const handleDelete = (item) => {
+    console.log('🗑️ Delete clicked, item:', item) // DEBUG
+    console.log('Item ID:', item?.id) // DEBUG
+    if (!item || !item.id) {
+      console.error('❌ Invalid item for delete:', item)
+      alert('Error: Invalid item data (missing ID)')
+      return
+    }
+    if (confirm(`Delete "${item.name}"?`)) {
+      deleteItem(item.id)
+    }
+  }
+
   const categories = [...new Set(inventory.map(item => item.category).filter(Boolean))]
   const suppliers = [...new Set(inventory.map(item => item.supplier_name).filter(Boolean))]
   const locations = [...new Set(inventory.map(item => item.location_in_shop).filter(Boolean))]
 
-  // Filter inventory
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,23 +253,10 @@ export default function ProviderInventoryPage() {
                   <InventoryRow
                     key={item.id}
                     item={item}
-                    onView={() => {
-                      setSelectedItem(item)
-                      setShowDetailsModal(true)
-                    }}
-                    onEdit={() => {
-                      setSelectedItem(item)
-                      setShowEditModal(true)
-                    }}
-                    onAdjust={() => {
-                      setSelectedItem(item)
-                      setShowAdjustModal(true)
-                    }}
-                    onDelete={() => {
-                      if (confirm(`Delete "${item.name}"?`)) {
-                        deleteItem(item.id)
-                      }
-                    }}
+                    onView={() => handleView(item)}
+                    onEdit={() => handleEdit(item)}
+                    onAdjust={() => handleAdjust(item)}
+                    onDelete={() => handleDelete(item)}
                     readOnly={readOnly}
                   />
                 ))
