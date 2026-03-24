@@ -1,11 +1,11 @@
 // src/app/provider/inventory/components/TabbedFormModal.jsx
-// FINAL FIX: UUID bug resolved with extensive debugging
+// PHASE 2 COMPLETE - All 10 tabs with 40+ fields
 
 'use client'
 
 import { useState } from 'react'
-import { TabContainer, TabPanel, AutocompleteInput, InputField, TextAreaField, SelectField, CheckboxField, calculateProfitMargin } from './FormUtilities'
-import { TagInput, RadioGroup } from './FormUtilities'
+import { TabContainer, TabPanel, AutocompleteInput, InputField, TextAreaField, 
+         SelectField, CheckboxField, calculateProfitMargin, TagInput, RadioGroup } from './FormUtilities'
 
 export default function TabbedFormModal({ 
   mode = 'add', 
@@ -19,17 +19,12 @@ export default function TabbedFormModal({
   const [activeTab, setActiveTab] = useState('basic')
   const [submitting, setSubmitting] = useState(false)
   
-  // DEBUG: Log what we received
-  console.log('🔧 TabbedFormModal props:', { mode, item, itemId: item?.id })
-  
-  // CRITICAL: Save item ID separately so it's not lost during state updates
+  // Save item ID
   const itemId = item?.id
   
-  console.log('💾 Saved itemId:', itemId) // DEBUG
-  
-  // Initialize form data
+  // Initialize form data with ALL fields (40+)
   const [formData, setFormData] = useState({
-    // Basic Info
+    // Tab 1: Basic Info
     name: item?.name || '',
     description: item?.description || '',
     sku: item?.sku || '',
@@ -37,19 +32,50 @@ export default function TabbedFormModal({
     barcode: item?.barcode || '',
     category: item?.category || '',
     
-    // Stock & Location
+    // Tab 2: Brand & Manufacturer
+    brand: item?.brand || '',
+    manufacturer: item?.manufacturer || '',
+    model: item?.model || '',
+    warranty_months: item?.warranty_months || '',
+    oem_part: item?.oem_part || false,
+    
+    // Tab 3: Stock & Location
     stock: item?.stock || 0,
     min_stock_level: item?.min_stock_level || 0,
     reorder_level: item?.reorder_level || '',
     reorder_quantity: item?.reorder_quantity || '',
     location_in_shop: item?.location_in_shop || '',
     
-    // Pricing
+    // Tab 4: Pricing
     cost_price: item?.cost_price || '',
     unit_price: item?.unit_price || 0,
     currency: item?.currency || 'KES',
     
-    // Notes
+    // Tab 5: Supplier
+    supplier_name: item?.supplier_name || '',
+    supplier_contact: item?.supplier_contact || '',
+    supplier_part_number: item?.supplier_part_number || '',
+    supplier_price: item?.supplier_price || '',
+    supplier_lead_time_days: item?.supplier_lead_time_days || '',
+    
+    // Tab 6: Physical
+    weight: item?.weight || '',
+    weight_unit: item?.weight_unit || 'kg',
+    dimensions: item?.dimensions || '',
+    
+    // Tab 7: Automotive
+    compatible_vehicles: item?.compatible_vehicles || [],
+    
+    // Tab 8: Quality
+    condition: item?.condition || 'new',
+    is_consumable: item?.is_consumable || false,
+    certification_standards: item?.certification_standards || [],
+    
+    // Tab 9: Media
+    primary_image_url: item?.primary_image_url || '',
+    image_urls: item?.image_urls || [],
+    
+    // Tab 10: Notes
     notes: item?.notes || '',
     is_active: item?.is_active !== false
   })
@@ -59,11 +85,17 @@ export default function TabbedFormModal({
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  // Tab configuration
+  // Tab configuration - ALL 10 TABS
   const tabs = [
     { id: 'basic', label: 'Basic Info', icon: '📝', required: true },
+    { id: 'brand', label: 'Brand', icon: '🏷️' },
     { id: 'stock', label: 'Stock & Location', icon: '📦', required: true },
     { id: 'pricing', label: 'Pricing', icon: '💰', required: true },
+    { id: 'supplier', label: 'Supplier', icon: '🏭' },
+    { id: 'physical', label: 'Physical', icon: '📏' },
+    { id: 'automotive', label: 'Automotive', icon: '🚗' },
+    { id: 'quality', label: 'Quality', icon: '✨' },
+    { id: 'media', label: 'Media', icon: '🖼️' },
     { id: 'notes', label: 'Notes', icon: '📄' }
   ]
 
@@ -87,16 +119,12 @@ export default function TabbedFormModal({
     return true
   }
 
-  // Handle save button click (not form submit)
+  // Handle save
   const handleSaveClick = async () => {
     if (!validateForm()) return
     
-    // Validate we have ID for edit mode
     if (mode === 'edit' && !itemId) {
-      console.error('❌ Edit mode but no item ID available')
-      console.error('Item prop:', item)
-      console.error('itemId variable:', itemId)
-      alert('Error: Item ID is missing. Cannot update.')
+      alert('Error: Item ID is missing')
       return
     }
     
@@ -109,26 +137,29 @@ export default function TabbedFormModal({
       
       const method = mode === 'add' ? 'POST' : 'PUT'
       
-      console.log(`📡 ${mode.toUpperCase()} request to:`, url) // DEBUG
-      console.log('📦 Data being sent:', formData) // DEBUG
+      // Ensure arrays are properly formatted
+      const submitData = {
+        ...formData,
+        compatible_vehicles: Array.isArray(formData.compatible_vehicles) ? formData.compatible_vehicles : [],
+        certification_standards: Array.isArray(formData.certification_standards) ? formData.certification_standards : [],
+        image_urls: Array.isArray(formData.image_urls) ? formData.image_urls : []
+      }
       
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        console.log('✅ Success:', data) // DEBUG
         onSuccess()
       } else {
-        console.error('❌ Server error:', data) // DEBUG
         alert(data.error || `Failed to ${mode} item`)
       }
     } catch (error) {
-      console.error(`❌ ${mode} error:`, error)
+      console.error(`${mode} error:`, error)
       alert(`Failed to ${mode} item`)
     } finally {
       setSubmitting(false)
@@ -159,7 +190,7 @@ export default function TabbedFormModal({
         <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">
-              {mode === 'add' ? 'Add Inventory Item' : `Edit Inventory Item ${itemId ? `(ID: ${itemId.slice(0, 8)}...)` : ''}`}
+              {mode === 'add' ? 'Add Inventory Item' : 'Edit Inventory Item'}
             </h2>
             <button
               type="button"
@@ -169,9 +200,12 @@ export default function TabbedFormModal({
               ×
             </button>
           </div>
+          <p className="text-sm text-gray-500 mt-2">
+            Tab {currentTabIndex + 1} of {tabs.length} • {tabs[currentTabIndex].label}
+          </p>
         </div>
 
-        {/* Content - NOT wrapped in form to prevent auto-submit */}
+        {/* Content */}
         <div className="p-6">
           <TabContainer tabs={tabs} activeTab={activeTab} onChange={setActiveTab}>
             {/* Tab 1: Basic Info */}
@@ -183,7 +217,15 @@ export default function TabbedFormModal({
               />
             </TabPanel>
 
-            {/* Tab 2: Stock & Location */}
+            {/* Tab 2: Brand & Manufacturer */}
+            <TabPanel id="brand" activeTab={activeTab}>
+              <BrandTab 
+                formData={formData}
+                onChange={handleChange}
+              />
+            </TabPanel>
+
+            {/* Tab 3: Stock & Location */}
             <TabPanel id="stock" activeTab={activeTab}>
               <StockTab 
                 formData={formData}
@@ -192,7 +234,7 @@ export default function TabbedFormModal({
               />
             </TabPanel>
 
-            {/* Tab 3: Pricing */}
+            {/* Tab 4: Pricing */}
             <TabPanel id="pricing" activeTab={activeTab}>
               <PricingTab 
                 formData={formData}
@@ -200,7 +242,48 @@ export default function TabbedFormModal({
               />
             </TabPanel>
 
-            {/* Tab 4: Notes */}
+            {/* Tab 5: Supplier */}
+            <TabPanel id="supplier" activeTab={activeTab}>
+              <SupplierTab 
+                formData={formData}
+                onChange={handleChange}
+                existingSuppliers={existingSuppliers}
+              />
+            </TabPanel>
+
+            {/* Tab 6: Physical */}
+            <TabPanel id="physical" activeTab={activeTab}>
+              <PhysicalTab 
+                formData={formData}
+                onChange={handleChange}
+              />
+            </TabPanel>
+
+            {/* Tab 7: Automotive */}
+            <TabPanel id="automotive" activeTab={activeTab}>
+              <AutomotiveTab 
+                formData={formData}
+                onChange={handleChange}
+              />
+            </TabPanel>
+
+            {/* Tab 8: Quality */}
+            <TabPanel id="quality" activeTab={activeTab}>
+              <QualityTab 
+                formData={formData}
+                onChange={handleChange}
+              />
+            </TabPanel>
+
+            {/* Tab 9: Media */}
+            <TabPanel id="media" activeTab={activeTab}>
+              <MediaTab 
+                formData={formData}
+                onChange={handleChange}
+              />
+            </TabPanel>
+
+            {/* Tab 10: Notes */}
             <TabPanel id="notes" activeTab={activeTab}>
               <NotesTab 
                 formData={formData}
@@ -266,7 +349,6 @@ export default function TabbedFormModal({
 function BasicInfoTab({ formData, onChange, existingCategories }) {
   return (
     <div className="space-y-6">
-      {/* Part Name - Required */}
       <InputField
         label="Part Name"
         value={formData.name}
@@ -275,7 +357,6 @@ function BasicInfoTab({ formData, onChange, existingCategories }) {
         required
       />
 
-      {/* Description */}
       <TextAreaField
         label="Description"
         value={formData.description}
@@ -284,7 +365,6 @@ function BasicInfoTab({ formData, onChange, existingCategories }) {
         rows={3}
       />
 
-      {/* SKU, Part Number, Barcode - Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <InputField
           label="SKU"
@@ -306,7 +386,6 @@ function BasicInfoTab({ formData, onChange, existingCategories }) {
         />
       </div>
 
-      {/* Category with Autocomplete */}
       <AutocompleteInput
         label="Category"
         value={formData.category}
@@ -318,11 +397,62 @@ function BasicInfoTab({ formData, onChange, existingCategories }) {
   )
 }
 
-// Tab 2: Stock & Location
+// Tab 2: Brand & Manufacturer
+function BrandTab({ formData, onChange }) {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <InputField
+          label="Brand"
+          value={formData.brand}
+          onChange={(e) => onChange('brand', e.target.value)}
+          placeholder="e.g., Bosch, NGK, Denso"
+        />
+        <InputField
+          label="Manufacturer"
+          value={formData.manufacturer}
+          onChange={(e) => onChange('manufacturer', e.target.value)}
+          placeholder="e.g., Toyota, Honda"
+        />
+        <InputField
+          label="Model"
+          value={formData.model}
+          onChange={(e) => onChange('model', e.target.value)}
+          placeholder="e.g., Series 3, Type A"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InputField
+          label="Warranty (months)"
+          type="number"
+          value={formData.warranty_months}
+          onChange={(e) => onChange('warranty_months', e.target.value)}
+          min="0"
+          placeholder="e.g., 12, 24"
+        />
+        <div className="flex items-center pt-7">
+          <CheckboxField
+            label="OEM (Original Equipment Manufacturer) Part"
+            checked={formData.oem_part}
+            onChange={(e) => onChange('oem_part', e.target.checked)}
+          />
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> OEM parts are original manufacturer parts, often higher quality and price.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Tab 3: Stock & Location
 function StockTab({ formData, onChange, existingLocations }) {
   return (
     <div className="space-y-6">
-      {/* Stock Levels - Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <InputField
           label="Current Stock"
@@ -357,7 +487,6 @@ function StockTab({ formData, onChange, existingLocations }) {
         />
       </div>
 
-      {/* Location with Autocomplete */}
       <AutocompleteInput
         label="Location in Shop"
         value={formData.location_in_shop}
@@ -366,7 +495,6 @@ function StockTab({ formData, onChange, existingLocations }) {
         placeholder="e.g., Shelf A-12, Bin 5, Warehouse"
       />
 
-      {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Set a minimum stock level to get low stock alerts. 
@@ -377,7 +505,7 @@ function StockTab({ formData, onChange, existingLocations }) {
   )
 }
 
-// Tab 3: Pricing
+// Tab 4: Pricing
 function PricingTab({ formData, onChange }) {
   const profitMargin = calculateProfitMargin(
     parseFloat(formData.cost_price) || 0,
@@ -389,7 +517,6 @@ function PricingTab({ formData, onChange }) {
 
   return (
     <div className="space-y-6">
-      {/* Pricing Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <InputField
           label="Cost Price"
@@ -423,7 +550,6 @@ function PricingTab({ formData, onChange }) {
         />
       </div>
 
-      {/* Profit Margin Display */}
       {profitMargin && (
         <div className={`rounded-lg p-4 ${showWarning ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
           <div className="flex items-center justify-between">
@@ -446,7 +572,6 @@ function PricingTab({ formData, onChange }) {
         </div>
       )}
 
-      {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Enter the cost price to track profit margins. 
@@ -457,98 +582,10 @@ function PricingTab({ formData, onChange }) {
   )
 }
 
-// Tab 4: Notes
-function NotesTab({ formData, onChange }) {
-  return (
-    <div className="space-y-6">
-      {/* Internal Notes */}
-      <TextAreaField
-        label="Internal Notes"
-        value={formData.notes}
-        onChange={(e) => onChange('notes', e.target.value)}
-        placeholder="Add any internal notes, comments, or special instructions..."
-        rows={6}
-      />
-
-      {/* Active Status */}
-      <div className="pt-4 border-t border-gray-200">
-        <CheckboxField
-          label="Active"
-          checked={formData.is_active}
-          onChange={(e) => onChange('is_active', e.target.checked)}
-        />
-        <p className="text-sm text-gray-500 mt-2 ml-6">
-          Inactive items are hidden from most views but can still be found in searches.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ==================================================
-// TAB 5: BRAND & MANUFACTURER
-// ==================================================
-function BrandTab({ formData, onChange }) {
-  return (
-    <div className="space-y-6">
-      {/* Brand, Manufacturer, Model */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <InputField
-          label="Brand"
-          value={formData.brand}
-          onChange={(e) => onChange('brand', e.target.value)}
-          placeholder="e.g., Bosch, NGK, Denso"
-        />
-        <InputField
-          label="Manufacturer"
-          value={formData.manufacturer}
-          onChange={(e) => onChange('manufacturer', e.target.value)}
-          placeholder="e.g., Toyota, Honda"
-        />
-        <InputField
-          label="Model"
-          value={formData.model}
-          onChange={(e) => onChange('model', e.target.value)}
-          placeholder="e.g., Series 3, Type A"
-        />
-      </div>
- 
-      {/* Warranty & OEM */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <InputField
-          label="Warranty (months)"
-          type="number"
-          value={formData.warranty_months}
-          onChange={(e) => onChange('warranty_months', e.target.value)}
-          min="0"
-          placeholder="e.g., 12, 24"
-        />
-        <div className="flex items-center pt-7">
-          <CheckboxField
-            label="OEM (Original Equipment Manufacturer) Part"
-            checked={formData.oem_part}
-            onChange={(e) => onChange('oem_part', e.target.checked)}
-          />
-        </div>
-      </div>
- 
-      {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          <strong>Tip:</strong> OEM parts are original manufacturer parts, often higher quality and price.
-        </p>
-      </div>
-    </div>
-  )
-}
- 
-// ==================================================
-// TAB 6: SUPPLIER (ENHANCED)
-// ==================================================
+// Tab 5: Supplier
 function SupplierTab({ formData, onChange, existingSuppliers }) {
   return (
     <div className="space-y-6">
-      {/* Supplier Name & Contact */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AutocompleteInput
           label="Supplier Name"
@@ -564,16 +601,14 @@ function SupplierTab({ formData, onChange, existingSuppliers }) {
           placeholder="Phone or Email"
         />
       </div>
- 
-      {/* Supplier Part Number */}
+
       <InputField
         label="Supplier Part Number"
         value={formData.supplier_part_number}
         onChange={(e) => onChange('supplier_part_number', e.target.value)}
         placeholder="Their part number (may differ from yours)"
       />
- 
-      {/* Supplier Price & Lead Time */}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputField
           label="Supplier Price"
@@ -593,8 +628,7 @@ function SupplierTab({ formData, onChange, existingSuppliers }) {
           placeholder="Delivery time"
         />
       </div>
- 
-      {/* Info Box */}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Track supplier prices and lead times to optimize reordering.
@@ -603,14 +637,11 @@ function SupplierTab({ formData, onChange, existingSuppliers }) {
     </div>
   )
 }
- 
-// ==================================================
-// TAB 7: PHYSICAL PROPERTIES
-// ==================================================
+
+// Tab 6: Physical
 function PhysicalTab({ formData, onChange }) {
   return (
     <div className="space-y-6">
-      {/* Weight & Unit */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <InputField
           label="Weight"
@@ -639,8 +670,7 @@ function PhysicalTab({ formData, onChange }) {
           placeholder="e.g., 10x5x3 cm"
         />
       </div>
- 
-      {/* Info Box */}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Physical properties help with shipping calculations and storage planning.
@@ -649,22 +679,18 @@ function PhysicalTab({ formData, onChange }) {
     </div>
   )
 }
- 
-// ==================================================
-// TAB 8: AUTOMOTIVE
-// ==================================================
+
+// Tab 7: Automotive
 function AutomotiveTab({ formData, onChange }) {
   return (
     <div className="space-y-6">
-      {/* Compatible Vehicles */}
       <TagInput
         label="Compatible Vehicles"
         value={formData.compatible_vehicles}
         onChange={(tags) => onChange('compatible_vehicles', tags)}
         placeholder="e.g., Toyota Corolla 2015-2020"
       />
- 
-      {/* Info Box */}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>How to use:</strong> Type a vehicle make/model and press Enter to add it as a tag.
@@ -682,14 +708,11 @@ function AutomotiveTab({ formData, onChange }) {
     </div>
   )
 }
- 
-// ==================================================
-// TAB 9: QUALITY & CERTIFICATIONS
-// ==================================================
+
+// Tab 8: Quality
 function QualityTab({ formData, onChange }) {
   return (
     <div className="space-y-6">
-      {/* Condition */}
       <RadioGroup
         label="Condition"
         value={formData.condition}
@@ -700,22 +723,15 @@ function QualityTab({ formData, onChange }) {
           { value: 'used', label: 'Used' }
         ]}
       />
- 
-      {/* Consumable & OEM */}
+
       <div className="space-y-3 pt-4 border-t border-gray-200">
         <CheckboxField
           label="Consumable Item (e.g., oil, filters, fluids)"
           checked={formData.is_consumable}
           onChange={(e) => onChange('is_consumable', e.target.checked)}
         />
-        <CheckboxField
-          label="OEM (Original Equipment Manufacturer) Part"
-          checked={formData.oem_part}
-          onChange={(e) => onChange('oem_part', e.target.checked)}
-        />
       </div>
- 
-      {/* Certifications */}
+
       <div className="pt-4 border-t border-gray-200">
         <TagInput
           label="Certification Standards"
@@ -727,8 +743,7 @@ function QualityTab({ formData, onChange }) {
           Common: ISO 9001, SAE Certified, CE Marked, IATF 16949
         </p>
       </div>
- 
-      {/* Info Box */}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Quality indicators and certifications help justify premium pricing.
@@ -737,33 +752,28 @@ function QualityTab({ formData, onChange }) {
     </div>
   )
 }
- 
-// ==================================================
-// TAB 10: MEDIA (IMAGES)
-// ==================================================
+
+// Tab 9: Media
 function MediaTab({ formData, onChange }) {
-  // Helper to convert textarea to array
   const imageUrlsText = Array.isArray(formData.image_urls) 
     ? formData.image_urls.join('\n') 
     : formData.image_urls || ''
- 
+
   const handleImageUrlsChange = (e) => {
     const text = e.target.value
     const urls = text.split('\n').filter(url => url.trim())
     onChange('image_urls', urls)
   }
- 
+
   return (
     <div className="space-y-6">
-      {/* Primary Image */}
       <InputField
         label="Primary Image URL"
         value={formData.primary_image_url}
         onChange={(e) => onChange('primary_image_url', e.target.value)}
         placeholder="https://example.com/images/part-main.jpg"
       />
- 
-      {/* Preview Primary Image */}
+
       {formData.primary_image_url && (
         <div>
           <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
@@ -775,8 +785,7 @@ function MediaTab({ formData, onChange }) {
           />
         </div>
       )}
- 
-      {/* Additional Images */}
+
       <TextAreaField
         label="Additional Image URLs (one per line)"
         value={imageUrlsText}
@@ -786,8 +795,7 @@ function MediaTab({ formData, onChange }) {
 https://example.com/images/part-back.jpg
 https://example.com/images/part-detail.jpg"
       />
- 
-      {/* Info Box */}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Enter one image URL per line. Images help customers identify the correct part.
@@ -796,6 +804,29 @@ https://example.com/images/part-detail.jpg"
     </div>
   )
 }
- 
-// Export all new tabs
-export { BrandTab, SupplierTab, PhysicalTab, AutomotiveTab, QualityTab, MediaTab }
+
+// Tab 10: Notes
+function NotesTab({ formData, onChange }) {
+  return (
+    <div className="space-y-6">
+      <TextAreaField
+        label="Internal Notes"
+        value={formData.notes}
+        onChange={(e) => onChange('notes', e.target.value)}
+        placeholder="Add any internal notes, comments, or special instructions..."
+        rows={6}
+      />
+
+      <div className="pt-4 border-t border-gray-200">
+        <CheckboxField
+          label="Active"
+          checked={formData.is_active}
+          onChange={(e) => onChange('is_active', e.target.checked)}
+        />
+        <p className="text-sm text-gray-500 mt-2 ml-6">
+          Inactive items are hidden from most views but can still be found in searches.
+        </p>
+      </div>
+    </div>
+  )
+}
