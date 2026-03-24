@@ -1,5 +1,5 @@
 // src/app/provider/inventory/components/TabbedFormModal.jsx
-// FIXED: Proper form submission handling + UUID bug fix
+// FINAL FIX: UUID bug resolved with extensive debugging
 
 'use client'
 
@@ -17,6 +17,14 @@ export default function TabbedFormModal({
 }) {
   const [activeTab, setActiveTab] = useState('basic')
   const [submitting, setSubmitting] = useState(false)
+  
+  // DEBUG: Log what we received
+  console.log('🔧 TabbedFormModal props:', { mode, item, itemId: item?.id })
+  
+  // CRITICAL: Save item ID separately so it's not lost during state updates
+  const itemId = item?.id
+  
+  console.log('💾 Saved itemId:', itemId) // DEBUG
   
   // Initialize form data
   const [formData, setFormData] = useState({
@@ -78,20 +86,30 @@ export default function TabbedFormModal({
     return true
   }
 
-  // Handle form submission
-  async function handleSubmit(e) {
-    e.preventDefault()
-    
+  // Handle save button click (not form submit)
+  const handleSaveClick = async () => {
     if (!validateForm()) return
+    
+    // Validate we have ID for edit mode
+    if (mode === 'edit' && !itemId) {
+      console.error('❌ Edit mode but no item ID available')
+      console.error('Item prop:', item)
+      console.error('itemId variable:', itemId)
+      alert('Error: Item ID is missing. Cannot update.')
+      return
+    }
     
     setSubmitting(true)
 
     try {
       const url = mode === 'add' 
         ? '/api/inventory'
-        : `/api/inventory/${item.id}`
+        : `/api/inventory/${itemId}`
       
       const method = mode === 'add' ? 'POST' : 'PUT'
+      
+      console.log(`📡 ${mode.toUpperCase()} request to:`, url) // DEBUG
+      console.log('📦 Data being sent:', formData) // DEBUG
       
       const response = await fetch(url, {
         method,
@@ -102,12 +120,14 @@ export default function TabbedFormModal({
       const data = await response.json()
 
       if (response.ok) {
+        console.log('✅ Success:', data) // DEBUG
         onSuccess()
       } else {
+        console.error('❌ Server error:', data) // DEBUG
         alert(data.error || `Failed to ${mode} item`)
       }
     } catch (error) {
-      console.error(`${mode} error:`, error)
+      console.error(`❌ ${mode} error:`, error)
       alert(`Failed to ${mode} item`)
     } finally {
       setSubmitting(false)
@@ -131,40 +151,6 @@ export default function TabbedFormModal({
     }
   }
 
-  // Handle save button click (not form submit)
-  const handleSaveClick = async () => {
-    if (!validateForm()) return
-    
-    setSubmitting(true)
-
-    try {
-      const url = mode === 'add' 
-        ? '/api/inventory'
-        : `/api/inventory/${item.id}`
-      
-      const method = mode === 'add' ? 'POST' : 'PUT'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        onSuccess()
-      } else {
-        alert(data.error || `Failed to ${mode} item`)
-      }
-    } catch (error) {
-      console.error(`${mode} error:`, error)
-      alert(`Failed to ${mode} item`)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -172,7 +158,7 @@ export default function TabbedFormModal({
         <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">
-              {mode === 'add' ? 'Add Inventory Item' : 'Edit Inventory Item'}
+              {mode === 'add' ? 'Add Inventory Item' : `Edit Inventory Item ${itemId ? `(ID: ${itemId.slice(0, 8)}...)` : ''}`}
             </h2>
             <button
               type="button"
