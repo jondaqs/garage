@@ -1,5 +1,5 @@
 // src/app/provider/inventory/components/TabbedFormModal.jsx
-// Add/Edit Modal with 4 Core Tabs
+// FIXED: Proper form submission handling + UUID bug fix
 
 'use client'
 
@@ -131,6 +131,40 @@ export default function TabbedFormModal({
     }
   }
 
+  // Handle save button click (not form submit)
+  const handleSaveClick = async () => {
+    if (!validateForm()) return
+    
+    setSubmitting(true)
+
+    try {
+      const url = mode === 'add' 
+        ? '/api/inventory'
+        : `/api/inventory/${item.id}`
+      
+      const method = mode === 'add' ? 'POST' : 'PUT'
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        onSuccess()
+      } else {
+        alert(data.error || `Failed to ${mode} item`)
+      }
+    } catch (error) {
+      console.error(`${mode} error:`, error)
+      alert(`Failed to ${mode} item`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -141,6 +175,7 @@ export default function TabbedFormModal({
               {mode === 'add' ? 'Add Inventory Item' : 'Edit Inventory Item'}
             </h2>
             <button
+              type="button"
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl"
             >
@@ -149,8 +184,8 @@ export default function TabbedFormModal({
           </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
+        {/* Content - NOT wrapped in form to prevent auto-submit */}
+        <div className="p-6">
           <TabContainer tabs={tabs} activeTab={activeTab} onChange={setActiveTab}>
             {/* Tab 1: Basic Info */}
             <TabPanel id="basic" activeTab={activeTab}>
@@ -220,7 +255,8 @@ export default function TabbedFormModal({
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSaveClick}
                   disabled={submitting}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
@@ -229,7 +265,7 @@ export default function TabbedFormModal({
               )}
             </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
