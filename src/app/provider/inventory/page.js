@@ -1,10 +1,12 @@
 'use client'
 
 // src/app/provider/inventory/page.js
-// Complete inventory management for service providers
+// Main Inventory Page - Modular Architecture
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import TabbedFormModal from './components/TabbedFormModal'
+import DetailsModal from './components/DetailsModal'
+import AdjustStockModal from './components/AdjustStockModal'
 
 export default function ProviderInventoryPage() {
   const [inventory, setInventory] = useState([])
@@ -13,6 +15,7 @@ export default function ProviderInventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAdjustModal, setShowAdjustModal] = useState(false)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -44,14 +47,33 @@ export default function ProviderInventoryPage() {
     }
   }
 
-  // Get unique categories
+  async function deleteItem(id) {
+    try {
+      const response = await fetch(`/api/inventory/${id}`, { method: 'DELETE' })
+      if (response.ok) {
+        loadInventory()
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Failed to delete item')
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Failed to delete item')
+    }
+  }
+
+  // Extract autocomplete data from existing inventory
   const categories = [...new Set(inventory.map(item => item.category).filter(Boolean))]
+  const suppliers = [...new Set(inventory.map(item => item.supplier_name).filter(Boolean))]
+  const locations = [...new Set(inventory.map(item => item.location_in_shop).filter(Boolean))]
 
   // Filter inventory
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.part_number?.toLowerCase().includes(searchTerm.toLowerCase())
+                         item.part_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.description?.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesCategory = filterCategory === 'all' || item.category === filterCategory
     
@@ -95,61 +117,29 @@ export default function ProviderInventoryPage() {
       {/* Statistics Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <StatCard
-            title="Total Items"
-            value={stats.totalItems}
-            icon="📦"
-            color="blue"
-          />
-          <StatCard
-            title="Active Items"
-            value={stats.activeItems}
-            icon="✅"
-            color="green"
-          />
-          <StatCard
-            title="Low Stock"
-            value={stats.lowStockItems}
-            icon="⚠️"
-            color="yellow"
-          />
-          <StatCard
-            title="Out of Stock"
-            value={stats.outOfStockItems}
-            icon="❌"
-            color="red"
-          />
-          <StatCard
-            title="Total Value"
-            value={`KES ${stats.totalValue.toLocaleString()}`}
-            icon="💰"
-            color="purple"
-          />
+          <StatCard title="Total Items" value={stats.totalItems} icon="📦" color="blue" />
+          <StatCard title="Active Items" value={stats.activeItems} icon="✅" color="green" />
+          <StatCard title="Low Stock" value={stats.lowStockItems} icon="⚠️" color="yellow" />
+          <StatCard title="Out of Stock" value={stats.outOfStockItems} icon="❌" color="red" />
+          <StatCard title="Total Value" value={`KES ${stats.totalValue?.toLocaleString() || 0}`} icon="💰" color="purple" />
         </div>
       )}
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, SKU, or part number..."
+              placeholder="Search by name, SKU, barcode..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
-          {/* Category Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
@@ -161,12 +151,8 @@ export default function ProviderInventoryPage() {
               ))}
             </select>
           </div>
-
-          {/* Status Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Stock Status
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Stock Status</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -187,27 +173,13 @@ export default function ProviderInventoryPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Part Details
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Value
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Part Details</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -224,6 +196,10 @@ export default function ProviderInventoryPage() {
                   <InventoryRow
                     key={item.id}
                     item={item}
+                    onView={() => {
+                      setSelectedItem(item)
+                      setShowDetailsModal(true)
+                    }}
                     onEdit={() => {
                       setSelectedItem(item)
                       setShowEditModal(true)
@@ -232,9 +208,9 @@ export default function ProviderInventoryPage() {
                       setSelectedItem(item)
                       setShowAdjustModal(true)
                     }}
-                    onDelete={async () => {
+                    onDelete={() => {
                       if (confirm(`Delete "${item.name}"?`)) {
-                        await deleteItem(item.id)
+                        deleteItem(item.id)
                       }
                     }}
                     readOnly={readOnly}
@@ -248,17 +224,22 @@ export default function ProviderInventoryPage() {
 
       {/* Modals */}
       {showAddModal && (
-        <AddItemModal
+        <TabbedFormModal
+          mode="add"
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false)
             loadInventory()
           }}
+          existingCategories={categories}
+          existingSuppliers={suppliers}
+          existingLocations={locations}
         />
       )}
 
       {showEditModal && selectedItem && (
-        <EditItemModal
+        <TabbedFormModal
+          mode="edit"
           item={selectedItem}
           onClose={() => {
             setShowEditModal(false)
@@ -269,6 +250,9 @@ export default function ProviderInventoryPage() {
             setSelectedItem(null)
             loadInventory()
           }}
+          existingCategories={categories}
+          existingSuppliers={suppliers}
+          existingLocations={locations}
         />
       )}
 
@@ -286,26 +270,22 @@ export default function ProviderInventoryPage() {
           }}
         />
       )}
+
+      {showDetailsModal && selectedItem && (
+        <DetailsModal
+          item={selectedItem}
+          onClose={() => {
+            setShowDetailsModal(false)
+            setSelectedItem(null)
+          }}
+          onEdit={() => {
+            setShowDetailsModal(false)
+            setShowEditModal(true)
+          }}
+        />
+      )}
     </div>
   )
-
-  async function deleteItem(id) {
-    try {
-      const response = await fetch(`/api/inventory/${id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        loadInventory()
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to delete item')
-      }
-    } catch (error) {
-      console.error('Delete error:', error)
-      alert('Failed to delete item')
-    }
-  }
 }
 
 // Stat Card Component
@@ -332,7 +312,7 @@ function StatCard({ title, value, icon, color }) {
 }
 
 // Inventory Row Component
-function InventoryRow({ item, onEdit, onAdjust, onDelete, readOnly }) {
+function InventoryRow({ item, onView, onEdit, onAdjust, onDelete, readOnly }) {
   const stockStatus = item.stock === 0 ? 'out' : item.stock <= item.min_stock_level ? 'low' : 'ok'
   
   return (
@@ -368,522 +348,33 @@ function InventoryRow({ item, onEdit, onAdjust, onDelete, readOnly }) {
       </td>
       <td className="px-6 py-4">
         {stockStatus === 'out' && (
-          <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">
-            Out of Stock
-          </span>
+          <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">Out of Stock</span>
         )}
         {stockStatus === 'low' && (
-          <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">
-            Low Stock
-          </span>
+          <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">Low Stock</span>
         )}
         {stockStatus === 'ok' && (
-          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-            In Stock
-          </span>
+          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">In Stock</span>
         )}
       </td>
       <td className="px-6 py-4 text-right space-x-2">
+        <button onClick={onView} className="text-gray-600 hover:text-gray-800 text-sm font-medium">
+          View
+        </button>
         {!readOnly && (
           <>
-            <button
-              onClick={onAdjust}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
+            <button onClick={onAdjust} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
               Adjust
             </button>
-            <button
-              onClick={onEdit}
-              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-            >
+            <button onClick={onEdit} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
               Edit
             </button>
-            <button
-              onClick={onDelete}
-              className="text-red-600 hover:text-red-800 text-sm font-medium"
-            >
+            <button onClick={onDelete} className="text-red-600 hover:text-red-800 text-sm font-medium">
               Delete
             </button>
           </>
         )}
       </td>
     </tr>
-  )
-}
-
-// Add Item Modal
-function AddItemModal({ onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    sku: '',
-    part_number: '',
-    brand: '',
-    category: '',
-    stock: 0,
-    min_stock_level: 0,
-    unit_price: 0
-  })
-  const [submitting, setSubmitting] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setSubmitting(true)
-
-    try {
-      const response = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        onSuccess()
-      } else {
-        alert(data.error || 'Failed to add item')
-      }
-    } catch (error) {
-      console.error('Add item error:', error)
-      alert('Failed to add item')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold">Add Inventory Item</h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Part Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                SKU
-              </label>
-              <input
-                type="text"
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Part Number
-              </label>
-              <input
-                type="text"
-                value={formData.part_number}
-                onChange={(e) => setFormData({ ...formData, part_number: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Brand
-              </label>
-              <input
-                type="text"
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <input
-                type="text"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Filters, Brakes, Engine"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Initial Stock
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Minimum Stock Level
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.min_stock_level}
-                onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Unit Price (KES)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.unit_price}
-                onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-4 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {submitting ? 'Adding...' : 'Add Item'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// Edit Item Modal (similar to Add, but with existing data)
-function EditItemModal({ item, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
-    name: item.name || '',
-    sku: item.sku || '',
-    part_number: item.part_number || '',
-    brand: item.brand || '',
-    category: item.category || '',
-    stock: item.stock || 0,
-    min_stock_level: item.min_stock_level || 0,
-    unit_price: item.unit_price || 0,
-    is_active: item.is_active !== false
-  })
-  const [submitting, setSubmitting] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setSubmitting(true)
-
-    try {
-      const response = await fetch(`/api/inventory/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        onSuccess()
-      } else {
-        alert(data.error || 'Failed to update item')
-      }
-    } catch (error) {
-      console.error('Update item error:', error)
-      alert('Failed to update item')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold">Edit Inventory Item</h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Part Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                SKU
-              </label>
-              <input
-                type="text"
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Part Number
-              </label>
-              <input
-                type="text"
-                value={formData.part_number}
-                onChange={(e) => setFormData({ ...formData, part_number: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Brand
-              </label>
-              <input
-                type="text"
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <input
-                type="text"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Stock
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Minimum Stock Level
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.min_stock_level}
-                onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Unit Price (KES)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.unit_price}
-                onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Active</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-4 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {submitting ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// Adjust Stock Modal
-function AdjustStockModal({ item, onClose, onSuccess }) {
-  const [adjustment, setAdjustment] = useState('')
-  const [reason, setReason] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  const newStock = item.stock + (parseInt(adjustment) || 0)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setSubmitting(true)
-
-    try {
-      const response = await fetch(`/api/inventory/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          adjustment: parseInt(adjustment),
-          reason 
-        })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        onSuccess()
-      } else {
-        alert(data.error || 'Failed to adjust stock')
-      }
-    } catch (error) {
-      console.error('Adjust stock error:', error)
-      alert('Failed to adjust stock')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold">Adjust Stock</h2>
-          <p className="text-gray-600 mt-1">{item.name}</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="mb-6">
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <div className="text-sm text-gray-600 mb-1">Current Stock</div>
-              <div className="text-3xl font-bold text-gray-900">{item.stock}</div>
-            </div>
-
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Adjustment
-            </label>
-            <input
-              type="number"
-              required
-              value={adjustment}
-              onChange={(e) => setAdjustment(e.target.value)}
-              placeholder="Enter + or - value (e.g., +10 or -5)"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Use positive numbers to add stock, negative to reduce
-            </p>
-
-            {adjustment && (
-              <div className={`mt-4 p-4 rounded-lg ${newStock < 0 ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
-                <div className="text-sm font-medium mb-1">
-                  {newStock < 0 ? '❌ Invalid' : '✅ New Stock'}
-                </div>
-                <div className="text-2xl font-bold">
-                  {item.stock} {parseInt(adjustment) > 0 ? '+' : ''}{adjustment} = {newStock}
-                </div>
-                {newStock < 0 && (
-                  <p className="text-sm text-red-600 mt-1">Stock cannot be negative</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Reason (Optional)
-            </label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., New shipment arrived, Stock check correction, Used for work order"
-              rows="3"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !adjustment || newStock < 0}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {submitting ? 'Adjusting...' : 'Adjust Stock'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   )
 }
