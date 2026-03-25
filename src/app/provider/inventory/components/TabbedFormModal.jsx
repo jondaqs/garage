@@ -125,7 +125,7 @@ export default function TabbedFormModal({
   const handleSaveClick = async () => {
     if (!validateForm()) return
     
-    if (mode === 'edit' && !itemId) {
+    if (mode != 'add' && !itemId) {
       alert('Error: Item ID is missing')
       return
     }
@@ -133,6 +133,9 @@ export default function TabbedFormModal({
     setSubmitting(true)
 
     try {
+
+        console.log('Submitting form with data:', itemId)
+        
       const url = mode === 'add' 
         ? '/api/inventory'
         : `/api/inventory/${itemId}`
