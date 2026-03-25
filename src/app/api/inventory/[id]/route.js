@@ -8,6 +8,14 @@ export async function PUT(request, { params }) {
   try {
 
     console.log('route [id] called; PUT request received for inventory:')
+    console.log('PARAM ID:', id)
+
+    if (!id || id === 'undefined') {
+    return NextResponse.json(
+        { error: 'Invalid item ID' },
+        { status: 400 }
+    )
+    }
 
     const supabase = await createClient()
     const { id } = params
@@ -152,6 +160,13 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+
+    if (!id || id === 'undefined') {
+        return NextResponse.json(
+            { error: 'Invalid item ID' },
+            { status: 400 }
+        )
+    }
     const supabase = await createClient()
     const { id } = params
 
@@ -186,6 +201,13 @@ export async function DELETE(request, { params }) {
 
 // PATCH - Adjust stock quantity (enhanced with last_restocked_at)
 export async function PATCH(request, { params }) {
+
+    if (!id || id === 'undefined') {
+        return NextResponse.json(
+        { error: 'Invalid item ID' },
+            { status: 400 }
+        )
+    }
   try {
     const supabase = await createClient()
     const { id } = params
