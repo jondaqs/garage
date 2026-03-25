@@ -6,6 +6,9 @@ import { NextResponse } from 'next/server'
 
 export async function PUT(request, { params }) {
   try {
+
+    console.log('route [id] called; PUT request received for inventory:')
+
     const supabase = await createClient()
     const { id } = params
 
