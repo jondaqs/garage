@@ -21,6 +21,8 @@ export default function TabbedFormModal({
   
   // Save item ID
   const itemId = item?.id
+
+  console.log('TabbedFormModal initialized with item:', itemId)
   
   // Initialize form data with ALL fields (40+)
   const [formData, setFormData] = useState({

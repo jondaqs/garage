@@ -16,6 +16,8 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log(`Updating inventory item ${id} by user ${user.id}`)
+
     const body = await request.json()
     
     // Extract ALL fields from request
