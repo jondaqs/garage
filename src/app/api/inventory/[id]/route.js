@@ -8,6 +8,10 @@ export async function PUT(request, { params }) {
   try {
 
     console.log('route [id] called; PUT request received for inventory:')
+
+    const supabase = await createClient()
+    const { id } = params
+
     console.log('PARAM ID:', id)
 
     if (!id || id === 'undefined') {
@@ -16,9 +20,6 @@ export async function PUT(request, { params }) {
         { status: 400 }
     )
     }
-
-    const supabase = await createClient()
-    const { id } = params
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
