@@ -134,7 +134,7 @@ export default function TabbedFormModal({
 
     try {
 
-        console.log('Submitting form with data:', itemId)
+        console.log('Submitting form with itemId:', itemId)
         
       const url = mode === 'add' 
         ? '/api/inventory'

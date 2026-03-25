@@ -4,13 +4,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function PUT(request, { params }) {
+export async function PUT(request, context)  {
   try {
 
     console.log('route [id] called; PUT request received for inventory:')
 
     const supabase = await createClient()
-    const { id } = params
+    //const { id } = params
+    const id = context?.params?.id
 
     console.log('PARAM ID:', id)
 
