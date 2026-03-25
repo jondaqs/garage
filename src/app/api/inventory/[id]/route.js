@@ -1,26 +1,18 @@
 // src/app/api/inventory/[id]/route.js
-// ENHANCED - Update and delete with ALL fields
+// REAL FIX - await params in Next.js 15+
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function PUT(request, context)  {
+export async function PUT(request, context) {
   try {
+    // CRITICAL FIX: await params in Next.js 15+
+    const params = await context.params
+    const { id } = params
 
-    console.log('route [id] called; PUT request received for inventory:')
+    console.log('📝 PUT request for item ID:', id) // Should show actual ID now
 
     const supabase = await createClient()
-    //const { id } = params
-    const id = context?.params?.id
-
-    console.log('PARAM ID:', id)
-
-    if (!id || id === 'undefined') {
-    return NextResponse.json(
-        { error: 'Invalid item ID' },
-        { status: 400 }
-    )
-    }
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -28,8 +20,6 @@ export async function PUT(request, context)  {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    console.log(`Updating inventory item ${id} by user ${user.id}`)
 
     const body = await request.json()
     
@@ -108,11 +98,11 @@ export async function PUT(request, context)  {
       warranty_months: warranty_months ? parseInt(warranty_months) : null,
       category: category || null,
       location_in_shop: location_in_shop || null,
-      stock: parseInt(stock),
-      min_stock_level: parseInt(min_stock_level),
+      stock: parseInt(stock) || 0,
+      min_stock_level: parseInt(min_stock_level) || 0,
       reorder_level: reorder_level ? parseInt(reorder_level) : null,
       reorder_quantity: reorder_quantity ? parseInt(reorder_quantity) : null,
-      unit_price: parseFloat(unit_price),
+      unit_price: parseFloat(unit_price) || 0,
       cost_price: cost_price ? parseFloat(cost_price) : null,
       currency: currency || 'KES',
       supplier_name: supplier_name || null,
@@ -131,10 +121,12 @@ export async function PUT(request, context)  {
       certification_standards: certification_standards || null,
       image_urls: image_urls || null,
       primary_image_url: primary_image_url || null,
-      is_active,
+      is_active: is_active !== false,
       updated_by: user.id,
       updated_at: new Date().toISOString()
     }
+
+    console.log('💾 Updating item:', id) // DEBUG
 
     // Update inventory item
     const { data: item, error: updateError } = await supabase
@@ -145,14 +137,16 @@ export async function PUT(request, context)  {
       .single()
 
     if (updateError) {
-      console.error('Update inventory error:', updateError)
+      console.error('❌ Update error:', updateError)
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
+
+    console.log('✅ Update successful!')
 
     return NextResponse.json({ success: true, item })
 
   } catch (error) {
-    console.error('Update inventory error:', error)
+    console.error('❌ Update inventory error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -160,17 +154,15 @@ export async function PUT(request, context)  {
   }
 }
 
-export async function DELETE(request, { params }) {
+export async function DELETE(request, context) {
   try {
-
-    if (!id || id === 'undefined') {
-        return NextResponse.json(
-            { error: 'Invalid item ID' },
-            { status: 400 }
-        )
-    }
-    const supabase = await createClient()
+    // CRITICAL FIX: await params in Next.js 15+
+    const params = await context.params
     const { id } = params
+
+    console.log('🗑️ DELETE request for item ID:', id)
+
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -186,14 +178,16 @@ export async function DELETE(request, { params }) {
       .eq('id', id)
 
     if (deleteError) {
-      console.error('Delete inventory error:', deleteError)
+      console.error('❌ Delete error:', deleteError)
       return NextResponse.json({ error: deleteError.message }, { status: 500 })
     }
+
+    console.log('✅ Delete successful!')
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Delete inventory error:', error)
+    console.error('❌ Delete inventory error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -201,18 +195,16 @@ export async function DELETE(request, { params }) {
   }
 }
 
-// PATCH - Adjust stock quantity (enhanced with last_restocked_at)
-export async function PATCH(request, { params }) {
-
-    if (!id || id === 'undefined') {
-        return NextResponse.json(
-        { error: 'Invalid item ID' },
-            { status: 400 }
-        )
-    }
+// PATCH - Adjust stock quantity
+export async function PATCH(request, context) {
   try {
-    const supabase = await createClient()
+    // CRITICAL FIX: await params in Next.js 15+
+    const params = await context.params
     const { id } = params
+
+    console.log('📊 PATCH (adjust stock) for item ID:', id)
+
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -246,14 +238,14 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'Stock cannot be negative' }, { status: 400 })
     }
 
-    // Prepare update - set last_restocked_at if adding stock
+    // Prepare update
     const updateData = {
       stock: newStock,
       updated_by: user.id,
       updated_at: new Date().toISOString()
     }
 
-    // If adding stock (positive adjustment), update last_restocked_at
+    // If adding stock, update last_restocked_at
     if (adjustment > 0) {
       updateData.last_restocked_at = new Date().toISOString()
     }
@@ -267,10 +259,11 @@ export async function PATCH(request, { params }) {
       .single()
 
     if (updateError) {
+      console.error('❌ Stock update error:', updateError)
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    console.log(`Stock adjusted: ${currentItem.stock} → ${newStock} (${adjustment > 0 ? '+' : ''}${adjustment})${reason ? ` - ${reason}` : ''}`)
+    console.log(`✅ Stock adjusted: ${currentItem.stock} → ${newStock} (${adjustment > 0 ? '+' : ''}${adjustment})`)
 
     return NextResponse.json({ 
       success: true, 
@@ -283,7 +276,7 @@ export async function PATCH(request, { params }) {
     })
 
   } catch (error) {
-    console.error('Stock adjustment error:', error)
+    console.error('❌ Stock adjustment error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
