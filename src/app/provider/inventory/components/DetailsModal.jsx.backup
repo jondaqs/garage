@@ -1,5 +1,5 @@
 // src/app/provider/inventory/components/DetailsModal.jsx
-// ENHANCED - View Details Modal with ALL 10 Tabs (Read-only)
+// View Details Modal with 4 Core Tabs (Read-only)
 
 'use client'
 
@@ -15,17 +15,11 @@ export default function DetailsModal({ item, onClose, onEdit }) {
   const totalCost = (item.stock * (item.cost_price || 0)) || 0
   const needsReorder = item.reorder_level && item.stock <= item.reorder_level
 
-  // Tab configuration - ALL 10 TABS
+  // Tab configuration
   const tabs = [
     { id: 'basic', label: 'Basic Info', icon: '📝' },
-    { id: 'brand', label: 'Brand', icon: '🏷️' },
     { id: 'stock', label: 'Stock & Location', icon: '📦' },
     { id: 'pricing', label: 'Pricing', icon: '💰' },
-    { id: 'supplier', label: 'Supplier', icon: '🏭' },
-    { id: 'physical', label: 'Physical', icon: '📏' },
-    { id: 'automotive', label: 'Automotive', icon: '🚗' },
-    { id: 'quality', label: 'Quality', icon: '✨' },
-    { id: 'media', label: 'Media', icon: '🖼️' },
     { id: 'notes', label: 'Notes', icon: '📄' }
   ]
 
@@ -67,47 +61,17 @@ export default function DetailsModal({ item, onClose, onEdit }) {
               <BasicInfoView item={item} />
             </TabPanel>
 
-            {/* Tab 2: Brand & Manufacturer */}
-            <TabPanel id="brand" activeTab={activeTab}>
-              <BrandView item={item} />
-            </TabPanel>
-
-            {/* Tab 3: Stock & Location */}
+            {/* Tab 2: Stock & Location */}
             <TabPanel id="stock" activeTab={activeTab}>
               <StockView item={item} needsReorder={needsReorder} />
             </TabPanel>
 
-            {/* Tab 4: Pricing */}
+            {/* Tab 3: Pricing */}
             <TabPanel id="pricing" activeTab={activeTab}>
               <PricingView item={item} profitMargin={profitMargin} totalValue={totalValue} totalCost={totalCost} />
             </TabPanel>
 
-            {/* Tab 5: Supplier */}
-            <TabPanel id="supplier" activeTab={activeTab}>
-              <SupplierView item={item} />
-            </TabPanel>
-
-            {/* Tab 6: Physical Properties */}
-            <TabPanel id="physical" activeTab={activeTab}>
-              <PhysicalView item={item} />
-            </TabPanel>
-
-            {/* Tab 7: Automotive */}
-            <TabPanel id="automotive" activeTab={activeTab}>
-              <AutomotiveView item={item} />
-            </TabPanel>
-
-            {/* Tab 8: Quality */}
-            <TabPanel id="quality" activeTab={activeTab}>
-              <QualityView item={item} />
-            </TabPanel>
-
-            {/* Tab 9: Media */}
-            <TabPanel id="media" activeTab={activeTab}>
-              <MediaView item={item} />
-            </TabPanel>
-
-            {/* Tab 10: Notes */}
+            {/* Tab 4: Notes */}
             <TabPanel id="notes" activeTab={activeTab}>
               <NotesView item={item} />
             </TabPanel>
@@ -134,7 +98,7 @@ export default function DetailsModal({ item, onClose, onEdit }) {
 // VIEW COMPONENTS (Read-only displays)
 // ============================================
 
-// Tab 1: Basic Info View (EXISTING - KEPT AS IS)
+// Basic Info View
 function BasicInfoView({ item }) {
   return (
     <div className="space-y-6">
@@ -170,39 +134,7 @@ function BasicInfoView({ item }) {
   )
 }
 
-// Tab 2: Brand & Manufacturer View (NEW)
-function BrandView({ item }) {
-  const hasData = item.brand || item.manufacturer || item.model || item.warranty_months || item.oem_part
-
-  if (!hasData) {
-    return <p className="text-gray-500 text-center py-8">No brand information available</p>
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {item.brand && <DetailRow label="Brand" value={item.brand} />}
-        {item.manufacturer && <DetailRow label="Manufacturer" value={item.manufacturer} />}
-        {item.model && <DetailRow label="Model" value={item.model} />}
-      </div>
-
-      {item.warranty_months && (
-        <DetailRow 
-          label="Warranty" 
-          value={`${item.warranty_months} months`}
-        />
-      )}
-
-      {item.oem_part && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-800 font-medium">✅ OEM (Original Equipment Manufacturer) Part</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Tab 3: Stock & Location View (EXISTING - KEPT AS IS)
+// Stock & Location View
 function StockView({ item, needsReorder }) {
   const stockStatus = item.stock === 0 ? 'out' : item.stock <= item.min_stock_level ? 'low' : 'ok'
   
@@ -283,7 +215,7 @@ function StockView({ item, needsReorder }) {
   )
 }
 
-// Tab 4: Pricing View (EXISTING - KEPT AS IS)
+// Pricing View
 function PricingView({ item, profitMargin, totalValue, totalCost }) {
   return (
     <div className="space-y-6">
@@ -360,210 +292,7 @@ function PricingView({ item, profitMargin, totalValue, totalCost }) {
   )
 }
 
-// Tab 5: Supplier View (NEW)
-function SupplierView({ item }) {
-  const hasData = item.supplier_name || item.supplier_contact || item.supplier_part_number || 
-                   item.supplier_price || item.supplier_lead_time_days
-
-  if (!hasData) {
-    return <p className="text-gray-500 text-center py-8">No supplier information available</p>
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {item.supplier_name && <DetailRow label="Supplier Name" value={item.supplier_name} />}
-        {item.supplier_contact && <DetailRow label="Contact" value={item.supplier_contact} />}
-      </div>
-
-      {item.supplier_part_number && (
-        <DetailRow label="Supplier Part Number" value={item.supplier_part_number} />
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {item.supplier_price && (
-          <DetailBox label="Supplier Price" value={`${item.currency || 'KES'} ${item.supplier_price.toLocaleString()}`} />
-        )}
-        {item.supplier_lead_time_days && (
-          <DetailBox label="Lead Time" value={`${item.supplier_lead_time_days} days`} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Tab 6: Physical Properties View (NEW)
-function PhysicalView({ item }) {
-  const hasData = item.weight || item.dimensions
-
-  if (!hasData) {
-    return <p className="text-gray-500 text-center py-8">No physical properties available</p>
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {item.weight && (
-          <DetailRow 
-            label="Weight" 
-            value={`${item.weight} ${item.weight_unit || 'kg'}`}
-          />
-        )}
-        {item.dimensions && (
-          <DetailRow label="Dimensions" value={item.dimensions} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Tab 7: Automotive View (NEW)
-function AutomotiveView({ item }) {
-  const vehicles = item.compatible_vehicles || []
-
-  if (vehicles.length === 0) {
-    return <p className="text-gray-500 text-center py-8">No compatible vehicles listed</p>
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Compatible Vehicles</p>
-        <div className="flex flex-wrap gap-2">
-          {vehicles.map((vehicle, index) => (
-            <span
-              key={index}
-              className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-            >
-              🚗 {vehicle}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Tab 8: Quality View (NEW)
-function QualityView({ item }) {
-  const certifications = item.certification_standards || []
-  const hasData = item.condition || certifications.length > 0 || item.is_consumable !== undefined || item.oem_part
-
-  if (!hasData) {
-    return <p className="text-gray-500 text-center py-8">No quality information available</p>
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Condition */}
-      {item.condition && (
-        <DetailRow 
-          label="Condition" 
-          value={
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              item.condition === 'new' ? 'bg-green-100 text-green-800' :
-              item.condition === 'refurbished' ? 'bg-blue-100 text-blue-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
-            </span>
-          }
-        />
-      )}
-
-      {/* Properties */}
-      <div className="space-y-3">
-        {item.is_consumable && (
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
-              🔄 Consumable Item
-            </span>
-          </div>
-        )}
-        {item.oem_part && (
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-              ✅ OEM Part
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Certifications */}
-      {certifications.length > 0 && (
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-3">Certification Standards</p>
-          <div className="flex flex-wrap gap-2">
-            {certifications.map((cert, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm"
-              >
-                🏅 {cert}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Tab 9: Media View (NEW)
-function MediaView({ item }) {
-  const imageUrls = item.image_urls || []
-  const hasImages = item.primary_image_url || imageUrls.length > 0
-
-  if (!hasImages) {
-    return <p className="text-gray-500 text-center py-8">No images available</p>
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Primary Image */}
-      {item.primary_image_url && (
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-3">Primary Image</p>
-          <img 
-            src={item.primary_image_url} 
-            alt={item.name}
-            className="w-64 h-64 object-cover rounded-lg border border-gray-300"
-            onError={(e) => {
-              e.target.style.display = 'none'
-              e.target.nextSibling.style.display = 'block'
-            }}
-          />
-          <p className="text-xs text-red-500 mt-2" style={{ display: 'none' }}>
-            Failed to load image
-          </p>
-        </div>
-      )}
-
-      {/* Additional Images */}
-      {imageUrls.length > 0 && (
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-3">
-            Additional Images ({imageUrls.length})
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {imageUrls.map((url, index) => (
-              <div key={index}>
-                <img 
-                  src={url} 
-                  alt={`${item.name} - ${index + 1}`}
-                  className="w-full h-32 object-cover rounded-lg border border-gray-300"
-                  onError={(e) => e.target.style.display = 'none'}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Tab 10: Notes View (EXISTING - KEPT AS IS)
+// Notes View
 function NotesView({ item }) {
   return (
     <div className="space-y-6">
@@ -597,7 +326,7 @@ function NotesView({ item }) {
 }
 
 // ============================================
-// UTILITY COMPONENTS (KEPT AS IS)
+// UTILITY COMPONENTS
 // ============================================
 
 function DetailRow({ label, value }) {
