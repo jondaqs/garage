@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { COUNTRIES } from '@/lib/constants/countries'
 
-export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
+export default function ProviderInfoStep({ data, updateData, nextStep, previousStep }) {
   const [formData, setFormData] = useState({
     name: data?.name || '',
     registration_number: data?.registration_number || '',
@@ -15,7 +15,7 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
     phone: data?.phone || '',
     email: data?.email || '',
     years_in_operation: data?.years_in_operation || '',
-    country: data?.country || 'Kenya' // Default to Kenya
+    country: data?.country || '' // Default to Kenya
   })
 
   const [errors, setErrors] = useState({})
@@ -81,17 +81,17 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
 
     console.log('Validation passed, form data:', formData)
 
-    // Check if onUpdate is a function
-    if (typeof onUpdate !== 'function') {
-      console.error('onUpdate is not a function:', onUpdate)
-      alert('Configuration error: onUpdate callback is missing')
+    // Check if updateData is a function
+    if (typeof updateData !== 'function') {
+      console.error('updateData is not a function:', updateData)
+      alert('Configuration error: updateData callback is missing')
       return
     }
 
-    // Check if onNext is a function
-    if (typeof onNext !== 'function') {
-      console.error('onNext is not a function:', onNext)
-      alert('Configuration error: onNext callback is missing')
+    // Check if nextStep is a function
+    if (typeof nextStep !== 'function') {
+      console.error('nextStep is not a function:', nextStep)
+      alert('Configuration error: nextStep callback is missing')
       return
     }
 
@@ -99,15 +99,15 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
 
     try {
       // Update parent component with form data
-      console.log('Calling onUpdate...')
-      onUpdate(formData)
-      
+      console.log('Calling updateData...')
+      updateData(formData)
+
       // Small delay to ensure state updates
       await new Promise(resolve => setTimeout(resolve, 100))
       
       // Move to next step
-      console.log('Calling onNext...')
-      onNext()
+      console.log('Calling nextStep...')
+      nextStep()
     } catch (error) {
       console.error('Error during form submission:', error)
       alert('An error occurred. Please try again.')
@@ -117,10 +117,10 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
   }
 
   const handleBack = () => {
-    if (typeof onBack === 'function') {
-      onBack()
+    if (typeof previousStep === 'function') {
+      previousStep()
     } else {
-      console.error('onBack is not a function')
+      console.error('previousStep is not a function')
     }
   }
 
@@ -332,16 +332,7 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
         </div>
       </form>
 
-      {/* Debug Info (remove in production) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-8 p-4 bg-gray-100 rounded text-xs">
-          <p><strong>Debug Info:</strong></p>
-          <p>onUpdate type: {typeof onUpdate}</p>
-          <p>onNext type: {typeof onNext}</p>
-          <p>onBack type: {typeof onBack}</p>
-          <p>isSubmitting: {isSubmitting ? 'true' : 'false'}</p>
-        </div>
-      )}
+      
     </div>
   )
 }
