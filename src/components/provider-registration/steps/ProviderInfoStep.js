@@ -15,7 +15,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
     phone: data?.phone || '',
     email: data?.email || '',
     years_in_operation: data?.years_in_operation || '',
-    country: data?.country || '' // Default to Kenya
+    country: data?.country || 'Kenya' // Default to Kenya
   })
 
   const [errors, setErrors] = useState({})
@@ -101,7 +101,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
       // Update parent component with form data
       console.log('Calling updateData...')
       updateData(formData)
-
+      
       // Small delay to ensure state updates
       await new Promise(resolve => setTimeout(resolve, 100))
       
