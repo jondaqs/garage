@@ -1,24 +1,25 @@
 // src/components/provider-registration/steps/ProviderInfoStep.js
-// UPDATED VERSION - Includes Country Field
+// FIXED VERSION - Proper error handling and validation
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { COUNTRIES } from '@/lib/constants/countries'
 
 export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
   const [formData, setFormData] = useState({
-    name: data.name || '',
-    registration_number: data.registration_number || '',
-    tax_id: data.tax_id || '',
-    description: data.description || '',
-    phone: data.phone || '',
-    email: data.email || '',
-    years_in_operation: data.years_in_operation || '',
-    country: data.country || 'Kenya' // Default to Kenya
+    name: data?.name || '',
+    registration_number: data?.registration_number || '',
+    tax_id: data?.tax_id || '',
+    description: data?.description || '',
+    phone: data?.phone || '',
+    email: data?.email || '',
+    years_in_operation: data?.years_in_operation || '',
+    country: data?.country || 'Kenya' // Default to Kenya
   })
 
   const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const validate = () => {
     const newErrors = {}
@@ -62,11 +63,64 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (validate()) {
+    
+    // Prevent double submission
+    if (isSubmitting) {
+      console.log('Already submitting, please wait...')
+      return
+    }
+
+    console.log('Form submitted, validating...')
+    
+    if (!validate()) {
+      console.log('Validation failed:', errors)
+      return
+    }
+
+    console.log('Validation passed, form data:', formData)
+
+    // Check if onUpdate is a function
+    if (typeof onUpdate !== 'function') {
+      console.error('onUpdate is not a function:', onUpdate)
+      alert('Configuration error: onUpdate callback is missing')
+      return
+    }
+
+    // Check if onNext is a function
+    if (typeof onNext !== 'function') {
+      console.error('onNext is not a function:', onNext)
+      alert('Configuration error: onNext callback is missing')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      // Update parent component with form data
+      console.log('Calling onUpdate...')
       onUpdate(formData)
+      
+      // Small delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Move to next step
+      console.log('Calling onNext...')
       onNext()
+    } catch (error) {
+      console.error('Error during form submission:', error)
+      alert('An error occurred. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBack = () => {
+    if (typeof onBack === 'function') {
+      onBack()
+    } else {
+      console.error('onBack is not a function')
     }
   }
 
@@ -86,7 +140,8 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+            disabled={isSubmitting}
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
               errors.name ? 'border-red-500' : 'border-gray-300'
             }`}
             placeholder="ABC Garage Services Ltd"
@@ -105,7 +160,8 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
             name="country"
             value={formData.country}
             onChange={handleChange}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+            disabled={isSubmitting}
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
               errors.country ? 'border-red-500' : 'border-gray-300'
             }`}
           >
@@ -144,7 +200,8 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
             name="registration_number"
             value={formData.registration_number}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            disabled={isSubmitting}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             placeholder="PVT-1234567890"
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -162,7 +219,8 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
             name="tax_id"
             value={formData.tax_id}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            disabled={isSubmitting}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             placeholder="A123456789X"
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -181,7 +239,8 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+              disabled={isSubmitting}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
                 errors.phone ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="+254712345678"
@@ -200,7 +259,8 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+              disabled={isSubmitting}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
                 errors.email ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="info@abcgarage.com"
@@ -221,8 +281,9 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
             name="years_in_operation"
             value={formData.years_in_operation}
             onChange={handleChange}
+            disabled={isSubmitting}
             min="0"
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
               errors.years_in_operation ? 'border-red-500' : 'border-gray-300'
             }`}
             placeholder="5"
@@ -241,8 +302,9 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
             name="description"
             value={formData.description}
             onChange={handleChange}
+            disabled={isSubmitting}
             rows="4"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             placeholder="Tell potential customers about your business, services, and what makes you unique..."
           />
           <p className="mt-1 text-xs text-gray-500">
@@ -254,19 +316,32 @@ export default function ProviderInfoStep({ data, onUpdate, onNext, onBack }) {
         <div className="flex gap-4 pt-4">
           <button
             type="button"
-            onClick={onBack}
-            className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+            onClick={handleBack}
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back
           </button>
           <button
             type="submit"
-            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Continue
+            {isSubmitting ? 'Processing...' : 'Continue'}
           </button>
         </div>
       </form>
+
+      {/* Debug Info (remove in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-8 p-4 bg-gray-100 rounded text-xs">
+          <p><strong>Debug Info:</strong></p>
+          <p>onUpdate type: {typeof onUpdate}</p>
+          <p>onNext type: {typeof onNext}</p>
+          <p>onBack type: {typeof onBack}</p>
+          <p>isSubmitting: {isSubmitting ? 'true' : 'false'}</p>
+        </div>
+      )}
     </div>
   )
 }
