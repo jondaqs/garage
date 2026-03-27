@@ -1,5 +1,5 @@
 // src/components/provider-registration/steps/ProviderInfoStep.js
-// FIXED VERSION - Correct data structure to match ReviewSubmitStep
+// COMPLETE FIX - Callback names + Database alignment
 
 'use client'
 
@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { COUNTRIES } from '@/lib/constants/countries'
 
 export default function ProviderInfoStep({ data, updateData, nextStep, previousStep }) {
+  // ✅ FIX 2: Read from data.providerInfo to match ReviewSubmitStep
   const [formData, setFormData] = useState({
     businessName: data?.providerInfo?.businessName || '',
     registrationNumber: data?.providerInfo?.registrationNumber || '',
@@ -66,6 +67,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Prevent double submission
     if (isSubmitting) {
       console.log('Already submitting, please wait...')
       return
@@ -80,6 +82,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
 
     console.log('Validation passed, form data:', formData)
 
+    // ✅ FIX 1: Check correct prop name
     if (typeof updateData !== 'function') {
       console.error('updateData is not a function:', updateData)
       alert('Configuration error: updateData callback is missing')
@@ -95,11 +98,14 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
     setIsSubmitting(true)
 
     try {
-      // ✅ CRITICAL FIX: Wrap data in providerInfo object
+      // ✅ FIX 2: Wrap in providerInfo to match ReviewSubmitStep expectations
+      console.log('Calling updateData with providerInfo wrapper...')
       updateData({ providerInfo: formData })
       
+      // Small delay to ensure state updates
       await new Promise(resolve => setTimeout(resolve, 100))
       
+      // Move to next step
       console.log('Calling nextStep...')
       nextStep()
     } catch (error) {
@@ -159,22 +165,35 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
               errors.country ? 'border-red-500' : 'border-gray-300'
             }`}
           >
-            <option value="">Select a country</option>
-            {COUNTRIES.map(country => (
-              <option key={country.code} value={country.name}>
-                {country.flag} {country.name}
-              </option>
-            ))}
+            <option value="">Select Country</option>
+            <optgroup label="East Africa">
+              {COUNTRIES.slice(0, 10).map(country => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Other African Countries">
+              {COUNTRIES.slice(10, 60).map(country => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </optgroup>
+            <optgroup label="International">
+              {COUNTRIES.slice(60).map(country => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </optgroup>
           </select>
           {errors.country && (
             <p className="mt-1 text-sm text-red-600">{errors.country}</p>
           )}
+          <p className="mt-1 text-xs text-gray-500">
+            Select the country where your business is registered
+          </p>
         </div>
 
         {/* Registration Number */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Business Registration Number
+            Business Registration Number (Optional)
           </label>
           <input
             type="text"
@@ -183,14 +202,17 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
             onChange={handleChange}
             disabled={isSubmitting}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            placeholder="BN/2024/12345"
+            placeholder="PVT-1234567890"
           />
+          <p className="mt-1 text-xs text-gray-500">
+            Company registration or business permit number
+          </p>
         </div>
 
         {/* Tax ID */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tax ID / VAT Number
+            Tax ID / KRA PIN (Optional)
           </label>
           <input
             type="text"
@@ -199,50 +221,54 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
             onChange={handleChange}
             disabled={isSubmitting}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            placeholder="P051234567A"
+            placeholder="A123456789X"
           />
+          <p className="mt-1 text-xs text-gray-500">
+            Tax identification number (e.g., KRA PIN for Kenya)
+          </p>
         </div>
 
-        {/* Phone */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Business Phone Number *
-          </label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            disabled={isSubmitting}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
-              errors.phone ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="0712345678"
-          />
-          {errors.phone && (
-            <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-          )}
-        </div>
+        {/* Phone and Email */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Business Phone *
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              disabled={isSubmitting}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
+                errors.phone ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="+254712345678"
+            />
+            {errors.phone && (
+              <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+            )}
+          </div>
 
-        {/* Email */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Business Email (Optional)
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            disabled={isSubmitting}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
-              errors.email ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="info@abcgarage.com"
-          />
-          {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Business Email (Optional)
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={isSubmitting}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
+                errors.email ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="info@abcgarage.com"
+            />
+            {errors.email && (
+              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+            )}
+          </div>
         </div>
 
         {/* Years in Operation */}
@@ -279,29 +305,33 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
             disabled={isSubmitting}
             rows="4"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            placeholder="Brief description of your business and services..."
+            placeholder="Tell potential customers about your business, services, and what makes you unique..."
           />
+          <p className="mt-1 text-xs text-gray-500">
+            This will be shown to customers when they browse providers
+          </p>
         </div>
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between pt-4">
+        <div className="flex gap-4 pt-4">
           <button
             type="button"
             onClick={handleBack}
             disabled={isSubmitting}
-            className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-medium disabled:opacity-50"
+            className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Saving...' : 'Continue'}
+            {isSubmitting ? 'Processing...' : 'Continue'}
           </button>
         </div>
       </form>
+      
     </div>
   )
 }
