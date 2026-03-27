@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Clock, CheckCircle, AlertTriangle, TrendingUp, Building2 } from 'lucide-react'
+import { Users, Clock, CheckCircle, AlertTriangle, TrendingUp, Building2, Mail } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AdminDashboard() {
@@ -237,7 +237,10 @@ function EmailQueueWidget() {
     <div className="bg-white rounded-lg shadow">
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">📧 Email Queue</h3>
+          <div className="flex items-center">
+            <Mail className="h-5 w-5 text-blue-600 mr-2" />
+            <h3 className="text-lg font-bold text-gray-900">Email Queue</h3>
+          </div>
           <Link
             href="/admin/email-queue"
             className="text-sm text-blue-600 hover:text-blue-800 font-medium"
@@ -275,15 +278,24 @@ function EmailQueueWidget() {
             {/* Status Breakdown */}
             <div className="pt-4 border-t border-gray-200 space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">✅ Sent</span>
+                <span className="text-gray-600 flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
+                  Sent
+                </span>
                 <span className="font-medium text-green-600">{stats.sent_emails || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">⏳ Pending</span>
+                <span className="text-gray-600 flex items-center">
+                  <Clock className="h-4 w-4 text-yellow-600 mr-1" />
+                  Pending
+                </span>
                 <span className="font-medium text-yellow-600">{stats.pending_emails || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">❌ Failed</span>
+                <span className="text-gray-600 flex items-center">
+                  <AlertTriangle className="h-4 w-4 text-red-600 mr-1" />
+                  Failed
+                </span>
                 <span className="font-medium text-red-600">{stats.failed_emails || 0}</span>
               </div>
             </div>
@@ -291,15 +303,20 @@ function EmailQueueWidget() {
             {/* Alert if there are failures */}
             {stats.failed_emails > 0 && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-800 font-medium">
-                  ⚠️ {stats.failed_emails} failed email{stats.failed_emails !== 1 ? 's' : ''}
-                </p>
-                <Link
-                  href="/admin/email-queue?status=failed"
-                  className="text-sm text-red-600 hover:text-red-800 underline mt-1 inline-block"
-                >
-                  View failed emails →
-                </Link>
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-red-800 font-medium">
+                      {stats.failed_emails} failed email{stats.failed_emails !== 1 ? 's' : ''}
+                    </p>
+                    <Link
+                      href="/admin/email-queue?status=failed"
+                      className="text-sm text-red-600 hover:text-red-800 underline mt-1 inline-block"
+                    >
+                      View failed emails →
+                    </Link>
+                  </div>
+                </div>
               </div>
             )}
           </div>
