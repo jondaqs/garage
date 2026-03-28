@@ -50,6 +50,8 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
         .eq('code', 'service_provider_owner')
         .single()
 
+      console.log('Owner role:', ownerRole.id, '; user_id: ', userProfile.id) // Debug log
+
       if (ownerRole) {
         await supabase
           .from('user_roles')
