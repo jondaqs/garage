@@ -198,7 +198,7 @@ function EmailRow({ email }) {
           </div>
           
           <p className="text-sm text-gray-600">
-            📧 To: <span className="font-medium">{email.recipient_email}</span>
+            Email To: <span className="font-medium">{email.recipient_email}</span>
           </p>
           
           <p className="text-xs text-gray-500 mt-1">
