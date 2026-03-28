@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, Users, Shield, Settings, 
-  FileText, Bell, LogOut, CheckCircle, Clock
+  FileText, Bell, LogOut, CheckCircle, Clock,
+  MailIcon
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -17,7 +18,7 @@ export default function AdminSidebar() {
     { name: 'Pending Providers', href: '/admin/providers', icon: Clock, badge: true },
     { name: 'All Providers', href: '/admin/providers/all', icon: CheckCircle },
     { name: 'Users', href: '/admin/users', icon: Users },
-    {name: 'Email Queue',href: '/admin/email-queue',icon: '📧',badge: 'New'},
+    {name: 'Email Queue',href: '/admin/email-queue',icon: MailIcon,badge: 'New'},
     { name: 'Admin Management', href: '/admin/admins', icon: Shield },
     { name: 'Reports', href: '/admin/reports', icon: FileText },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
