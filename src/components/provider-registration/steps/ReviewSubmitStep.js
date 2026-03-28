@@ -44,21 +44,47 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       if (providerError) throw providerError
 
       // 2. Assign service provider owner role
-      const { data: ownerRole } = await supabase
+      const { data: ownerRole, error: lookupError } = await supabase
         .from('user_roles_lookup')
         .select('id')
         .eq('code', 'service_provider_owner')
         .single()
-
-      console.log('Owner role:', ownerRole.id, '; user_id: ', userProfile.id) // Debug log
-
+ 
+      if (lookupError) {
+        console.error('❌ Error fetching role lookup:', lookupError)
+        throw new Error('Failed to fetch service provider role')
+      }
+ 
+      console.log('✅ Found owner role:', ownerRole.id)
+ 
       if (ownerRole) {
-        await supabase
+        console.log('🔍 Assigning role to user:', {
+          user_id: userProfile.id,
+          role_id: ownerRole.id
+        })
+        
+        const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
           .insert([{
             user_id: userProfile.id,
             role_id: ownerRole.id
           }])
+          .select()
+        
+        if (roleError) {
+          console.error('❌ Role assignment error:', roleError)
+          console.error('Error details:', {
+            code: roleError.code,
+            message: roleError.message,
+            details: roleError.details,
+            hint: roleError.hint
+          })
+          throw new Error(`Failed to assign role: ${roleError.message}`)
+        }
+        
+        console.log('✅ Role assigned successfully:', roleData)
+      } else {
+        throw new Error('Owner role not found in user_roles_lookup')
       }
 
       // 3. Link services
