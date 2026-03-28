@@ -51,7 +51,7 @@ export default function EmailQueueViewer() {
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900">📧 Email Queue</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Email Queue</h2>
         <p className="text-gray-600 mt-1">Monitor email delivery status</p>
       </div>
 
