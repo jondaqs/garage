@@ -12,25 +12,47 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Check if provider is a dealership
+  const isDealership = data.providerType?.code === 'dealership'
+
   useEffect(() => {
     fetchServices()
-  }, [])
+  }, [data.providerType])
 
   const fetchServices = async () => {
     try {
-      const { data: servicesData, error } = await supabase
+      setLoading(true)
+      
+      let query = supabase
         .from('services')
         .select('*')
         .eq('is_active', true)
+      
+      // Filter by service type based on provider type
+      if (isDealership) {
+        query = query.eq('service_type', 'spare_part')
+      } else {
+        query = query.eq('service_type', 'service')
+      }
+      
+      const { data: servicesData, error: fetchError } = await query
         .order('category', { ascending: true })
         .order('display_name', { ascending: true })
 
-      if (error) throw error
+      if (fetchError) {
+        console.error('❌ Error fetching services:', {
+          code: fetchError.code,
+          message: fetchError.message,
+          details: fetchError.details
+        })
+        throw new Error(`Failed to load ${isDealership ? 'spare parts' : 'services'}: ${fetchError.message}`)
+      }
 
+      console.log(`✅ Loaded ${servicesData?.length || 0} ${isDealership ? 'spare parts' : 'services'}`)
       setServices(servicesData || [])
     } catch (err) {
-      setError('Failed to load services')
-      console.error('Error:', err)
+      console.error('Error loading services:', err)
+      setError(err.message || `Failed to load ${isDealership ? 'spare parts' : 'services'}`)
     } finally {
       setLoading(false)
     }
@@ -69,6 +91,29 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
     return acc
   }, {})
 
+  // Get friendly category name for dealerships
+  const getCategoryDisplayName = (category) => {
+    if (!isDealership) return category
+
+    const categoryMap = {
+      'spare_lighting': 'Lighting Parts',
+      'spare_engine': 'Engine Parts',
+      'spare_brakes': 'Braking System',
+      'spare_suspension': 'Suspension Parts',
+      'spare_wheels': 'Wheels & Tires',
+      'spare_electrical': 'Electrical Parts',
+      'spare_body': 'Body Parts',
+      'spare_interior': 'Interior Parts',
+      'spare_transmission': 'Transmission Parts',
+      'spare_cooling': 'Cooling System',
+      'spare_exhaust': 'Exhaust System',
+      'spare_fluids': 'Fluids & Lubricants',
+      'spare_filters': 'Filters'
+    }
+
+    return categoryMap[category] || category
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -81,18 +126,21 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Select Services Offered
+          {isDealership ? 'Select Spare Parts You Stock' : 'Select Services Offered'}
         </h2>
         <p className="text-gray-600">
-          Choose all the services your business provides
+          {isDealership 
+            ? 'Choose all the spare parts you have in stock' 
+            : 'Choose all the services your business provides'
+          }
         </p>
       </div>
 
       {/* Selected count */}
       <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-blue-800">
-          <strong>{selectedServices.length}</strong> service{selectedServices.length !== 1 ? 's' : ''} selected
-          {selectedServices.length === 0 && ' (Select at least 1 service to continue)'}
+          <strong>{selectedServices.length}</strong> {isDealership ? 'spare part' : 'service'}{selectedServices.length !== 1 ? 's' : ''} selected
+          {selectedServices.length === 0 && ` (Select at least 1 ${isDealership ? 'spare part' : 'service'} to continue)`}
         </p>
       </div>
 
@@ -104,29 +152,30 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search services..."
+            placeholder={isDealership ? 'Search spare parts...' : 'Search services...'}
             className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-          {error}
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 flex items-start">
+          <AlertCircle className="mr-2 flex-shrink-0 mt-0.5" size={20} />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Services by category */}
+      {/* Services/Spare Parts by category */}
       <div className="space-y-6 max-h-[500px] overflow-y-auto mb-6">
         {Object.keys(servicesByCategory).length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            No services found matching your search
+            No {isDealership ? 'spare parts' : 'services'} found matching your search
           </div>
         ) : (
           Object.entries(servicesByCategory).map(([category, categoryServices]) => (
             <div key={category} className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="font-semibold text-gray-800 mb-3 text-lg">
-                {category}
+                {getCategoryDisplayName(category)}
               </h3>
               <div className="grid md:grid-cols-2 gap-3">
                 {categoryServices.map((service) => {
@@ -174,7 +223,7 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-start">
           <AlertCircle className="text-yellow-600 mr-3 flex-shrink-0" size={20} />
           <p className="text-sm text-yellow-800">
-            Please select at least one service to continue
+            Please select at least one {isDealership ? 'spare part' : 'service'} to continue
           </p>
         </div>
       )}
