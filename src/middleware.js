@@ -2,11 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
 export async function middleware(request) {
+  const { pathname } = request.nextUrl
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
 
-  const supabase = await createServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
@@ -28,18 +30,52 @@ export async function middleware(request) {
     }
   )
 
+  // Get the current session
   const { data: { session } } = await supabase.auth.getSession()
 
+  // Company routes protection
+  if (pathname.startsWith('/company')) {
+    // First check if user is logged in
+    if (!session) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
+
+    // Get user from session
+    const user = session.user
+
+    // Check if user is a company member
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (userProfile) {
+      const { data: companyUser } = await supabase
+        .from('company_users')
+        .select('id')
+        .eq('user_id', userProfile.id)
+        .single()
+
+      // If user is not a company member, redirect to dashboard
+      if (!companyUser) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+    } else {
+      // No user profile found, redirect to dashboard
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
   // Protect dashboard routes
-  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+  if (pathname.startsWith('/dashboard')) {
     if (!session) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
   }
 
-  // Redirect to dashboard if already logged in
-  if (request.nextUrl.pathname.startsWith('/auth/login') || 
-      request.nextUrl.pathname.startsWith('/auth/signup')) {
+  // Redirect to dashboard if already logged in and trying to access auth pages
+  if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')) {
     if (session) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
@@ -49,5 +85,9 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/auth/:path*'],
+  matcher: [
+    '/dashboard/:path*', 
+    '/auth/:path*',
+    '/company/:path*'  // Added company routes to matcher
+  ],
 }
