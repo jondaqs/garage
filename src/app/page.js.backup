@@ -1,11 +1,12 @@
-'use client'
+// src/app/page.js
+'use client';
 
-import React from 'react'
-import { useRouter } from 'next/navigation'
-import { Car, Wrench, Building2, User, Calendar, History, Bell, LogIn } from 'lucide-react'
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { Car, Wrench, Building2, User, Calendar, History, Bell } from 'lucide-react';
 
 export default function LandingPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
@@ -16,6 +17,12 @@ export default function LandingPage() {
             <Car className="text-white mr-2" size={32} />
             <h1 className="text-2xl font-bold text-white">GariCare</h1>
           </div>
+          <button
+            onClick={() => router.push('/auth/login')}
+            className="text-white bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition font-medium"
+          >
+            Sign In
+          </button>
         </div>
       </header>
 
@@ -28,79 +35,43 @@ export default function LandingPage() {
           Connect with trusted service providers, manage your fleet, and keep your vehicles running smoothly.
         </p>
 
-        {/* User Type Selection */}
+        {/* User Type Selection - UPDATED ROUTES */}
         <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <User className="text-blue-600" size={32} />
+          {/* Normal User - Direct to /auth/signup */}
+          <button
+            onClick={() => router.push('/auth/signup')}
+            className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2 group"
+          >
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-600 transition">
+              <User className="text-blue-600 group-hover:text-white transition" size={32} />
             </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Vehicle Owner</h3>
-            <p className="text-gray-600 mb-6">Book services, track maintenance, and manage your vehicles</p>
-            
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/auth/signup?type=normal')}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-medium"
-              >
-                Sign Up
-              </button>
-              <button
-                onClick={() => router.push('/auth/login?type=normal')}
-                className="w-full bg-white border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 transition font-medium flex items-center justify-center"
-              >
-                <LogIn size={18} className="mr-2" />
-                Sign In
-              </button>
-            </div>
-          </div>
+            <p className="text-gray-600">Book services, track maintenance, and manage your vehicles</p>
+          </button>
 
-          <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Wrench className="text-green-600" size={32} />
+          {/* Service Provider - Direct to /auth/provider-signup */}
+          <button
+            onClick={() => router.push('/auth/provider-signup')}
+            className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2 group"
+          >
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-600 transition">
+              <Wrench className="text-green-600 group-hover:text-white transition" size={32} />
             </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Service Provider</h3>
-            <p className="text-gray-600 mb-6">Register your garage and connect with customers</p>
-            
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/auth/provider-signup')}
-                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-medium"
-              >
-                Register Business
-              </button>
-              <button
-                onClick={() => router.push('/auth/login?type=provider')}
-                className="w-full bg-white border-2 border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition font-medium flex items-center justify-center"
-              >
-                <LogIn size={18} className="mr-2" />
-                Sign In
-              </button>
-            </div>
-          </div>
+            <p className="text-gray-600">Register your garage and connect with customers</p>
+          </button>
 
-          <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="text-purple-600" size={32} />
+          {/* Company Fleet - Direct to /auth/company-signup */}
+          <button
+            onClick={() => router.push('/auth/company-signup')}
+            className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2 group"
+          >
+            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-600 transition">
+              <Building2 className="text-purple-600 group-hover:text-white transition" size={32} />
             </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Company Fleet</h3>
-            <p className="text-gray-600 mb-6">Manage your company vehicles and maintenance</p>
-            
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/auth/signup?type=company')}
-                className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-medium"
-              >
-                Sign Up
-              </button>
-              <button
-                onClick={() => router.push('/auth/login?type=company')}
-                className="w-full bg-white border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg hover:bg-purple-50 transition font-medium flex items-center justify-center"
-              >
-                <LogIn size={18} className="mr-2" />
-                Sign In
-              </button>
-            </div>
-          </div>
+            <p className="text-gray-600">Manage your company vehicles and maintenance</p>
+          </button>
         </div>
 
         {/* Features */}
@@ -125,5 +96,5 @@ export default function LandingPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
