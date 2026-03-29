@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { UserPlusIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
+import { UserPlus, Mail } from 'lucide-react'
 
 export default function TeamPage() {
   const [members, setMembers] = useState([])
@@ -71,7 +71,7 @@ export default function TeamPage() {
           onClick={() => setShowInviteForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          <UserPlusIcon className="w-5 h-5" />
+          <UserPlus className="w-5 h-5" />
           Invite Member
         </button>
       </div>
@@ -147,7 +147,7 @@ export default function TeamPage() {
           <div className="space-y-2">
             {invitations.map((inv) => (
               <div key={inv.id} className="flex items-center gap-2 text-sm">
-                <EnvelopeIcon className="w-4 h-4 text-yellow-600" />
+                <Mail className="w-4 h-4 text-yellow-600" />
                 <span>{inv.invitee_email} - {inv.staff_role}</span>
               </div>
             ))}

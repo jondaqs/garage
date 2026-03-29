@@ -4,13 +4,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
-  CheckCircleIcon, 
-  XCircleIcon,
-  DocumentTextIcon,
-  BuildingOfficeIcon,
-  UserGroupIcon,
-  ArrowLeftIcon
-} from '@heroicons/react/24/outline'
+  CheckCircle, 
+  XCircle,
+  FileText,
+  Building2,
+  Users,
+  ArrowLeft
+} from 'lucide-react'
 import { sendCompanyApprovalEmail } from '@/lib/email/sendCompanyInviteEmail'
 
 export default function CompanyDetailPage({ params }) {
@@ -49,11 +49,20 @@ export default function CompanyDetailPage({ params }) {
       if (companyData.owner_user_id) {
         const { data: ownerData } = await supabase
           .from('user_profiles')
-          .select('*, auth_user:auth.users(email)')
+          .select('*')
           .eq('id', companyData.owner_user_id)
           .single()
 
-        setOwner(ownerData)
+        // Get owner email from auth
+        if (ownerData) {
+          const { data: authData } = await supabase
+            .from('auth.users')
+            .select('email')
+            .eq('id', ownerData.auth_user_id)
+            .single()
+
+          setOwner({ ...ownerData, email: authData?.email || ownerData.email })
+        }
       }
 
       // Fetch documents
@@ -98,7 +107,7 @@ export default function CompanyDetailPage({ params }) {
       if (owner) {
         try {
           await sendCompanyApprovalEmail({
-            ownerEmail: owner.auth_user?.email || owner.email,
+            ownerEmail: owner.email,
             ownerName: `${owner.first_name} ${owner.last_name}`,
             companyName: company.name,
             companyId: company.id
@@ -231,26 +240,24 @@ export default function CompanyDetailPage({ params }) {
 
   const getStatusColor = (status) => {
     const colors = {
-      'pending_verification': 'yellow',
-      'active': 'green',
-      'rejected': 'red',
-      'pending_info': 'orange',
-      'suspended': 'gray'
+      'pending_verification': 'bg-yellow-100 text-yellow-800',
+      'active': 'bg-green-100 text-green-800',
+      'rejected': 'bg-red-100 text-red-800',
+      'pending_info': 'bg-orange-100 text-orange-800',
+      'suspended': 'bg-gray-100 text-gray-800'
     }
-    return colors[status] || 'gray'
+    return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
-  const statusColor = getStatusColor(company.status)
-
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto p-6">
       {/* Header */}
       <div className="mb-6">
         <Link 
           href="/admin/companies"
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
         >
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5" />
           Back to Companies
         </Link>
 
@@ -259,7 +266,7 @@ export default function CompanyDetailPage({ params }) {
             <h1 className="text-3xl font-bold text-gray-900">{company.name}</h1>
             <p className="text-gray-600 mt-1">Registration Review</p>
           </div>
-          <div className={`px-4 py-2 bg-${statusColor}-100 text-${statusColor}-800 rounded-full font-medium`}>
+          <div className={`px-4 py-2 rounded-full font-medium ${getStatusColor(company.status)}`}>
             {company.status.replace('_', ' ').toUpperCase()}
           </div>
         </div>
@@ -275,7 +282,7 @@ export default function CompanyDetailPage({ params }) {
               disabled={processing}
               className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
             >
-              <CheckCircleIcon className="w-5 h-5" />
+              <CheckCircle className="w-5 h-5" />
               Approve Company
             </button>
             <button
@@ -283,7 +290,7 @@ export default function CompanyDetailPage({ params }) {
               disabled={processing}
               className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400"
             >
-              <XCircleIcon className="w-5 h-5" />
+              <XCircle className="w-5 h-5" />
               Reject
             </button>
             <button
@@ -302,7 +309,7 @@ export default function CompanyDetailPage({ params }) {
         {/* Company Details */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center gap-2 mb-4">
-            <BuildingOfficeIcon className="w-6 h-6 text-blue-600" />
+            <Building2 className="w-6 h-6 text-blue-600" />
             <h2 className="text-xl font-semibold">Company Information</h2>
           </div>
           <dl className="space-y-3">
@@ -336,7 +343,7 @@ export default function CompanyDetailPage({ params }) {
         {/* Contact Information */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center gap-2 mb-4">
-            <UserGroupIcon className="w-6 h-6 text-blue-600" />
+            <Users className="w-6 h-6 text-blue-600" />
             <h2 className="text-xl font-semibold">Contact Information</h2>
           </div>
           <dl className="space-y-3">
@@ -348,7 +355,7 @@ export default function CompanyDetailPage({ params }) {
             </div>
             <div>
               <dt className="text-sm text-gray-600">Email</dt>
-              <dd className="font-medium">{owner?.auth_user?.email || owner?.email || 'N/A'}</dd>
+              <dd className="font-medium">{owner?.email || 'N/A'}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-600">Phone</dt>
@@ -391,7 +398,7 @@ export default function CompanyDetailPage({ params }) {
       {/* Documents */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+          <FileText className="w-6 h-6 text-blue-600" />
           <h2 className="text-xl font-semibold">Uploaded Documents</h2>
         </div>
         

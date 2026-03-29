@@ -2,31 +2,31 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
-  HomeIcon, 
-  TruckIcon, 
-  UsersIcon, 
-  CalendarIcon,
-  ChartBarIcon,
-  CogIcon,
-  BuildingOfficeIcon
-} from '@heroicons/react/24/outline'
+  Home, 
+  Truck, 
+  Users, 
+  Calendar,
+  BarChart3,
+  Settings,
+  Building2
+} from 'lucide-react'
 
 export default function CompanySidebar() {
   const pathname = usePathname()
 
   const navigation = [
-    { name: 'Dashboard', href: '/company/dashboard', icon: HomeIcon },
-    { name: 'Fleet', href: '/company/fleet', icon: TruckIcon },
-    { name: 'Team', href: '/company/team', icon: UsersIcon },
-    { name: 'Bookings', href: '/company/bookings', icon: CalendarIcon },
-    { name: 'Reports', href: '/company/reports', icon: ChartBarIcon },
-    { name: 'Settings', href: '/company/settings', icon: CogIcon },
+    { name: 'Dashboard', href: '/company/dashboard', icon: Home },
+    { name: 'Fleet', href: '/company/fleet', icon: Truck },
+    { name: 'Team', href: '/company/team', icon: Users },
+    { name: 'Bookings', href: '/company/bookings', icon: Calendar },
+    { name: 'Reports', href: '/company/reports', icon: BarChart3 },
+    { name: 'Settings', href: '/company/settings', icon: Settings },
   ]
 
   return (
     <div className="w-64 bg-white border-r border-gray-200">
       <div className="flex items-center gap-2 p-6 border-b">
-        <BuildingOfficeIcon className="w-8 h-8 text-blue-600" />
+        <Building2 className="w-8 h-8 text-blue-600" />
         <div>
           <h1 className="font-bold text-lg">GariCare</h1>
           <p className="text-xs text-gray-500">Company Portal</p>

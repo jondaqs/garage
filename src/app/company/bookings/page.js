@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { 
-  PlusIcon, 
-  CalendarIcon,
-  TruckIcon,
-  WrenchScrewdriverIcon
-} from '@heroicons/react/24/outline'
+  Plus, 
+  Calendar,
+  Truck,
+  Wrench
+} from 'lucide-react'
 
 export default function CompanyBookingsPage() {
   const [bookings, setBookings] = useState([])
@@ -119,7 +119,7 @@ export default function CompanyBookingsPage() {
           href="/company/bookings/new"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          <PlusIcon className="w-5 h-5" />
+          <Plus className="w-5 h-5" />
           Book Service
         </Link>
       </div>
@@ -144,7 +144,7 @@ export default function CompanyBookingsPage() {
       {/* Bookings List */}
       {bookings.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <CalendarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             No bookings found
           </h3>
@@ -157,7 +157,7 @@ export default function CompanyBookingsPage() {
             href="/company/bookings/new"
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            <PlusIcon className="w-5 h-5" />
+            <Plus className="w-5 h-5" />
             Book Your First Service
           </Link>
         </div>
@@ -175,14 +175,14 @@ export default function CompanyBookingsPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-blue-50 rounded-lg">
-                      <WrenchScrewdriverIcon className="w-6 h-6 text-blue-600" />
+                      <Wrench className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg mb-1">
                         {booking.service_type || 'Service Booking'}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <TruckIcon className="w-4 h-4" />
+                        <Truck className="w-4 h-4" />
                         <span>
                           {booking.vehicle?.license_plate} - {booking.vehicle?.make} {booking.vehicle?.model}
                         </span>

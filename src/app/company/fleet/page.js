@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { TruckIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { Truck, Plus } from 'lucide-react'
 
 export default function FleetPage() {
   const [fleet, setFleet] = useState([])
@@ -39,14 +39,14 @@ export default function FleetPage() {
           href="/company/fleet/add"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          <PlusIcon className="w-5 h-5" />
+          <Plus className="w-5 h-5" />
           Add Vehicle
         </Link>
       </div>
 
       {fleet.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <TruckIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <Truck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             No vehicles in your fleet
           </h3>
@@ -57,7 +57,7 @@ export default function FleetPage() {
             href="/company/fleet/add"
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            <PlusIcon className="w-5 h-5" />
+            <Plus className="w-5 h-5" />
             Add Your First Vehicle
           </Link>
         </div>
@@ -70,7 +70,7 @@ export default function FleetPage() {
               className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-center justify-between mb-4">
-                <TruckIcon className="w-8 h-8 text-blue-600" />
+                <Truck className="w-8 h-8 text-blue-600" />
                 <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
                   Active
                 </span>

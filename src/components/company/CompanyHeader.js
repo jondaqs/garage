@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { BellIcon, UserCircleIcon } from '@heroicons/react/24/outline'
+import { Bell, UserCircle } from 'lucide-react'
 
 export default function CompanyHeader() {
   const [company, setCompany] = useState(null)
@@ -58,12 +58,12 @@ export default function CompanyHeader() {
 
         <div className="flex items-center gap-4">
           <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-            <BellIcon className="w-6 h-6 text-gray-600" />
+            <Bell className="w-6 h-6 text-gray-600" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
           <div className="flex items-center gap-2">
-            <UserCircleIcon className="w-8 h-8 text-gray-600" />
+            <UserCircle className="w-8 h-8 text-gray-600" />
             <div className="text-sm">
               <p className="font-medium">
                 {user?.first_name} {user?.last_name}
