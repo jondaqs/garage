@@ -62,7 +62,47 @@ export async function GET(request) {
         }
       }
 
-      // Check if this is a provider registration flow
+      // ============================================
+      // COMPANY SIGNUP FLOW (NEW)
+      // ============================================
+      if (next.includes('company-signup')) {
+        console.log('Company signup flow detected')
+        
+        // Get the profile (either existing or just created)
+        const { data: userProfile } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single()
+
+        if (userProfile) {
+          // Check if user already has a company account
+          const { data: existingCompany } = await supabase
+            .from('company_profiles')
+            .select('id, name, status')
+            .eq('owner_user_id', userProfile.id)
+            .single()
+
+          if (existingCompany) {
+            console.log('User already has company account, redirecting to dashboard')
+            // Already has company account - go to company dashboard
+            if (existingCompany.status === 'active') {
+              return NextResponse.redirect(new URL('/company/dashboard', request.url))
+            } else {
+              // Pending verification
+              return NextResponse.redirect(new URL('/company/dashboard?status=pending', request.url))
+            }
+          }
+        }
+        
+        // No company account - continue with registration
+        console.log('No company account found, continuing registration')
+        return NextResponse.redirect(new URL('/auth/company-signup', request.url))
+      }
+
+      // ============================================
+      // PROVIDER SIGNUP FLOW (EXISTING)
+      // ============================================
       if (next.includes('provider-signup')) {
         console.log('Provider signup flow detected')
         
@@ -98,7 +138,10 @@ export async function GET(request) {
         return NextResponse.redirect(new URL('/auth/provider-signup', request.url))
       }
 
-      // Check user role and redirect appropriately for non-provider flows
+      // ============================================
+      // DEFAULT FLOW (EXISTING)
+      // ============================================
+      // Check user role and redirect appropriately for non-provider/non-company flows
       const { data: userProfile } = await supabase
         .from('user_profiles')
         .select(`
@@ -121,6 +164,12 @@ export async function GET(request) {
         const isProvider = userProfile.user_roles?.some(ur => ur.role?.code === 'service_provider_owner')
         if (isProvider) {
           return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+        }
+
+        // Check if company owner
+        const isCompany = userProfile.user_roles?.some(ur => ur.role?.code === 'company_owner')
+        if (isCompany) {
+          return NextResponse.redirect(new URL('/company/dashboard', request.url))
         }
       }
 
