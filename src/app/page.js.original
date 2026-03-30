@@ -30,7 +30,6 @@ export default function LandingPage() {
 
         {/* User Type Selection */}
         <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6 mb-8">
-          {/* VEHICLE OWNER CARD */}
           <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="text-blue-600" size={32} />
@@ -46,7 +45,7 @@ export default function LandingPage() {
                 Sign Up
               </button>
               <button
-                onClick={() => router.push('/auth/login')}
+                onClick={() => router.push('/auth/login?type=normal')}
                 className="w-full bg-white border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 transition font-medium flex items-center justify-center"
               >
                 <LogIn size={18} className="mr-2" />
@@ -55,7 +54,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* SERVICE PROVIDER CARD */}
           <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Wrench className="text-green-600" size={32} />
@@ -71,7 +69,7 @@ export default function LandingPage() {
                 Register Business
               </button>
               <button
-                onClick={() => router.push('/auth/login')}
+                onClick={() => router.push('/auth/login?type=provider')}
                 className="w-full bg-white border-2 border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition font-medium flex items-center justify-center"
               >
                 <LogIn size={18} className="mr-2" />
@@ -80,7 +78,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* COMPANY FLEET CARD - UPDATED */}
           <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
             <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Building2 className="text-purple-600" size={32} />
@@ -89,15 +86,14 @@ export default function LandingPage() {
             <p className="text-gray-600 mb-6">Manage your company vehicles and maintenance</p>
             
             <div className="space-y-2">
-              {/* CHANGED: Direct to /auth/company-signup (matches provider pattern) */}
               <button
-                onClick={() => router.push('/auth/company-signup')}
+                onClick={() => router.push('/auth/signup?type=company')}
                 className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-medium"
               >
-                Register Company
+                Sign Up
               </button>
               <button
-                onClick={() => router.push('/auth/login')}
+                onClick={() => router.push('/auth/login?type=company')}
                 className="w-full bg-white border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg hover:bg-purple-50 transition font-medium flex items-center justify-center"
               >
                 <LogIn size={18} className="mr-2" />
