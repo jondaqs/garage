@@ -1,7 +1,9 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function ReviewSubmitStep({ data, previousStep, router }) {
+    const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
