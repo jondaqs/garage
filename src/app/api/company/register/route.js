@@ -58,7 +58,9 @@ export async function POST(request) {
                 physical_address: body.companyDetails.address || body.companyDetails.physicalAddress,  // ✅ FIXED: 'physical_address' not 'address'
                 city: body.companyDetails.city,
                 country: body.companyDetails.country || 'Kenya',
-                years_in_operation: body.companyDetails.yearsInOperation,
+                years_in_operation: body.companyDetails.yearsInOperation 
+                    ? parseInt(body.companyDetails.yearsInOperation) 
+                    : null,
                 opening_time: body.companyDetails.openingTime,
                 closing_time: body.companyDetails.closingTime,
                 owner_user_id: userProfile.id,
