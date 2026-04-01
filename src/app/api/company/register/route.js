@@ -58,8 +58,8 @@ export async function POST(request) {
                 physical_address: body.companyDetails.address || body.companyDetails.physicalAddress,  // ✅ FIXED: 'physical_address' not 'address'
                 city: body.companyDetails.city,
                 country: body.companyDetails.country || 'Kenya',
-                years_in_operation: body.companyDetails.yearsInOperation 
-                    ? parseInt(body.companyDetails.yearsInOperation) 
+                years_in_operation: body.companyDetails.yearsInOperation
+                    ? parseInt(body.companyDetails.yearsInOperation)
                     : null,
                 opening_time: body.companyDetails.openingTime,
                 closing_time: body.companyDetails.closingTime,
@@ -78,6 +78,7 @@ export async function POST(request) {
         }
 
         console.log('✅ Company created:', company[0].id)
+
 
         // Add owner as company user with admin rights
         const { error: companyUserError } = await supabase
@@ -112,11 +113,12 @@ export async function POST(request) {
         }
 
         // Process document uploads
+        // Process document uploads
         if (body.documents && body.documents.length > 0) {
-            // Update uploaded_files to link them to this company
             const documentIds = body.documents.map(doc => doc.id).filter(Boolean)
 
             if (documentIds.length > 0) {
+                // Link documents to company in uploaded_files table
                 const { error: docsUpdateError } = await supabase
                     .from('uploaded_files')
                     .update({
@@ -130,6 +132,60 @@ export async function POST(request) {
                 } else {
                     console.log('✅ Documents linked to company')
                 }
+
+                // ========================================
+                // NEW: Save document URLs to company_profiles
+                // ========================================
+                try {
+                    // Get uploaded files with their storage paths
+                    const { data: uploadedFiles } = await supabase
+                        .from('uploaded_files')
+                        .select('id, storage_path')
+                        .in('id', documentIds)
+
+                    if (uploadedFiles && uploadedFiles.length > 0) {
+                        // Create a map of document type to URL
+                        const docUrls = {}
+
+                        // Match uploaded files to document types
+                        body.documents.forEach(doc => {
+                            const file = uploadedFiles.find(f => f.id === doc.id)
+                            if (file && file.storage_path) {
+                                // Get public URL from storage
+                                const { data: { publicUrl } } = supabase.storage
+                                    .from('documents')
+                                    .getPublicUrl(file.storage_path)
+
+                                // Map document type to column name
+                                docUrls[doc.type] = publicUrl
+                            }
+                        })
+
+                        // Update company_profiles with document URLs
+                        const { error: urlUpdateError } = await supabase
+                            .from('company_profiles')
+                            .update({
+                                business_licence_url: docUrls.business_license || null,
+                                certificate_of_incorporation_url: docUrls.certificate_of_incorporation || null,
+                                tax_certificate_url: docUrls.tax_compliance || null,
+                                kra_pin_url: docUrls.kra_pin || null,
+                                insurance_url: docUrls.insurance || null
+                            })
+                            .eq('id', company[0].id)
+
+                        if (urlUpdateError) {
+                            console.error('⚠️ Document URL update error:', urlUpdateError)
+                        } else {
+                            console.log('✅ Document URLs saved to company profile')
+                        }
+                    }
+                } catch (docUrlError) {
+                    console.error('⚠️ Document URL processing error:', docUrlError)
+                    // Don't fail registration if URL update fails
+                }
+                // ========================================
+                // END NEW SECTION
+                // ========================================
             }
         }
 
@@ -226,10 +282,13 @@ export async function POST(request) {
         // Create notifications for all admins
         try {
             // Get all admin users
-            const { data: adminRoles } = await supabase
+            const { data: adminUsers } = await supabase
                 .from('user_roles')
-                .select('user_id')
-                .eq('role_code', 'admin')
+                .select(`
+                user_id,
+                user_roles_lookup!inner(code)
+                `)
+                .eq('user_roles_lookup.code', 'admin')
 
             if (adminRoles && adminRoles.length > 0) {
                 // Create individual notifications for each admin
