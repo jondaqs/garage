@@ -43,28 +43,45 @@ export async function middleware(request) {
     // Get user from session
     const user = session.user
 
-    // Check if user is a company member
+    // Get user profile
     const { data: userProfile } = await supabase
       .from('user_profiles')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (userProfile) {
-      const { data: companyUser } = await supabase
-        .from('company_users')
-        .select('id')
-        .eq('user_id', userProfile.id)
-        .single()
-
-      // If user is not a company member, redirect to dashboard
-      if (!companyUser) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
-    } else {
+    if (!userProfile) {
       // No user profile found, redirect to dashboard
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
+
+    // ========================================
+    // ✅ FIXED: Check BOTH ownership and membership
+    // ========================================
+    
+    // Check if user owns a company
+    const { data: ownedCompany } = await supabase
+      .from('company_profiles')
+      .select('id, status')
+      .eq('owner_user_id', userProfile.id)
+      .single()
+
+    // Check if user is a company member
+    const { data: companyMembership } = await supabase
+      .from('company_users')
+      .select('id, company_id, is_active')
+      .eq('user_id', userProfile.id)
+      .eq('is_active', true)
+      .single()
+
+    // Allow access if user either owns a company OR is a member
+    if (ownedCompany || companyMembership) {
+      // User has company access, allow through
+      return response
+    }
+
+    // User has no company access, redirect to company signup
+    return NextResponse.redirect(new URL('/auth/company-signup', request.url))
   }
 
   // Protect dashboard routes
@@ -88,6 +105,6 @@ export const config = {
   matcher: [
     '/dashboard/:path*', 
     '/auth/:path*',
-    '/company/:path*'  // Added company routes to matcher
+    '/company/:path*'
   ],
 }
