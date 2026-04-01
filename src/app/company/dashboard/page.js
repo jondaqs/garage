@@ -18,6 +18,7 @@ export default function CompanyDashboard() {
     })
     const [recentBookings, setRecentBookings] = useState([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         fetchDashboardData()
@@ -28,7 +29,11 @@ export default function CompanyDashboard() {
 
         try {
             const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
+            if (!user) {
+                setError('Not authenticated')
+                setLoading(false)
+                return
+            }
 
             const { data: userProfile } = await supabase
                 .from('user_profiles')
@@ -36,25 +41,54 @@ export default function CompanyDashboard() {
                 .eq('auth_user_id', user.id)
                 .single()
 
-            const { data: companyUser } = await supabase
-                .from('company_users')
-                .select('company_id')
-                .eq('user_id', userProfile.id)
-                .single()
+            if (!userProfile) {
+                setError('User profile not found')
+                setLoading(false)
+                return
+            }
 
-            if (!companyUser) return
+            // ✅ FIX: Check BOTH company ownership AND membership
+            let companyId = null
+
+            // First check if user owns a company
+            const { data: ownedCompany } = await supabase
+                .from('company_profiles')
+                .select('id')
+                .eq('owner_user_id', userProfile.id)
+                .maybeSingle()
+
+            if (ownedCompany) {
+                companyId = ownedCompany.id
+            } else {
+                // Check if user is a company member
+                const { data: companyUser } = await supabase
+                    .from('company_users')
+                    .select('company_id')
+                    .eq('user_id', userProfile.id)
+                    .maybeSingle()
+
+                if (companyUser) {
+                    companyId = companyUser.company_id
+                }
+            }
+
+            if (!companyId) {
+                setError('No company found')
+                setLoading(false)
+                return
+            }
 
             // Fetch fleet count
             const { count: vehicleCount } = await supabase
                 .from('vehicle_ownership')
                 .select('*', { count: 'exact', head: true })
-                .eq('owner_company_id', companyUser.company_id)
+                .eq('owner_company_id', companyId)
 
             // Fetch team members count
             const { count: membersCount } = await supabase
                 .from('company_users')
                 .select('*', { count: 'exact', head: true })
-                .eq('company_id', companyUser.company_id)
+                .eq('company_id', companyId)
 
             setStats({
                 totalVehicles: vehicleCount || 0,
@@ -63,9 +97,11 @@ export default function CompanyDashboard() {
                 pendingBookings: 0
             })
 
+            setLoading(false)
+
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
-        } finally {
+            setError(error.message)
             setLoading(false)
         }
     }
@@ -74,28 +110,28 @@ export default function CompanyDashboard() {
         {
             name: 'Total Vehicles',
             value: stats.totalVehicles,
-            icon: Truck,  // Changed from TruckIcon
+            icon: Truck,
             color: 'blue',
             link: '/company/fleet'
         },
         {
             name: 'Team Members',
             value: stats.teamMembers,
-            icon: Users,  // Changed from UsersIcon
+            icon: Users,
             color: 'green',
             link: '/company/team'
         },
         {
             name: 'Pending Bookings',
             value: stats.pendingBookings,
-            icon: Calendar,  // Changed from CalendarIcon
+            icon: Calendar,
             color: 'yellow',
             link: '/company/bookings'
         },
         {
             name: 'Monthly Budget',
             value: 'KES 0',
-            icon: DollarSign,  // Changed from CurrencyDollarIcon
+            icon: DollarSign,
             color: 'purple',
             link: '/company/reports'
         }
@@ -105,6 +141,20 @@ export default function CompanyDashboard() {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="text-gray-500">Loading dashboard...</div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64">
+                <div className="text-red-500 mb-4">Error: {error}</div>
+                <button 
+                    onClick={() => window.location.href = '/auth/company-signup'}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                >
+                    Register Company
+                </button>
             </div>
         )
     }
