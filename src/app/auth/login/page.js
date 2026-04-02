@@ -65,6 +65,7 @@ export default function LoginPage() {
           .maybeSingle()
 
         if (ownedCompany) {
+          console.log('User is company owner, company status:', ownedCompany.status)
           router.push('/company/dashboard')
           router.refresh()
           return

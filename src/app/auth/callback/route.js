@@ -153,6 +153,8 @@ export async function GET(request) {
         .eq('auth_user_id', user.id)
         .single()
 
+      console.log('User profile fetched for role check:', userProfile.user_roles) // Debug log
+
       if (userProfile) {
         // Check if admin
         const isAdmin = userProfile.user_roles?.some(ur => ur.role?.code === 'admin')
@@ -169,6 +171,7 @@ export async function GET(request) {
         // Check if company owner
         const isCompany = userProfile.user_roles?.some(ur => ur.role?.code === 'company_owner')
         if (isCompany) {
+          console.log('User is company owner, redirecting to company dashboard')
           return NextResponse.redirect(new URL('/company/dashboard', request.url))
         }
       }
