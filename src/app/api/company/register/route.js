@@ -99,17 +99,34 @@ export async function POST(request) {
             console.log('✅ Owner added as company admin')
         }
 
-        // Assign owner role
-        const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert([{
-                user_id: userProfile.id,
-                role_code: 'company_owner'
-            }])
+        // Assign company_owner role
+        try {
+            // Get the company_owner role_id from lookup table
+            const { data: companyOwnerRole } = await supabase
+                .from('user_roles_lookup')
+                .select('id')
+                .eq('code', 'company_owner')
+                .single()
 
-        if (roleError) {
+            if (companyOwnerRole) {
+                // Insert into user_roles with role_id
+                const { error: roleError } = await supabase
+                    .from('user_roles')
+                    .insert([{
+                        user_id: userProfile.id,
+                        role_id: companyOwnerRole.id
+                    }])
+
+                if (roleError) {
+                    console.error('⚠️ Role assignment error:', roleError)
+                } else {
+                    console.log('✅ Company owner role assigned')
+                }
+            } else {
+                console.error('⚠️ company_owner role not found in user_roles_lookup')
+            }
+        } catch (roleError) {
             console.error('⚠️ Role assignment error:', roleError)
-            // Don't fail - not critical
         }
 
         // Process document uploads
