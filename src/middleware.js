@@ -30,113 +30,140 @@ export async function middleware(request) {
     }
   )
 
-  // Get the current session
+  // Get session
   const { data: { session } } = await supabase.auth.getSession()
 
   // ========================================
-  // COMPANY ROUTES PROTECTION
+  // NOT LOGGED IN - Protect routes
   // ========================================
-  if (pathname.startsWith('/company')) {
-    if (!session) {
+  if (!session) {
+    if (
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/provider') ||
+      pathname.startsWith('/company') ||
+      pathname.startsWith('/admin')
+    ) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
-
-    // Get user profile
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('auth_user_id', session.user.id)
-      .single()
-
-    if (!userProfile) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
-
-    // ✅ CRITICAL FIX: Check company_profiles FIRST (no recursion)
-    // This checks if user OWNS a company
-    const { data: ownedCompany } = await supabase
-      .from('company_profiles')
-      .select('id, status')
-      .eq('owner_user_id', userProfile.id)
-      .maybeSingle()  // Use maybeSingle to avoid error if not found
-
-    // Then check company_users (will work because of non-recursive RLS)
-    const { data: companyMembership } = await supabase
-      .from('company_users')
-      .select('company_id, is_active')
-      .eq('user_id', userProfile.id)
-      .eq('is_active', true)
-      .maybeSingle()  // Use maybeSingle to avoid error if not found
-
-    // Allow access if user either owns OR is a member
-    if (ownedCompany || companyMembership) {
-      return response
-    }
-
-    // No company access - redirect to company signup
-    return NextResponse.redirect(new URL('/auth/company-signup', request.url))
-  }
-
-  // ========================================
-  // DASHBOARD ROUTES PROTECTION
-  // ========================================
-  if (pathname.startsWith('/dashboard')) {
-    if (!session) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
-
-    // ✅ NEW: If user has company, redirect to company dashboard
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('auth_user_id', session.user.id)
-      .single()
-
-    if (userProfile) {
-      // Check if owns company
-      const { data: ownedCompany } = await supabase
-        .from('company_profiles')
-        .select('id')
-        .eq('owner_user_id', userProfile.id)
-        .maybeSingle()
-
-      if (ownedCompany) {
-        // User owns company - redirect to company dashboard
-        return NextResponse.redirect(new URL('/company/dashboard', request.url))
-      }
-    }
-
-    // Regular user - allow access to normal dashboard
     return response
   }
 
   // ========================================
-  // AUTH PAGES (login/signup)
+  // LOGGED IN - Determine user role
   // ========================================
-  if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')) {
-    if (session) {
-      // User already logged in - check if they have company
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('auth_user_id', session.user.id)
-        .single()
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select(`
+      id,
+      user_roles(
+        role:user_roles_lookup(code)
+      )
+    `)
+    .eq('auth_user_id', session.user.id)
+    .single()
 
-      if (userProfile) {
-        const { data: ownedCompany } = await supabase
-          .from('company_profiles')
-          .select('id')
-          .eq('owner_user_id', userProfile.id)
-          .maybeSingle()
+  if (!profile) {
+    return NextResponse.redirect(new URL('/auth/login', request.url))
+  }
 
-        if (ownedCompany) {
-          return NextResponse.redirect(new URL('/company/dashboard', request.url))
-        }
-      }
+  let role = 'user'
 
-      // Regular user
+  // Check if admin (highest priority)
+  const isAdmin = profile.user_roles?.some(ur => ur.role?.code === 'admin')
+  if (isAdmin) {
+    role = 'admin'
+  }
+
+  // Check if service provider
+  const { data: provider } = await supabase
+    .from('service_providers')
+    .select('id, status')
+    .eq('owner_user_id', profile.id)
+    .maybeSingle()
+
+  if (provider) {
+    role = 'provider'
+  }
+
+  // Check if company owner (via company_profiles)
+  const { data: ownedCompany } = await supabase
+    .from('company_profiles')
+    .select('id, status')
+    .eq('owner_user_id', profile.id)
+    .maybeSingle()
+
+  if (ownedCompany) {
+    role = 'company'
+  }
+
+  // Check if company member (via company_users)
+  if (!ownedCompany) {
+    const { data: companyMember } = await supabase
+      .from('company_users')
+      .select('company_id, is_active')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (companyMember) {
+      role = 'company'
+    }
+  }
+
+  // ========================================
+  // ROUTE PROTECTION & REDIRECTION
+  // ========================================
+
+  // Admin routes
+  if (pathname.startsWith('/admin')) {
+    if (role !== 'admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
+    return response
+  }
+
+  // Company routes
+  if (pathname.startsWith('/company')) {
+    if (role !== 'company') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return response
+  }
+
+  // Provider routes
+  if (pathname.startsWith('/provider')) {
+    if (role !== 'provider') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return response
+  }
+
+  // Regular dashboard - redirect based on role
+  if (pathname.startsWith('/dashboard')) {
+    if (role === 'admin') {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    }
+    if (role === 'company') {
+      return NextResponse.redirect(new URL('/company/dashboard', request.url))
+    }
+    if (role === 'provider') {
+      return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+    }
+    return response
+  }
+
+  // Auth pages - redirect if already logged in
+  if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')) {
+    if (role === 'admin') {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    }
+    if (role === 'company') {
+      return NextResponse.redirect(new URL('/company/dashboard', request.url))
+    }
+    if (role === 'provider') {
+      return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+    }
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return response
@@ -144,8 +171,10 @@ export async function middleware(request) {
 
 export const config = {
   matcher: [
-    '/dashboard/:path*', 
+    '/dashboard/:path*',
+    '/provider/:path*',
+    '/company/:path*',
+    '/admin/:path*',
     '/auth/:path*',
-    '/company/:path*'
   ],
 }

@@ -6,9 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Car, Mail, Lock, Eye, EyeOff, Chrome } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() { // ← Remove 'async' here!
+export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClient() // ← Remove 'await' here!
+  const supabase = createClient()
   
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
@@ -41,18 +41,62 @@ export default function LoginPage() { // ← Remove 'async' here!
           .eq('auth_user_id', authData.user.id)
           .single()
 
-        // Check if user is a service provider
+        // ========================================
+        // CHECK ADMIN (HIGHEST PRIORITY)
+        // ========================================
+        const isAdmin = profile?.user_roles?.some(
+          ur => ur.role?.code === 'admin'
+        )
+
+        if (isAdmin) {
+          router.push('/admin/dashboard')
+          router.refresh()
+          return
+        }
+
+        // ========================================
+        // CHECK COMPANY OWNER/MEMBER
+        // ========================================
+        // Check if user owns a company
+        const { data: ownedCompany } = await supabase
+          .from('company_profiles')
+          .select('id, status')
+          .eq('owner_user_id', profile.id)
+          .maybeSingle()
+
+        if (ownedCompany) {
+          router.push('/company/dashboard')
+          router.refresh()
+          return
+        }
+
+        // Check if user is a company member
+        const { data: companyMember } = await supabase
+          .from('company_users')
+          .select('company_id, is_active')
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        if (companyMember) {
+          router.push('/company/dashboard')
+          router.refresh()
+          return
+        }
+
+        // ========================================
+        // CHECK SERVICE PROVIDER
+        // ========================================
         const isProvider = profile?.user_roles?.some(
           ur => ur.role?.code === 'service_provider_owner'
         )
 
-        // Check if provider has completed registration
         if (isProvider) {
           const { data: provider } = await supabase
             .from('service_providers')
             .select('id, status')
             .eq('owner_user_id', profile.id)
-            .single()
+            .maybeSingle()
 
           if (!provider) {
             // Provider hasn't completed registration workflow
@@ -66,18 +110,9 @@ export default function LoginPage() { // ← Remove 'async' here!
           }
         }
 
-        // Check if user is admin
-        const isAdmin = profile?.user_roles?.some(
-          ur => ur.role?.code === 'admin'
-        )
-
-        if (isAdmin) {
-          router.push('/admin/dashboard')
-          router.refresh()
-          return
-        }
-
-        // Default to regular user dashboard
+        // ========================================
+        // DEFAULT TO REGULAR USER DASHBOARD
+        // ========================================
         router.push('/dashboard')
         router.refresh()
       }
