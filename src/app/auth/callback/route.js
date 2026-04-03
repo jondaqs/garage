@@ -62,45 +62,7 @@ export async function GET(request) {
         }
       }
 
-      // ============================================
-      // COMPANY SIGNUP FLOW (NEW)
-      // ============================================
-      console.log('Checking for company signup flow with next parameter:', next)
-      if (next.includes('company-signup')) {
-        console.log('Company signup flow detected')
-        
-        // Get the profile (either existing or just created)
-        const { data: userProfile } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single()
-
-        if (userProfile) {
-          // Check if user already has a company account
-          const { data: existingCompany } = await supabase
-            .from('company_profiles')
-            .select('id, name, status')
-            .eq('owner_user_id', userProfile.id)
-            .single()
-
-          if (existingCompany) {
-            console.log('User already has company account, redirecting to dashboard')
-            // Already has company account - go to company dashboard
-            if (existingCompany.status === 'active') {
-              return NextResponse.redirect(new URL('/company/dashboard', request.url))
-            } else {
-              console.log('Company account pending verification, redirecting to dashboard with pending status')
-              // Pending verification
-              return NextResponse.redirect(new URL('/company/dashboard?status=pending', request.url))
-            }
-          }
-        }
-        
-        // No company account - continue with registration
-        console.log('No company account found, continuing registration')
-        return NextResponse.redirect(new URL('/auth/company-signup', request.url))
-      }
+      
 
       // ============================================
       // PROVIDER SIGNUP FLOW (EXISTING)
