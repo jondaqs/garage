@@ -19,9 +19,10 @@ export default function CompanySidebar() {
     { name: 'Fleet', href: '/company/fleet', icon: Truck },
     { name: 'Team', href: '/company/team', icon: Users },
     { name: 'Bookings', href: '/company/bookings', icon: Calendar },
-    { name: 'Reports', href: '/company/reports', icon: BarChart3 },
-    { name: 'Settings', href: '/company/settings', icon: Settings },
   ]
+
+    //{ name: 'Reports', href: '/company/reports', icon: BarChart3 },
+    //{ name: 'Settings', href: '/company/settings', icon: Settings },
 
   return (
     <div className="w-64 bg-white border-r border-gray-200">
