@@ -30,6 +30,7 @@ export default function CompanyDashboard() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
+                console.error('User not authenticated')
                 setError('Not authenticated')
                 setLoading(false)
                 return
@@ -42,6 +43,7 @@ export default function CompanyDashboard() {
                 .single()
 
             if (!userProfile) {
+                console.error('User profile not found for authenticated user')
                 setError('User profile not found')
                 setLoading(false)
                 return
@@ -58,6 +60,7 @@ export default function CompanyDashboard() {
                 .maybeSingle()
 
             if (ownedCompany) {
+                console.log('User is company owner, company ID:', ownedCompany.id)
                 companyId = ownedCompany.id
             } else {
                 // Check if user is a company member
@@ -68,11 +71,13 @@ export default function CompanyDashboard() {
                     .maybeSingle()
 
                 if (companyUser) {
+                    console.log('User is company member, company ID:', companyUser.company_id)
                     companyId = companyUser.company_id
                 }
             }
 
             if (!companyId) {
+                console.error('No company found for user')
                 setError('No company found')
                 setLoading(false)
                 return
@@ -96,15 +101,49 @@ export default function CompanyDashboard() {
                 teamMembers: membersCount || 0,
                 pendingBookings: 0
             })
+            console.log('Stats fetched:', {
+                totalVehicles: vehicleCount,
+                teamMembers: membersCount
+            })
+
+            // Fetch recent bookings (for simplicity, fetching all bookings for company vehicles)
+            const { data: fleet } = await supabase
+                .from('vehicle_ownership')
+                .select('vehicle_id')
+                .eq('owner_company_id', companyId)
+
+            const vehicleIds = fleet.map(v => v.vehicle_id)
+
+            const { data: bookingsData, error } = await supabase
+                .from('bookings')
+                .select(`
+                    *,
+                    vehicle:vehicles(*),
+                    provider:provider_profiles(business_name)
+                `)
+                .in('vehicle_id', vehicleIds)
+                .order('created_at', { ascending: false })
+                .limit(5)
+
+            if (error) throw error
+
+            setRecentBookings(bookingsData || [])   
 
             setLoading(false)
 
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
             setError(error.message)
+            console.error('Detailed error info:', {
+                code: error.code,
+                message: error.message,
+                details: error.details
+            })
             setLoading(false)
         }
     }
+
+    console.log('Rendering dashboard with stats:', stats)
 
     const statCards = [
         {
@@ -137,6 +176,8 @@ export default function CompanyDashboard() {
         }
     ]
 
+    console.log('Stat cards to render:', statCards)
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -145,7 +186,10 @@ export default function CompanyDashboard() {
         )
     }
 
+    console.log('Dashboard loaded, rendering content')
+
     if (error) {
+        console.error('Dashboard error:', error)
         return (
             <div className="flex flex-col items-center justify-center h-64">
                 <div className="text-red-500 mb-4">Error: {error}</div>

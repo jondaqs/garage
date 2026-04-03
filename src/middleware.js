@@ -37,6 +37,7 @@ export async function middleware(request) {
   // NOT LOGGED IN - Protect routes
   // ========================================
   if (!session) {
+    console.log('No session found, redirecting to login for protected route:', pathname)
     if (
       pathname.startsWith('/dashboard') ||
       pathname.startsWith('/provider') ||
@@ -124,6 +125,7 @@ export async function middleware(request) {
 
   // Company routes
   if (pathname.startsWith('/company')) {
+    console.log('Accessing company route, user role:', role) // Debug log
     if (role !== 'company') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
@@ -144,6 +146,7 @@ export async function middleware(request) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
     if (role === 'company') {
+      console.log('Redirecting to company dashboard for user with company role') // Debug log
       return NextResponse.redirect(new URL('/company/dashboard', request.url))
     }
     if (role === 'provider') {
@@ -158,6 +161,7 @@ export async function middleware(request) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
     if (role === 'company') {
+      console.log('Redirecting to company dashboard from auth page; for already logged in user with company role') // Debug log
       return NextResponse.redirect(new URL('/company/dashboard', request.url))
     }
     if (role === 'provider') {
