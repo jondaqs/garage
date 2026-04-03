@@ -106,7 +106,7 @@ export default function CompanyDashboard() {
                 teamMembers: membersCount
             }) 
 
-            setLoading(false)
+            //setLoading(false)
 
             console.log('set loading false after fetching stats')
 
