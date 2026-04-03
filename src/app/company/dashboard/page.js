@@ -145,17 +145,15 @@ export default function CompanyDashboard() {
             icon: Calendar,
             color: 'yellow',
             link: '/company/bookings'
+        },
+        {
+            name: 'Monthly Budget',
+            value: 'KES 0',
+            icon: DollarSign,
+            color: 'purple',
+            link: '/company/reports'
         }
     ]
-
-    //,
-       // {
-           // name: 'Monthly Budget',
-           // value: 'KES 0',
-            //icon: DollarSign,
-            //color: 'purple',
-            //link: '/company/reports'
-       // }
 
     console.log('Stat cards to render:', statCards)
 

@@ -65,6 +65,7 @@ export async function GET(request) {
       // ============================================
       // COMPANY SIGNUP FLOW (NEW)
       // ============================================
+      console.log('Checking for company signup flow with next parameter:', next)
       if (next.includes('company-signup')) {
         console.log('Company signup flow detected')
         
@@ -89,6 +90,7 @@ export async function GET(request) {
             if (existingCompany.status === 'active') {
               return NextResponse.redirect(new URL('/company/dashboard', request.url))
             } else {
+              console.log('Company account pending verification, redirecting to dashboard with pending status')
               // Pending verification
               return NextResponse.redirect(new URL('/company/dashboard?status=pending', request.url))
             }
