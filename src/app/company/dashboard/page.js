@@ -112,21 +112,6 @@ export default function CompanyDashboard() {
                 .select('vehicle_id')
                 .eq('owner_company_id', companyId)
 
-            const vehicleIds = fleet.map(v => v.vehicle_id)
-
-            const { data: bookingsData, error } = await supabase
-                .from('bookings')
-                .select(`
-                    *,
-                    vehicle:vehicles(*),
-                    provider:provider_profiles(business_name)
-                `)
-                .in('vehicle_id', vehicleIds)
-                .order('created_at', { ascending: false })
-                .limit(5)
-
-            if (error) throw error
-
             setRecentBookings(bookingsData || [])   
 
             setLoading(false)
