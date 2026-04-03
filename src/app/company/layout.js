@@ -52,6 +52,7 @@ export default function CompanyLayout({ children }) {
         .single()
 
       if (!profile?.company) {
+        console.log('No company profile found for user in company layout, redirecting to company signup')
         // No company - redirect to signup
         router.push('/auth/company-signup')
         return
