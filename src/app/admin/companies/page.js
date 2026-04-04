@@ -20,12 +20,11 @@ export default function AdminCompaniesPage() {
     // Base company query — email lives on user_profiles.email
     let query = supabase
       .from('company_profiles')
-      .select('id, name, registration_number, status, submitted_at, created_at, owner:user_profiles(first_name, last_name, email)')
+      .select('id, name, registration_number, status, submitted_at, created_at, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)')
       .order('submitted_at', { ascending: false, nullsFirst: false })
 
     if (filter !== 'all') {
       query = query.eq('status', filter)
-      console.log(`Fetching companies with status "${filter}"`)
     }
 
     const { data, error } = await query
@@ -49,12 +48,10 @@ export default function AdminCompaniesPage() {
             .select('*', { count: 'exact', head: true })
             .eq('company_id', company.id),
         ])
-        console.log(`Company "${company.name}" (ID: ${company.id}) - Vehicles: ${vehicleCount}, Team Members: ${teamCount}`)    
         return { ...company, vehicleCount: vehicleCount || 0, teamCount: teamCount || 0 }
       })
     )
 
-    console.log(`Fetched ${companiesWithCounts.length} companies with counts`)
     setCompanies(companiesWithCounts)
     setLoading(false)
   }

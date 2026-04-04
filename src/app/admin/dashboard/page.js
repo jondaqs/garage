@@ -63,7 +63,7 @@ export default function AdminDashboard() {
         // 5 most recent pending companies
         supabase
           .from('company_profiles')
-          .select('id, name, registration_number, status, submitted_at, owner:user_profiles(first_name, last_name, email)')
+          .select('id, name, registration_number, status, submitted_at, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)')
           .eq('status', 'pending_verification')
           .order('submitted_at', { ascending: false })
           .limit(5),

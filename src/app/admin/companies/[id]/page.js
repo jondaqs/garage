@@ -40,23 +40,15 @@ export default function CompanyDetailPage({ params }) {
       // ── Company profile ──
       const { data: companyData, error: companyError } = await supabase
         .from('company_profiles')
-        .select('*')
+        .select('*, owner:user_profiles!company_profiles_owner_user_id_fkey(id, first_name, last_name, phone, email)')
         .eq('id', companyId)
         .single()
 
       if (companyError) throw companyError
       setCompany(companyData)
 
-      // ── Owner profile — email is on user_profiles.email (fix 0.7) ──
-      if (companyData.owner_user_id) {
-        const { data: ownerData } = await supabase
-          .from('user_profiles')
-          .select('id, first_name, last_name, phone, email')
-          .eq('id', companyData.owner_user_id)
-          .single()
-
-        setOwner(ownerData || null)
-      }
+      // Owner is embedded in the company query above
+      setOwner(companyData.owner || null)
 
       // ── Documents — from uploaded_files (fix 0.6) ──
       const { data: docsData } = await supabase
