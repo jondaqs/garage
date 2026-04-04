@@ -58,14 +58,16 @@ export default function CompanyDetailPage({ params }) {
         .eq('reference_id', companyId)
         .order('created_at', { ascending: true })
 
-      // Build public URLs
-      const docsWithUrls = (docsData || []).map((file) => {
-        const { data: { publicUrl } } = supabase
-          .storage
-          .from(file.storage_bucket || 'documents')
-          .getPublicUrl(file.storage_path)
-        return { ...file, publicUrl }
-      })
+      // Build signed URLs — bucket is private, matches provider document pattern
+      const docsWithUrls = await Promise.all(
+        (docsData || []).map(async (file) => {
+          const { data: signedData, error: signedError } = await supabase
+            .storage
+            .from(file.storage_bucket || 'documents')
+            .createSignedUrl(file.storage_path, 3600)
+          return { ...file, publicUrl: signedError ? null : signedData.signedUrl }
+        })
+      )
       setDocuments(docsWithUrls)
 
       // ── Team members (invitations) ──
@@ -501,14 +503,18 @@ export default function CompanyDetailPage({ params }) {
                     <span className="text-xs text-gray-400">
                       {new Date(doc.created_at).toLocaleDateString()}
                     </span>
-                    <a
-                      href={doc.publicUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      View <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {doc.publicUrl ? (
+                      <a
+                        href={doc.publicUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        View <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-400">URL unavailable</span>
+                    )}
                   </div>
                 </div>
               ))}
