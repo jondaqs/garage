@@ -25,6 +25,7 @@ export default function AdminCompaniesPage() {
 
     if (filter !== 'all') {
       query = query.eq('status', filter)
+      console.log(`Fetching companies with status "${filter}"`)
     }
 
     const { data, error } = await query
@@ -48,10 +49,12 @@ export default function AdminCompaniesPage() {
             .select('*', { count: 'exact', head: true })
             .eq('company_id', company.id),
         ])
+        console.log(`Company "${company.name}" (ID: ${company.id}) - Vehicles: ${vehicleCount}, Team Members: ${teamCount}`)    
         return { ...company, vehicleCount: vehicleCount || 0, teamCount: teamCount || 0 }
       })
     )
 
+    console.log(`Fetched ${companiesWithCounts.length} companies with counts`)
     setCompanies(companiesWithCounts)
     setLoading(false)
   }
