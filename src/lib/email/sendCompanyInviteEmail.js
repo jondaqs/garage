@@ -11,7 +11,7 @@ export async function sendCompanyInviteEmail({
   const MAILJET_API_KEY = process.env.MAILJET_API_KEY
   const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY
   const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@survlinx.com'
-  const FROM_NAME = process.env.FROM_NAME || 'GariCare'
+  const FROM_NAME = process.env.FROM_NAME || 'Motiifix'
 
   if (!MAILJET_API_KEY || !MAILJET_SECRET_KEY) {
     console.error('❌ Mailjet credentials not configured')
