@@ -27,14 +27,12 @@ export async function POST(request) {
             return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
         }
 
-        console.log('✅ User profile found:', userProfile.id)
-
         // Check if user already owns a company
         const { data: existingCompany } = await supabase
             .from('company_profiles')
             .select('id, name')
             .eq('owner_user_id', userProfile.id)
-            .single()
+            .maybeSingle()
 
         if (existingCompany) {
             return NextResponse.json({
@@ -50,14 +48,15 @@ export async function POST(request) {
                 name: body.companyInfo.name,
                 registration_number: body.companyInfo.registrationNumber,
                 tax_id: body.companyInfo.taxId,
-                industry: body.companyInfo.industry || body.companyInfo.industryType,  // ✅ FIXED: 'industry' not 'industry_type'
+                industry: body.companyInfo.industry || body.companyInfo.industryType,
                 company_size: body.companyInfo.companySize,
                 bio: body.companyDetails.bio,
                 website: body.companyDetails.website,
                 phone: body.companyDetails.phone,
-                physical_address: body.companyDetails.address || body.companyDetails.physicalAddress,  // ✅ FIXED: 'physical_address' not 'address'
+                physical_address: body.companyDetails.address || body.companyDetails.physicalAddress,
                 city: body.companyDetails.city,
                 country: body.companyDetails.country || 'Kenya',
+                working_days: body.companyDetails.workingDays || null,
                 years_in_operation: body.companyDetails.yearsInOperation
                     ? parseInt(body.companyDetails.yearsInOperation)
                     : null,
@@ -77,15 +76,15 @@ export async function POST(request) {
             }, { status: 500 })
         }
 
-        console.log('✅ Company created:', company[0].id)
-
+        const companyId = company[0].id
+        console.log('✅ Company created:', companyId)
 
         // Add owner as company user with admin rights
         const { error: companyUserError } = await supabase
             .from('company_users')
             .insert([{
                 user_id: userProfile.id,
-                company_id: company[0].id,
+                company_id: companyId,
                 staff_role: 'owner',
                 is_admin: true,
                 is_active: true,
@@ -93,15 +92,13 @@ export async function POST(request) {
             }])
 
         if (companyUserError) {
-            console.error('❌ Company user error:', companyUserError)
-            // Don't fail - company is already created
+            console.error('⚠️ Company user error:', companyUserError)
         } else {
             console.log('✅ Owner added as company admin')
         }
 
         // Assign company_owner role
         try {
-            // Get the company_owner role_id from lookup table
             const { data: companyOwnerRole } = await supabase
                 .from('user_roles_lookup')
                 .select('id')
@@ -109,7 +106,6 @@ export async function POST(request) {
                 .single()
 
             if (companyOwnerRole) {
-                // Insert into user_roles with role_id
                 const { error: roleError } = await supabase
                     .from('user_roles')
                     .insert([{
@@ -129,110 +125,100 @@ export async function POST(request) {
             console.error('⚠️ Role assignment error:', roleError)
         }
 
-        // Process document uploads
-        // Process document uploads
+        // Link uploaded documents to the company (uploaded_files pattern)
         if (body.documents && body.documents.length > 0) {
             const documentIds = body.documents.map(doc => doc.id).filter(Boolean)
 
             if (documentIds.length > 0) {
-                // Link documents to company in uploaded_files table
                 const { error: docsUpdateError } = await supabase
                     .from('uploaded_files')
                     .update({
                         reference_type: 'company_document',
-                        reference_id: company[0].id
+                        reference_id: companyId
                     })
                     .in('id', documentIds)
 
                 if (docsUpdateError) {
-                    console.error('⚠️ Documents update error:', docsUpdateError)
+                    console.error('⚠️ Documents link error:', docsUpdateError)
                 } else {
                     console.log('✅ Documents linked to company')
                 }
 
-                // ========================================
-                // NEW: Save document URLs to company_profiles
-                // ========================================
+                // Also snapshot URL columns on company_profiles for quick admin access
+                // BUG 1.3 FIX: correct column names from DB schema
                 try {
-                    // Get uploaded files with their storage paths
                     const { data: uploadedFiles } = await supabase
                         .from('uploaded_files')
                         .select('id, storage_path')
                         .in('id', documentIds)
 
                     if (uploadedFiles && uploadedFiles.length > 0) {
-                        // Create a map of document type to URL
                         const docUrls = {}
 
-                        // Match uploaded files to document types
                         body.documents.forEach(doc => {
                             const file = uploadedFiles.find(f => f.id === doc.id)
                             if (file && file.storage_path) {
-                                // Get public URL from storage
                                 const { data: { publicUrl } } = supabase.storage
                                     .from('documents')
                                     .getPublicUrl(file.storage_path)
-
-                                // Map document type to column name
                                 docUrls[doc.type] = publicUrl
                             }
                         })
 
-                        // Update company_profiles with document URLs
+                        // BUG 1.3 FIX: correct column names matching DB schema
+                        // DB has: business_license_url, certificate_of_incorporation_url,
+                        //         tax_certificate_url, insurance_documents_url
+                        // No kra_pin_url column exists — store in tax_certificate_url
                         const { error: urlUpdateError } = await supabase
                             .from('company_profiles')
                             .update({
-                                business_licence_url: docUrls.business_license || null,
+                                business_license_url: docUrls.business_license || null,
                                 certificate_of_incorporation_url: docUrls.certificate_of_incorporation || null,
-                                tax_certificate_url: docUrls.tax_compliance || null,
-                                kra_pin_url: docUrls.kra_pin || null,
-                                insurance_url: docUrls.insurance || null
+                                tax_certificate_url: docUrls.tax_compliance || docUrls.kra_pin || null,
+                                insurance_documents_url: docUrls.insurance || null,  // was insurance_url ❌
                             })
-                            .eq('id', company[0].id)
+                            .eq('id', companyId)
 
                         if (urlUpdateError) {
-                            console.error('⚠️ Document URL update error:', urlUpdateError)
+                            console.error('⚠️ Document URL snapshot error:', urlUpdateError)
                         } else {
-                            console.log('✅ Document URLs saved to company profile')
+                            console.log('✅ Document URLs snapshotted on company profile')
                         }
                     }
                 } catch (docUrlError) {
-                    console.error('⚠️ Document URL processing error:', docUrlError)
-                    // Don't fail registration if URL update fails
+                    console.error('⚠️ Document URL processing error (non-fatal):', docUrlError)
                 }
-                // ========================================
-                // END NEW SECTION
-                // ========================================
             }
         }
 
-        // Add team members if any
+        // Add team member invitations
         if (body.teamMembers && body.teamMembers.length > 0) {
             for (const member of body.teamMembers) {
                 try {
-                    // Create invitation
                     const inviteToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
                     const expiresAt = new Date()
-                    expiresAt.setDate(expiresAt.getDate() + 7) // 7 days
+                    expiresAt.setDate(expiresAt.getDate() + 7)
 
                     const { error: inviteError } = await supabase
                         .from('company_invitations')
                         .insert([{
-                            company_id: company[0].id,
+                            company_id: companyId,
                             invited_by: userProfile.id,
-                            email: member.email,  // ✅ FIXED: 'email' not 'invitee_email'
+                            email: member.email,
                             first_name: member.firstName,
                             last_name: member.lastName,
                             phone: member.phone,
-                            staff_role: member.role,
+                            staff_role: member.role || member.staffRole || 'driver',
                             is_admin: member.isAdmin || false,
-                            invitation_token: inviteToken,  // ✅ FIXED: 'invitation_token' not 'token'
+                            invitation_token: inviteToken,
                             expires_at: expiresAt.toISOString(),
                             status: 'pending'
                         }])
 
                     if (inviteError) {
                         console.error(`⚠️ Invitation error for ${member.email}:`, inviteError)
+                    } else {
+                        console.log(`✅ Invitation created for ${member.email}`)
                     }
                 } catch (err) {
                     console.error('Team member invitation error:', err)
@@ -240,18 +226,18 @@ export async function POST(request) {
             }
         }
 
-        // Add fleet vehicles if any
+        // Add fleet vehicles
+        // BUG 1.2 FIX: plate_number and year_of_manufacture (not license_plate / year)
         if (body.fleet && body.fleet.length > 0) {
             for (const vehicle of body.fleet) {
                 try {
-                    // Create vehicle
                     const { data: newVehicle, error: vehicleError } = await supabase
                         .from('vehicles')
                         .insert([{
-                            license_plate: vehicle.licensePlate,
+                            plate_number: vehicle.licensePlate || vehicle.plateNumber,  // was license_plate ❌
                             make: vehicle.make,
                             model: vehicle.model,
-                            year: vehicle.year ? parseInt(vehicle.year) : null,
+                            year_of_manufacture: vehicle.year ? parseInt(vehicle.year) : null,  // was year ❌
                             color: vehicle.color,
                             vin: vehicle.vin
                         }])
@@ -259,21 +245,21 @@ export async function POST(request) {
                         .single()
 
                     if (vehicleError) {
-                        console.error(`⚠️ Vehicle creation error for ${vehicle.licensePlate}:`, vehicleError)
+                        console.error(`⚠️ Vehicle creation error for ${vehicle.licensePlate || vehicle.plateNumber}:`, vehicleError)
                         continue
                     }
 
-                    // Link vehicle to company
                     const { error: ownershipError } = await supabase
                         .from('vehicle_ownership')
                         .insert([{
                             vehicle_id: newVehicle.id,
-                            owner_company_id: company[0].id,
-                            ownership_start: new Date().toISOString()
+                            owner_company_id: companyId
                         }])
 
                     if (ownershipError) {
-                        console.error(`⚠️ Ownership error for ${vehicle.licensePlate}:`, ownershipError)
+                        console.error(`⚠️ Ownership error:`, ownershipError)
+                    } else {
+                        console.log(`✅ Vehicle ${newVehicle.plate_number} added to fleet`)
                     }
                 } catch (err) {
                     console.error('Fleet vehicle error:', err)
@@ -287,40 +273,34 @@ export async function POST(request) {
                 ownerEmail: user.email,
                 ownerName: `${userProfile.first_name} ${userProfile.last_name}`,
                 companyName: company[0].name,
-                companyId: company[0].id
+                companyId: companyId
             })
-            console.log('✅ Registration email sent')
+            console.log('✅ Registration confirmation email sent')
         } catch (emailError) {
-            console.error('⚠️ Email error:', emailError)
-            // Don't fail registration if email fails
+            console.error('⚠️ Email error (non-fatal):', emailError)
         }
 
-        // Create admin notification
-        // Create notifications for all admins
+        // Notify all admins
+        // BUG 1.1 FIX: was referencing undefined `adminRoles` — variable is `adminUsers`
         try {
-            // Get all admin users
             const { data: adminUsers } = await supabase
                 .from('user_roles')
-                .select(`
-                user_id,
-                user_roles_lookup!inner(code)
-                `)
+                .select('user_id, user_roles_lookup!inner(code)')
                 .eq('user_roles_lookup.code', 'admin')
 
-            if (adminRoles && adminRoles.length > 0) {
-                // Create individual notifications for each admin
-                const notifications = adminRoles.map(role => ({
-                    user_id: role.user_id,              // User who will receive notification
-                    recipient_user_id: role.user_id,    // Same as user_id (duplicate field)
-                    type: 'company_registration',       // Notification type
-                    notification_type: 'company_registration',  // Duplicate field
-                    reference_type: 'company',          // What type of reference
-                    reference_table: 'company_profiles', // Table being referenced
-                    reference_id: company[0].id,        // Company ID
+            if (adminUsers && adminUsers.length > 0) {
+                const notifications = adminUsers.map(admin => ({
+                    user_id: admin.user_id,
+                    recipient_user_id: admin.user_id,
+                    type: 'company_registration',
+                    notification_type: 'company_registration',
+                    reference_type: 'company',
+                    reference_table: 'company_profiles',
+                    reference_id: companyId,
                     title: 'New Company Registration',
                     message: `${company[0].name} has registered and is pending verification`,
                     is_read: false,
-                    recipient_type: 'admin'             // Type of recipient
+                    recipient_type: 'admin'
                 }))
 
                 const { error: notifError } = await supabase
@@ -330,20 +310,19 @@ export async function POST(request) {
                 if (notifError) {
                     console.error('⚠️ Admin notification error:', notifError)
                 } else {
-                    console.log(`✅ Notifications sent to ${adminRoles.length} admin(s)`)
+                    console.log(`✅ Notified ${adminUsers.length} admin(s)`)
                 }
             } else {
                 console.log('⚠️ No admins found to notify')
             }
         } catch (notifError) {
-            console.error('⚠️ Notification error:', notifError)
-            // Don't fail registration if notification fails
+            console.error('⚠️ Notification error (non-fatal):', notifError)
         }
 
         return NextResponse.json({
             success: true,
             company: {
-                id: company[0].id,
+                id: companyId,
                 name: company[0].name,
                 status: company[0].status
             }
