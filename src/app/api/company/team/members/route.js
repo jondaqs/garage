@@ -23,25 +23,41 @@ export async function GET(request) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Get user's company
-    const { data: companyUser } = await supabase
-      .from('company_users')
-      .select('company_id')
-      .eq('user_id', userProfile.id)
-      .single()
+    // Resolve company — check ownership first, then membership
+    let companyId = null
 
-    if (!companyUser) {
-      return NextResponse.json({ 
-        error: 'Not a company member' 
+    const { data: ownedCompany } = await supabase
+      .from('company_profiles')
+      .select('id')
+      .eq('owner_user_id', userProfile.id)
+      .maybeSingle()
+
+    if (ownedCompany) {
+      companyId = ownedCompany.id
+    } else {
+      const { data: companyMember } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', userProfile.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (companyMember) companyId = companyMember.company_id
+    }
+
+    if (!companyId) {
+      return NextResponse.json({
+        error: 'Not associated with a company'
       }, { status: 403 })
     }
 
     // Get all company members
+    // FK hint required: company_users has two FKs to user_profiles (user_id and updated_by)
     const { data: members, error: membersError } = await supabase
       .from('company_users')
       .select(`
         *,
-        user:user_profiles(
+        user:user_profiles!company_users_user_id_fkey(
           id,
           first_name,
           last_name,
@@ -50,7 +66,7 @@ export async function GET(request) {
           created_at
         )
       `)
-      .eq('company_id', companyUser.company_id)
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
 
     if (membersError) {
@@ -64,7 +80,7 @@ export async function GET(request) {
     const { data: invitations } = await supabase
       .from('company_invitations')
       .select('*')
-      .eq('company_id', companyUser.company_id)
+      .eq('company_id', companyId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 

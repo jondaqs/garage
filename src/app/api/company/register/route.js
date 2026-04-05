@@ -241,18 +241,13 @@ export async function POST(request) {
             console.error('⚠️ Email error (non-fatal):', emailError)
         }
 
-        // Notify all admins
-        // BUG 1.1 FIX: was referencing undefined `adminRoles` — variable is `adminUsers`
+        // Notify admins — insert a single broadcast notification with recipient_type: 'admin'
+        // (same pattern as provider registration; no need to resolve individual admin user IDs)
         try {
-            const { data: adminUsers } = await supabase
-                .from('user_roles')
-                .select('user_id, user_roles_lookup!inner(code)')
-                .eq('user_roles_lookup.code', 'admin')
-
-            if (adminUsers && adminUsers.length > 0) {
-                const notifications = adminUsers.map(admin => ({
-                    user_id: admin.user_id,
-                    recipient_user_id: admin.user_id,
+            const { error: notifError } = await supabase
+                .from('notifications')
+                .insert([{
+                    recipient_type: 'admin',
                     type: 'company_registration',
                     notification_type: 'company_registration',
                     reference_type: 'company',
@@ -261,20 +256,12 @@ export async function POST(request) {
                     title: 'New Company Registration',
                     message: `${company[0].name} has registered and is pending verification`,
                     is_read: false,
-                    recipient_type: 'admin'
-                }))
+                }])
 
-                const { error: notifError } = await supabase
-                    .from('notifications')
-                    .insert(notifications)
-
-                if (notifError) {
-                    console.error('⚠️ Admin notification error:', notifError)
-                } else {
-                    console.log(`✅ Notified ${adminUsers.length} admin(s)`)
-                }
+            if (notifError) {
+                console.error('⚠️ Admin notification error:', notifError)
             } else {
-                console.log('⚠️ No admins found to notify')
+                console.log('✅ Admin notification sent')
             }
         } catch (notifError) {
             console.error('⚠️ Notification error (non-fatal):', notifError)
