@@ -132,8 +132,8 @@ export async function sendCompanyRegistrationEmail({
 }) {
   const MAILJET_API_KEY = process.env.MAILJET_API_KEY
   const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY
-  const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@garicare.com'
-  const FROM_NAME = process.env.FROM_NAME || 'GariCare'
+  const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@survlinx.com'
+  const FROM_NAME = process.env.FROM_NAME || 'Motiifix'
 
   const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/company/dashboard`
 
@@ -244,8 +244,8 @@ export async function sendCompanyApprovalEmail({
 }) {
   const MAILJET_API_KEY = process.env.MAILJET_API_KEY
   const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY
-  const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@garicare.com'
-  const FROM_NAME = process.env.FROM_NAME || 'GariCare'
+  const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@survlinx.com'
+  const FROM_NAME = process.env.FROM_NAME || 'Motiifix'
 
   const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/company/dashboard`
 
