@@ -10,7 +10,7 @@ export async function sendCompanyInviteEmail({
 }) {
   const MAILJET_API_KEY = process.env.MAILJET_API_KEY
   const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY
-  const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@garicare.com'
+  const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@survlinx.com'
   const FROM_NAME = process.env.FROM_NAME || 'GariCare'
 
   if (!MAILJET_API_KEY || !MAILJET_SECRET_KEY) {
