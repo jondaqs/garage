@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { sendCompanyRegistrationEmail } from '@/lib/email/sendCompanyInviteEmail'
+import { sendCompanyRegistrationEmail, sendCompanyInviteEmail, sendAdminNewCompanyEmail } from '@/lib/email/sendCompanyInviteEmail'
 
 export async function POST(request) {
     try {
@@ -177,6 +177,19 @@ export async function POST(request) {
                         console.error(`⚠️ Invitation error for ${member.email}:`, inviteError)
                     } else {
                         console.log(`✅ Invitation created for ${member.email}`)
+                        // Send invitation email to the team member
+                        try {
+                            await sendCompanyInviteEmail({
+                                inviteeEmail: member.email,
+                                inviteeName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
+                                companyName: company[0].name,
+                                inviterName: `${userProfile.first_name} ${userProfile.last_name}`,
+                                staffRole: member.role || member.staffRole || 'driver',
+                                invitationToken: inviteToken,
+                            })
+                        } catch (emailErr) {
+                            console.error(`⚠️ Invite email error for ${member.email} (non-fatal):`, emailErr)
+                        }
                     }
                 } catch (err) {
                     console.error('Team member invitation error:', err)
@@ -265,6 +278,26 @@ export async function POST(request) {
             }
         } catch (notifError) {
             console.error('⚠️ Notification error (non-fatal):', notifError)
+        }
+
+        // Send email alert to admin inbox
+        // ADMIN_EMAIL env var holds the admin notification address
+        try {
+            const adminEmail = process.env.ADMIN_EMAIL
+            if (adminEmail) {
+                await sendAdminNewCompanyEmail({
+                    adminEmail,
+                    companyName: company[0].name,
+                    ownerName: `${userProfile.first_name} ${userProfile.last_name}`,
+                    ownerEmail: user.email,
+                    registrationNumber: body.companyInfo.registrationNumber,
+                    companyId,
+                })
+            } else {
+                console.log('⚠️ ADMIN_EMAIL not set — skipping admin email alert')
+            }
+        } catch (adminEmailError) {
+            console.error('⚠️ Admin email alert error (non-fatal):', adminEmailError)
         }
 
         return NextResponse.json({
