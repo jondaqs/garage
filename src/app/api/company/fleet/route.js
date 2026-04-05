@@ -179,12 +179,13 @@ export async function POST(request) {
       return NextResponse.json({ error: `Failed to create vehicle: ${vehicleError.message}` }, { status: 500 })
     }
 
+    // RLS on vehicle_ownership requires owner_user_id to match auth user
     const { data: ownership, error: ownershipError } = await supabase
       .from('vehicle_ownership')
       .insert([{
         vehicle_id: vehicle[0].id,
         owner_company_id: companyId,
-        owner_user_id: null
+        owner_user_id: userProfile.id
       }])
       .select()
 

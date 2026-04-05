@@ -1,212 +1,71 @@
 'use client'
-import { useState } from 'react'
 
 export default function FleetSetupStep({ data, updateData, nextStep, previousStep }) {
-  const [vehicles, setVehicles] = useState(data?.fleet || [])
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({
-    licensePlate: '',
-    make: '',
-    model: '',
-    year: '',
-    vin: '',
-    color: ''
-  })
 
-  const addVehicle = () => {
-    if (!formData.licensePlate || !formData.make || !formData.model) {
-      alert('Please fill in license plate, make, and model')
-      return
-    }
-
-    setVehicles([...vehicles, { ...formData }])
-    setFormData({
-      licensePlate: '',
-      make: '',
-      model: '',
-      year: '',
-      vin: '',
-      color: ''
-    })
-    setShowForm(false)
-  }
-
-  const removeVehicle = (index) => {
-    setVehicles(vehicles.filter((_, i) => i !== index))
-  }
-
-  const handleSubmit = () => {
-    updateData({ fleet: vehicles })
+  const handleContinue = () => {
+    // Pass empty fleet — vehicles are added from the dashboard after approval
+    updateData({ fleet: [] })
     nextStep()
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold mb-2">Add Fleet Vehicles</h2>
-      <p className="text-gray-600 mb-6">
-        Add vehicles to your company fleet (Optional - you can do this later)
+      <h2 className="text-2xl font-bold mb-2">Company Fleet</h2>
+      <p className="text-gray-600 mb-8">
+        Vehicle registration is done from your company dashboard after your account is approved.
       </p>
 
-      {vehicles.length > 0 && (
-        <div className="mb-6 space-y-3">
-          {vehicles.map((vehicle, index) => (
-            <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
-              <div>
-                <p className="font-medium text-lg">{vehicle.licensePlate}</p>
-                <p className="text-sm text-gray-600">
-                  {vehicle.year} {vehicle.make} {vehicle.model}
-                </p>
-                {vehicle.color && (
-                  <p className="text-xs text-gray-500">Color: {vehicle.color}</p>
-                )}
-              </div>
-              <button
-                onClick={() => removeVehicle(index)}
-                className="text-red-600 hover:text-red-700 px-3 py-1 rounded hover:bg-red-50"
-              >
-                Remove
-              </button>
+      {/* Why not here */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-semibold text-blue-900 mb-1">Why add fleet after approval?</p>
+            <p className="text-sm text-blue-800 leading-relaxed">
+              Adding vehicles requires your company account to be active. Once our team verifies 
+              your registration (typically 2–5 business days), you'll have full access to the 
+              Fleet section of your dashboard where you can add, manage, and assign vehicles.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* What you can do after approval */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+        <p className="font-semibold text-gray-900 mb-4">From your dashboard you'll be able to:</p>
+        <div className="space-y-3">
+          {[
+            { icon: '🚗', text: 'Add vehicles individually with full details (plate, make, model, VIN)' },
+            { icon: '📋', text: 'Upload a CSV to bulk-import your entire fleet at once' },
+            { icon: '👤', text: 'Assign drivers to specific vehicles' },
+            { icon: '🔧', text: 'Book services for any vehicle in your fleet' },
+            { icon: '📊', text: 'Track service history and costs per vehicle' },
+          ].map(({ icon, text }) => (
+            <div key={text} className="flex items-start gap-3">
+              <span className="text-lg leading-tight">{icon}</span>
+              <p className="text-sm text-gray-700">{text}</p>
             </div>
           ))}
         </div>
-      )}
+      </div>
 
-      {!showForm ? (
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition"
-        >
-          + Add Vehicle to Fleet
-        </button>
-      ) : (
-        <div className="border rounded-lg p-6 space-y-4 bg-gray-50">
-          <h3 className="font-semibold text-lg mb-4">Vehicle Details</h3>
-          
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              License Plate Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., KAA 123B"
-              value={formData.licensePlate}
-              onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value.toUpperCase() })}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Make <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Toyota"
-                value={formData.make}
-                onChange={(e) => setFormData({ ...formData, make: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Model <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Hilux"
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Year</label>
-              <input
-                type="number"
-                placeholder="e.g., 2022"
-                min="1900"
-                max={new Date().getFullYear() + 1}
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Color</label>
-              <input
-                type="text"
-                placeholder="e.g., White"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">VIN (Optional)</label>
-            <input
-              type="text"
-              placeholder="Vehicle Identification Number"
-              value={formData.vin}
-              onChange={(e) => setFormData({ ...formData, vin: e.target.value.toUpperCase() })}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">17-character vehicle identification number</p>
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <button
-              onClick={addVehicle}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Add Vehicle
-            </button>
-            <button
-              onClick={() => {
-                setShowForm(false)
-                setFormData({
-                  licensePlate: '',
-                  make: '',
-                  model: '',
-                  year: '',
-                  vin: '',
-                  color: ''
-                })
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {vehicles.length > 0 && (
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-900">
-            <strong>{vehicles.length}</strong> vehicle{vehicles.length !== 1 ? 's' : ''} added to your fleet.
-            You can add more vehicles later from your dashboard.
-          </p>
-        </div>
-      )}
-
-      <div className="flex justify-between pt-6 mt-6 border-t">
+      {/* Navigation */}
+      <div className="flex justify-between pt-6 border-t">
         <button
           onClick={previousStep}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
         >
           Back
         </button>
         <button
-          onClick={handleSubmit}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={handleContinue}
+          className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
         >
-          {vehicles.length > 0 ? 'Continue' : 'Skip for Now'}
+          Continue to Review →
         </button>
       </div>
     </div>

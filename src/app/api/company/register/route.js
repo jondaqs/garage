@@ -144,50 +144,8 @@ export async function POST(request) {
                     console.log('✅ Documents linked to company')
                 }
 
-                // Also snapshot URL columns on company_profiles for quick admin access
-                // BUG 1.3 FIX: correct column names from DB schema
-                try {
-                    const { data: uploadedFiles } = await supabase
-                        .from('uploaded_files')
-                        .select('id, storage_path')
-                        .in('id', documentIds)
-
-                    if (uploadedFiles && uploadedFiles.length > 0) {
-                        const docUrls = {}
-
-                        body.documents.forEach(doc => {
-                            const file = uploadedFiles.find(f => f.id === doc.id)
-                            if (file && file.storage_path) {
-                                const { data: { publicUrl } } = supabase.storage
-                                    .from('documents')
-                                    .getPublicUrl(file.storage_path)
-                                docUrls[doc.type] = publicUrl
-                            }
-                        })
-
-                        // BUG 1.3 FIX: correct column names matching DB schema
-                        // DB has: business_license_url, certificate_of_incorporation_url,
-                        //         tax_certificate_url, insurance_documents_url
-                        // No kra_pin_url column exists — store in tax_certificate_url
-                        const { error: urlUpdateError } = await supabase
-                            .from('company_profiles')
-                            .update({
-                                business_license_url: docUrls.business_license || null,
-                                certificate_of_incorporation_url: docUrls.certificate_of_incorporation || null,
-                                tax_certificate_url: docUrls.tax_compliance || docUrls.kra_pin || null,
-                                insurance_documents_url: docUrls.insurance || null,  // was insurance_url ❌
-                            })
-                            .eq('id', companyId)
-
-                        if (urlUpdateError) {
-                            console.error('⚠️ Document URL snapshot error:', urlUpdateError)
-                        } else {
-                            console.log('✅ Document URLs snapshotted on company profile')
-                        }
-                    }
-                } catch (docUrlError) {
-                    console.error('⚠️ Document URL processing error (non-fatal):', docUrlError)
-                }
+                // Document URLs are stored via uploaded_files (reference_type='company_document').
+                // No URL snapshot needed on company_profiles — dropped to avoid RLS recursion.
             }
         }
 
@@ -249,11 +207,14 @@ export async function POST(request) {
                         continue
                     }
 
+                    // RLS on vehicle_ownership requires owner_user_id to match auth user
+                    // Set both: owner_company_id for company ownership, owner_user_id for RLS
                     const { error: ownershipError } = await supabase
                         .from('vehicle_ownership')
                         .insert([{
                             vehicle_id: newVehicle.id,
-                            owner_company_id: companyId
+                            owner_company_id: companyId,
+                            owner_user_id: userProfile.id
                         }])
 
                     if (ownershipError) {
