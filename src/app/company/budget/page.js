@@ -1,11 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { DollarSign, Plus, Edit2, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function BudgetPage() {
   const [budget, setBudget] = useState(null)
-  const [companyId, setCompanyId] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -26,61 +24,19 @@ export default function BudgetPage() {
   }, [])
 
   const fetchBudget = async () => {
-    const supabase = createClient()
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const res = await fetch('/api/company/budget')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load budget')
 
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single()
-
-      // Resolve company + admin status
-      let cId = null
-      let adminStatus = false
-
-      const { data: owned } = await supabase
-        .from('company_profiles')
-        .select('id')
-        .eq('owner_user_id', profile.id)
-        .maybeSingle()
-
-      if (owned) {
-        cId = owned.id
-        adminStatus = true
-      } else {
-        const { data: member } = await supabase
-          .from('company_users')
-          .select('company_id, is_admin')
-          .eq('user_id', profile.id)
-          .eq('is_active', true)
-          .maybeSingle()
-        if (member) { cId = member.company_id; adminStatus = member.is_admin }
-      }
-
-      setCompanyId(cId)
-      setIsAdmin(adminStatus)
-
-      if (!cId) return
-
-      // Fetch current period budget
-      const { data: currentBudget } = await supabase
-        .from('company_budgets')
-        .select('*')
-        .eq('company_id', cId)
-        .lte('period_start', today.toISOString().split('T')[0])
-        .gte('period_end', today.toISOString().split('T')[0])
-        .maybeSingle()
-
-      setBudget(currentBudget || null)
-      if (currentBudget) {
+      setBudget(data.budget || null)
+      setIsAdmin(data.isAdmin ?? true)
+      if (data.budget) {
         setFormData({
-          budget_amount: currentBudget.budget_amount,
-          period_start: currentBudget.period_start,
-          period_end: currentBudget.period_end,
-          currency: currentBudget.currency || 'KES',
+          budget_amount: data.budget.budget_amount,
+          period_start:  data.budget.period_start,
+          period_end:    data.budget.period_end,
+          currency:      data.budget.currency || 'KES',
         })
       }
     } catch (err) {
@@ -98,35 +54,20 @@ export default function BudgetPage() {
     }
     setSaving(true)
     setError(null)
-    const supabase = createClient()
 
     try {
-      const payload = {
-        company_id: companyId,
-        budget_amount: parseFloat(formData.budget_amount),
-        period_start: formData.period_start,
-        period_end: formData.period_end,
-        currency: formData.currency,
-        updated_at: new Date().toISOString(),
-      }
+      const method  = budget ? 'PATCH' : 'POST'
+      const payload = budget
+        ? { id: budget.id, ...formData, budget_amount: parseFloat(formData.budget_amount) }
+        : { ...formData, budget_amount: parseFloat(formData.budget_amount) }
 
-      let err
-      if (budget) {
-        // Update existing
-        const { error } = await supabase
-          .from('company_budgets')
-          .update(payload)
-          .eq('id', budget.id)
-        err = error
-      } else {
-        // Insert new
-        const { error } = await supabase
-          .from('company_budgets')
-          .insert([{ ...payload, spent_amount: 0 }])
-        err = error
-      }
-
-      if (err) throw err
+      const res  = await fetch('/api/company/budget', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save budget')
 
       setSuccess('Budget saved successfully')
       setShowForm(false)
