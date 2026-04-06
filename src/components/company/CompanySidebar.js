@@ -1,60 +1,119 @@
 'use client'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { 
-  Home, 
-  Truck, 
-  Users, 
-  Calendar,
-  BarChart3,
-  Settings,
-  Building2
-} from 'lucide-react'
 
-export default function CompanySidebar() {
+import { usePathname, useRouter } from 'next/navigation'
+import {
+  Home, Truck, Users, Calendar,
+  BarChart3, DollarSign, LogOut, Building2, AlertCircle
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+
+export default function CompanySidebar({ company, userRole }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
 
   const navigation = [
-    { name: 'Dashboard', href: '/company/dashboard', icon: Home },
-    { name: 'Fleet', href: '/company/fleet', icon: Truck },
-    { name: 'Team', href: '/company/team', icon: Users },
-    { name: 'Bookings', href: '/company/bookings', icon: Calendar },
+    { name: 'Dashboard',  href: '/company/dashboard',  icon: Home },
+    { name: 'Fleet',      href: '/company/fleet',       icon: Truck },
+    { name: 'Team',       href: '/company/team',        icon: Users },
+    { name: 'Bookings',   href: '/company/bookings',    icon: Calendar },
+    { name: 'Budget',     href: '/company/budget',      icon: DollarSign },
+    { name: 'Reports',    href: '/company/reports',     icon: BarChart3 },
   ]
 
-    //{ name: 'Reports', href: '/company/reports', icon: BarChart3 },
-    //{ name: 'Settings', href: '/company/settings', icon: Settings },
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const statusConfig = {
+    active:               { label: 'Active',         dot: 'bg-green-500',  text: 'text-green-700',  bg: 'bg-green-50  border-green-200'  },
+    pending_verification: { label: 'Pending Review', dot: 'bg-yellow-500', text: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200' },
+    pending_info:         { label: 'Info Required',  dot: 'bg-orange-500', text: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+    rejected:             { label: 'Rejected',       dot: 'bg-red-500',    text: 'text-red-700',    bg: 'bg-red-50    border-red-200'    },
+    suspended:            { label: 'Suspended',      dot: 'bg-gray-400',   text: 'text-gray-600',   bg: 'bg-gray-50   border-gray-200'   },
+  }
+  const statusCfg = company?.status ? statusConfig[company.status] : null
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200">
-      <div className="flex items-center gap-2 p-6 border-b">
-        <Building2 className="w-8 h-8 text-blue-600" />
-        <div>
-          <h1 className="font-bold text-lg">GariCare</h1>
-          <p className="text-xs text-gray-500">Company Portal</p>
+    <>
+      {/* ── Desktop sidebar ── */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+        <div className="flex flex-col flex-grow bg-white border-r border-gray-200 pt-5 pb-4 overflow-y-auto">
+
+          {/* Logo */}
+          <div className="flex items-center flex-shrink-0 px-4 mb-2">
+            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
+              <Building2 className="text-white w-5 h-5" />
+            </div>
+            <div className="ml-3 min-w-0">
+              <p className="text-sm font-bold text-gray-900 truncate">
+                {company?.name || 'GariCare'}
+              </p>
+              <p className="text-xs text-gray-500">Company Portal</p>
+            </div>
+          </div>
+
+          {/* Status badge */}
+          {statusCfg && company?.status !== 'active' && (
+            <div className={`mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium ${statusCfg.bg} ${statusCfg.text}`}>
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {statusCfg.label}
+            </div>
+          )}
+
+          {statusCfg && company?.status === 'active' && (
+            <div className="mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+              <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+              <span className="text-xs font-medium text-green-700">Verified & Active</span>
+            </div>
+          )}
+
+          {/* Role badge for non-owners */}
+          {userRole && userRole.staff_role !== 'owner' && (
+            <div className="mx-4 mt-1 px-3 py-1">
+              <span className="text-xs text-gray-400 capitalize">
+                {userRole.staff_role}{userRole.is_admin ? ' · Admin' : ''}
+              </span>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <nav className="mt-4 flex-1 px-3 space-y-0.5">
+            {navigation.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => router.push(item.href)}
+                  className={`
+                    w-full group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
+                    ${isActive
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }
+                  `}
+                >
+                  <Icon className={`mr-3 flex-shrink-0 h-4.5 w-4.5 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} size={18} />
+                  {item.name}
+                </button>
+              )
+            })}
+          </nav>
+
+          {/* Sign out */}
+          <div className="flex-shrink-0 border-t border-gray-200 p-4">
+            <button
+              onClick={handleSignOut}
+              className="w-full group flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              <LogOut className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
-
-      <nav className="p-4 space-y-1">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href
-          const Icon = item.icon
-          
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                isActive
-                  ? 'bg-blue-50 text-blue-600 font-medium'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              {item.name}
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+    </>
   )
 }
