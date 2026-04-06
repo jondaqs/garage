@@ -21,6 +21,8 @@ export default function CompanySidebar({ company, userRole }) {
     { name: 'Reports',    href: '/company/reports',     icon: BarChart3 },
   ]
 
+  const showInfoAlert = company?.status === 'pending_info'
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
@@ -80,6 +82,16 @@ export default function CompanySidebar({ company, userRole }) {
 
           {/* Navigation */}
           <nav className="mt-4 flex-1 px-3 space-y-0.5">
+            {/* Pending info action — shown when admin requests more info */}
+            {showInfoAlert && (
+              <button
+                onClick={() => router.push('/company/pending-info')}
+                className="w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition-colors mb-1"
+              >
+                <AlertCircle className="mr-3 h-4 w-4 text-orange-500 shrink-0 animate-pulse" size={18} />
+                Action Required
+              </button>
+            )}
             {navigation.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
