@@ -98,7 +98,7 @@ export default function CompanyNewBookingPage() {
 
       // Load services
       const { data: servicesData } = await supabase
-        .from('services').select('id, name, description, base_price, duration_minutes')
+        .from('services').select('id, name, description, category, display_name')
         .eq('is_active', true).order('name')
       setServices(servicesData || [])
 
@@ -326,8 +326,8 @@ export default function CompanyNewBookingPage() {
                   className="mt-0.5 text-blue-600 rounded" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">{service.name}</p>
-                  {service.base_price && (
-                    <p className="text-xs text-gray-500">KES {Number(service.base_price).toLocaleString()}</p>
+                  {service.category && (
+                    <p className="text-xs text-gray-400 capitalize">{service.category}</p>
                   )}
                 </div>
               </label>
