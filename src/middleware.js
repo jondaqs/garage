@@ -30,14 +30,13 @@ export async function middleware(request) {
     }
   )
 
-  // Get session
+  // Refresh session
   const { data: { session } } = await supabase.auth.getSession()
 
-  // ========================================
-  // NOT LOGGED IN - Protect routes
-  // ========================================
+  // ============================================================
+  // NOT LOGGED IN — protect all app routes
+  // ============================================================
   if (!session) {
-    console.log('No session found, redirecting to login for protected route:', pathname)
     if (
       pathname.startsWith('/dashboard') ||
       pathname.startsWith('/provider') ||
@@ -49,9 +48,11 @@ export async function middleware(request) {
     return response
   }
 
-  // ========================================
-  // LOGGED IN - Determine user role
-  // ========================================
+  // ============================================================
+  // LOGGED IN — resolve role from user_roles only (single query)
+  // No extra round-trips to company_profiles or company_users.
+  // Roles are assigned at registration and kept in sync by DB functions.
+  // ============================================================
   const { data: profile } = await supabase
     .from('user_profiles')
     .select(`
@@ -67,55 +68,25 @@ export async function middleware(request) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
+  const codes = profile.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+
+  // Priority order — highest wins
+  const isAdmin        = codes.includes('admin') || codes.includes('platform_admin')
+  const isProvider     = codes.includes('service_provider_owner')
+  const isCompanyOwner = codes.includes('company_owner')
+  const isCompanyMember= codes.includes('company_member')
+
   let role = 'user'
+  if (isAdmin)          role = 'admin'
+  else if (isProvider)  role = 'provider'
+  else if (isCompanyOwner)  role = 'company'   // owner → dedicated /company portal
+  else if (isCompanyMember) role = 'member'    // member → stays in /dashboard
 
-  // Check if admin (highest priority)
-  const isAdmin = profile.user_roles?.some(ur => ur.role?.code === 'admin')
-  if (isAdmin) {
-    role = 'admin'
-  }
+  // ============================================================
+  // ROUTE PROTECTION
+  // ============================================================
 
-  // Check if service provider
-  const { data: provider } = await supabase
-    .from('service_providers')
-    .select('id, status')
-    .eq('owner_user_id', profile.id)
-    .maybeSingle()
-
-  if (provider) {
-    role = 'provider'
-  }
-
-  // Check if company owner (via company_profiles)
-  const { data: ownedCompany } = await supabase
-    .from('company_profiles')
-    .select('id, status')
-    .eq('owner_user_id', profile.id)
-    .maybeSingle()
-
-  if (ownedCompany) {
-    role = 'company'
-  }
-
-  // Check if company member (via company_users)
-  if (!ownedCompany) {
-    const { data: companyMember } = await supabase
-      .from('company_users')
-      .select('company_id, is_active')
-      .eq('user_id', profile.id)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (companyMember) {
-      role = 'company'
-    }
-  }
-
-  // ========================================
-  // ROUTE PROTECTION & REDIRECTION
-  // ========================================
-
-  // Admin routes
+  // /admin — admins only
   if (pathname.startsWith('/admin')) {
     if (role !== 'admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -123,16 +94,16 @@ export async function middleware(request) {
     return response
   }
 
-  // Company routes
+  // /company — company owners only
+  // Members are NOT sent here — they use /dashboard with company sidebar sections
   if (pathname.startsWith('/company')) {
-    console.log('Accessing company route, user role:', role) // Debug log
     if (role !== 'company') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return response
   }
 
-  // Provider routes
+  // /provider — service providers only
   if (pathname.startsWith('/provider')) {
     if (role !== 'provider') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -140,33 +111,21 @@ export async function middleware(request) {
     return response
   }
 
-  // Regular dashboard - redirect based on role
+  // /dashboard — redirect away only if the user has a dedicated portal
   if (pathname.startsWith('/dashboard')) {
-    if (role === 'admin') {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    }
-    if (role === 'company') {
-      console.log('Redirecting to company dashboard for user with company role') // Debug log
-      return NextResponse.redirect(new URL('/company/dashboard', request.url))
-    }
-    if (role === 'provider') {
-      return NextResponse.redirect(new URL('/provider/dashboard', request.url))
-    }
+    if (role === 'admin')   return NextResponse.redirect(new URL('/admin/dashboard',    request.url))
+    if (role === 'company') return NextResponse.redirect(new URL('/company/dashboard',  request.url))
+    if (role === 'provider')return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+    // role='member' and role='user' — let through to /dashboard
     return response
   }
 
-  // Auth pages - redirect if already logged in
+  // /auth/login or /auth/signup — redirect already-logged-in users away
   if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')) {
-    if (role === 'admin') {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    }
-    if (role === 'company') {
-      console.log('Redirecting to company dashboard from auth page; for already logged in user with company role') // Debug log
-      return NextResponse.redirect(new URL('/company/dashboard', request.url))
-    }
-    if (role === 'provider') {
-      return NextResponse.redirect(new URL('/provider/dashboard', request.url))
-    }
+    if (role === 'admin')   return NextResponse.redirect(new URL('/admin/dashboard',    request.url))
+    if (role === 'company') return NextResponse.redirect(new URL('/company/dashboard',  request.url))
+    if (role === 'provider')return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+    // members and regular users → /dashboard
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

@@ -9,7 +9,7 @@ import Link from 'next/link'
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
-  
+
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -23,97 +23,69 @@ export default function LoginPage() {
     try {
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
       })
 
       if (signInError) throw signInError
 
       if (authData.user) {
-        // Get user profile and roles
+        // Single query — roles already include everything we need
         const { data: profile } = await supabase
           .from('user_profiles')
           .select(`
-            *,
+            id,
             user_roles(
-              role:user_roles_lookup(code, display_name)
+              role:user_roles_lookup(code)
             )
           `)
           .eq('auth_user_id', authData.user.id)
           .single()
 
-        // ========================================
-        // CHECK ADMIN (HIGHEST PRIORITY)
-        // ========================================
-        const isAdmin = profile?.user_roles?.some(
-          ur => ur.role?.code === 'admin'
-        )
+        const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
 
-        if (isAdmin) {
+        // ── Priority order ──────────────────────────────────────
+        // 1. Platform admin
+        if (codes.includes('admin') || codes.includes('platform_admin')) {
           router.push('/admin/dashboard')
           router.refresh()
           return
         }
 
-        // ========================================
-        // CHECK COMPANY OWNER/MEMBER
-        // ========================================
-        // Check if user owns a company
-        const { data: ownedCompany } = await supabase
-          .from('company_profiles')
-          .select('id, status')
-          .eq('owner_user_id', profile.id)
-          .maybeSingle()
-
-        if (ownedCompany) {
-          console.log('User is company owner, company status:', ownedCompany.status)
+        // 2. Company owner → dedicated company portal
+        if (codes.includes('company_owner')) {
           router.push('/company/dashboard')
           router.refresh()
           return
         }
 
-        // Check if user is a company member
-        const { data: companyMember } = await supabase
-          .from('company_users')
-          .select('company_id, is_active')
-          .eq('user_id', profile.id)
-          .eq('is_active', true)
-          .maybeSingle()
-
-        if (companyMember) {
-          router.push('/company/dashboard')
-          router.refresh()
-          return
-        }
-
-        // ========================================
-        // CHECK SERVICE PROVIDER
-        // ========================================
-        const isProvider = profile?.user_roles?.some(
-          ur => ur.role?.code === 'service_provider_owner'
-        )
-
-        if (isProvider) {
+        // 3. Service provider owner
+        if (codes.includes('service_provider_owner')) {
+          // Verify registration is complete
           const { data: provider } = await supabase
             .from('service_providers')
-            .select('id, status')
+            .select('id')
             .eq('owner_user_id', profile.id)
             .maybeSingle()
 
           if (!provider) {
-            // Provider hasn't completed registration workflow
+            // Registration flow not yet completed
             router.push('/auth/provider-signup')
-            return
           } else {
-            // Route to provider dashboard
             router.push('/provider/dashboard')
             router.refresh()
-            return
           }
+          return
         }
 
-        // ========================================
-        // DEFAULT TO REGULAR USER DASHBOARD
-        // ========================================
+        // 4. Company member → normal dashboard
+        // (Sidebar will detect membership and inject company nav sections)
+        if (codes.includes('company_member')) {
+          router.push('/dashboard')
+          router.refresh()
+          return
+        }
+
+        // 5. Regular user
         router.push('/dashboard')
         router.refresh()
       }
@@ -128,10 +100,9 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
-      }
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
     })
-    
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -184,7 +155,7 @@ export default function LoginPage() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="you@example.com"
@@ -199,7 +170,7 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="••••••••"
@@ -230,11 +201,8 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <Link
-              href="/auth/signup"
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Don't have an account? Sign up
+            <Link href="/auth/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+              Don&apos;t have an account? Sign up
             </Link>
           </div>
         </div>
