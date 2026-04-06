@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   CheckCircle, XCircle, FileText, Building2,
   Users, ArrowLeft, Truck, Clock, AlertCircle,
-  ExternalLink, Mail, Phone, Globe, MapPin
+  ExternalLink, Mail, Phone, Globe, MapPin, AlertTriangle
 } from 'lucide-react'
 import { sendCompanyApprovalEmail } from '@/lib/email/sendCompanyInviteEmail'
 
@@ -318,6 +318,24 @@ export default function CompanyDetailPage({ params }) {
 
   if (!company) return null
 
+  // ── Personal email detection ──────────────────────────────────────────────
+  // Companies should register with a corporate domain, not a free email provider.
+  // Flag these for the admin during review so they can ask for a business email.
+  const PERSONAL_DOMAINS = new Set([
+    'gmail.com', 'yahoo.com', 'yahoo.co.ke', 'hotmail.com', 'outlook.com',
+    'live.com', 'icloud.com', 'me.com', 'mac.com', 'aol.com',
+    'protonmail.com', 'zoho.com', 'yandex.com', 'mail.com',
+    'gmx.com', 'inbox.com', 'fastmail.com', 'tutanota.com',
+  ])
+
+  const isPersonalEmail = (email) => {
+    if (!email) return false
+    const domain = email.split('@')[1]?.toLowerCase()
+    return domain ? PERSONAL_DOMAINS.has(domain) : false
+  }
+
+  const ownerUsesPersonalEmail = isPersonalEmail(owner?.email)
+
   const isPending = company.status === 'pending_verification' || company.status === 'pending_info'
 
   return (
@@ -368,6 +386,20 @@ export default function CompanyDetailPage({ params }) {
           )}
         </div>
       </div>
+
+      {/* Personal email warning — shown whenever owner used a free email provider */}
+      {ownerUsesPersonalEmail && (
+        <div className="flex items-start gap-3 px-4 py-3.5 mb-6 bg-red-50 border border-red-300 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-800">Personal email detected</p>
+            <p className="text-sm text-red-700 mt-0.5">
+              The owner registered with <span className="font-mono font-medium">{owner?.email}</span>, which is a personal/free email address.
+              Companies should use a corporate domain email. Consider requesting a business email before approving.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
@@ -446,7 +478,21 @@ export default function CompanyDetailPage({ params }) {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="flex items-center gap-1 text-gray-500 shrink-0"><Mail className="w-3.5 h-3.5" /> Email</dt>
-                <dd className="font-medium text-gray-900 text-right break-all">{owner?.email || <span className="text-gray-300">—</span>}</dd>
+                <dd className="font-medium text-gray-900 text-right break-all">
+                  {owner?.email
+                    ? (
+                      <span className="inline-flex items-center gap-2 flex-wrap justify-end">
+                        <span>{owner.email}</span>
+                        {ownerUsesPersonalEmail && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 border border-red-300 text-red-700 text-xs font-semibold rounded-full whitespace-nowrap">
+                            <AlertTriangle className="w-3 h-3" /> Personal email
+                          </span>
+                        )}
+                      </span>
+                    )
+                    : <span className="text-gray-300">—</span>
+                  }
+                </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="flex items-center gap-1 text-gray-500 shrink-0"><Phone className="w-3.5 h-3.5" /> Phone</dt>
