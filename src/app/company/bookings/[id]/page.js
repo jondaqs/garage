@@ -35,7 +35,7 @@ export default function CompanyBookingDetailPage() {
           provider:service_providers(id, name, phone, email),
           shop:shops(id, name, town, county, street),
           status:booking_statuses(code, display_name, color_code),
-          booking_services(service:services(id, name, base_price))
+          booking_services(service:services(id, name, category))
         `)
         .eq('id', params.id)
         .single()
@@ -221,10 +221,8 @@ export default function CompanyBookingDetailPage() {
                   <CheckCircle className="w-3.5 h-3.5 text-green-500" />
                   <span className="text-gray-800">{bs.service?.name}</span>
                 </div>
-                {bs.service?.base_price && (
-                  <span className="text-gray-500 text-xs">
-                    KES {Number(bs.service.base_price).toLocaleString()}
-                  </span>
+                {bs.service?.category && (
+                  <span className="text-xs text-gray-400 capitalize">{bs.service.category}</span>
                 )}
               </div>
             ))}
