@@ -48,10 +48,13 @@ export async function GET(request) {
     }
 
     // BUG 1.2 FIX: select correct column names from vehicles table
+    // vehicle_ownership has no created_at — order by vehicles.created_at via the join
     const { data: fleet, error: fleetError } = await supabase
       .from('vehicle_ownership')
       .select(`
-        *,
+        vehicle_id,
+        owner_user_id,
+        owner_company_id,
         vehicle:vehicles(
           id,
           plate_number,
@@ -64,7 +67,7 @@ export async function GET(request) {
         )
       `)
       .eq('owner_company_id', companyId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false, foreignTable: 'vehicle' })
 
     if (fleetError) {
       console.error('❌ Fleet fetch error:', fleetError)

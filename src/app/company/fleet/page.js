@@ -79,8 +79,8 @@ export default function FleetPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {fleet.map((item) => (
             <Link
-              key={item.vehicle_id || item.id}
-              href={`/company/fleet/${item.vehicle_id || item.id}`}
+              key={item.vehicle_id}
+              href={`/company/fleet/${item.vehicle_id}`}
               className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-center justify-between mb-4">
