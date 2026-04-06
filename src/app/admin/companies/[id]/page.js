@@ -102,25 +102,18 @@ export default function CompanyDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Update company_profiles
-      const { error: updateError } = await supabase
-        .from('company_profiles')
-        .update({
-          status: 'active',
-          is_active: true,
-          verified_at: new Date().toISOString(),
-          verified_by: user.id,
-        })
-        .eq('id', company.id)
+      // Use SECURITY DEFINER rpc — bypasses RLS on company_profiles
+      const { data: rpcResult, error: updateError } = await supabase.rpc(
+        'admin_update_company_status',
+        {
+          p_company_id:  company.id,
+          p_status:      'active',
+          p_verified_by: user.id,
+        }
+      )
 
       if (updateError) throw updateError
-
-      // Activate owner in company_users (fix 1.4 / 0.6)
-      await supabase
-        .from('company_users')
-        .update({ is_active: true })
-        .eq('company_id', company.id)
-        .eq('staff_role', 'owner')
+      if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
 
       // Notification for owner
       await supabase.from('notifications').insert([{
@@ -208,14 +201,18 @@ export default function CompanyDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
-      await supabase
-        .from('company_profiles')
-        .update({
-          status: 'rejected',
-          is_active: false,
-          verified_by: user.id,
-        })
-        .eq('id', company.id)
+      const { data: rpcResult, error: updateError } = await supabase.rpc(
+        'admin_update_company_status',
+        {
+          p_company_id:  company.id,
+          p_status:      'rejected',
+          p_verified_by: user.id,
+          p_extra_note:  rejectionReason,
+        }
+      )
+
+      if (updateError) throw updateError
+      if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
 
       await supabase.from('notifications').insert([{
         user_id: company.owner_user_id,
@@ -251,10 +248,17 @@ export default function CompanyDetailPage({ params }) {
     const supabase = createClient()
 
     try {
-      await supabase
-        .from('company_profiles')
-        .update({ status: 'pending_info' })
-        .eq('id', company.id)
+      const { data: rpcResult, error: updateError } = await supabase.rpc(
+        'admin_update_company_status',
+        {
+          p_company_id: company.id,
+          p_status:     'pending_info',
+          p_extra_note: additionalInfo,
+        }
+      )
+
+      if (updateError) throw updateError
+      if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
 
       await supabase.from('notifications').insert([{
         user_id: company.owner_user_id,
@@ -714,7 +718,7 @@ export default function CompanyDetailPage({ params }) {
               >
                 Cancel
               </button>
-            </div>
+            </div> 
           </div>
         </div>
       )}
