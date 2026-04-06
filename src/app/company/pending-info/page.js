@@ -166,31 +166,34 @@ export default function PendingInfoPage() {
     setSaving(true); setError(null)
 
     try {
-      const { error: ue } = await supabase
-        .from('company_profiles')
-        .update({
-          name:                form.name.trim(),
-          registration_number: form.registration_number.trim() || null,
-          tax_id:              form.tax_id.trim() || null,
-          industry:            form.industry || null,
-          company_size:        form.company_size || null,
-          bio:                 form.bio.trim() || null,
-          website:             form.website.trim() || null,
-          phone:               form.phone.trim(),
-          physical_address:    form.physical_address.trim() || null,
-          city:                form.city.trim() || null,
-          country:             form.country,
-          years_in_operation:  form.years_in_operation ? parseInt(form.years_in_operation) : null,
-          opening_time:        form.opening_time || null,
-          closing_time:        form.closing_time || null,
-          working_days:        form.working_days.length > 0 ? form.working_days : null,
-          status:              'pending_verification',
-          submitted_at:        new Date().toISOString(),
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('id', company.id)
+      // Use the SECURITY DEFINER RPC — bypasses RLS, validates ownership
+      // server-side via owner_user_id, and whitelists updatable columns.
+      // Direct .update() is blocked by RLS until the company is approved.
+      const { data: rpcResult, error: ue } = await supabase.rpc(
+        'owner_update_company_details',
+        {
+          p_company_id:          company.id,
+          p_name:                form.name.trim(),
+          p_registration_number: form.registration_number.trim() || null,
+          p_tax_id:              form.tax_id.trim() || null,
+          p_industry:            form.industry || null,
+          p_company_size:        form.company_size || null,
+          p_bio:                 form.bio.trim() || null,
+          p_website:             form.website.trim() || null,
+          p_phone:               form.phone.trim(),
+          p_physical_address:    form.physical_address.trim() || null,
+          p_city:                form.city.trim() || null,
+          p_country:             form.country,
+          p_years_in_operation:  form.years_in_operation ? parseInt(form.years_in_operation) : null,
+          p_opening_time:        form.opening_time || null,
+          p_closing_time:        form.closing_time || null,
+          p_working_days:        form.working_days.length > 0 ? form.working_days : null,
+          p_status:              'pending_verification',
+        }
+      )
 
       if (ue) throw ue
+      if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
 
       const { error: notifError } = await supabase.from('notifications').insert([{
         recipient_type: 'admin', type: 'company_resubmission',

@@ -41,18 +41,49 @@ export default function AddFleetVehiclePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
-      // Get user's company
+      // Get user profile
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('id, company_id, company_users!inner(is_admin)')
+        .select('id')
         .eq('auth_user_id', user.id)
         .single();
-      
-      if (!profile?.company_id) {
+
+      if (!profile) throw new Error('User profile not found');
+
+      // Resolve company — owner first, then admin member
+      let companyId = null;
+      let isAdmin   = false;
+
+      // Check ownership (owner is always admin)
+      const { data: ownedCompany } = await supabase
+        .from('company_profiles')
+        .select('id')
+        .eq('owner_user_id', profile.id)
+        .maybeSingle();
+
+      if (ownedCompany) {
+        companyId = ownedCompany.id;
+        isAdmin   = true;
+      } else {
+        // Check company_users membership
+        const { data: membership } = await supabase
+          .from('company_users')
+          .select('company_id, is_admin')
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membership) {
+          companyId = membership.company_id;
+          isAdmin   = membership.is_admin;
+        }
+      }
+
+      if (!companyId) {
         throw new Error('You are not associated with a company');
       }
-      
-      if (!profile.company_users?.[0]?.is_admin) {
+
+      if (!isAdmin) {
         throw new Error('Only admins can add vehicles');
       }
       
@@ -88,8 +119,9 @@ export default function AddFleetVehiclePage() {
       const { error: ownershipError } = await supabase
         .from('vehicle_ownership')
         .insert({
-          vehicle_id: vehicle.id,
-          owner_company_id: profile.company_id,
+          vehicle_id:       vehicle.id,
+          owner_company_id: companyId,
+          owner_user_id:    profile.id,  // required by RLS on vehicle_ownership
         });
       
       if (ownershipError) throw ownershipError;
@@ -99,12 +131,12 @@ export default function AddFleetVehiclePage() {
         await supabase
           .from('company_vehicle_assignments')
           .insert({
-            company_id: profile.company_id,
-            vehicle_id: vehicle.id,
-            assigned_to_user_id: formData.assignedDriver,
-            primary_driver: true,
-            is_active: true,
-            notes: formData.notes || null,
+            company_id:           companyId,
+            vehicle_id:           vehicle.id,
+            assigned_to_user_id:  formData.assignedDriver,
+            primary_driver:       true,
+            is_active:            true,
+            notes:                formData.notes || null,
           });
       }
       
