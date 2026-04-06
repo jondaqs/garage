@@ -455,4 +455,4 @@ export default function PendingInfoPage() {
       </p>
     </div>
   )
-}
+} 
