@@ -165,8 +165,11 @@ export default function PendingInfoPage() {
     if (!form.phone.trim()) { setError('Phone number is required'); return }
     setSaving(true); setError(null)
 
+    console.log('🔵 [1] handleSubmit started — company.id:', company?.id)
+
     try {
-      const { error: ue } = await supabase
+      console.log('🔵 [2] About to UPDATE company_profiles — id:', company.id)
+      const { data: updateData, error: ue } = await supabase
         .from('company_profiles')
         .update({
           name:                form.name.trim(),
@@ -189,10 +192,17 @@ export default function PendingInfoPage() {
           updated_at:          new Date().toISOString(),
         })
         .eq('id', company.id)
+        .select()
 
-      if (ue) throw ue
+      console.log('🔵 [3] UPDATE result — error:', ue, '| data:', updateData)
+      if (ue) {
+        console.error('🔴 [3] UPDATE failed:', ue.code, ue.message)
+        throw ue
+      }
+      console.log('🟢 [3] UPDATE succeeded')
 
-      await supabase.from('notifications').insert([{
+      console.log('🔵 [4] About to INSERT notification')
+      const { error: notifError } = await supabase.from('notifications').insert([{
         recipient_type: 'admin', type: 'company_resubmission',
         notification_type: 'company_resubmission',
         reference_type: 'company', reference_table: 'company_profiles',
@@ -202,9 +212,17 @@ export default function PendingInfoPage() {
         is_read: false,
       }])
 
+      if (notifError) {
+        console.error('🔴 [4] Notification INSERT failed:', notifError.code, notifError.message)
+      } else {
+        console.log('🟢 [4] Notification inserted')
+      }
+
+      console.log('🟢 [5] All done — setting success')
       setSuccess(true)
       setTimeout(() => router.push('/company/dashboard'), 3000)
     } catch (err) {
+      console.error('🔴 [CATCH] Error at unknown step:', err.message, err)
       setError('Failed to save: ' + err.message)
     } finally {
       setSaving(false)
