@@ -26,16 +26,25 @@ const REQUIRED_DOCS = [
   { id: 'insurance',                    label: 'Insurance Documents' },
 ]
 
+// Values must match exactly what CompanyInfoStep stores in the DB
 const INDUSTRY_OPTIONS = [
-  'Transportation & Logistics', 'Construction', 'Agriculture', 'Healthcare',
-  'Manufacturing', 'Retail & Distribution', 'Government & Public Sector',
-  'NGO & Non-Profit', 'Education', 'Mining & Extractives',
-  'Tourism & Hospitality', 'Other',
+  { value: 'Transportation', label: 'Transportation & Logistics' },
+  { value: 'Construction',   label: 'Construction' },
+  { value: 'Manufacturing',  label: 'Manufacturing' },
+  { value: 'Retail',         label: 'Retail' },
+  { value: 'Technology',     label: 'Technology' },
+  { value: 'Healthcare',     label: 'Healthcare' },
+  { value: 'Hospitality',    label: 'Hospitality' },
+  { value: 'Agriculture',    label: 'Agriculture' },
+  { value: 'Other',          label: 'Other' },
 ]
 
 const COMPANY_SIZE_OPTIONS = [
-  '1-10 employees', '11-50 employees', '51-200 employees',
-  '201-500 employees', '500+ employees',
+  { value: '1-10',    label: '1-10 employees' },
+  { value: '11-50',   label: '11-50 employees' },
+  { value: '51-100',  label: '51-100 employees' },
+  { value: '101-500', label: '101-500 employees' },
+  { value: '500+',    label: '500+ employees' },
 ]
 
 export default function PendingInfoPage() {
@@ -270,14 +279,14 @@ export default function PendingInfoPage() {
             <label className="block text-xs font-medium text-gray-600 mb-1">Industry</label>
             <select value={form.industry} onChange={e => setForm({...form, industry: e.target.value})} className={inp}>
               <option value="">Select industry</option>
-              {INDUSTRY_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
+              {INDUSTRY_OPTIONS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Company Size</label>
             <select value={form.company_size} onChange={e => setForm({...form, company_size: e.target.value})} className={inp}>
               <option value="">Select size</option>
-              {COMPANY_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              {COMPANY_SIZE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
         </div>
