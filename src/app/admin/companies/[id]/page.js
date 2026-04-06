@@ -135,6 +135,42 @@ export default function CompanyDetailPage({ params }) {
         is_read: false,
       }])
 
+      // 3.6 — Notify all pending invited team members that the company is now active
+      try {
+        const { data: pendingInvites } = await supabase
+          .from('company_invitations')
+          .select('id, email, first_name, last_name, invitation_token, invitee_user_id')
+          .eq('company_id', company.id)
+          .eq('status', 'pending')
+
+        if (pendingInvites && pendingInvites.length > 0) {
+          // Insert in-app notification for invitees who already have accounts
+          const existingUserIds = pendingInvites
+            .map(i => i.invitee_user_id)
+            .filter(Boolean)
+
+          if (existingUserIds.length > 0) {
+            await supabase.from('notifications').insert(
+              existingUserIds.map(uid => ({
+                user_id: uid,
+                recipient_user_id: uid,
+                type: 'company_approved',
+                notification_type: 'company_approved',
+                reference_type: 'company',
+                reference_id: company.id,
+                title: `${company.name} is now active`,
+                message: `The company you were invited to join has been approved. Complete your account setup to get started.`,
+                is_read: false,
+              }))
+            )
+          }
+
+          console.log(`✅ Notified ${pendingInvites.length} pending invitee(s)`)
+        }
+      } catch (inviteNotifError) {
+        console.error('⚠️ Invitee notification error (non-fatal):', inviteNotifError)
+      }
+
       // Send approval email if owner email is available
       if (owner?.email) {
         try {
