@@ -160,7 +160,7 @@ export default function CompanyBookingsPage() {
           <p className="text-sm text-gray-500 mt-1">{bookings.length} booking{bookings.length !== 1 ? 's' : ''}</p>
         </div>
         <Link
-          href="/company/bookings/new"
+          href="/company/bookings/book"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
         >
           <Plus className="w-4 h-4" />
@@ -196,7 +196,7 @@ export default function CompanyBookingsPage() {
               : `No ${filter.replace(/_/g, ' ')} bookings`}
           </p>
           <Link
-            href="/company/bookings/new"
+            href="/company/bookings/book"
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
           >
             <Plus className="w-4 h-4" />
