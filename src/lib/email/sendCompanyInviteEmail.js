@@ -41,7 +41,7 @@ export async function sendCompanyInviteEmail({
   invitationToken,
   permissions = {},
 }) {
-  const acceptUrl = `${process.env.NEXT_PUBLIC_APP_URL}/company/accept-invitation?token=${invitationToken}`
+  const acceptUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/company?token=${invitationToken}`
 
   const permissionsList = Object.entries(permissions)
     .filter(([, v]) => v)

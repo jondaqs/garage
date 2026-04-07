@@ -4,6 +4,7 @@
 'use client'
 
 import PendingInvitationsCard from '@/components/PendingInvitationsCard'
+import PendingCompanyInvitationsCard from '@/components/PendingCompanyInvitationsCard'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Car, Calendar, Check, CreditCard, Plus, Trash2 } from 'lucide-react'
@@ -344,6 +345,8 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        <PendingCompanyInvitationsCard />
 
         <PendingInvitationsCard />
 
