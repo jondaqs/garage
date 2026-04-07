@@ -1,18 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+
+// Service role client — bypasses RLS for reading other users' profiles
+// Used only server-side, never exposed to the browser
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function GET(request) {
   try {
     const supabase = await createClient()
-    
-    // Authenticate user
+
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
     const { data: userProfile } = await supabase
       .from('user_profiles')
       .select('id')
@@ -23,7 +31,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Resolve company — check ownership first, then membership
+    // Resolve company
     let companyId = null
 
     const { data: ownedCompany } = await supabase
@@ -46,101 +54,112 @@ export async function GET(request) {
     }
 
     if (!companyId) {
-      return NextResponse.json({
-        error: 'Not associated with a company'
-      }, { status: 403 })
+      return NextResponse.json({ error: 'Not associated with a company' }, { status: 403 })
     }
 
-    // Get all company members
-    // FK hint required: company_users has two FKs to user_profiles (user_id and updated_by)
+    // Fetch company_users rows (no profile join — avoids RLS cross-user read issue)
     const { data: members, error: membersError } = await supabase
       .from('company_users')
-      .select(`
-        *,
-        user:user_profiles!company_users_user_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          created_at
-        )
-      `)
+      .select('id, user_id, staff_role, is_admin, is_active, created_at, updated_at')
       .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     if (membersError) {
-      console.error('❌ Members fetch error:', membersError)
-      return NextResponse.json({ 
-        error: membersError.message 
-      }, { status: 500 })
+      return NextResponse.json({ error: membersError.message }, { status: 500 })
     }
 
-    // Get pending invitations
+    // Fetch profiles for all members using service role (bypasses RLS — server-side only)
+    const userIds = (members || []).map(m => m.user_id).filter(Boolean)
+    let profileMap = {}
+
+    if (userIds.length > 0) {
+      const serviceClient = getServiceClient()
+      const { data: profiles } = await serviceClient
+        .from('user_profiles')
+        .select('id, first_name, last_name, email, phone')
+        .in('id', userIds)
+
+      if (profiles) {
+        profileMap = Object.fromEntries(profiles.map(p => [p.id, p]))
+      }
+    }
+
+    // Attach profile to each member row
+    const membersWithProfiles = (members || []).map(m => ({
+      ...m,
+      user: profileMap[m.user_id] || null,
+    }))
+
+    // Pending invitations
     const { data: invitations } = await supabase
       .from('company_invitations')
-      .select('*')
+      .select('id, email, first_name, last_name, staff_role, is_admin, status, created_at')
       .eq('company_id', companyId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 
     return NextResponse.json({
       success: true,
-      members: members || [],
-      pendingInvitations: invitations || []
+      members: membersWithProfiles,
+      pendingInvitations: invitations || [],
     })
 
   } catch (error) {
-    console.error('❌ Error:', error)
-    return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
-    }, { status: 500 })
+    console.error('❌ Team GET error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
 
-// Update team member
 export async function PUT(request) {
   try {
     const supabase = await createClient()
     const body = await request.json()
-    
+
     if (!body.memberId) {
-      return NextResponse.json({ 
-        error: 'Member ID is required' 
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Member ID is required' }, { status: 400 })
     }
 
-    // Authenticate user
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Get user profile
     const { data: userProfile } = await supabase
       .from('user_profiles')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
-    // Verify user is admin
-    const { data: adminCheck } = await supabase
-      .from('company_users')
-      .select('company_id, is_admin')
-      .eq('user_id', userProfile.id)
-      .single()
+    // Verify caller is owner or admin member
+    let companyId = null
 
-    if (!adminCheck || !adminCheck.is_admin) {
-      return NextResponse.json({ 
-        error: 'Only admins can update team members' 
+    const { data: ownedCompany } = await supabase
+      .from('company_profiles')
+      .select('id')
+      .eq('owner_user_id', userProfile.id)
+      .maybeSingle()
+
+    if (ownedCompany) {
+      companyId = ownedCompany.id
+    } else {
+      const { data: adminCheck } = await supabase
+        .from('company_users')
+        .select('company_id, is_admin')
+        .eq('user_id', userProfile.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (adminCheck?.is_admin) companyId = adminCheck.company_id
+    }
+
+    if (!companyId) {
+      return NextResponse.json({
+        error: 'Only company owners or admins can update team members'
       }, { status: 403 })
     }
 
-    // Update member
     const updateData = {}
-    if (body.staffRole) updateData.staff_role = body.staffRole
-    if (typeof body.isAdmin === 'boolean') updateData.is_admin = body.isAdmin
-    if (typeof body.isActive === 'boolean') updateData.is_active = body.isActive
+    if (body.staffRole)                        updateData.staff_role = body.staffRole
+    if (typeof body.isAdmin   === 'boolean')   updateData.is_admin   = body.isAdmin
+    if (typeof body.isActive  === 'boolean')   updateData.is_active  = body.isActive
     updateData.updated_by = userProfile.id
     updateData.updated_at = new Date().toISOString()
 
@@ -148,26 +167,17 @@ export async function PUT(request) {
       .from('company_users')
       .update(updateData)
       .eq('id', body.memberId)
-      .eq('company_id', adminCheck.company_id)
+      .eq('company_id', companyId)
       .select()
 
     if (updateError) {
-      console.error('❌ Update error:', updateError)
-      return NextResponse.json({ 
-        error: updateError.message 
-      }, { status: 500 })
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      member: updated[0],
-      message: 'Team member updated successfully'
-    })
+    return NextResponse.json({ success: true, member: updated[0] })
 
   } catch (error) {
-    console.error('❌ Error:', error)
-    return NextResponse.json({ 
-      error: error.message 
-    }, { status: 500 })
+    console.error('❌ Team PUT error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
