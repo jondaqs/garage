@@ -110,7 +110,7 @@ export async function POST(request) {
         }
       }
 
-      // Assign company_member role in user_roles
+      // Assign company_member role in user_roles (ignore if already assigned)
       const { data: roleRow } = await supabase
         .from('user_roles_lookup')
         .select('id')
@@ -118,11 +118,13 @@ export async function POST(request) {
         .maybeSingle()
 
       if (roleRow) {
+        // Use upsert with ignoreDuplicates — Supabase JS equivalent of ON CONFLICT DO NOTHING
         await supabase
           .from('user_roles')
-          .insert([{ user_id: userProfile.id, role_id: roleRow.id }])
-          .onConflict('user_id, role_id')   // ignore if already assigned
-          .ignore()
+          .upsert(
+            [{ user_id: userProfile.id, role_id: roleRow.id }],
+            { ignoreDuplicates: true }
+          )
       }
 
       // Mark invitation accepted + link invitee_user_id
