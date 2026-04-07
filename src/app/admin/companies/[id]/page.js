@@ -18,6 +18,7 @@ export default function CompanyDetailPage({ params }) {
   const [owner, setOwner] = useState(null)
   const [documents, setDocuments] = useState([])
   const [teamMembers, setTeamMembers] = useState([])
+  const [activeMembers, setActiveMembers] = useState([])
   const [fleet, setFleet] = useState([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
@@ -70,13 +71,27 @@ export default function CompanyDetailPage({ params }) {
       )
       setDocuments(docsWithUrls)
 
-      // ── Team members (invitations) ──
+      // ── Team members — two sources ──
+      // 1. company_invitations: all invites (pending, accepted, rejected)
       const { data: invitationsData } = await supabase
         .from('company_invitations')
         .select('id, first_name, last_name, email, phone, staff_role, is_admin, status, created_at')
         .eq('company_id', companyId)
         .order('created_at', { ascending: true })
       setTeamMembers(invitationsData || [])
+
+      // 2. company_users: accepted members with their linked user profiles
+      const { data: membersData } = await supabase
+        .from('company_users')
+        .select(`
+          id, staff_role, is_admin, is_active, created_at,
+          user:user_profiles!company_users_user_id_fkey(
+            id, first_name, last_name, email, phone
+          )
+        `)
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true })
+      setActiveMembers(membersData || [])
 
       // ── Fleet ──
       const { data: ownershipData } = await supabase
@@ -422,7 +437,7 @@ export default function CompanyDetailPage({ params }) {
               )}
               {tab === 'Team Members' && (
                 <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                  {teamMembers.length}
+                  {activeMembers.length + teamMembers.length}
                 </span>
               )}
               {tab === 'Fleet' && (
@@ -611,53 +626,112 @@ export default function CompanyDetailPage({ params }) {
 
       {/* ── TEAM MEMBERS TAB ── */}
       {activeTab === 'Team Members' && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <h2 className="text-base font-semibold">Invited Team Members</h2>
-            <span className="text-xs text-gray-500">({teamMembers.length})</span>
+        <div className="space-y-5">
+
+          {/* ── Active members (company_users with linked profiles) ── */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-600" />
+              <h2 className="text-base font-semibold">Active Members</h2>
+              <span className="text-xs text-gray-500">({activeMembers.length})</span>
+            </div>
+
+            {activeMembers.length === 0 ? (
+              <div className="text-center py-10 text-gray-500 text-sm">
+                No active members yet
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Name', 'Email', 'Phone', 'Role', 'Admin', 'Status'].map(h => (
+                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {activeMembers.map((member) => (
+                    <tr key={member.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-3 text-sm font-medium text-gray-900">
+                        {member.user
+                          ? `${member.user.first_name || ''} ${member.user.last_name || ''}`.trim() || '—'
+                          : '—'}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-500">{member.user?.email || '—'}</td>
+                      <td className="px-6 py-3 text-sm text-gray-500">{member.user?.phone || '—'}</td>
+                      <td className="px-6 py-3 text-sm text-gray-700 capitalize">{member.staff_role || '—'}</td>
+                      <td className="px-6 py-3 text-sm text-gray-700">
+                        {member.is_admin
+                          ? <span className="text-blue-600 font-medium">Yes</span>
+                          : 'No'}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                          member.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {member.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
-          {teamMembers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 text-sm">
-              No team members invited during registration
+          {/* ── Invitations (all statuses) ── */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+              <Users className="w-5 h-5 text-gray-400" />
+              <h2 className="text-base font-semibold">Invitations</h2>
+              <span className="text-xs text-gray-500">({teamMembers.length})</span>
             </div>
-          ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Name', 'Email', 'Role', 'Admin', 'Status'].map(h => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {teamMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 text-sm font-medium text-gray-900">
-                      {member.first_name} {member.last_name}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-500">{member.email}</td>
-                    <td className="px-6 py-3 text-sm text-gray-700 capitalize">{member.staff_role}</td>
-                    <td className="px-6 py-3 text-sm text-gray-700">
-                      {member.is_admin ? (
-                        <span className="text-blue-600 font-medium">Yes</span>
-                      ) : 'No'}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        member.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                        member.status === 'pending'  ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {member.status}
-                      </span>
-                    </td>
+
+            {teamMembers.length === 0 ? (
+              <div className="text-center py-10 text-gray-500 text-sm">
+                No invitations sent
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Name', 'Email', 'Role', 'Admin', 'Status'].map(h => (
+                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {teamMembers.map((member) => (
+                    <tr key={member.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-3 text-sm font-medium text-gray-900">
+                        {member.first_name} {member.last_name}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-500">{member.email}</td>
+                      <td className="px-6 py-3 text-sm text-gray-700 capitalize">{member.staff_role}</td>
+                      <td className="px-6 py-3 text-sm text-gray-700">
+                        {member.is_admin
+                          ? <span className="text-blue-600 font-medium">Yes</span>
+                          : 'No'}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                          member.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                          member.status === 'pending'  ? 'bg-yellow-100 text-yellow-800' :
+                          member.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {member.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
         </div>
       )}
 
