@@ -106,15 +106,16 @@ export default function LandingPage() {
         .gc-btn-primary:hover { transform: translateY(-1px); }
 
         .role-card {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(0,0,0,0.25);
+          border: 1px solid rgba(255,255,255,0.14);
           border-radius: 20px;
           padding: 32px 28px;
           cursor: pointer;
           transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
           position: relative;
           overflow: hidden;
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
         }
         .role-card::before {
           content: '';
@@ -128,19 +129,21 @@ export default function LandingPage() {
         .role-card:hover {
           border-color: var(--card-border);
           transform: translateY(-4px);
-          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.4);
         }
 
         .feat-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(0,0,0,0.2);
+          border: 1px solid rgba(255,255,255,0.1);
           border-radius: 16px;
           padding: 24px;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           transition: background 0.2s ease, border-color 0.2s ease;
         }
         .feat-card:hover {
-          background: rgba(255,255,255,0.07);
-          border-color: rgba(255,255,255,0.15);
+          background: rgba(0,0,0,0.3);
+          border-color: rgba(255,255,255,0.2);
         }
 
         @keyframes fadeUp {
@@ -162,11 +165,11 @@ export default function LandingPage() {
 
         .pill {
           display: inline-block;
-          padding: 2px 10px;
+          padding: 3px 12px;
           border-radius: 99px;
           font-size: 11px;
           font-weight: 600;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.05em;
           text-transform: uppercase;
         }
       `}</style>
@@ -252,21 +255,21 @@ export default function LandingPage() {
           </div>
 
           <h1 className="gc-display fade-up delay-1" style={{
-            fontSize: 'clamp(42px, 7vw, 80px)',
+            fontSize: 'clamp(36px, 5vw, 60px)',
             fontWeight: 800,
-            color: '#fff',
-            lineHeight: 1.05,
+            color: '#ffffff',
+            lineHeight: 1.1,
             letterSpacing: '-0.03em',
             marginBottom: 24,
           }}>
             Your Vehicle,<br />
-            <span style={{ color: '#93c5fd' }}>Perfectly Cared For.</span>
+            <span style={{ color: '#bfdbfe' }}>Perfectly Cared For.</span>
           </h1>
 
           <p className="fade-up delay-2" style={{
-            fontSize: 18, color: 'rgba(255,255,255,0.65)',
-            maxWidth: 520, margin: '0 auto 56px',
-            lineHeight: 1.7, fontWeight: 300,
+            fontSize: 17, color: 'rgba(255,255,255,0.82)',
+            maxWidth: 500, margin: '0 auto 56px',
+            lineHeight: 1.75, fontWeight: 400,
           }}>
             Connect with verified garages, manage your fleet, and stay on top of every service — all in one place.
           </p>
@@ -307,13 +310,13 @@ export default function LandingPage() {
                     <Icon size={24} color={role.accent} />
                   </div>
 
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
                     {role.sub}
                   </p>
-                  <h3 className="gc-display" style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 10 }}>
+                  <h3 className="gc-display" style={{ fontSize: 20, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>
                     {role.label}
                   </h3>
-                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, marginBottom: 24 }}>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65, marginBottom: 24 }}>
                     {role.description}
                   </p>
 
@@ -345,10 +348,10 @@ export default function LandingPage() {
           padding: '0 24px 80px',
         }}>
           <div className="fade-up delay-4" style={{ textAlign: 'center', marginBottom: 40 }}>
-            <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+            <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
               Why GariCare
             </p>
-            <h2 className="gc-display" style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+            <h2 className="gc-display" style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
               Everything your vehicle needs
             </h2>
           </div>
@@ -368,10 +371,10 @@ export default function LandingPage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     marginBottom: 14,
                   }}>
-                    <Icon size={18} color="rgba(255,255,255,0.7)" />
+                    <Icon size={18} color="rgba(255,255,255,0.85)" />
                   </div>
-                  <h4 style={{ fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 6 }}>{f.title}</h4>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.65 }}>{f.body}</p>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>{f.title}</h4>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.65 }}>{f.body}</p>
                 </div>
               )
             })}
