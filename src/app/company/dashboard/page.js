@@ -313,7 +313,7 @@ export default function CompanyDashboard() {
               <Calendar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
               <p className="text-sm text-gray-400">No bookings yet</p>
               <Link
-                href="/company/bookings/new"
+                href="/company/bookings/book"
                 className="inline-flex items-center gap-1.5 mt-3 text-xs text-blue-600 hover:text-blue-700 font-medium"
               >
                 <Plus className="w-3.5 h-3.5" /> Book a service
@@ -373,7 +373,7 @@ export default function CompanyDashboard() {
                 hoverBorder: 'hover:border-green-400 hover:bg-green-50',
               },
               {
-                href: '/company/bookings/new',
+                href: '/company/bookings/book',
                 icon: Calendar,
                 label: 'Book a Service',
                 color: 'text-purple-600',
