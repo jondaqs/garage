@@ -8,9 +8,11 @@ import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
+const supabase = createClient()
+
 export default function AddVehiclePage() {
   const router = useRouter()
-  const supabase = createClient()
+  
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
