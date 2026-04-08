@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, MapPin, Search, Star, Filter, X, CalendarDays } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function BookServicePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [providers, setProviders] = useState([])
   const [vehicles, setVehicles] = useState([])
-  const [selectedVehicle, setSelectedVehicle] = useState(null)
+  const [selectedVehicle, setSelectedVehicle] = useState(searchParams.get('vehicle') || null)
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [selectedDate, setSelectedDate] = useState(null) // ← ADD THIS
   const [loading, setLoading] = useState(true)

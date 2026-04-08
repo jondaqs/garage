@@ -374,7 +374,7 @@ export default function VehicleDetailPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800">Service History</h2>
           <Link
-            href={`/dashboard/bookings/new?vehicleId=${vehicleId}`}
+            href={`/dashboard/bookings/book?vehicle=${vehicleId}`}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
           >
             <Wrench className="w-3.5 h-3.5" />
