@@ -307,7 +307,11 @@ export default function DashboardPage() {
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               {vehicles.map(vehicle => (
-                <div key={vehicle.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                <div
+                  key={vehicle.id}
+                  onClick={() => router.push(`/dashboard/vehicles/${vehicle.id}`)}
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition cursor-pointer"
+                >
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h4 className="font-bold text-lg text-gray-800">{vehicle.plate_number}</h4>
@@ -317,28 +321,14 @@ export default function DashboardPage() {
                       {vehicle.year}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center text-sm text-gray-600 mb-4">
                     <span className="mr-4">Color: {vehicle.color}</span>
                     {vehicle.vin && <span className="text-xs">VIN: {vehicle.vin}</span>}
                   </div>
 
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => router.push('/dashboard/bookings')}
-                      className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100 transition font-medium flex items-center justify-center"
-                    >
-                      <Calendar size={18} className="mr-2" />
-                      Book Service
-                    </button>
-                    
-                    <button 
-                      onClick={() => handleDeleteVehicle(vehicle.id)}
-                      className="bg-red-50 text-red-600 p-2 rounded-lg hover:bg-red-100 transition"
-                      title="Delete vehicle"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                  <div className="flex items-center gap-1 text-xs text-blue-500 font-medium">
+                    <span>View details, edit or delete →</span>
                   </div>
                 </div>
               ))}
