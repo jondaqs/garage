@@ -1,133 +1,400 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, Wrench, Building2, User, Calendar, History, Bell, LogIn } from 'lucide-react'
+import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap } from 'lucide-react'
 
 export default function LandingPage() {
   const router = useRouter()
+  const canvasRef = useRef(null)
+
+  // Subtle animated grid
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    let animFrame
+    let offset = 0
+
+    const draw = () => {
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'
+      ctx.lineWidth = 1
+
+      const spacing = 60
+      // Vertical lines
+      for (let x = (offset % spacing); x < canvas.width; x += spacing) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke()
+      }
+      // Horizontal lines
+      for (let y = 0; y < canvas.height; y += spacing) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      }
+
+      offset += 0.3
+      animFrame = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(animFrame)
+  }, [])
+
+  const roles = [
+    {
+      icon: User,
+      label: 'Vehicle Owner',
+      sub: 'Personal',
+      description: 'Book services, track maintenance history, and keep your vehicles in top shape.',
+      accent: '#3b82f6',
+      accentLight: 'rgba(59,130,246,0.12)',
+      border: 'rgba(59,130,246,0.3)',
+      cta: 'Get Started',
+      route: '/auth/signup?type=normal',
+      pill: 'Most Popular',
+    },
+    {
+      icon: Building2,
+      label: 'Company Fleet',
+      sub: 'Business',
+      description: 'Centralise fleet maintenance, control budgets, and manage your entire team.',
+      accent: '#8b5cf6',
+      accentLight: 'rgba(139,92,246,0.12)',
+      border: 'rgba(139,92,246,0.3)',
+      cta: 'Register Company',
+      route: '/auth/company-signup',
+      pill: null,
+    },
+    {
+      icon: Wrench,
+      label: 'Service Provider',
+      sub: 'Garage / Workshop',
+      description: 'Grow your workshop, accept online bookings, and build a loyal customer base.',
+      accent: '#10b981',
+      accentLight: 'rgba(16,185,129,0.12)',
+      border: 'rgba(16,185,129,0.3)',
+      cta: 'Register Business',
+      route: '/auth/provider-signup',
+      pill: null,
+    },
+  ]
+
+  const features = [
+    { icon: Calendar, title: 'Instant Booking', body: 'Schedule with verified garages in seconds — no phone calls needed.' },
+    { icon: History,  title: 'Full Service Log',  body: 'Every job, every part, every date — your vehicle history always on hand.' },
+    { icon: Bell,     title: 'Smart Reminders', body: "We'll ping you before your next service is due so you never fall behind." },
+    { icon: Shield,   title: 'Verified Providers', body: 'Every workshop is vetted and rated by real customers before listing.' },
+    { icon: Zap,      title: 'Real-time Updates', body: 'Live status from drop-off to collection. Know exactly when your car is ready.' },
+    { icon: Building2,title: 'Fleet Control',  body: 'Full visibility across every company vehicle — mileage, spend, bookings.' },
+  ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
-      {/* Header */}
-      <header className="bg-white/10 backdrop-blur-md border-b border-white/20">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <Car className="text-white mr-2" size={32} />
-            <h1 className="text-2xl font-bold text-white">GariCare</h1>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+        .gc-root { font-family: 'DM Sans', sans-serif; }
+        .gc-display { font-family: 'Syne', sans-serif; }
+
+        .gc-btn-primary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 12px 24px; border-radius: 10px;
+          font-weight: 500; font-size: 14px; cursor: pointer;
+          transition: all 0.2s ease; border: none; outline: none;
+        }
+        .gc-btn-primary:hover { transform: translateY(-1px); }
+
+        .role-card {
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 20px;
+          padding: 32px 28px;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(12px);
+        }
+        .role-card::before {
+          content: '';
+          position: absolute; inset: 0;
+          background: var(--card-accent-light);
+          opacity: 0;
+          transition: opacity 0.25s ease;
+          border-radius: 20px;
+        }
+        .role-card:hover::before { opacity: 1; }
+        .role-card:hover {
+          border-color: var(--card-border);
+          transform: translateY(-4px);
+          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .feat-card {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 16px;
+          padding: 24px;
+          transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .feat-card:hover {
+          background: rgba(255,255,255,0.07);
+          border-color: rgba(255,255,255,0.15);
+        }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.7s ease both; }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+
+        @keyframes float {
+          0%,100% { transform: translateY(0px) rotate(-6deg); }
+          50%      { transform: translateY(-18px) rotate(-6deg); }
+        }
+        .float-car { animation: float 6s ease-in-out infinite; }
+
+        .pill {
+          display: inline-block;
+          padding: 2px 10px;
+          border-radius: 99px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+      `}</style>
+
+      <div className="gc-root" style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 35%, #2563eb 60%, #4338ca 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+
+        {/* Animated grid canvas */}
+        <canvas ref={canvasRef} style={{
+          position: 'fixed', inset: 0, width: '100%', height: '100%',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
+        {/* Radial glow */}
+        <div style={{
+          position: 'fixed', top: '-20%', right: '-10%',
+          width: '600px', height: '600px',
+          background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+        <div style={{
+          position: 'fixed', bottom: '-20%', left: '-10%',
+          width: '500px', height: '500px',
+          background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
+        {/* ── NAV ── */}
+        <nav style={{
+          position: 'relative', zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 48px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(8px)',
+          background: 'rgba(255,255,255,0.03)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: 'rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Car size={20} color="#fff" />
+            </div>
+            <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+              GariCare
+            </span>
+          </div>
+
+          <button
+            onClick={() => router.push('/auth/login')}
+            className="gc-btn-primary"
+            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
+          >
+            Sign In <ArrowRight size={15} />
+          </button>
+        </nav>
+
+        {/* ── HERO ── */}
+        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '72px 24px 40px' }}>
+
+          {/* Floating car illustration */}
+          <div className="float-car" style={{
+            position: 'absolute', top: 0, right: '8%',
+            opacity: 0.07, pointerEvents: 'none',
+          }}>
+            <Car size={260} color="#fff" />
+          </div>
+
+          <div className="fade-up" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 99, padding: '6px 16px', marginBottom: 28,
+          }}>
+            <Zap size={13} color="#93c5fd" />
+            <span style={{ fontSize: 12, color: '#bfdbfe', fontWeight: 500, letterSpacing: '0.04em' }}>
+              Kenya's #1 Vehicle Care Platform
+            </span>
+          </div>
+
+          <h1 className="gc-display fade-up delay-1" style={{
+            fontSize: 'clamp(42px, 7vw, 80px)',
+            fontWeight: 800,
+            color: '#fff',
+            lineHeight: 1.05,
+            letterSpacing: '-0.03em',
+            marginBottom: 24,
+          }}>
+            Your Vehicle,<br />
+            <span style={{ color: '#93c5fd' }}>Perfectly Cared For.</span>
+          </h1>
+
+          <p className="fade-up delay-2" style={{
+            fontSize: 18, color: 'rgba(255,255,255,0.65)',
+            maxWidth: 520, margin: '0 auto 56px',
+            lineHeight: 1.7, fontWeight: 300,
+          }}>
+            Connect with verified garages, manage your fleet, and stay on top of every service — all in one place.
+          </p>
+
+          {/* ── ROLE CARDS ── */}
+          <div className="fade-up delay-3" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 20, maxWidth: 900, margin: '0 auto 80px',
+          }}>
+            {roles.map((role) => {
+              const Icon = role.icon
+              return (
+                <div
+                  key={role.label}
+                  className="role-card"
+                  style={{
+                    '--card-accent-light': role.accentLight,
+                    '--card-border': role.border,
+                  }}
+                  onClick={() => router.push(role.route)}
+                >
+                  {role.pill && (
+                    <div style={{ marginBottom: 16 }}>
+                      <span className="pill" style={{ background: role.accentLight, color: role.accent, border: `1px solid ${role.border}` }}>
+                        {role.pill}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 14,
+                    background: role.accentLight,
+                    border: `1px solid ${role.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 18,
+                  }}>
+                    <Icon size={24} color={role.accent} />
+                  </div>
+
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                    {role.sub}
+                  </p>
+                  <h3 className="gc-display" style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 10 }}>
+                    {role.label}
+                  </h3>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, marginBottom: 24 }}>
+                    {role.description}
+                  </p>
+
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: role.accent }}>
+                      {role.cta}
+                    </span>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: role.accentLight, border: `1px solid ${role.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <ArrowRight size={15} color={role.accent} />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
-      </header>
 
-      {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
-          Your Vehicle,<br />Our Priority
-        </h2>
-        <p className="text-xl text-blue-100 mb-12 max-w-2xl mx-auto">
-          Connect with trusted service providers, manage your fleet, and keep your vehicles running smoothly.
-        </p>
-
-        {/* User Type Selection */}
-        <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6 mb-8">
-          {/* VEHICLE OWNER CARD */}
-          <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <User className="text-blue-600" size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Vehicle Owner</h3>
-            <p className="text-gray-600 mb-6">Book services, track maintenance, and manage your vehicles</p>
-            
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/auth/signup?type=normal')}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-medium"
-              >
-                Sign Up
-              </button>
-              <button
-                onClick={() => router.push('/auth/login')}
-                className="w-full bg-white border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 transition font-medium flex items-center justify-center"
-              >
-                <LogIn size={18} className="mr-2" />
-                Sign In
-              </button>
-            </div>
+        {/* ── FEATURES ── */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          maxWidth: 1000, margin: '0 auto',
+          padding: '0 24px 80px',
+        }}>
+          <div className="fade-up delay-4" style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+              Why GariCare
+            </p>
+            <h2 className="gc-display" style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+              Everything your vehicle needs
+            </h2>
           </div>
 
-          {/* SERVICE PROVIDER CARD */}
-          <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Wrench className="text-green-600" size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Service Provider</h3>
-            <p className="text-gray-600 mb-6">Register your garage and connect with customers</p>
-            
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/auth/provider-signup')}
-                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-medium"
-              >
-                Register Business
-              </button>
-              <button
-                onClick={() => router.push('/auth/login')}
-                className="w-full bg-white border-2 border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition font-medium flex items-center justify-center"
-              >
-                <LogIn size={18} className="mr-2" />
-                Sign In
-              </button>
-            </div>
-          </div>
-
-          {/* COMPANY FLEET CARD - UPDATED */}
-          <div className="bg-white rounded-2xl p-8 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="text-purple-600" size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Company Fleet</h3>
-            <p className="text-gray-600 mb-6">Manage your company vehicles and maintenance</p>
-            
-            <div className="space-y-2">
-              {/* CHANGED: Direct to /auth/company-signup (matches provider pattern) */}
-              <button
-                onClick={() => router.push('/auth/company-signup')}
-                className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-medium"
-              >
-                Register Company
-              </button>
-              <button
-                onClick={() => router.push('/auth/login')}
-                className="w-full bg-white border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg hover:bg-purple-50 transition font-medium flex items-center justify-center"
-              >
-                <LogIn size={18} className="mr-2" />
-                Sign In
-              </button>
-            </div>
+          <div className="fade-up delay-5" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 16,
+          }}>
+            {features.map((f) => {
+              const Icon = f.icon
+              return (
+                <div key={f.title} className="feat-card">
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    background: 'rgba(255,255,255,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 14,
+                  }}>
+                    <Icon size={18} color="rgba(255,255,255,0.7)" />
+                  </div>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 6 }}>{f.title}</h4>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.65 }}>{f.body}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
 
-        {/* Features */}
-        <div className="max-w-3xl mx-auto bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
-          <div className="grid md:grid-cols-3 gap-6 text-white">
-            <div>
-              <Calendar className="mx-auto mb-3" size={32} />
-              <h4 className="font-semibold mb-2">Easy Booking</h4>
-              <p className="text-sm text-blue-100">Schedule services with verified providers</p>
-            </div>
-            <div>
-              <History className="mx-auto mb-3" size={32} />
-              <h4 className="font-semibold mb-2">Service History</h4>
-              <p className="text-sm text-blue-100">Track all your vehicle maintenance</p>
-            </div>
-            <div>
-              <Bell className="mx-auto mb-3" size={32} />
-              <h4 className="font-semibold mb-2">Smart Reminders</h4>
-              <p className="text-sm text-blue-100">Never miss scheduled maintenance</p>
-            </div>
+        {/* ── FOOTER ── */}
+        <footer style={{
+          position: 'relative', zIndex: 1,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          padding: '24px 48px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Car size={16} color="rgba(255,255,255,0.3)" />
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>GariCare</span>
           </div>
-        </div>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
+            © {new Date().getFullYear()} GariCare. Built for Kenyan roads.
+          </p>
+        </footer>
       </div>
-    </div>
+    </>
   )
 }
