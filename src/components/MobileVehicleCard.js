@@ -1,3 +1,5 @@
+'use client'
+
 import { useRouter } from 'next/navigation'
 
 export default function MobileVehicleCard({ vehicle }) {
@@ -28,4 +30,4 @@ export default function MobileVehicleCard({ vehicle }) {
       <p className="mt-2 text-xs text-gray-400">Tap to view, edit or delete</p>
     </div>
   )
-}s
+}
