@@ -29,18 +29,33 @@ export default function DashboardPage() {
     totalSpent: 0
   })
 
+  // ── DEBUG STATE ──────────────────────────────────────────────────────────
+  const [debugLog, setDebugLog] = useState([])
+  const [showDebug, setShowDebug] = useState(false)
+
+  const log = (step, status, detail = '') => {
+    const entry = { time: new Date().toISOString().slice(11,23), step, status, detail }
+    console.log(`[DEBUG] ${entry.time} | ${step} | ${status}`, detail)
+    setDebugLog(prev => [...prev, entry])
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     const fetchData = async () => {
       try {
+        log('init', 'started')
+
         // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         
         if (userError || !user) {
+          log('auth', 'FAIL', userError?.message || 'no user returned')
           console.error('User error:', userError)
           router.push('/auth/login')
           return
         }
 
+        log('auth', 'ok', `uid=${user.id} email=${user.email}`)
         setUser(user)
 
         // Step 1: Get or create user profile
@@ -51,9 +66,15 @@ export default function DashboardPage() {
           .eq('auth_user_id', user.id)
           .maybeSingle()
 
+        if (profileFetchError) {
+          log('profile_fetch', 'FAIL', profileFetchError.message)
+        }
+
         if (existingProfile) {
+          log('profile_fetch', 'ok', `profile_id=${existingProfile.id}`)
           userProfile = existingProfile
         } else {
+          log('profile_fetch', 'not_found — attempting create')
           // Create profile if doesn't exist
           const { data: newProfile, error: createError } = await supabase
             .from('user_profiles')
@@ -67,14 +88,17 @@ export default function DashboardPage() {
             .single()
 
           if (createError) {
+            log('profile_create', 'FAIL', createError.message)
             console.error('Error creating profile:', createError)
             setLoading(false)
             return
           }
+          log('profile_create', 'ok', `profile_id=${newProfile?.id}`)
           userProfile = newProfile
         }
 
         if (!userProfile) {
+          log('profile', 'FAIL', 'null after fetch+create')
           console.error('No user profile found')
           setLoading(false)
           return
@@ -87,13 +111,17 @@ export default function DashboardPage() {
           .eq('owner_user_id', userProfile.id)
 
         if (ownershipError) {
+          log('ownership_fetch', 'FAIL', ownershipError.message)
           console.error('Ownership error:', ownershipError)
           setVehicles([])
           setLoading(false)
           return
         }
 
+        log('ownership_fetch', 'ok', `count=${ownerships?.length ?? 0}`)
+
         if (!ownerships || ownerships.length === 0) {
+          log('vehicles', 'none', 'no ownership records found')
           setVehicles([])
           setStats(prev => ({ ...prev, totalVehicles: 0 }))
           setLoading(false)
@@ -102,6 +130,8 @@ export default function DashboardPage() {
 
         // Step 3: Get vehicle details
         const vehicleIds = ownerships.map(o => o.vehicle_id)
+        log('vehicles_fetch', 'started', `ids=${vehicleIds.join(',')}`)
+
         const { data: vehiclesData, error: vehiclesError } = await supabase
           .from('vehicles')
           .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at')
@@ -109,9 +139,11 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false })
 
         if (vehiclesError) {
+          log('vehicles_fetch', 'FAIL', vehiclesError.message)
           console.error('Vehicles error:', vehiclesError)
           setVehicles([])
         } else {
+          log('vehicles_fetch', 'ok', `count=${vehiclesData?.length ?? 0}`)
           // Map year_of_manufacture to year for display
           const mappedVehicles = (vehiclesData || []).map(v => ({
             ...v,
@@ -124,7 +156,10 @@ export default function DashboardPage() {
           }))
         }
 
+        log('init', 'complete')
+
       } catch (error) {
+        log('fetchData', 'UNCAUGHT_ERROR', error?.message || String(error))
         console.error('Error fetching data:', error)
       } finally {
         setLoading(false)
@@ -225,6 +260,8 @@ export default function DashboardPage() {
                 <MobileVehicleCard
                   key={vehicle.id}
                   vehicle={vehicle}
+                  onDelete={handleDeleteVehicle}
+                  onBook={() => router.push('/dashboard/bookings')}
                 />
               ))}
             </div>
@@ -305,11 +342,7 @@ export default function DashboardPage() {
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               {vehicles.map(vehicle => (
-                <div
-                  key={vehicle.id}
-                  onClick={() => router.push(`/dashboard/vehicles/${vehicle.id}`)}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition cursor-pointer"
-                >
+                <div key={vehicle.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h4 className="font-bold text-lg text-gray-800">{vehicle.plate_number}</h4>
@@ -319,14 +352,28 @@ export default function DashboardPage() {
                       {vehicle.year}
                     </div>
                   </div>
-
+                  
                   <div className="flex items-center text-sm text-gray-600 mb-4">
                     <span className="mr-4">Color: {vehicle.color}</span>
                     {vehicle.vin && <span className="text-xs">VIN: {vehicle.vin}</span>}
                   </div>
 
-                  <div className="flex items-center gap-1 text-xs text-blue-500 font-medium">
-                    <span>View details, edit or delete →</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => router.push('/dashboard/bookings')}
+                      className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100 transition font-medium flex items-center justify-center"
+                    >
+                      <Calendar size={18} className="mr-2" />
+                      Book Service
+                    </button>
+                    
+                    <button 
+                      onClick={() => handleDeleteVehicle(vehicle.id)}
+                      className="bg-red-50 text-red-600 p-2 rounded-lg hover:bg-red-100 transition"
+                      title="Delete vehicle"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -372,6 +419,67 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+
+    {/* ── DEBUG PANEL ── Remove this block once issue is identified ── */}
+    <div style={{
+      position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
+      fontFamily: 'monospace', fontSize: 12,
+    }}>
+      <button
+        onClick={() => setShowDebug(v => !v)}
+        style={{
+          background: debugLog.some(e => e.status.includes('FAIL') || e.status.includes('ERROR'))
+            ? '#ef4444' : '#1d4ed8',
+          color: '#fff', border: 'none', borderRadius: 8,
+          padding: '6px 14px', cursor: 'pointer', fontWeight: 700,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        }}
+      >
+        🐛 DEBUG {debugLog.length > 0 ? `(${debugLog.length})` : ''}
+        {debugLog.some(e => e.status.includes('FAIL') || e.status.includes('ERROR')) ? ' ⚠️' : ''}
+      </button>
+
+      {showDebug && (
+        <div style={{
+          position: 'absolute', bottom: 40, right: 0,
+          width: 480, maxHeight: 400, overflowY: 'auto',
+          background: '#0f172a', color: '#e2e8f0',
+          borderRadius: 12, padding: 16,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          border: '1px solid #334155',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontWeight: 700, color: '#93c5fd' }}>Dashboard Debug Log</span>
+            <button onClick={() => setDebugLog([])} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              Clear
+            </button>
+          </div>
+          {debugLog.length === 0 && (
+            <p style={{ color: '#64748b' }}>No log entries yet — loading...</p>
+          )}
+          {debugLog.map((entry, i) => (
+            <div key={i} style={{
+              padding: '4px 0',
+              borderBottom: '1px solid #1e293b',
+              color: entry.status.includes('FAIL') || entry.status.includes('ERROR')
+                ? '#f87171'
+                : entry.status === 'ok' || entry.status === 'complete'
+                  ? '#4ade80'
+                  : '#fbbf24',
+            }}>
+              <span style={{ color: '#475569' }}>{entry.time} </span>
+              <span style={{ color: '#93c5fd' }}>[{entry.step}] </span>
+              <span style={{ fontWeight: 600 }}>{entry.status}</span>
+              {entry.detail && (
+                <span style={{ color: '#94a3b8' }}> — {String(entry.detail).slice(0, 120)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+    {/* ── END DEBUG PANEL ── */}
+
     </>
   )
 }
