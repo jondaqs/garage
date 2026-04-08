@@ -1,5 +1,4 @@
 // src/app/dashboard/company/[companyId]/fleet/add/page.js
-// Add a vehicle to a specific company fleet — accessible by company owner or admin
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -7,17 +6,19 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle, CheckCircle, Truck } from 'lucide-react'
 
+// ✅ Client outside component — preserves session across renders
+const supabase = createClient()
+
 export default function AddCompanyFleetVehiclePage() {
   const { companyId } = useParams()
   const router = useRouter()
-  const supabase = createClient()
 
-  const [loading, setLoading]     = useState(false)
-  const [checking, setChecking]   = useState(true)  // auth/permission check
-  const [error, setError]         = useState('')
-  const [success, setSuccess]     = useState('')
   const [profileId, setProfileId] = useState(null)
   const [isAdmin, setIsAdmin]     = useState(false)
+  const [checking, setChecking]   = useState(true)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState('')
+  const [success, setSuccess]     = useState('')
 
   const [form, setForm] = useState({
     plateNumber: '',
@@ -48,7 +49,7 @@ export default function AddCompanyFleetVehiclePage() {
       }
       setProfileId(profile.id)
 
-      // Is this user the company owner?
+      // Company owner?
       const { data: owned } = await supabase
         .from('company_profiles')
         .select('id')
@@ -62,7 +63,7 @@ export default function AddCompanyFleetVehiclePage() {
         return
       }
 
-      // Is this user an active admin member?
+      // Active admin member?
       const { data: membership } = await supabase
         .from('company_users')
         .select('is_admin')
@@ -80,16 +81,17 @@ export default function AddCompanyFleetVehiclePage() {
     }
 
     checkPermission()
-  }, [companyId]) // eslint-disable-line
+  }, [companyId, router])
 
-  // ── Form submit ───────────────────────────────────────────────────────────
+  const field = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     setSuccess('')
 
-    // Basic plate validation (Kenya format)
     const kenyaPlate = /^[A-Z]{3}\s?\d{3}[A-Z]?$/i
     if (!kenyaPlate.test(form.plateNumber.trim())) {
       setError('Invalid plate number format. Expected e.g. KAA 123A')
@@ -100,7 +102,7 @@ export default function AddCompanyFleetVehiclePage() {
     try {
       const plate = form.plateNumber.trim().toUpperCase()
 
-      // 1. Check for duplicate plate
+      // Duplicate plate check
       const { data: existing } = await supabase
         .from('vehicles')
         .select('id')
@@ -113,56 +115,24 @@ export default function AddCompanyFleetVehiclePage() {
         return
       }
 
-      // 2. Insert vehicle
-      const { data: vehicle, error: vErr } = await supabase
-        .from('vehicles')
-        .insert({
-          plate_number:       plate,
-          make:               form.make,
-          model:              form.model,
-          year_of_manufacture: form.year ? parseInt(form.year) : null,
-          color:              form.color || null,
-          vin:                form.vin   ? form.vin.toUpperCase() : null,
-        })
-        .select()
-        .single()
+      // Single atomic RPC — inserts vehicle + ownership (+ optional mileage history)
+      // SECURITY DEFINER sidesteps the RLS chicken-and-egg
+      const { error: rpcError } = await supabase.rpc('add_fleet_vehicle_with_ownership', {
+        p_plate_number:        plate,
+        p_make:                form.make,
+        p_model:               form.model,
+        p_year_of_manufacture: form.year ? parseInt(form.year) : null,
+        p_color:               form.color || null,
+        p_vin:                 form.vin.trim() || null,
+        p_mileage:             form.mileage ? parseInt(form.mileage) : null,
+        p_owner_user_id:       profileId,
+        p_owner_company_id:    companyId,
+      })
 
-      if (vErr) throw vErr
-
-      // 3. Create company ownership
-      //    NOTE: owner_user_id must also be set so the allow_insert_ownership
-      //    policy (which checks owner_user_id = current user) is satisfied.
-      //    company_owner_add_fleet and company_admins_add_fleet check owner_company_id.
-      //    Both policies are PERMISSIVE so satisfying either one is enough,
-      //    BUT owner_user_id is NOT NULL-constrained — we still pass it for
-      //    audit purposes and to satisfy the ownership_insert_simple policy.
-      const { error: oErr } = await supabase
-        .from('vehicle_ownership')
-        .insert({
-          vehicle_id:       vehicle.id,
-          owner_company_id: companyId,
-          owner_user_id:    profileId,   // links the registering user for audit
-        })
-
-      if (oErr) {
-        // Roll back the orphaned vehicle row
-        await supabase.from('vehicles').delete().eq('id', vehicle.id)
-        throw oErr
-      }
-
-      // 4. Optional: record initial mileage
-      if (form.mileage && parseInt(form.mileage) > 0) {
-        await supabase.from('vehicle_history').insert({
-          vehicle_id:  vehicle.id,
-          mileage:     parseInt(form.mileage),
-          recorded_at: new Date().toISOString(),
-        })
-      }
+      if (rpcError) throw rpcError
 
       setSuccess('Vehicle added to fleet successfully!')
-      setTimeout(() => {
-        router.push(`/dashboard/company/${companyId}/fleet`)
-      }, 1800)
+      setTimeout(() => router.push(`/dashboard/company/${companyId}/fleet`), 1800)
 
     } catch (err) {
       console.error('Add fleet vehicle error:', err)
@@ -172,9 +142,7 @@ export default function AddCompanyFleetVehiclePage() {
     }
   }
 
-  const field = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
-
-  // ── Render: loading / error states ───────────────────────────────────────
+  // ── Loading / access denied states ───────────────────────────────────────
   if (checking) {
     return (
       <div className="flex justify-center items-center py-24">
@@ -191,10 +159,7 @@ export default function AddCompanyFleetVehiclePage() {
           <div>
             <p className="font-semibold text-red-800">Access Denied</p>
             <p className="text-red-600 text-sm mt-1">{error}</p>
-            <button
-              onClick={() => router.back()}
-              className="mt-3 text-sm text-red-700 underline"
-            >
+            <button onClick={() => router.back()} className="mt-3 text-sm text-red-700 underline">
               Go back
             </button>
           </div>
@@ -240,7 +205,6 @@ export default function AddCompanyFleetVehiclePage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Plate */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Plate Number <span className="text-red-500">*</span>
@@ -256,7 +220,6 @@ export default function AddCompanyFleetVehiclePage() {
             />
           </div>
 
-          {/* Make / Model */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -292,7 +255,6 @@ export default function AddCompanyFleetVehiclePage() {
             </div>
           </div>
 
-          {/* Year / Color */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -320,7 +282,6 @@ export default function AddCompanyFleetVehiclePage() {
             </div>
           </div>
 
-          {/* VIN / Mileage */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -350,7 +311,6 @@ export default function AddCompanyFleetVehiclePage() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
               type="button"
