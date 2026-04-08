@@ -85,6 +85,10 @@ export default function AddVehiclePage() {
 
       console.log('Inserting vehicle:', vehicleData)
 
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('Session token:', session?.access_token ? 'EXISTS' : 'MISSING')
+      console.log('User:', user?.id)
+
       const { data: newVehicle, error: vehicleError } = await supabase
         .from('vehicles')
         .insert([vehicleData])
