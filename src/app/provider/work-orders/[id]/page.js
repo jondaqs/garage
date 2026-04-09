@@ -103,7 +103,7 @@ export default function WorkOrderDetailPage() {
               specialization,
               user:user_profiles(first_name, last_name, phone)
             ),
-            booking:bookings(booking_number, customer_user_id,
+            booking:bookings!booking_id(booking_number, customer_user_id,
               customer:user_profiles!customer_user_id(first_name, last_name, phone, email)
             )
           `)

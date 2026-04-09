@@ -110,8 +110,8 @@ async function sendWalkInInviteEmail({
   const appUrl         = process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
   const mailjetApiKey  = process.env.MAILJET_API_KEY
   const mailjetSecret  = process.env.MAILJET_SECRET_KEY
-  const fromEmail      = process.env.MAILJET_FROM_EMAIL || 'noreply@garicare.com'
-  const fromName       = process.env.MAILJET_FROM_NAME  || 'GariCare'
+  const fromEmail      = process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com'
+  const fromName       = process.env.MAILJET_FROM_NAME  || 'Motiifix'
 
   if (!mailjetApiKey || !mailjetSecret) {
     // Queue for later and throw so caller can warn
