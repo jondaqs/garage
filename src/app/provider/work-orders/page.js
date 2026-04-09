@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import {
+import { Plus,
   ClipboardList, Search, Filter, ChevronRight,
   Car, Calendar, AlertCircle, Clock
 } from 'lucide-react'
@@ -116,6 +116,12 @@ export default function ProviderWorkOrdersPage() {
             {workOrders.length} total · {activeCount} active
           </p>
         </div>
+        <button
+          onClick={() => router.push('/provider/work-orders/new')}
+          className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex-shrink-0"
+        >
+          <Plus size={18} /> New Walk-In Work Order
+        </button>
       </div>
 
       {error && (
