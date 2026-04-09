@@ -1,33 +1,67 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { 
-  LayoutDashboard, Calendar, Users, Package, FileText, 
-  BarChart3, Settings, Store, Bell, LogOut 
+import { useEffect, useState } from 'react'
+import {
+  LayoutDashboard, Calendar, Users, Package, FileText,
+  BarChart3, Settings, Store, Bell, LogOut
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ProviderSidebar({ provider }) {
   const pathname = usePathname()
-  const router = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
+  const [activeWoCount, setActiveWoCount] = useState(0)
+
+  useEffect(() => {
+    if (provider?.id) loadActiveWoCount(provider.id)
+  }, [provider?.id])
+
+  const loadActiveWoCount = async (providerId) => {
+    try {
+      const { count } = await supabase
+        .from('work_orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_provider_id', providerId)
+        .in('status_id', await getActiveStatusIds())
+      setActiveWoCount(count || 0)
+    } catch {}
+  }
+
+  const getActiveStatusIds = async () => {
+    const { data } = await supabase
+      .from('work_order_statuses')
+      .select('id')
+      .not('code', 'in', '(completed,cancelled,closed)')
+    return data?.map(s => s.id) || []
+  }
 
   const navigation = [
-    { name: 'Dashboard', href: '/provider/dashboard', icon: LayoutDashboard },
-    { name: 'Bookings', href: '/provider/bookings', icon: Calendar },
-    { name: 'My Shops', href: '/provider/shops', icon: Store },
-    { name: 'Team Members', href: '/provider/team', icon: Users },
-    { name: 'Inventory', href: '/provider/inventory', icon: Package },
-    { name: 'Work Orders', href: '/provider/work-orders', icon: FileText },
-    { name: 'Analytics', href: '/provider/analytics', icon: BarChart3 },
+    { name: 'Dashboard',     href: '/provider/dashboard',   icon: LayoutDashboard },
+    { name: 'Bookings',      href: '/provider/bookings',    icon: Calendar },
+    {
+      name: 'Work Orders',
+      href: '/provider/work-orders',
+      icon: FileText,
+      badge: activeWoCount > 0 ? activeWoCount : null
+    },
+    { name: 'My Shops',      href: '/provider/shops',       icon: Store },
+    { name: 'Team Members',  href: '/provider/team',        icon: Users },
+    { name: 'Inventory',     href: '/provider/inventory',   icon: Package },
+    { name: 'Analytics',     href: '/provider/analytics',   icon: BarChart3 },
     { name: 'Notifications', href: '/provider/notifications', icon: Bell },
-    { name: 'Settings', href: '/provider/settings', icon: Settings },
+    { name: 'Settings',      href: '/provider/settings',    icon: Settings },
   ]
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
   }
+
+  // Active if pathname matches exactly or is a sub-route
+  const isActive = (href) =>
+    pathname === href || pathname.startsWith(href + '/')
 
   return (
     <>
@@ -41,7 +75,7 @@ export default function ProviderSidebar({ provider }) {
                 <Store className="text-white" size={24} />
               </div>
               <div className="ml-3">
-                <h2 className="text-lg font-bold text-gray-900">
+                <h2 className="text-lg font-bold text-gray-900 truncate max-w-[140px]">
                   {provider?.name || 'Provider'}
                 </h2>
                 <p className="text-xs text-gray-500 capitalize">
@@ -51,51 +85,51 @@ export default function ProviderSidebar({ provider }) {
             </div>
           </div>
 
-          {/* Status Badge */}
+          {/* Status badges */}
           {provider?.status === 'pending_verification' && (
             <div className="mx-4 mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <p className="text-xs text-yellow-800 font-medium">
-                ⏳ Verification Pending
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                Your application is under review
-              </p>
+              <p className="text-xs text-yellow-800 font-medium">⏳ Verification Pending</p>
+              <p className="text-xs text-yellow-700 mt-1">Your application is under review</p>
             </div>
           )}
-
           {provider?.status === 'active' && provider?.is_verified && (
             <div className="mx-4 mt-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <p className="text-xs text-green-800 font-medium">
-                ✓ Verified Provider
-              </p>
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+              <p className="text-xs text-green-800 font-medium">✓ Verified Provider</p>
             </div>
           )}
 
           {/* Navigation */}
           <nav className="mt-5 flex-1 px-2 space-y-1">
             {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              
+              const Icon     = item.icon
+              const active   = isActive(item.href)
               return (
                 <button
                   key={item.name}
                   onClick={() => router.push(item.href)}
                   className={`
-                    w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors
-                    ${isActive
+                    w-full group flex items-center justify-between px-2 py-2 text-sm font-medium
+                    rounded-md transition-colors
+                    ${active
                       ? 'bg-green-100 text-green-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }
                   `}
                 >
-                  <Icon
-                    className={`mr-3 flex-shrink-0 h-5 w-5 ${
-                      isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-500'
-                    }`}
-                  />
-                  {item.name}
+                  <div className="flex items-center">
+                    <Icon
+                      className={`mr-3 flex-shrink-0 h-5 w-5 ${
+                        active ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-500'
+                      }`}
+                    />
+                    {item.name}
+                  </div>
+                  {item.badge && (
+                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-green-600 rounded-full">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -103,10 +137,7 @@ export default function ProviderSidebar({ provider }) {
 
           {/* Sign Out */}
           <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-            <button
-              onClick={handleSignOut}
-              className="flex-shrink-0 w-full group block"
-            >
+            <button onClick={handleSignOut} className="flex-shrink-0 w-full group block">
               <div className="flex items-center">
                 <LogOut className="inline-block h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                 <div className="ml-3">
