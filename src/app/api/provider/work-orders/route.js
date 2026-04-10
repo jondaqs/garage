@@ -75,6 +75,7 @@ export async function POST(request) {
     // If an invitation was created, send the email
     if (result.invitation_id && walk_in_owner_email) {
       try {
+        console.log('Sending walk-in invite email to:', walk_in_owner_email)
         await sendWalkInInviteEmail({
           toEmail:          walk_in_owner_email,
           ownerName:        walk_in_owner_name,
