@@ -69,6 +69,7 @@ export default function WorkOrderDetailPage() {
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState('')
   const [activeTab, setActiveTab]     = useState('overview')
+  const [sendingEstimate, setSendingEstimate] = useState(false)
   const [estimate, setEstimate]       = useState(null)
 
   // Check-in
@@ -184,6 +185,25 @@ export default function WorkOrderDetailPage() {
       await loadWorkOrder()
     } catch (e) { setError(e.message) }
     finally { setUpdating(false) }
+  }
+
+  // ── Send estimate for approval (calls API route: DB + email + SMS) ──────
+  const handleSendEstimate = async () => {
+    if (!confirm('Send this estimate to the vehicle owner for approval?\nThey will receive an in-app notification, email, and SMS.')) return
+    setSendingEstimate(true); setError(''); setSuccess('')
+    try {
+      const resp = await fetch(`/api/work-orders/${params.id}/send-estimate`, { method: 'POST' })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to send estimate')
+      const channels = [
+        data.email_sent && 'email',
+        data.sms_sent   && 'SMS',
+        'in-app notification'
+      ].filter(Boolean).join(', ')
+      setSuccess(`Estimate sent to owner via ${channels}. Waiting for their decision.`)
+      await loadWorkOrder()
+    } catch (err) { setError(err.message) }
+    finally { setSendingEstimate(false) }
   }
 
   const advanceStatus = async (newStatusCode) => {
@@ -403,13 +423,23 @@ export default function WorkOrderDetailPage() {
               </div>
             )}
 
-            {/* Status advances */}
+            {/* Status advances — intercept 'awaiting_approval' to use API route */}
             {nextActions.map(action => (
-              <button key={action.code} onClick={() => advanceStatus(action.code)} disabled={updating}
-                className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
-                {updating && <Loader2 size={13} className="animate-spin" />}
-                {action.label}
-              </button>
+              action.code === 'awaiting_approval'
+                ? <button key={action.code}
+                    onClick={handleSendEstimate}
+                    disabled={sendingEstimate || updating}
+                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                    {sendingEstimate
+                      ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
+                      : action.label
+                    }
+                  </button>
+                : <button key={action.code} onClick={() => advanceStatus(action.code)} disabled={updating}
+                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                    {updating && <Loader2 size={13} className="animate-spin" />}
+                    {action.label}
+                  </button>
             ))}
           </div>
         </div>

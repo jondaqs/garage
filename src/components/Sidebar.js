@@ -4,8 +4,7 @@ import {
   Car, User, Plus, Calendar, CalendarDays, History,
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
-  AlertCircle,
-} from 'lucide-react'
+  AlertCircle, ClipboardList} from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect } from 'react'
@@ -81,6 +80,7 @@ export default function Sidebar({ user }) {
     { icon: User,        label: 'Dashboard',   path: '/dashboard' },
     { icon: Plus,        label: 'Add Vehicle', path: '/dashboard/vehicles/add' },
     { icon: Calendar,    label: 'Bookings',    path: '/dashboard/bookings' },
+    { icon: ClipboardList, label: 'Work Orders',  path: '/dashboard/work-orders' },
     { icon: CalendarDays,label: 'Calendar',    path: '/dashboard/calendar' },
     { icon: Users,       label: 'My Teams',    path: '/dashboard/my-teams' },
     { icon: History,     label: 'History',     path: '/dashboard/history' },
