@@ -1,0 +1,426 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import {
+  Plus, Trash2, CheckCircle, PlayCircle, SkipForward,
+  AlertCircle, ChevronDown, ChevronUp, Loader2, RefreshCw,
+  Info, DollarSign
+} from 'lucide-react'
+
+const STATUS_STYLES = {
+  pending:     'bg-gray-100 text-gray-600',
+  in_progress: 'bg-orange-100 text-orange-700',
+  completed:   'bg-green-100 text-green-700',
+  skipped:     'bg-gray-100 text-gray-400 line-through',
+  cancelled:   'bg-red-100 text-red-600',
+}
+
+export default function ServicesTab({ workOrder, onEstimateChange }) {
+  const supabase = createClient()
+
+  const [services, setServices]         = useState([])
+  const [allServices, setAllServices]   = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
+  const [error, setError]               = useState('')
+  const [success, setSuccess]           = useState('')
+  const [estimate, setEstimate]         = useState(null)
+  const [seeding, setSeeding]           = useState(false)
+  const [seedDone, setSeedDone]         = useState(false)
+
+  // Add service form
+  const [showAdd, setShowAdd]           = useState(false)
+  const [newService, setNewService]     = useState({
+    service_id: '', estimated_cost: '', notes: ''
+  })
+
+  // Inline edit state per row
+  const [editing, setEditing]           = useState({})   // { [id]: { actual_cost, notes } }
+
+  const hasBooking = !!workOrder.booking_id
+  const isTerminal = ['completed','cancelled','closed'].includes(workOrder.status?.code)
+
+  const loadServices = useCallback(async () => {
+    try {
+      const { data, error: err } = await supabase
+        .from('work_order_services')
+        .select(`
+          id, estimated_cost, actual_cost, notes, started_at, completed_at, sequence_order,
+          status:work_order_services_statuses(code, display_name),
+          service:services(id, name, description),
+          mechanic:mechanics(user:user_profiles(first_name, last_name))
+        `)
+        .eq('work_order_id', workOrder.id)
+        .order('sequence_order', { ascending: true })
+
+      if (err) throw err
+      setServices(data || [])
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [workOrder.id])
+
+  const loadAllServices = useCallback(async () => {
+    const { data } = await supabase
+      .from('services')
+      .select('id, name')
+      .order('name')
+    setAllServices(data || [])
+  }, [])
+
+  const refreshEstimate = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data } = await supabase.rpc('calculate_work_order_estimate', {
+        p_work_order_id:    workOrder.id,
+        p_provider_user_id: user.id,
+      })
+      if (data?.success) {
+        setEstimate(data)
+        onEstimateChange?.(data)
+      }
+    } catch {}
+  }, [workOrder.id])
+
+  useEffect(() => {
+    loadServices()
+    loadAllServices()
+    refreshEstimate()
+  }, [loadServices, loadAllServices, refreshEstimate])
+
+  // Auto-seed from booking on first open
+  useEffect(() => {
+    if (hasBooking && !seedDone && !loading && services.length === 0) {
+      handleSeedFromBooking(true)
+    }
+  }, [hasBooking, loading, services.length, seedDone])
+
+  const handleSeedFromBooking = async (silent = false) => {
+    if (!silent) setSeeding(true)
+    setError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error: rpcErr } = await supabase.rpc('seed_services_from_booking', {
+        p_work_order_id:    workOrder.id,
+        p_provider_user_id: user.id,
+      })
+      if (rpcErr) throw rpcErr
+      setSeedDone(true)
+      if (data.imported > 0) {
+        setSuccess(`${data.imported} service${data.imported > 1 ? 's' : ''} imported from booking`)
+        await loadServices()
+        await refreshEstimate()
+      }
+    } catch (e) {
+      if (!silent) setError(e.message)
+    } finally {
+      setSeeding(false)
+    }
+  }
+
+  const handleAddService = async () => {
+    if (!newService.service_id) { setError('Select a service'); return }
+    setSaving(true)
+    setError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error: rpcErr } = await supabase.rpc('add_work_order_service', {
+        p_work_order_id:    workOrder.id,
+        p_service_id:       newService.service_id,
+        p_estimated_cost:   newService.estimated_cost ? parseFloat(newService.estimated_cost) : null,
+        p_notes:            newService.notes || null,
+        p_provider_user_id: user.id,
+      })
+      if (rpcErr) throw rpcErr
+      if (!data.success) throw new Error(data.error)
+      setNewService({ service_id: '', estimated_cost: '', notes: '' })
+      setShowAdd(false)
+      setSuccess('Service added')
+      await loadServices()
+      await refreshEstimate()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleUpdateStatus = async (wosId, newStatus, actualCost = null) => {
+    setSaving(true)
+    setError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const editData = editing[wosId] || {}
+      const { data, error: rpcErr } = await supabase.rpc('update_work_order_service_status', {
+        p_wos_id:           wosId,
+        p_new_status_code:  newStatus,
+        p_provider_user_id: user.id,
+        p_actual_cost:      actualCost ?? (editData.actual_cost ? parseFloat(editData.actual_cost) : null),
+        p_notes:            editData.notes || null,
+      })
+      if (rpcErr) throw rpcErr
+      if (!data.success) throw new Error(data.error)
+      setEditing(e => { const n = { ...e }; delete n[wosId]; return n })
+      setSuccess('Service updated')
+      await loadServices()
+      await refreshEstimate()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const fmt = (n) => n != null ? `KES ${Number(n).toLocaleString()}` : '—'
+
+  if (loading) return (
+    <div className="flex justify-center py-12">
+      <Loader2 className="animate-spin text-gray-400" size={28} />
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Alerts */}
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm">
+          <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+          <span className="text-red-700">{error}</span>
+        </div>
+      )}
+      {success && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2 text-sm">
+          <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+          <span className="text-green-700">{success}</span>
+        </div>
+      )}
+
+      {/* Booking seed banner */}
+      {hasBooking && services.length === 0 && seedDone && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-blue-800">
+            <Info size={15} />
+            No services from the linked booking were found, or they were already imported.
+          </div>
+          <button onClick={() => handleSeedFromBooking(false)} disabled={seeding}
+            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1">
+            {seeding ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            Re-import
+          </button>
+        </div>
+      )}
+
+      {hasBooking && services.length > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-blue-700 flex items-center gap-1">
+            <Info size={12} /> Services seeded from booking #{workOrder.booking?.booking_number}
+          </p>
+          <button onClick={() => handleSeedFromBooking(false)} disabled={seeding}
+            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+            {seeding ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            Sync from booking
+          </button>
+        </div>
+      )}
+
+      {/* Services list */}
+      {services.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <p className="text-sm">No services added yet.</p>
+          {!isTerminal && (
+            <button onClick={() => setShowAdd(true)}
+              className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
+              + Add the first service
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {services.map((svc) => {
+            const statusCode = svc.status?.code || 'pending'
+            const isEditing  = !!editing[svc.id]
+            return (
+              <div key={svc.id}
+                className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div className="flex items-start gap-3 p-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <p className="font-medium text-gray-900 text-sm">{svc.service?.name}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[statusCode] || STATUS_STYLES.pending}`}>
+                        {svc.status?.display_name || statusCode}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                      <span>Est: {fmt(svc.estimated_cost)}</span>
+                      {svc.actual_cost != null && (
+                        <span className="text-green-700 font-medium">Actual: {fmt(svc.actual_cost)}</span>
+                      )}
+                      {svc.mechanic?.user && (
+                        <span>
+                          {svc.mechanic.user.first_name} {svc.mechanic.user.last_name}
+                        </span>
+                      )}
+                    </div>
+                    {svc.notes && !isEditing && (
+                      <p className="text-xs text-gray-500 mt-1 italic">{svc.notes}</p>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  {!isTerminal && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {statusCode === 'pending' && (
+                        <button onClick={() => handleUpdateStatus(svc.id, 'in_progress')}
+                          disabled={saving}
+                          className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg" title="Start">
+                          <PlayCircle size={16} />
+                        </button>
+                      )}
+                      {statusCode === 'in_progress' && (
+                        <button onClick={() => setEditing(e => ({
+                          ...e,
+                          [svc.id]: { actual_cost: svc.actual_cost || '', notes: svc.notes || '' }
+                        }))}
+                          disabled={saving}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg" title="Complete">
+                          <CheckCircle size={16} />
+                        </button>
+                      )}
+                      {['pending','in_progress'].includes(statusCode) && (
+                        <button onClick={() => handleUpdateStatus(svc.id, 'skipped')}
+                          disabled={saving}
+                          className="p-1.5 text-gray-400 hover:bg-gray-50 rounded-lg" title="Skip">
+                          <SkipForward size={16} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Inline complete form */}
+                {isEditing && (
+                  <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-2">
+                    <p className="text-xs font-medium text-gray-700">Complete service</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Actual Cost (KES)</label>
+                        <input type="number"
+                          value={editing[svc.id]?.actual_cost}
+                          onChange={e => setEditing(ed => ({ ...ed, [svc.id]: { ...ed[svc.id], actual_cost: e.target.value } }))}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Notes</label>
+                        <input type="text"
+                          value={editing[svc.id]?.notes}
+                          onChange={e => setEditing(ed => ({ ...ed, [svc.id]: { ...ed[svc.id], notes: e.target.value } }))}
+                          placeholder="Optional"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleUpdateStatus(svc.id, 'completed')}
+                        disabled={saving}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50">
+                        {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                        Mark Complete
+                      </button>
+                      <button onClick={() => setEditing(e => { const n = { ...e }; delete n[svc.id]; return n })}
+                        className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-xs">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Add service */}
+      {!isTerminal && (
+        <div>
+          {!showAdd ? (
+            <button onClick={() => setShowAdd(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
+              <Plus size={16} /> Add Service
+            </button>
+          ) : (
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
+              <p className="text-sm font-medium text-gray-700">Add service</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="text-xs text-gray-500 block mb-1">Service *</label>
+                  <select value={newService.service_id}
+                    onChange={e => setNewService(s => ({ ...s, service_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500">
+                    <option value="">Select service...</option>
+                    {allServices.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Estimated Cost (KES)</label>
+                  <input type="number" value={newService.estimated_cost}
+                    onChange={e => setNewService(s => ({ ...s, estimated_cost: e.target.value }))}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Notes</label>
+                  <input type="text" value={newService.notes}
+                    onChange={e => setNewService(s => ({ ...s, notes: e.target.value }))}
+                    placeholder="Optional"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleAddService} disabled={saving || !newService.service_id}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  Add
+                </button>
+                <button onClick={() => { setShowAdd(false); setNewService({ service_id: '', estimated_cost: '', notes: '' }) }}
+                  className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Estimate summary */}
+      {estimate && (
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm font-semibold text-blue-900 flex items-center gap-2 mb-3">
+            <DollarSign size={15} /> Estimate Summary
+          </p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between text-gray-700">
+              <span>Services</span><span>{fmt(estimate.services_total)}</span>
+            </div>
+            <div className="flex justify-between text-gray-700">
+              <span>Parts (reserved)</span><span>{fmt(estimate.parts_total)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600 border-t border-blue-200 pt-1.5">
+              <span>Subtotal</span><span>{fmt(estimate.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>VAT (16%)</span><span>{fmt(estimate.tax)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-blue-900 text-base border-t border-blue-300 pt-1.5">
+              <span>Total</span><span>{fmt(estimate.total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
