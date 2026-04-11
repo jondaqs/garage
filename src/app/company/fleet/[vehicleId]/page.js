@@ -86,21 +86,33 @@ export default function FleetVehicleDetailPage() {
         vin:                 v.vin                 ?? '',
       })
 
-      // Load service history
-      const { data: h } = await supabase
-        .from('vehicle_history')
-        .select(`
-          id, mileage, recorded_at,
-          work_order:work_orders(id, problem_description,
-            status:work_order_statuses(display_name)
-          ),
-          service_provider:service_providers(name)
-        `)
-        .eq('vehicle_id', vehicleId)
-        .order('recorded_at', { ascending: false })
+      // Load enriched service history timeline
+      const { data: { user: hUser } } = await supabase.auth.getUser()
+      const { data: timelineResult } = await supabase.rpc('get_vehicle_history_timeline', {
+        p_vehicle_id:      vehicleId,
+        p_requesting_user: hUser.id,
+        p_limit:           30,
+      })
+      let historyData = []
+      if (timelineResult?.success && timelineResult.timeline) {
+        historyData = timelineResult.timeline
+      } else {
+        const { data: h } = await supabase
+          .from('vehicle_history')
+          .select(`
+            id, mileage, recorded_at, event_type, description,
+            work_order:work_orders(id, work_order_number, problem_description,
+              status:work_order_statuses(display_name)
+            ),
+            service_provider:service_providers(name)
+          `)
+          .eq('vehicle_id', vehicleId)
+          .order('recorded_at', { ascending: false })
         .limit(20)
 
-      setHistory(h ?? [])
+        historyData = h ?? []
+      }
+      setHistory(historyData)
     } catch (err) {
       console.error(err)
       setError('Failed to load vehicle details.')
@@ -418,33 +430,73 @@ export default function FleetVehicleDetailPage() {
             <p className="text-gray-400 text-sm">No service history yet</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {history.map(h => (
-              <div key={h.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="p-2 bg-white border border-gray-200 rounded-lg">
-                  <Wrench className="w-4 h-4 text-gray-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    {h.work_order?.problem_description ?? h.service_provider?.name ?? 'Service record'}
-                  </p>
-                  <div className="flex items-center gap-3 mt-1">
-                    {h.mileage && <span className="text-xs text-gray-400">{h.mileage.toLocaleString()} km</span>}
-                    {h.service_provider?.name && <span className="text-xs text-gray-400">{h.service_provider.name}</span>}
+          <div className="relative">
+            <div className="absolute left-5 top-4 bottom-4 w-px bg-gray-200" />
+            <div className="space-y-4">
+              {history.map((h, idx) => {
+                const eventType = h.event_type || 'service_completed'
+                const timestamp = h.recorded_at
+                const mileage   = h.mileage
+                const provider  = h.provider || h.service_provider
+                const wo        = h.work_order
+                const services  = h.services || []
+                const totalAmt  = h.total_amount || wo?.total_amount
+                const desc      = h.description || wo?.problem_description || ''
+                const dotColor  = {
+                  service_completed: 'bg-green-500',
+                  checkin:           'bg-blue-500',
+                  checkout:          'bg-blue-400',
+                  issue_found:       'bg-orange-500',
+                }[eventType] || 'bg-gray-400'
+                const eventLabel = {
+                  service_completed: 'Service Completed',
+                  checkin:           'Vehicle Check-in',
+                  checkout:          'Vehicle Check-out',
+                  issue_found:       'Issue Found',
+                }[eventType] || 'Service Event'
+                return (
+                  <div key={h.id || idx} className="flex items-start gap-4 pl-10 relative">
+                    <div className={`absolute left-4 top-4 w-3 h-3 rounded-full border-2 border-white ${dotColor}`} />
+                    <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-100">
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{eventLabel}</p>
+                          {provider?.name && <p className="text-xs text-gray-500 mt-0.5">{provider.name}</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-400">
+                            {new Date(timestamp).toLocaleDateString('en-KE', {day:'numeric',month:'short',year:'numeric'})}
+                          </p>
+                          {mileage && <p className="text-xs text-gray-500 mt-0.5">{mileage.toLocaleString()} km</p>}
+                        </div>
+                      </div>
+                      {services.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {services.map((svc, si) => (
+                            <span key={si} className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">{svc}</span>
+                          ))}
+                        </div>
+                      )}
+                      {desc && <p className="text-xs text-gray-600 mt-2 leading-relaxed">{desc}</p>}
+                      {(wo?.id || totalAmt) && (
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                          {wo?.id && (
+                            <button
+                              onClick={() => router.push('/company/work-orders/' + wo.id)}
+                              className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                              {wo.work_order_number ? 'WO ' + wo.work_order_number : 'View Work Order'} →
+                            </button>
+                          )}
+                          {totalAmt && (
+                            <span className="text-xs font-semibold text-gray-700 ml-auto">KES {Number(totalAmt).toLocaleString()}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  {h.work_order?.status && (
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                      {h.work_order.status.display_name}
-                    </span>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(h.recorded_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
+                )
+              })}
+            </div>
           </div>
         )}
       </div>

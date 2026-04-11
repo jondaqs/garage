@@ -12,8 +12,8 @@
 
 import { sendAndQueueEmail } from './transport.js'
 
-const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garicare.com'
-const BRAND_NAME = 'GariCare'
+const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const BRAND_NAME = 'Motiifix'
 
 // ─── Shared HTML wrapper ─────────────────────────────────────────────────────
 
@@ -317,6 +317,68 @@ Please revise and re-submit: ${woUrl}
   return sendAndQueueEmail(supabase, {
     to:             [{ Email: to, Name: providerName }],
     subject:        `⚠️ Estimate Changes Requested — ${workOrderNumber}`,
+    html,
+    text,
+    referenceTable: 'work_orders',
+    referenceId:    workOrderId,
+  })
+}
+
+// ─── 5. Service completed — notify vehicle owner ──────────────────────────────
+
+/**
+ * sendWorkOrderCompletedEmail(supabase, { to, ownerName, workOrderNumber,
+ *   providerName, vehiclePlate, workOrderId, providerPhone? })
+ */
+export async function sendWorkOrderCompletedEmail(supabase, {
+  to, ownerName, workOrderNumber, providerName,
+  vehiclePlate, workOrderId, providerPhone,
+}) {
+  const detailUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
+  const greeting  = ownerName ? `Hello ${ownerName},` : 'Hello,'
+
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;margin:0 0 20px;">${greeting}</p>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px;margin:0 0 24px;text-align:center;">
+      <p style="font-size:32px;margin:0 0 8px;">✅</p>
+      <p style="color:#166534;font-size:18px;font-weight:700;margin:0 0 4px;">
+        Your vehicle is ready for pickup!
+      </p>
+      <p style="color:#15803d;font-size:14px;margin:0;">${vehiclePlate}</p>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      ${infoRow('Work Order',       `<strong>${workOrderNumber}</strong>`)}
+      ${infoRow('Vehicle',          vehiclePlate)}
+      ${infoRow('Service Provider', providerName)}
+      ${providerPhone ? infoRow('Contact', providerPhone) : ''}
+    </table>
+    <p style="color:#374151;font-size:14px;margin:0;">
+      Please collect your vehicle at your earliest convenience. If you have any
+      questions about the work performed, do not hesitate to contact ${providerName} directly.
+    </p>`
+
+  const html = emailWrapper({
+    title:       'Vehicle Ready for Pickup',
+    previewText: `Your vehicle ${vehiclePlate} is ready at ${providerName}`,
+    bodyHtml,
+    ctaHref:     detailUrl,
+    ctaLabel:    'View Service Details',
+    footerNote:  'You can view the full service record and invoice in your GariCare dashboard.',
+  })
+
+  const text = `${greeting}
+
+Your vehicle ${vehiclePlate} is ready for pickup at ${providerName}!
+
+Work Order: ${workOrderNumber}
+${providerPhone ? `Contact: ${providerPhone}\n` : ''}
+View full details: ${detailUrl}
+
+— ${BRAND_NAME}`
+
+  return sendAndQueueEmail(supabase, {
+    to:             [{ Email: to, Name: ownerName || to }],
+    subject:        `✅ Your vehicle is ready — ${workOrderNumber}`,
     html,
     text,
     referenceTable: 'work_orders',

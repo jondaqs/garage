@@ -7,12 +7,13 @@ import {
   ArrowLeft, Car, MapPin, User, Calendar, Clock,
   ClipboardList, AlertCircle, CheckCircle, ChevronRight,
   Wrench, Package, MessageSquare, Hash, ExternalLink,
-  AlertTriangle, FileText, Loader2
+  AlertTriangle, FileText, Loader2, ClipboardCheck
 } from 'lucide-react'
-import ServicesTab  from './components/ServicesTab'
-import PartsTab     from './components/PartsTab'
-import IssuesTab    from './components/IssuesTab'
-import CommentsTab  from './components/CommentsTab'
+import ServicesTab      from './components/ServicesTab'
+import PartsTab         from './components/PartsTab'
+import IssuesTab        from './components/IssuesTab'
+import CommentsTab      from './components/CommentsTab'
+import QualityCheckTab  from './components/QualityCheckTab'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const STATUS_COLORS = {
@@ -41,7 +42,7 @@ const NEXT_STATUS_MAP = {
   approved:          [{ code: 'in_progress',        label: 'Start Service',            color: 'bg-orange-500 hover:bg-orange-600' }],
   in_progress:       [{ code: 'quality_check',      label: 'Submit for QC',            color: 'bg-indigo-600 hover:bg-indigo-700' }],
   quality_check:     [
-    { code: 'completed',    label: 'QC Passed — Complete', color: 'bg-green-600 hover:bg-green-700'  },
+    { code: 'completed',    label: 'Complete Work Order',   color: 'bg-green-600 hover:bg-green-700', via_api: true },
     { code: 'rework',       label: 'QC Failed — Rework',   color: 'bg-red-600 hover:bg-red-700'     },
   ],
   rework:            [{ code: 'quality_check',      label: 'Resubmit for QC',          color: 'bg-indigo-600 hover:bg-indigo-700' }],
@@ -53,6 +54,7 @@ const TABS = [
   { id: 'services',  label: 'Services',   icon: Wrench         },
   { id: 'parts',     label: 'Parts',      icon: Package        },
   { id: 'issues',    label: 'Issues',     icon: AlertTriangle  },
+  { id: 'qc',        label: 'QC & Complete', icon: ClipboardCheck },
   { id: 'comments',  label: 'Comments',   icon: MessageSquare  },
 ]
 
@@ -423,24 +425,49 @@ export default function WorkOrderDetailPage() {
               </div>
             )}
 
-            {/* Status advances — intercept 'awaiting_approval' to use API route */}
-            {nextActions.map(action => (
-              action.code === 'awaiting_approval'
-                ? <button key={action.code}
+            {/* Status advances — intercept special actions */}
+            {nextActions.map(action => {
+              if (action.code === 'awaiting_approval') {
+                return (
+                  <button key={action.code}
                     onClick={handleSendEstimate}
                     disabled={sendingEstimate || updating}
                     className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
                     {sendingEstimate
                       ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
-                      : action.label
-                    }
+                      : action.label}
                   </button>
-                : <button key={action.code} onClick={() => advanceStatus(action.code)} disabled={updating}
+                )
+              }
+              if (action.code === 'quality_check') {
+                return (
+                  <button key={action.code}
+                    onClick={() => { advanceStatus('quality_check'); setActiveTab('qc') }}
+                    disabled={updating}
                     className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
                     {updating && <Loader2 size={13} className="animate-spin" />}
                     {action.label}
                   </button>
-            ))}
+                )
+              }
+              if (action.via_api) {
+                // Completed — go to QC tab which has the full completion form
+                return (
+                  <button key={action.code}
+                    onClick={() => setActiveTab('qc')}
+                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium ${action.color}`}>
+                    <ClipboardCheck size={13} /> Go to QC &amp; Complete
+                  </button>
+                )
+              }
+              return (
+                <button key={action.code} onClick={() => advanceStatus(action.code)} disabled={updating}
+                  className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                  {updating && <Loader2 size={13} className="animate-spin" />}
+                  {action.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -677,6 +704,17 @@ export default function WorkOrderDetailPage() {
           {/* ── ISSUES TAB ── */}
           {activeTab === 'issues' && (
             <IssuesTab workOrder={woWithProvider} />
+          )}
+
+          {/* ── QC & COMPLETE TAB ── */}
+          {activeTab === 'qc' && (
+            <QualityCheckTab
+              workOrder={woWithProvider}
+              onStatusChange={async () => {
+                await loadWorkOrder()
+                setSuccess('')
+              }}
+            />
           )}
 
           {/* ── COMMENTS TAB ── */}
