@@ -139,6 +139,7 @@ export default function CompanyDashboard() {
       // Work order stats
       let activeWorkOrders = 0
       let pendingApprovalWOs = 0
+      let pendingRecommendations = 0
       if (fleetVehicles && fleetVehicles.length > 0) {
         const vehicleIds2 = fleetVehicles.map(v => v.vehicle_id)
         const { data: woStatuses } = await supabase
@@ -167,10 +168,10 @@ export default function CompanyDashboard() {
         const { count: recCount } = await supabase
           .from('maintenance_recommendations')
           .select('id', { count: 'exact', head: true })
-          .in('vehicle_id', vehicleIds)
+          .in('vehicle_id', vehicleIds2)
           .eq('is_acknowledged', false)
-        pendingApprovalWOs = pendingApprovalWOs  // keep
-        var pendingRecommendations = recCount || 0
+        pendingApprovalWOs = pendingApprovalWOs  // keep existing value
+        pendingRecommendations = recCount || 0
       }
 
       setStats({
@@ -181,7 +182,7 @@ export default function CompanyDashboard() {
         budgetLimit: budget?.budget_amount || 0,
         activeWorkOrders,
         pendingApprovalWOs,
-        pendingRecommendations: typeof pendingRecommendations !== 'undefined' ? pendingRecommendations : 0,
+        pendingRecommendations,
       })
       setRecentBookings(recentBookingsList)
 
