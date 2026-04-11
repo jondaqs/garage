@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import {
-  Truck, Users, Calendar, DollarSign,
-  Plus, Wrench, AlertCircle, TrendingUp
+  Truck, Users, Calendar, DollarSign, ClipboardList,
+  Plus, Wrench, AlertCircle, TrendingUp, Bell
 } from 'lucide-react'
 
 export default function CompanyDashboard() {
@@ -16,6 +17,8 @@ export default function CompanyDashboard() {
     pendingBookings: 0,
     budgetSpent: 0,
     budgetLimit: 0,
+    activeWorkOrders: 0,
+    pendingApprovalWOs: 0,
   })
   const [recentBookings, setRecentBookings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -132,12 +135,42 @@ export default function CompanyDashboard() {
         recentBookingsList = recent || []
       }
 
+      // Work order stats
+      let activeWorkOrders = 0
+      let pendingApprovalWOs = 0
+      if (fleetVehicles && fleetVehicles.length > 0) {
+        const vehicleIds2 = fleetVehicles.map(v => v.vehicle_id)
+        const { data: woStatuses } = await supabase
+          .from('work_order_statuses').select('id, code')
+        const awaitingId = woStatuses?.find(s => s.code === 'awaiting_approval')?.id
+        const terminalCodes = ['completed', 'cancelled', 'closed']
+        const terminalIds = woStatuses?.filter(s => terminalCodes.includes(s.code)).map(s => s.id) || []
+
+        const { count: allWOs } = await supabase
+          .from('work_orders')
+          .select('id', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds2)
+          .not('status_id', 'in', `(${terminalIds.join(',')})`)
+        activeWorkOrders = allWOs || 0
+
+        if (awaitingId) {
+          const { count: awaitingWOs } = await supabase
+            .from('work_orders')
+            .select('id', { count: 'exact', head: true })
+            .in('vehicle_id', vehicleIds2)
+            .eq('status_id', awaitingId)
+          pendingApprovalWOs = awaitingWOs || 0
+        }
+      }
+
       setStats({
         totalVehicles: vehicleCount || 0,
         teamMembers: memberCount || 0,
         pendingBookings: pendingCount,
         budgetSpent: budget?.spent_amount || 0,
         budgetLimit: budget?.budget_amount || 0,
+        activeWorkOrders,
+        pendingApprovalWOs,
       })
       setRecentBookings(recentBookingsList)
 
@@ -185,6 +218,7 @@ export default function CompanyDashboard() {
       icon: Calendar,
       colorBg: 'bg-yellow-100',
       colorText: 'text-yellow-600',
+      href: '/company/bookings',
       link: '/company/bookings',
     },
     {
@@ -264,6 +298,27 @@ export default function CompanyDashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.pendingApprovalWOs > 0 && (
+          <div
+            onClick={() => router.push('/company/work-orders')}
+            className="mb-6 p-4 bg-yellow-50 border border-yellow-300 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:bg-yellow-100 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Bell className="text-yellow-600 flex-shrink-0" size={20} />
+              <div>
+                <p className="font-semibold text-yellow-900 text-sm">
+                  {stats.pendingApprovalWOs === 1
+                    ? '1 fleet vehicle estimate awaiting approval'
+                    : `${stats.pendingApprovalWOs} fleet vehicle estimates awaiting approval`}
+                </p>
+                <p className="text-yellow-700 text-xs mt-0.5">
+                  Click to review and authorise service work.
+                </p>
+              </div>
+            </div>
+            <span className="text-yellow-700 text-sm font-semibold flex-shrink-0">Review →</span>
+          </div>
+        )}
         {statCards.map((stat) => {
           const Icon = stat.icon
           return (

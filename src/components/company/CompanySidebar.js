@@ -1,24 +1,65 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import {
-  Home, Truck, Users, Calendar,
+  Home, Truck, Users, Calendar, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function CompanySidebar({ company, userRole }) {
   const pathname = usePathname()
-  const router = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
 
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
+
+  useEffect(() => {
+    if (company?.id) loadPendingCount(company.id)
+  }, [company?.id])
+
+  const loadPendingCount = async (companyId) => {
+    try {
+      // Get company vehicle ids
+      const { data: fleet } = await supabase
+        .from('vehicle_ownership')
+        .select('vehicle_id')
+        .eq('owner_company_id', companyId)
+      const vehicleIds = fleet?.map(f => f.vehicle_id) || []
+      if (vehicleIds.length === 0) return
+
+      // Count work orders awaiting approval
+      const { data: statuses } = await supabase
+        .from('work_order_statuses')
+        .select('id')
+        .eq('code', 'awaiting_approval')
+      const statusId = statuses?.[0]?.id
+      if (!statusId) return
+
+      const { count } = await supabase
+        .from('work_orders')
+        .select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('status_id', statusId)
+
+      setPendingApprovalCount(count || 0)
+    } catch {}
+  }
+
   const navigation = [
-    { name: 'Dashboard',  href: '/company/dashboard',  icon: Home },
-    { name: 'Fleet',      href: '/company/fleet',       icon: Truck },
-    { name: 'Team',       href: '/company/team',        icon: Users },
-    { name: 'Bookings',   href: '/company/bookings',    icon: Calendar },
-    { name: 'Budget',     href: '/company/budget',      icon: DollarSign },
-    { name: 'Reports',    href: '/company/reports',     icon: BarChart3 },
+    { name: 'Dashboard',   href: '/company/dashboard',   icon: Home         },
+    { name: 'Fleet',       href: '/company/fleet',        icon: Truck        },
+    { name: 'Team',        href: '/company/team',         icon: Users        },
+    { name: 'Bookings',    href: '/company/bookings',     icon: Calendar     },
+    {
+      name:  'Work Orders',
+      href:  '/company/work-orders',
+      icon:  ClipboardList,
+      badge: pendingApprovalCount > 0 ? pendingApprovalCount : null,
+    },
+    { name: 'Budget',      href: '/company/budget',       icon: DollarSign   },
+    { name: 'Reports',     href: '/company/reports',      icon: BarChart3    },
   ]
 
   const showInfoAlert = company?.status === 'pending_info'
@@ -36,6 +77,8 @@ export default function CompanySidebar({ company, userRole }) {
     suspended:            { label: 'Suspended',      dot: 'bg-gray-400',   text: 'text-gray-600',   bg: 'bg-gray-50   border-gray-200'   },
   }
   const statusCfg = company?.status ? statusConfig[company.status] : null
+
+  const isActive = (href) => pathname === href || pathname.startsWith(href + '/')
 
   return (
     <>
@@ -82,33 +125,42 @@ export default function CompanySidebar({ company, userRole }) {
 
           {/* Navigation */}
           <nav className="mt-4 flex-1 px-3 space-y-0.5">
-            {/* Pending info action — shown when admin requests more info */}
+            {/* Pending info action */}
             {showInfoAlert && (
               <button
                 onClick={() => router.push('/company/pending-info')}
                 className="w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition-colors mb-1"
               >
-                <AlertCircle className="mr-3 h-4 w-4 text-orange-500 shrink-0 animate-pulse" size={18} />
+                <AlertCircle className="mr-3 h-4 w-4 text-orange-500 shrink-0 animate-pulse" />
                 Action Required
               </button>
             )}
+
             {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const Icon   = item.icon
+              const active = isActive(item.href)
               return (
                 <button
                   key={item.name}
                   onClick={() => router.push(item.href)}
                   className={`
-                    w-full group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
-                    ${isActive
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }
+                    w-full group flex items-center justify-between px-3 py-2.5 text-sm font-medium
+                    rounded-lg transition-colors
+                    ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
                   `}
                 >
-                  <Icon className={`mr-3 flex-shrink-0 h-4.5 w-4.5 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} size={18} />
-                  {item.name}
+                  <div className="flex items-center">
+                    <Icon
+                      className={`mr-3 flex-shrink-0 w-4.5 h-4.5 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`}
+                      size={18}
+                    />
+                    {item.name}
+                  </div>
+                  {item.badge && (
+                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-yellow-500 rounded-full">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
                 </button>
               )
             })}

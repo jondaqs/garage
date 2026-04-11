@@ -84,7 +84,7 @@ export default function CompanyHeader({ company, user: authUser, userRole }) {
             - isAdmin=false so no broadcast admin alerts (company users are not admins)
             - Mark as read / delete work via the updated RLS policies
           */}
-          <NotificationBell />
+          <NotificationBell isCompany={true} />
 
           {/* User dropdown */}
           <div className="relative" ref={dropdownRef}>

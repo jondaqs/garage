@@ -1,99 +1,139 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, X, Check, CheckCheck, Building2, Store, Users } from 'lucide-react'
+import {
+  Bell, X, Check, CheckCheck, Building2, Store, Users,
+  ClipboardList, DollarSign, CheckCircle, XCircle,
+  MessageSquare, Wrench, Car
+} from 'lucide-react'
 
-// Notification type → icon + colour
-function NotificationIcon({ type, isRead }) {
-  const base = 'p-2 rounded-full flex-shrink-0'
-  const active = isRead ? 'bg-gray-100' : 'bg-blue-100'
-  const iconCls = isRead ? 'text-gray-500' : 'text-blue-600'
+// ─── Notification type → icon + colour + deep-link ──────────────────────────
 
-  if (type?.includes('company')) {
-    return (
-      <div className={`${base} ${isRead ? 'bg-gray-100' : 'bg-indigo-100'}`}>
-        <Building2 size={16} className={isRead ? 'text-gray-500' : 'text-indigo-600'} />
-      </div>
-    )
+const TYPE_CONFIG = {
+  // Work order — customer/company side
+  estimate_ready:              { icon: DollarSign,    bg: 'bg-yellow-100', iconCls: 'text-yellow-600', label: 'Estimate Ready' },
+  awaiting_approval:           { icon: DollarSign,    bg: 'bg-yellow-100', iconCls: 'text-yellow-600', label: 'Needs Approval' },
+
+  // Work order — provider side
+  estimate_approved:           { icon: CheckCircle,   bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Approved'       },
+  estimate_rejected:           { icon: XCircle,       bg: 'bg-red-100',    iconCls: 'text-red-600',    label: 'Rejected'       },
+  estimate_changes_requested:  { icon: MessageSquare, bg: 'bg-amber-100',  iconCls: 'text-amber-600',  label: 'Changes Needed' },
+
+  // Work order lifecycle
+  work_order_created:          { icon: ClipboardList, bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'WO Created'     },
+  work_order_completed:        { icon: Wrench,        bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'WO Complete'    },
+  booking_accepted:            { icon: Car,           bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Booking Accepted' },
+
+  // Existing types
+  company:                     { icon: Building2,     bg: 'bg-indigo-100', iconCls: 'text-indigo-600', label: 'Company'        },
+  provider:                    { icon: Store,         bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Provider'       },
+  team:                        { icon: Store,         bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Team'           },
+  invitation:                  { icon: Users,         bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Invitation'     },
+  invite:                      { icon: Users,         bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Invitation'     },
+  default:                     { icon: Bell,          bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: ''               },
+}
+
+function getTypeConfig(type) {
+  if (!type) return TYPE_CONFIG.default
+  // Exact match first
+  if (TYPE_CONFIG[type]) return TYPE_CONFIG[type]
+  // Prefix match
+  for (const key of Object.keys(TYPE_CONFIG)) {
+    if (type.includes(key)) return TYPE_CONFIG[key]
   }
-  if (type?.includes('provider') || type?.includes('team')) {
-    return (
-      <div className={`${base} ${isRead ? 'bg-gray-100' : 'bg-green-100'}`}>
-        <Store size={16} className={isRead ? 'text-gray-500' : 'text-green-600'} />
-      </div>
-    )
+  return TYPE_CONFIG.default
+}
+
+/** Derive the deep-link URL from notification fields */
+function getNotificationHref(n, isProvider, isCompany) {
+  const refType = n.reference_type
+  const refId   = n.reference_id
+  const type    = n.notification_type || n.type || ''
+
+  if (!refId) return null
+
+  if (refType === 'work_order' || type.includes('work_order') || type.includes('estimate')) {
+    if (isProvider) return `/provider/work-orders/${refId}`
+    if (isCompany)  return `/company/work-orders/${refId}`
+    return `/dashboard/work-orders/${refId}`
   }
-  if (type?.includes('invitation') || type?.includes('invite')) {
-    return (
-      <div className={`${base} ${isRead ? 'bg-gray-100' : 'bg-purple-100'}`}>
-        <Users size={16} className={isRead ? 'text-gray-500' : 'text-purple-600'} />
-      </div>
-    )
+  if (refType === 'booking' || type.includes('booking')) {
+    if (isProvider) return `/provider/bookings/${refId}`
+    if (isCompany)  return `/company/bookings/${refId}`
+    return `/dashboard/bookings/${refId}`
   }
+  return null
+}
+
+// ─── Notification icon component ─────────────────────────────────────────────
+
+function NotifIcon({ type, isRead }) {
+  const cfg  = getTypeConfig(type)
+  const Icon = cfg.icon
   return (
-    <div className={`${base} ${active}`}>
-      <Bell size={16} className={iconCls} />
+    <div className={`p-2 rounded-full flex-shrink-0 ${isRead ? 'bg-gray-100' : cfg.bg}`}>
+      <Icon size={15} className={isRead ? 'text-gray-400' : cfg.iconCls} />
     </div>
   )
 }
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-// isAdmin: boolean — when true, also fetches recipient_type='admin' notifications
-export default function NotificationBell({ isAdmin = false }) {
+// ─── Main component ───────────────────────────────────────────────────────────
+
+/**
+ * Props:
+ *  isAdmin    — fetch admin broadcast notifications too
+ *  isProvider — affects deep-link routing (work orders go to /provider/...)
+ *  isCompany  — affects deep-link routing (work orders go to /company/...)
+ */
+export default function NotificationBell({ isAdmin = false, isProvider = false, isCompany = false }) {
   const supabase = createClient()
+  const router   = useRouter()
+
   const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [isOpen, setIsOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [profileId, setProfileId] = useState(null)
+  const [unreadCount, setUnreadCount]     = useState(0)
+  const [isOpen, setIsOpen]               = useState(false)
+  const [loading, setLoading]             = useState(true)
+  const [profileId, setProfileId]         = useState(null)
+
+  useEffect(() => { resolveProfile() }, [])
 
   useEffect(() => {
-    resolveProfile()
-  }, [])
-
-  useEffect(() => {
-    if (profileId) {
-      loadNotifications()
-      const channel = supabase
-        .channel(`notifications-${profileId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
-          loadNotifications()
-        })
-        .subscribe()
-      return () => supabase.removeChannel(channel)
-    }
+    if (!profileId) return
+    loadNotifications()
+    const channel = supabase
+      .channel(`notifications-${profileId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        () => loadNotifications()
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
   }, [profileId])
 
   const resolveProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single()
+      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
     if (profile) setProfileId(profile.id)
   }
 
   const loadNotifications = async () => {
     if (!profileId) return
     try {
-      // Personal notifications — addressed directly to this user
-      // (covers: recipient_user_id OR user_id matching this profile)
       const { data: personal } = await supabase
         .from('notifications')
         .select('*')
         .or(`recipient_user_id.eq.${profileId},user_id.eq.${profileId}`)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(25)
 
       let all = personal || []
 
-      // Admin broadcast notifications — recipient_type='admin', no specific user_id
-      // Only fetched when the bell is rendered in an admin context
       if (isAdmin) {
-        const { data: adminBroadcast } = await supabase
+        const { data: broadcast } = await supabase
           .from('notifications')
           .select('*')
           .eq('recipient_type', 'admin')
@@ -102,11 +142,9 @@ export default function NotificationBell({ isAdmin = false }) {
           .order('created_at', { ascending: false })
           .limit(20)
 
-        if (adminBroadcast) {
-          // Merge and deduplicate by id, sort newest first
-          const merged = [...all, ...adminBroadcast]
+        if (broadcast) {
           const seen = new Set()
-          all = merged
+          all = [...all, ...broadcast]
             .filter(n => { if (seen.has(n.id)) return false; seen.add(n.id); return true })
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
             .slice(0, 30)
@@ -123,66 +161,55 @@ export default function NotificationBell({ isAdmin = false }) {
   }
 
   const markAsRead = async (id) => {
-    // Target by id — works for both personal and broadcast notifications.
-    // Requires the notifications_update RLS policy to include is_user_admin()
-    // for broadcast rows (recipient_user_id IS NULL).
-    const { error } = await supabase
-      .from('notifications')
+    await supabase.from('notifications')
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('id', id)
-    if (error) console.error('markAsRead error:', error)
-    else loadNotifications()
+    loadNotifications()
   }
 
   const markAllAsRead = async () => {
     if (!profileId) return
     const now = new Date().toISOString()
-
-    // Personal notifications — matched by recipient_user_id or user_id
-    await supabase
-      .from('notifications')
+    await supabase.from('notifications')
       .update({ is_read: true, read_at: now })
       .or(`recipient_user_id.eq.${profileId},user_id.eq.${profileId}`)
       .eq('is_read', false)
 
-    // Broadcast admin notifications — no user binding, must target by id.
-    // The notifications_update RLS policy allows this via is_user_admin().
     if (isAdmin) {
       const broadcastIds = notifications
         .filter(n => n.recipient_type === 'admin' && !n.recipient_user_id && !n.user_id && !n.is_read)
         .map(n => n.id)
       if (broadcastIds.length > 0) {
-        const { error } = await supabase
-          .from('notifications')
+        await supabase.from('notifications')
           .update({ is_read: true, read_at: now })
           .in('id', broadcastIds)
-        if (error) console.error('markAllAsRead (broadcast) error:', error)
       }
     }
     loadNotifications()
   }
 
   const deleteNotification = async (id) => {
-    // Target by id — works for personal and broadcast rows.
-    // Requires the notifications_delete RLS policy to include is_user_admin().
-    const { error } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', id)
-    if (error) console.error('deleteNotification error:', error)
-    else loadNotifications()
+    await supabase.from('notifications').delete().eq('id', id)
+    loadNotifications()
+  }
+
+  const handleNotifClick = async (n) => {
+    if (!n.is_read) await markAsRead(n.id)
+    const href = getNotificationHref(n, isProvider, isCompany)
+    if (href) {
+      setIsOpen(false)
+      router.push(href)
+    }
   }
 
   const formatTime = (ts) => {
-    const d = new Date(ts)
-    const now = new Date()
-    const diffMs = now - d
+    const diffMs   = Date.now() - new Date(ts)
     const diffMins = Math.floor(diffMs / 60000)
-    if (diffMins < 1) return 'just now'
+    if (diffMins < 1)  return 'just now'
     if (diffMins < 60) return `${diffMins}m ago`
     const diffHrs = Math.floor(diffMins / 60)
-    if (diffHrs < 24) return `${diffHrs}h ago`
-    return d.toLocaleDateString()
+    if (diffHrs < 24)  return `${diffHrs}h ago`
+    return new Date(ts).toLocaleDateString()
   }
 
   return (
@@ -231,50 +258,63 @@ export default function NotificationBell({ isAdmin = false }) {
                 <div className="p-8 text-center text-sm text-gray-500">Loading...</div>
               ) : notifications.length === 0 ? (
                 <div className="p-8 text-center text-gray-400">
-                  <Bell size={40} className="mx-auto mb-2 opacity-30" />
+                  <Bell size={36} className="mx-auto mb-2 opacity-30" />
                   <p className="text-sm">No notifications yet</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      className={`px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/60' : ''}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <NotificationIcon type={n.notification_type || n.type} isRead={n.is_read} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm leading-snug ${!n.is_read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
-                            {n.title}
-                          </p>
-                          {n.message && (
-                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
-                              {n.message}
+                  {notifications.map((n) => {
+                    const type = n.notification_type || n.type
+                    const href = getNotificationHref(n, isProvider, isCompany)
+                    const isClickable = !!href
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={() => isClickable && handleNotifClick(n)}
+                        className={`px-4 py-3 transition-colors ${
+                          !n.is_read ? 'bg-blue-50/60' : ''
+                        } ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <NotifIcon type={type} isRead={n.is_read} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm leading-snug ${!n.is_read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                              {n.title}
                             </p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-1">{formatTime(n.created_at)}</p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {!n.is_read && (
+                            {n.message && (
+                              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
+                                {n.message}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-gray-400">{formatTime(n.created_at)}</p>
+                              {isClickable && (
+                                <span className="text-xs text-blue-500 font-medium">View →</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!n.is_read && (
+                              <button
+                                onClick={e => { e.stopPropagation(); markAsRead(n.id) }}
+                                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                title="Mark as read"
+                              >
+                                <Check size={13} className="text-gray-500" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => markAsRead(n.id)}
-                              className="p-1 hover:bg-gray-200 rounded transition-colors"
-                              title="Mark as read"
+                              onClick={e => { e.stopPropagation(); deleteNotification(n.id) }}
+                              className="p-1 hover:bg-red-100 rounded transition-colors"
+                              title="Delete"
                             >
-                              <Check size={14} className="text-gray-500" />
+                              <X size={13} className="text-red-500" />
                             </button>
-                          )}
-                          <button
-                            onClick={() => deleteNotification(n.id)}
-                            className="p-1 hover:bg-red-100 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <X size={14} className="text-red-500" />
-                          </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

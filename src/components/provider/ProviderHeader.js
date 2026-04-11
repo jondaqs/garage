@@ -38,7 +38,7 @@ export default function ProviderHeader({ user, provider }) {
           {/* Right side */}
           <div className="ml-4 flex items-center md:ml-6 gap-3">
             {/* Notifications - Now functional! */}
-            <NotificationBell />
+            <NotificationBell isProvider={true} />
 
             {/* Profile */}
             <div className="relative">
