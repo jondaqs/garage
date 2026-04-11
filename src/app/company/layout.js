@@ -109,7 +109,7 @@ export default function CompanyLayout({ children }) {
             <CompanySidebar company={company} userRole={userRole} />
 
             {/* Main Content */}
-            <div className="lg:ml-64">
+            <div className="lg:ml-64 pt-14 lg:pt-0">
                 <CompanyHeader user={user} company={company} userRole={userRole} />
                 <main className="p-6">
                     {children}

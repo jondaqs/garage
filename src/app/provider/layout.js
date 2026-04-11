@@ -86,7 +86,7 @@ export default function ProviderLayout({ children }) {
       <ProviderSidebar provider={provider} />
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className="lg:ml-64 pt-14 lg:pt-0">
         <ProviderHeader user={user} provider={provider} />
         <main className="p-6">
           {children}
