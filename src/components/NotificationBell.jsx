@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Bell, X, Check, CheckCheck, Building2, Store, Users,
   ClipboardList, DollarSign, CheckCircle, XCircle,
-  MessageSquare, Wrench, Car
+  MessageSquare, Wrench, Car, FileText
 } from 'lucide-react'
 
 // ─── Notification type → icon + colour + deep-link ──────────────────────────
