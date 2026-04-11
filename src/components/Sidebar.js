@@ -185,7 +185,7 @@ export default function Sidebar({ user }) {
           Personal
         </p>
         {personalItems.map(item => (
-          <NavItem key={item.path} item={item} />
+          <NavItem key={item.path} item={item} compact />
         ))}
 
         {/* ── Company section — only for members ── */}
