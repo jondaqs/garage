@@ -19,6 +19,7 @@ export default function CompanyDashboard() {
     budgetLimit: 0,
     activeWorkOrders: 0,
     pendingApprovalWOs: 0,
+    pendingRecommendations: 0,
   })
   const [recentBookings, setRecentBookings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -161,6 +162,15 @@ export default function CompanyDashboard() {
             .eq('status_id', awaitingId)
           pendingApprovalWOs = awaitingWOs || 0
         }
+
+        // Count unacknowledged maintenance recommendations
+        const { count: recCount } = await supabase
+          .from('maintenance_recommendations')
+          .select('id', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds)
+          .eq('is_acknowledged', false)
+        pendingApprovalWOs = pendingApprovalWOs  // keep
+        var pendingRecommendations = recCount || 0
       }
 
       setStats({
@@ -171,6 +181,7 @@ export default function CompanyDashboard() {
         budgetLimit: budget?.budget_amount || 0,
         activeWorkOrders,
         pendingApprovalWOs,
+        pendingRecommendations: typeof pendingRecommendations !== 'undefined' ? pendingRecommendations : 0,
       })
       setRecentBookings(recentBookingsList)
 
@@ -213,12 +224,19 @@ export default function CompanyDashboard() {
       link: '/company/team',
     },
     {
+      name: 'Active Work Orders',
+      value: stats.activeWorkOrders,
+      icon: ClipboardList,
+      colorBg: 'bg-orange-100',
+      colorText: 'text-orange-600',
+      link: '/company/work-orders',
+    },
+    {
       name: 'Pending Bookings',
       value: stats.pendingBookings,
       icon: Calendar,
       colorBg: 'bg-yellow-100',
       colorText: 'text-yellow-600',
-      href: '/company/bookings',
       link: '/company/bookings',
     },
     {
@@ -298,6 +316,25 @@ export default function CompanyDashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.pendingRecommendations > 0 && (
+          <div
+            onClick={() => router.push('/company/reminders')}
+            className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:bg-purple-100 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Bell className="text-purple-600 flex-shrink-0" size={20} />
+              <div>
+                <p className="font-semibold text-purple-900 text-sm">
+                  {stats.pendingRecommendations} maintenance recommendation{stats.pendingRecommendations > 1 ? 's' : ''} pending
+                </p>
+                <p className="text-purple-700 text-xs mt-0.5">
+                  Your mechanics have flagged service items for your fleet.
+                </p>
+              </div>
+            </div>
+            <span className="text-purple-700 text-sm font-semibold flex-shrink-0">Review →</span>
+          </div>
+        )}
         {stats.pendingApprovalWOs > 0 && (
           <div
             onClick={() => router.push('/company/work-orders')}

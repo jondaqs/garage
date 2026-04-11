@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  Car, User, Plus, Calendar, CalendarDays, History,
+  Car, User, Plus, Calendar, CalendarDays, History, Bell,
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
   AlertCircle, ClipboardList} from 'lucide-react'
@@ -13,6 +13,27 @@ export default function Sidebar({ user }) {
   const router   = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
+  const [remindersCount, setRemindersCount] = useState(0)
+
+  useEffect(() => {
+    loadRemindersCount()
+  }, [])
+
+  const loadRemindersCount = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+      const { data: profile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
+      if (!profile) return
+      const { count } = await supabase
+        .from('reminders')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .eq('is_active', true)
+      setRemindersCount(count || 0)
+    } catch {}
+  }
 
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }
@@ -81,6 +102,8 @@ export default function Sidebar({ user }) {
     { icon: Plus,        label: 'Add Vehicle', path: '/dashboard/vehicles/add' },
     { icon: Calendar,    label: 'Bookings',    path: '/dashboard/bookings' },
     { icon: ClipboardList, label: 'Work Orders',  path: '/dashboard/work-orders' },
+    { icon: Bell,          label: 'Reminders',    path: '/dashboard/reminders',
+      badge: remindersCount > 0 ? remindersCount : null },
     { icon: CalendarDays,label: 'Calendar',    path: '/dashboard/calendar' },
     { icon: Users,       label: 'My Teams',    path: '/dashboard/my-teams' },
     { icon: History,     label: 'History',     path: '/dashboard/history' },
@@ -132,9 +155,14 @@ export default function Sidebar({ user }) {
           }`}
       >
         <Icon className="mr-3 flex-shrink-0" size={compact ? 16 : 20} />
-        <span className={compact ? 'font-medium text-sm' : 'font-medium'}>
+        <span className={`flex-1 text-left ${compact ? 'font-medium text-sm' : 'font-medium'}`}>
           {item.label}
         </span>
+        {item.badge && (
+          <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white bg-green-500 rounded-full">
+            {item.badge > 9 ? '9+' : item.badge}
+          </span>
+        )}
       </button>
     )
   }

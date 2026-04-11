@@ -7,7 +7,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
   Loader2, DollarSign, ThumbsUp, ThumbsDown, Edit3,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Star
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -35,6 +35,12 @@ export default function CustomerWorkOrderPage() {
   const [error, setError]         = useState('')
   const [success, setSuccess]     = useState('')
 
+  // Review state
+  const [review, setReview]             = useState({ rating: 0, title: '', body: '' })
+  const [reviewSubmitted, setReviewSubmitted] = useState(false)
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [existingReview, setExistingReview]   = useState(null)
+
   // Decision state
   const [decision, setDecision]         = useState(null)   // 'approve' | 'reject' | 'changes'
   const [approveNotes, setApproveNotes] = useState('')
@@ -56,6 +62,16 @@ export default function CustomerWorkOrderPage() {
       if (rpcErr) throw rpcErr
       if (!result.success) throw new Error(result.error)
       setWo(result.data)
+
+      // Check if already reviewed
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data: revData } = await supabase
+        .from('provider_reviews')
+        .select('id, rating, title, body, created_at')
+        .eq('work_order_id', params.id)
+        .maybeSingle()
+      if (revData) setExistingReview(revData)
+
     } catch (err) {
       setError(err.message || 'Failed to load work order')
     } finally {
@@ -118,6 +134,26 @@ export default function CustomerWorkOrderPage() {
       await loadWorkOrder()
     } catch (err) { setError(err.message) }
     finally { setActing(false) }
+  }
+
+  const handleSubmitReview = async () => {
+    if (review.rating === 0) { setError('Please select a star rating'); return }
+    setReviewSubmitting(true); setError('')
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data: result, error: rpcErr } = await supabase.rpc('submit_provider_review', {
+        p_work_order_id:    params.id,
+        p_customer_user_id: authUser.id,
+        p_rating:           review.rating,
+        p_title:            review.title || null,
+        p_body:             review.body  || null,
+      })
+      if (rpcErr) throw rpcErr
+      if (!result.success) throw new Error(result.error)
+      setReviewSubmitted(true)
+      setSuccess('Thank you for your review!')
+    } catch (err) { setError(err.message) }
+    finally { setReviewSubmitting(false) }
   }
 
   const fmt = (n) => n != null ? `KES ${Number(n).toLocaleString()}` : '—'
@@ -477,6 +513,76 @@ export default function CustomerWorkOrderPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Review section (completed or closed WOs only) ── */}
+      {['completed','closed'].includes(statusCode) && !reviewSubmitted && (
+        existingReview ? (
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <p className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Star size={15} className="text-yellow-500" /> Your Review
+            </p>
+            <div className="flex gap-1 mb-2">
+              {[1,2,3,4,5].map(s => (
+                <Star key={s} size={18}
+                  className={s <= existingReview.rating ? 'text-yellow-500' : 'text-gray-200'}
+                  fill={s <= existingReview.rating ? 'currentColor' : 'none'} />
+              ))}
+            </div>
+            {existingReview.title && <p className="text-sm font-medium text-gray-800">{existingReview.title}</p>}
+            {existingReview.body  && <p className="text-sm text-gray-600 mt-1">{existingReview.body}</p>}
+            <p className="text-xs text-gray-400 mt-2">
+              Reviewed {new Date(existingReview.created_at).toLocaleDateString('en-KE', {
+                day: 'numeric', month: 'short', year: 'numeric'
+              })}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <Star size={15} className="text-yellow-500" />
+              Rate your experience
+            </p>
+            <p className="text-xs text-gray-500">
+              How was the service at {wo.service_provider?.name}?
+            </p>
+
+            {/* Star selector */}
+            <div className="flex gap-2">
+              {[1,2,3,4,5].map(s => (
+                <button key={s}
+                  onClick={() => setReview(r => ({ ...r, rating: s }))}
+                  className="p-1 transition-transform hover:scale-110">
+                  <Star size={28}
+                    className={s <= review.rating ? 'text-yellow-400' : 'text-gray-300'}
+                    fill={s <= review.rating ? 'currentColor' : 'none'} />
+                </button>
+              ))}
+              {review.rating > 0 && (
+                <span className="text-sm text-gray-500 self-center ml-1">
+                  {['','Poor','Fair','Good','Very good','Excellent'][review.rating]}
+                </span>
+              )}
+            </div>
+
+            <input type="text" value={review.title}
+              onChange={e => setReview(r => ({ ...r, title: e.target.value }))}
+              placeholder="Headline (optional)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" />
+
+            <textarea value={review.body}
+              onChange={e => setReview(r => ({ ...r, body: e.target.value }))}
+              placeholder="Tell others about your experience..."
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-green-500" />
+
+            <button onClick={handleSubmitReview} disabled={reviewSubmitting || review.rating === 0}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-semibold">
+              {reviewSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
+              Submit Review
+            </button>
+          </div>
+        )
       )}
     </div>
   )

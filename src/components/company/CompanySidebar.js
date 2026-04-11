@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   Home, Truck, Users, Calendar, ClipboardList,
-  BarChart3, DollarSign, LogOut, Building2, AlertCircle
+  BarChart3, DollarSign, LogOut, Building2, AlertCircle, Bell
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -14,9 +14,13 @@ export default function CompanySidebar({ company, userRole }) {
   const supabase = createClient()
 
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
+  const [recommendationsCount, setRecommendationsCount] = useState(0)
 
   useEffect(() => {
-    if (company?.id) loadPendingCount(company.id)
+    if (company?.id) {
+      loadPendingCount(company.id)
+      loadRecommendationsCount(company.id)
+    }
   }, [company?.id])
 
   const loadPendingCount = async (companyId) => {
@@ -47,6 +51,23 @@ export default function CompanySidebar({ company, userRole }) {
     } catch {}
   }
 
+  const loadRecommendationsCount = async (companyId) => {
+    try {
+      const { data: fleet } = await supabase
+        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', companyId)
+      const vehicleIds = fleet?.map(f => f.vehicle_id) || []
+      if (vehicleIds.length === 0) return
+
+      const { count } = await supabase
+        .from('maintenance_recommendations')
+        .select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('is_acknowledged', false)
+
+      setRecommendationsCount(count || 0)
+    } catch {}
+  }
+
   const navigation = [
     { name: 'Dashboard',   href: '/company/dashboard',   icon: Home         },
     { name: 'Fleet',       href: '/company/fleet',        icon: Truck        },
@@ -57,6 +78,12 @@ export default function CompanySidebar({ company, userRole }) {
       href:  '/company/work-orders',
       icon:  ClipboardList,
       badge: pendingApprovalCount > 0 ? pendingApprovalCount : null,
+    },
+    {
+      name:  'Reminders',
+      href:  '/company/reminders',
+      icon:  Bell,
+      badge: recommendationsCount > 0 ? recommendationsCount : null,
     },
     { name: 'Budget',      href: '/company/budget',       icon: DollarSign   },
     { name: 'Reports',     href: '/company/reports',      icon: BarChart3    },

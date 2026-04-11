@@ -7,14 +7,15 @@ import {
   ArrowLeft, Car, MapPin, User, Calendar, Clock,
   ClipboardList, AlertCircle, CheckCircle, ChevronRight,
   Wrench, Package, MessageSquare, Hash, ExternalLink,
-  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt
+  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell
 } from 'lucide-react'
 import ServicesTab      from './components/ServicesTab'
 import PartsTab         from './components/PartsTab'
 import IssuesTab        from './components/IssuesTab'
 import CommentsTab      from './components/CommentsTab'
 import QualityCheckTab  from './components/QualityCheckTab'
-import InvoiceTab       from './components/InvoiceTab'
+import InvoiceTab            from './components/InvoiceTab'
+import RecommendationsTab    from './components/RecommendationsTab'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const STATUS_COLORS = {
@@ -56,6 +57,7 @@ const TABS = [
   { id: 'parts',     label: 'Parts',      icon: Package        },
   { id: 'issues',    label: 'Issues',     icon: AlertTriangle  },
   { id: 'invoice',   label: 'Invoice',        icon: FileText       },
+  { id: 'recommendations', label: 'Next Service', icon: Bell },
   { id: 'qc',        label: 'QC & Complete', icon: ClipboardCheck },
   { id: 'comments',  label: 'Comments',   icon: MessageSquare  },
 ]
@@ -711,6 +713,11 @@ export default function WorkOrderDetailPage() {
           {/* ── INVOICE TAB ── */}
           {activeTab === 'invoice' && (
             <InvoiceTab workOrder={woWithProvider} />
+          )}
+
+          {/* ── RECOMMENDATIONS TAB ── */}
+          {activeTab === 'recommendations' && (
+            <RecommendationsTab workOrder={woWithProvider} />
           )}
 
           {/* ── QC & COMPLETE TAB ── */}

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Bell, X, Check, CheckCheck, Building2, Store, Users,
   ClipboardList, DollarSign, CheckCircle, XCircle,
-  MessageSquare, Wrench, Car, FileText
+  MessageSquare, Wrench, Car, FileText, Star
 } from 'lucide-react'
 
 // ─── Notification type → icon + colour + deep-link ──────────────────────────
@@ -20,6 +20,10 @@ const TYPE_CONFIG = {
   estimate_approved:           { icon: CheckCircle,   bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Approved'       },
   estimate_rejected:           { icon: XCircle,       bg: 'bg-red-100',    iconCls: 'text-red-600',    label: 'Rejected'       },
   estimate_changes_requested:  { icon: MessageSquare, bg: 'bg-amber-100',  iconCls: 'text-amber-600',  label: 'Changes Needed' },
+
+  // Phase 6 — Recommendations & Reviews
+  maintenance_recommendation:  { icon: Wrench,       bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Recommendation' },
+  new_review:                  { icon: Star,         bg: 'bg-yellow-100', iconCls: 'text-yellow-500', label: 'New Review'     },
 
   // Invoice & payment
   invoice_issued:              { icon: FileText,     bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Invoice Ready'  },
@@ -58,16 +62,26 @@ function getNotificationHref(n, isProvider, isCompany) {
 
   if (!refId) return null
 
-  if (refType === 'invoice' || type.includes('invoice') || type.includes('payment')) {
-    if (isProvider) return `/provider/work-orders/${refId}`  // route to WO, not separate invoice page for provider
+  if (refType === 'recommendation' || type === 'maintenance_recommendation') {
+    if (isCompany) return `/company/reminders`
+    return `/dashboard/reminders`
+  }
+  if (refType === 'review' || type === 'new_review') {
+    if (isProvider) return `/provider/work-orders/${refId}`
+    return null
+  }
+  if (refType === 'receipt' || type === 'payment_received') {
+    // Provider receives payment_received — no separate page needed, they see it in WO/invoice
+    return null
+  }
+  if (refType === 'invoice' || type.includes('invoice')) {
+    if (isProvider) return `/provider/work-orders/${refId}`
     if (isCompany)  return `/company/work-orders/${refId}`
     return `/dashboard/invoices/${refId}`
   }
-  if (refType === 'receipt' || type === 'payment_received') {
-    if (isProvider) return null   // provider gets WO context already
-    return null
-  }
-  if (refType === 'work_order' || type.includes('work_order') || type.includes('estimate')) {
+  if (refType === 'work_order' || type.includes('work_order') || type.includes('estimate')
+      || type === 'booking_accepted') {
+    // booking_accepted creates a work_order — always route to the WO page
     if (isProvider) return `/provider/work-orders/${refId}`
     if (isCompany)  return `/company/work-orders/${refId}`
     return `/dashboard/work-orders/${refId}`
