@@ -57,6 +57,20 @@ export default function ReportsPage() {
 
       const vehicleIds = (fleetRows || []).map(r => r.vehicle_id)
 
+      // Compute total fleet spend from receipts
+      if (vehicleIds.length > 0) {
+        const { data: spendRows } = await supabase
+          .from('invoices')
+          .select('total_amount, receipts(amount_paid)')
+          .in('vehicle_id', vehicleIds)
+          .eq('status', 'paid')
+        const total = (spendRows || []).reduce((sum, inv) => {
+          const paid = (inv.receipts || []).reduce((s, r) => s + Number(r.amount_paid || 0), 0)
+          return sum + paid
+        }, 0)
+        setTotalSpend(total)
+      }
+
       // Get team members
       const { data: members } = await supabase
         .from('company_users')

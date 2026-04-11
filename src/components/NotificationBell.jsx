@@ -21,6 +21,10 @@ const TYPE_CONFIG = {
   estimate_rejected:           { icon: XCircle,       bg: 'bg-red-100',    iconCls: 'text-red-600',    label: 'Rejected'       },
   estimate_changes_requested:  { icon: MessageSquare, bg: 'bg-amber-100',  iconCls: 'text-amber-600',  label: 'Changes Needed' },
 
+  // Invoice & payment
+  invoice_issued:              { icon: FileText,     bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Invoice Ready'  },
+  payment_received:            { icon: DollarSign,   bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Payment Received' },
+
   // Work order lifecycle
   work_order_created:          { icon: ClipboardList, bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'WO Created'     },
   work_order_completed:        { icon: Wrench,        bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'WO Complete'    },
@@ -54,6 +58,15 @@ function getNotificationHref(n, isProvider, isCompany) {
 
   if (!refId) return null
 
+  if (refType === 'invoice' || type.includes('invoice') || type.includes('payment')) {
+    if (isProvider) return `/provider/work-orders/${refId}`  // route to WO, not separate invoice page for provider
+    if (isCompany)  return `/company/work-orders/${refId}`
+    return `/dashboard/invoices/${refId}`
+  }
+  if (refType === 'receipt' || type === 'payment_received') {
+    if (isProvider) return null   // provider gets WO context already
+    return null
+  }
   if (refType === 'work_order' || type.includes('work_order') || type.includes('estimate')) {
     if (isProvider) return `/provider/work-orders/${refId}`
     if (isCompany)  return `/company/work-orders/${refId}`

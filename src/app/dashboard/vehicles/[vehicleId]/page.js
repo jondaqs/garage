@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import VehicleSpendWidget from '@/components/VehicleSpendWidget'
 import {
   ArrowLeft, Car, Calendar, Gauge, Hash, Palette,
   AlertCircle, Clock, Wrench, Pencil, Trash2, X, Check
@@ -377,6 +378,9 @@ export default function VehicleDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Per-vehicle spend summary */}
+      <VehicleSpendWidget vehicleId={vehicleId} />
 
       {/* Service history */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">

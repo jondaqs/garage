@@ -122,6 +122,18 @@ export default function DashboardPage() {
             ...prev,
             totalVehicles: mappedVehicles?.length || 0
           }))
+
+          // Compute total spent from paid receipts for this user's vehicles
+          if (mappedVehicles?.length > 0) {
+            const vids = mappedVehicles.map(v => v.id)
+            const { data: spendData } = await supabase
+              .from('receipts')
+              .select('amount_paid, invoice:invoices!invoice_id(vehicle_id, status)')
+              .eq('invoice.status', 'paid')
+              .in('invoice.vehicle_id', vids)
+            const totalSpent = (spendData || []).reduce((sum, r) => sum + Number(r.amount_paid || 0), 0)
+            setStats(prev => ({ ...prev, totalSpent }))
+          }
         }
 
       } catch (error) {
