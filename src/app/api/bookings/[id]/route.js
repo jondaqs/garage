@@ -1,6 +1,8 @@
 /**
  * PATCH /api/bookings/[id]
  * Updates booking status and fires email + SMS to customer on confirmed/cancelled.
+ *
+ * Each step is logged with a prefix so you can trace exactly where it stops in Vercel logs.
  */
 
 import { createClient }                        from '@/lib/supabase/server'
@@ -9,45 +11,26 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 
+const TAG = (id) => `[PATCH /api/bookings/${id}]`
+
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
+  }
   return createServiceClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
 
-/** Resolve email for a user_profiles.id via service client (bypasses RLS) */
-async function resolveEmail(profileId) {
-  try {
-    const sc = getServiceClient()
-    const { data, error } = await sc
-      .from('user_profiles')
-      .select('email, auth_user_id')
-      .eq('id', profileId)
-      .single()
-
-    if (error) console.warn(`resolveEmail(${profileId}) query error:`, error.message)
-    if (data?.email) return data.email
-
-    if (data?.auth_user_id) {
-      const { data: au, error: auErr } = await sc.auth.admin.getUserById(data.auth_user_id)
-      if (auErr) console.warn(`resolveEmail getUserById error:`, auErr.message)
-      return au?.user?.email || null
-    }
-    return null
-  } catch (e) {
-    console.warn('resolveEmail threw:', e.message)
-    return null
-  }
-}
-
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
-const BRAND   = 'Motiifix' // Brand name used in communications
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garicare.com'
+const BRAND   = 'GariCare'
 
 const fmtDate = (d) => d
-  ? new Date(d).toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  ? new Date(d).toLocaleDateString('en-KE', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    })
   : '—'
 
 const fmtTime = (t) => {
@@ -121,27 +104,39 @@ View: ${bookingUrl}
 }
 
 export async function PATCH(request, { params }) {
+  const { id } = await params
+  const t = TAG(id)
+
   try {
-    const supabase   = await createClient()
-    const sc         = getServiceClient()           // service client for cross-user reads + queue writes
-    const { id }     = await params
-    const body       = await request.json()
+    console.log(`${t} ── START ──────────────────────────────────`)
+
+    // ── 1. Env check ──────────────────────────────────────────────────────────
+    console.log(`${t} [1] env: APP_URL=${APP_URL()} MAILJET_KEY=${!!process.env.MAILJET_API_KEY} AT_KEY=${!!process.env.AT_API_KEY} SVC_KEY=${!!process.env.SUPABASE_SERVICE_ROLE_KEY}`)
+
+    const supabase = await createClient()
+    const sc       = getServiceClient()
+    const body     = await request.json()
     const { statusCode } = body
+
+    console.log(`${t} [2] statusCode=${statusCode}`)
 
     if (!statusCode) {
       return NextResponse.json({ error: 'statusCode is required' }, { status: 400 })
     }
 
-    // ── Auth ──────────────────────────────────────────────────────────────────
+    // ── 2. Auth ───────────────────────────────────────────────────────────────
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) {
+      console.error(`${t} [3] auth failed:`, authErr?.message)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    console.log(`${t} [3] auth OK user=${user.id}`)
 
     const { data: profile } = await supabase
       .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+    console.log(`${t} [4] provider profile id=${profile?.id}`)
 
-    // ── Load booking ──────────────────────────────────────────────────────────
+    // ── 3. Load booking ───────────────────────────────────────────────────────
     const { data: booking, error: fetchErr } = await supabase
       .from('bookings')
       .select(`
@@ -155,32 +150,41 @@ export async function PATCH(request, { params }) {
       .single()
 
     if (fetchErr || !booking) {
+      console.error(`${t} [5] booking fetch failed:`, fetchErr?.message)
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
+    console.log(`${t} [5] booking loaded: number=${booking.booking_number} customer_user_id=${booking.customer_user_id} stored_email=${booking.customer_email||'null'} stored_phone=${booking.customer_phone||'null'}`)
 
-    // ── Get new status ────────────────────────────────────────────────────────
-    const { data: newStatus } = await supabase
+    // ── 4. Get status id ──────────────────────────────────────────────────────
+    const { data: newStatus, error: statusErr } = await supabase
       .from('booking_statuses').select('id').eq('code', statusCode).single()
 
     if (!newStatus) {
+      console.error(`${t} [6] status not found: ${statusCode}`, statusErr?.message)
       return NextResponse.json({ error: `Status "${statusCode}" not found` }, { status: 400 })
     }
+    console.log(`${t} [6] status id=${newStatus.id}`)
 
-    // ── Update booking ────────────────────────────────────────────────────────
+    // ── 5. Update booking ─────────────────────────────────────────────────────
     const patch = { status_id: newStatus.id, updated_at: new Date().toISOString() }
     if (statusCode === 'confirmed') {
       patch.confirmed_by_provider_at      = new Date().toISOString()
       patch.confirmed_by_provider_user_id = profile.id
     }
-    if (statusCode.startsWith('cancelled')) {
+    const isCancelled = statusCode === 'cancelled' || statusCode.startsWith('cancelled')
+    if (isCancelled) {
       patch.cancelled_at         = new Date().toISOString()
       patch.cancelled_by_user_id = profile.id
     }
 
     const { error: upErr } = await supabase.from('bookings').update(patch).eq('id', id)
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+    if (upErr) {
+      console.error(`${t} [7] booking update failed:`, upErr.message)
+      return NextResponse.json({ error: upErr.message }, { status: 500 })
+    }
+    console.log(`${t} [7] booking updated to "${statusCode}"`)
 
-    // ── In-app notification ───────────────────────────────────────────────────
+    // ── 6. In-app notification ────────────────────────────────────────────────
     const { error: notifErr } = await supabase.from('notifications').insert({
       user_id:           booking.customer_user_id,
       recipient_user_id: booking.customer_user_id,
@@ -193,91 +197,114 @@ export async function PATCH(request, { params }) {
       reference_table:   'bookings',
       is_read:           false,
     })
-    if (notifErr) console.warn('Notification failed (non-fatal):', notifErr.message)
+    if (notifErr) {
+      console.warn(`${t} [8] notification failed (non-fatal):`, notifErr.message)
+    } else {
+      console.log(`${t} [8] in-app notification inserted`)
+    }
 
-    // ── Email + SMS only for confirmed / cancelled ────────────────────────────
-    if (!['confirmed', 'cancelled'].includes(statusCode)) {
+    // ── 7. Skip email/SMS for non-customer-facing status changes ──────────────
+    const sendComms = statusCode === 'confirmed' || statusCode.startsWith('cancelled')
+    if (!sendComms) {
+      console.log(`${t} [9] status="${statusCode}" — no email/SMS needed`)
       return NextResponse.json({ success: true })
     }
 
-    // Resolve customer contact — service client bypasses user_profiles RLS
-    const { data: custProfile } = await sc
+    // ── 8. Resolve customer profile (service client bypasses RLS) ─────────────
+    console.log(`${t} [9] resolving customer profile via service client…`)
+    const { data: custProfile, error: custErr } = await sc
       .from('user_profiles')
       .select('first_name, last_name, phone, email, auth_user_id')
       .eq('id', booking.customer_user_id)
       .maybeSingle()
 
+    if (custErr) console.warn(`${t} [9] custProfile error:`, custErr.message)
+    console.log(`${t} [9] custProfile: first=${custProfile?.first_name} last=${custProfile?.last_name} email=${custProfile?.email||'null'} phone=${custProfile?.phone||'null'} auth_user_id=${custProfile?.auth_user_id||'null'}`)
+
     const customerName = custProfile
       ? `${custProfile.first_name || ''} ${custProfile.last_name || ''}`.trim() || 'Customer'
       : 'Customer'
 
-    let custEmail = booking.customer_email || custProfile?.email
+    // Try email in order: booking record → profile row → auth.users
+    let custEmail = booking.customer_email || custProfile?.email || null
     if (!custEmail && custProfile?.auth_user_id) {
-      const { data: au } = await sc.auth.admin.getUserById(custProfile.auth_user_id)
+      console.log(`${t} [10] email not in profile — fetching from auth.users…`)
+      const { data: au, error: auErr } = await sc.auth.admin.getUserById(custProfile.auth_user_id)
+      if (auErr) console.warn(`${t} [10] auth.users lookup error:`, auErr.message)
       custEmail = au?.user?.email || null
+      console.log(`${t} [10] auth.users email=${custEmail||'null'}`)
     }
 
-    const custPhone = booking.customer_phone || custProfile?.phone
+    const custPhone = booking.customer_phone || custProfile?.phone || null
+    console.log(`${t} [11] final: customerName="${customerName}" email=${custEmail||'NONE'} phone=${custPhone||'NONE'}`)
 
-    // Is this customer a company member? (for URL routing)
-    const { data: companyMem } = await sc
+    // ── 9. Determine URL routing (individual vs company) ──────────────────────
+    const { data: companyMem, error: coErr } = await sc
       .from('company_users')
       .select('company_id')
       .eq('user_id', booking.customer_user_id)
       .eq('is_active', true)
       .maybeSingle()
-    const isCompany   = !!companyMem?.company_id
-    const bookingUrl  = `${APP_URL()}/${isCompany ? 'company' : 'dashboard'}/bookings/${id}`
 
-    console.log(`[PATCH /api/bookings/${id}] status=${statusCode} customer=${customerName} email=${custEmail||'NONE'} phone=${custPhone||'NONE'} isCompany=${isCompany}`)
+    if (coErr) console.warn(`${t} [12] company_users lookup error:`, coErr.message)
+    const isCompany  = !!companyMem?.company_id
+    const bookingUrl = `${APP_URL()}/${isCompany ? 'company' : 'dashboard'}/bookings/${id}`
+    console.log(`${t} [12] isCompany=${isCompany} bookingUrl=${bookingUrl}`)
 
+    // ── 10. Send comms ────────────────────────────────────────────────────────
     const comms = []
 
-    // ── Email — use service client so queue insert bypasses RLS ──────────────
     if (custEmail) {
+      console.log(`${t} [13] queueing email → ${custEmail}`)
       const { html, text } = buildEmail({ statusCode, booking, customerName, bookingUrl })
       comms.push(
-        sendAndQueueEmail(sc, {   // ← service client, not supabase
+        sendAndQueueEmail(sc, {
           to:      [{ Email: custEmail, Name: customerName }],
           subject: `Booking ${statusCode === 'confirmed' ? 'Confirmed' : 'Cancelled'} — ${booking.booking_number}`,
           html,
           text,
         })
-        .then(() => console.log(`[PATCH /api/bookings/${id}] ✓ email → ${custEmail}`))
-        .catch(e  => console.error(`[PATCH /api/bookings/${id}] ✗ email:`, e.message))
+        .then(() => console.log(`${t} [13] ✓ email sent → ${custEmail}`))
+        .catch(e  => console.error(`${t} [13] ✗ email FAILED:`, e.message, e.stack?.split('\n')[1]))
       )
     } else {
-      console.warn(`[PATCH /api/bookings/${id}] no customer email — skipping`)
+      console.warn(`${t} [13] NO email address found — email skipped`)
     }
 
-    // ── SMS — use service client so queue insert bypasses RLS ────────────────
     if (custPhone) {
       const phone = normalisePhone(custPhone)
+      console.log(`${t} [14] phone raw="${custPhone}" normalised="${phone||'INVALID'}"`)
       if (phone) {
         const dateShort = new Date(booking.booking_date)
           .toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })
         const state   = statusCode === 'confirmed' ? 'confirmed ✓' : 'cancelled'
         const message = `${BRAND}: Your booking (${booking.booking_number}) at ${booking.service_provider?.name || '—'} on ${dateShort} has been ${state}. View: ${bookingUrl}`
+        console.log(`${t} [14] SMS message (${message.length} chars): ${message.substring(0, 100)}…`)
 
         comms.push(
-          sendAndQueueSms(sc, { to: phone, message })   // ← service client
-          .then(() => console.log(`[PATCH /api/bookings/${id}] ✓ SMS → ${phone}`))
-          .catch(e  => console.error(`[PATCH /api/bookings/${id}] ✗ SMS:`, e.message))
+          sendAndQueueSms(sc, { to: phone, message })
+          .then(() => console.log(`${t} [14] ✓ SMS sent → ${phone}`))
+          .catch(e  => console.error(`${t} [14] ✗ SMS FAILED:`, e.message))
         )
-      } else {
-        console.warn(`[PATCH /api/bookings/${id}] phone "${custPhone}" failed to normalise — skipping SMS`)
       }
     } else {
-      console.warn(`[PATCH /api/bookings/${id}] no customer phone — skipping SMS`)
+      console.warn(`${t} [14] NO phone found — SMS skipped`)
     }
 
-    await Promise.allSettled(comms)
-    console.log(`[PATCH /api/bookings/${id}] done (${comms.length} comms tasks)`)
+    console.log(`${t} [15] awaiting ${comms.length} comm task(s)…`)
+    const results = await Promise.allSettled(comms)
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.error(`${t} [15] task ${i} rejected:`, r.reason)
+      }
+    })
+    console.log(`${t} [15] all comms done`)
+    console.log(`${t} ── END ────────────────────────────────────`)
 
     return NextResponse.json({ success: true })
 
   } catch (err) {
-    console.error('PATCH /api/bookings/[id] error:', err)
+    console.error(`${t} UNHANDLED ERROR:`, err.message, err.stack?.split('\n').slice(0, 3).join(' | '))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

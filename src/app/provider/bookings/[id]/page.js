@@ -79,6 +79,7 @@ export default function ManageBookingPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
+      // 1. RPC: confirm booking + create work order + in-app notification
       const { data, error: fnError } = await supabase.rpc(
         'accept_booking_and_create_work_order',
         { p_booking_id: params.id, p_provider_user_id: user.id }
@@ -86,6 +87,19 @@ export default function ManageBookingPage() {
 
       if (fnError) throw fnError
       if (!data.success) throw new Error(data.error)
+
+      // 2. Fire email + SMS to customer via API (non-blocking — don't await result)
+      fetch(`/api/bookings/${params.id}/notify`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          event:          'booking_accepted',
+          workOrderId:    data.work_order_id,
+          workOrderNumber: data.work_order_number,
+        }),
+      }).then(r => r.json())
+        .then(d => console.log('[acceptBooking] notify result:', d))
+        .catch(e => console.error('[acceptBooking] notify failed (non-fatal):', e.message))
 
       setSuccessMsg(`Work order ${data.work_order_number} created! Redirecting...`)
       await loadBooking()
