@@ -19,6 +19,7 @@ export default function BookingsCalendarPage() {
   const [view, setView] = useState('month')
   const [date, setDate] = useState(new Date())
   const [statusFilter, setStatusFilter] = useState('all')
+  const [pastDateMsg, setPastDateMsg] = useState(false)
 
   useEffect(() => {
     loadBookings()
@@ -129,8 +130,12 @@ export default function BookingsCalendarPage() {
   today.setHours(0, 0, 0, 0)
 
   const handleSelectSlot = ({ start }) => {
-    // Block past dates
-    if (start < today) return
+    // Block past dates — show friendly message
+    if (start < today) {
+      setPastDateMsg(true)
+      setTimeout(() => setPastDateMsg(false), 3000)
+      return
+    }
     const dateStr = moment(start).format('YYYY-MM-DD')
     sessionStorage.setItem('selectedBookingDate', dateStr)
     router.push('/dashboard/bookings/book')
@@ -286,6 +291,15 @@ export default function BookingsCalendarPage() {
           (you'll select your vehicle and provider, then the date will be pre-filled).
         </p>
       </div>
+      {/* Past date toast */}
+      {pastDateMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50
+                        flex items-center gap-2 px-5 py-3 bg-gray-900 text-white
+                        text-sm font-medium rounded-xl shadow-xl animate-fade-in">
+          <CalendarIcon size={16} className="text-yellow-400 flex-shrink-0" />
+          Please choose today or a future date to book a service.
+        </div>
+      )}
     </div>
   )
 }

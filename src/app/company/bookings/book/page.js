@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, Star, MapPin, Truck, ArrowLeft, Calendar } from 'lucide-react'
+import { Search, Star, MapPin, Truck, ArrowLeft, Calendar, CalendarDays, X, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 const supabase = createClient()
@@ -23,9 +23,19 @@ export default function CompanyBookServicePage() {
   const [loading, setLoading]               = useState(true)
   const [searchQuery, setSearchQuery]       = useState('')
   const [selectedType, setSelectedType]     = useState('all')
+  const [selectedDate, setSelectedDate]     = useState(null)
   const [error, setError]                   = useState(null)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    const storedDate = sessionStorage.getItem('selectedBookingDate')
+    if (storedDate) setSelectedDate(storedDate)
+  }, [])
+
+  const clearSelectedDate = () => {
+    sessionStorage.removeItem('selectedBookingDate')
+    setSelectedDate(null)
+  }
 
   const loadData = async () => {
     try {
@@ -78,7 +88,7 @@ export default function CompanyBookServicePage() {
       const { data: providerData } = await supabase
         .from('service_providers')
         .select(`
-          id, name, description, status,
+          id, name, description, status, is_verified,
           provider_type:service_provider_types(display_name, code),
           shops(id, name, town, county),
           provider_reviews(rating)
@@ -148,6 +158,33 @@ export default function CompanyBookServicePage() {
           <p className="text-sm text-gray-500 mt-0.5">Select a fleet vehicle and service provider</p>
         </div>
       </div>
+
+      {/* Date banner from calendar */}
+      {selectedDate && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <CalendarDays className="text-blue-600 mt-0.5 flex-shrink-0" size={24} />
+              <div>
+                <p className="font-semibold text-blue-900 text-sm">
+                  📅 Booking Date Selected:{' '}
+                  {new Date(selectedDate).toLocaleDateString('en-KE', {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                  })}
+                </p>
+                <p className="text-blue-700 text-xs mt-1">
+                  Select your fleet vehicle and service provider below. The date will be
+                  automatically filled in the booking form.
+                </p>
+              </div>
+            </div>
+            <button onClick={clearSelectedDate}
+              className="text-blue-400 hover:text-blue-600 flex-shrink-0 p-1">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Step 1: Select vehicle */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -246,7 +283,14 @@ export default function CompanyBookServicePage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-gray-900">{provider.name}</p>
+                      <p className="font-semibold text-gray-900 flex items-center gap-2">
+                        {provider.name}
+                        {provider.is_verified && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded">
+                            <CheckCircle size={9} /> Verified
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-gray-400">{provider.provider_type?.display_name}</p>
                     </div>
                     {provider.avgRating > 0 && (
@@ -277,9 +321,13 @@ export default function CompanyBookServicePage() {
                 <button
                   onClick={() => handleBook(provider)}
                   disabled={!selectedVehicle}
-                  className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    selectedVehicle
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
                 >
-                  Book
+                  {selectedVehicle ? 'Book Service' : 'Select Vehicle First'}
                 </button>
               </div>
             ))}
