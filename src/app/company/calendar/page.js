@@ -170,6 +170,20 @@ export default function CompanyCalendarPage() {
     return [...bookingEvents, ...woEvents]
   }, [bookings, workOrders, statusFilter, vehicleFilter, showWOs])
 
+  const slotPropGetter = (slotDate) => {
+    const t = new Date()
+    t.setHours(0, 0, 0, 0)
+    if (slotDate < t) {
+      return {
+        style: {
+          backgroundColor: '#f3f4f6',
+          cursor: 'not-allowed',
+        }
+      }
+    }
+    return {}
+  }
+
   const eventStyleGetter = (event) => {
     const c = statusColor(event.status)
     return {
@@ -194,7 +208,12 @@ export default function CompanyCalendarPage() {
     }
   }
 
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   const handleSelectSlot = ({ start }) => {
+    // Block past dates
+    if (start < today) return
     const dateStr = moment(start).format('YYYY-MM-DD')
     sessionStorage.setItem('selectedBookingDate', dateStr)
     router.push('/company/bookings/book')
@@ -340,6 +359,7 @@ export default function CompanyCalendarPage() {
           onSelectSlot={handleSelectSlot}
           selectable
           eventPropGetter={eventStyleGetter}
+          slotPropGetter={slotPropGetter}
           views={['month', 'week', 'day', 'agenda']}
           popup
           tooltipAccessor={ev =>
