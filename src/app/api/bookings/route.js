@@ -201,34 +201,48 @@ export async function POST(request) {
 
     // ── Customer email ────────────────────────────────────────────────────────
     if (effectiveEmail) {
+        
       ;(async () => {
+        console.log('Dispatching customer email with args:', { to: effectiveEmail, customerName, isCompany, ...sharedArgs }) // Debug log
         try { await sendBookingConfirmationEmail(supabase, { to: effectiveEmail, customerName, isCompany, ...sharedArgs }) }
         catch (e) { console.error('Customer email failed (non-fatal):', e.message) }
       })()
+    }else {
+      console.warn('No effective email found for customer, skipping booking confirmation email.')
     }
 
     // ── Customer SMS ──────────────────────────────────────────────────────────
     if (effectivePhone) {
+        
       ;(async () => {
+        console.log('Dispatching customer SMS with args:', { phone: effectivePhone, customerName, isCompany, ...sharedArgs }) // Debug log
         try { await sendBookingConfirmationSms(supabase, { phone: effectivePhone, customerName, isCompany, ...sharedArgs }) }
         catch (e) { console.error('Customer SMS failed (non-fatal):', e.message) }
       })()
+    }else {
+      console.warn('No effective phone number found for customer, skipping booking confirmation SMS.')
     }
 
     // ── Provider email ────────────────────────────────────────────────────────
     if (providerOwner?.email) {
       ;(async () => {
+        console.log('Dispatching provider email with args:', { to: providerOwner.email, providerOwnerName: provOwnerName, customerName, customerPhone: effectivePhone || null, ...sharedArgs }) // Debug log
         try { await sendNewBookingProviderEmail(supabase, { to: providerOwner.email, providerOwnerName: provOwnerName, customerName, customerPhone: effectivePhone || null, ...sharedArgs }) }
         catch (e) { console.error('Provider email failed (non-fatal):', e.message) }
       })()
+    }else {
+      console.warn('No email found for provider owner, skipping new booking provider email.')
     }
 
     // ── Provider SMS ──────────────────────────────────────────────────────────
     if (providerOwner?.phone) {
       ;(async () => {
+        console.log('Dispatching provider SMS with args:', { phone: providerOwner.phone, providerOwnerName: provOwnerName, customerName, ...sharedArgs }) // Debug log  
         try { await sendNewBookingProviderSms(supabase, { phone: providerOwner.phone, providerOwnerName: provOwnerName, customerName, ...sharedArgs }) }
         catch (e) { console.error('Provider SMS failed (non-fatal):', e.message) }
       })()
+    }else {
+      console.warn('No phone number found for provider owner, skipping new booking provider SMS.')
     }
 
     return NextResponse.json({
