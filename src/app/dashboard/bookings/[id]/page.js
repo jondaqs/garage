@@ -113,35 +113,25 @@ export default function BookingDetailPage() {
     }
   }
 
+  const [cancelling, setCancelling] = useState(false)
+
   const cancelBooking = async () => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return
-
+    if (!confirm('Are you sure you want to cancel this booking?\nThe service provider will be notified.')) return
+    setCancelling(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single()
-
-      const { data: cancelledStatus } = await supabase
-        .from('booking_statuses')
-        .select('id')
-        .eq('code', 'cancelled')
-        .single()
-
-      await supabase.from('bookings').update({
-        status_id: cancelledStatus.id,
-        cancelled_at: new Date().toISOString(),
-        cancelled_by_user_id: profile.id,
-        cancellation_reason: 'Cancelled by customer'
-      }).eq('id', params.id)
-
-      alert('Booking cancelled')
+      const res  = await fetch(`/api/bookings/${params.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ statusCode: 'cancelled_customer' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to cancel')
       loadBooking()
     } catch (error) {
       console.error('Error cancelling booking:', error)
-      alert('Failed to cancel booking')
+      alert('Failed to cancel: ' + error.message)
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -222,14 +212,15 @@ export default function BookingDetailPage() {
               <AddToCalendarButton booking={booking} variant="dropdown" />
             )}
             
-            {/* Cancel Button */}
-            {booking.status?.code === 'pending' && (
-              <button 
-                onClick={cancelBooking} 
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+            {/* Cancel Button — allowed on pending or confirmed (before work starts) */}
+            {['pending', 'confirmed'].includes(booking.status?.code) && (
+              <button
+                onClick={cancelBooking}
+                disabled={cancelling}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
-                <XCircle size={20} />
-                Cancel Booking
+                <XCircle size={18} />
+                {cancelling ? 'Cancelling…' : 'Cancel Booking'}
               </button>
             )}
           </div>

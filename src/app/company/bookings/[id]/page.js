@@ -52,24 +52,17 @@ export default function CompanyBookingDetailPage() {
   }
 
   const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return
+    if (!confirm('Are you sure you want to cancel this booking?\nThe service provider will be notified.')) return
 
     setCancelling(true)
     try {
-      const { data: cancelledStatus } = await supabase
-        .from('booking_statuses').select('id').eq('code', 'cancelled').single()
-
-      const { error: cancelError } = await supabase
-        .from('bookings')
-        .update({
-          status_id:          cancelledStatus.id,
-          cancelled_at:       new Date().toISOString(),
-          cancellation_reason:'Cancelled by company',
-        })
-        .eq('id', booking.id)
-
-      if (cancelError) throw cancelError
-
+      const res  = await fetch(`/api/bookings/${booking.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ statusCode: 'cancelled_customer' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to cancel')
       loadBooking()
     } catch (err) {
       console.error(err)

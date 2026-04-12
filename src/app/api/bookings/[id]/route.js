@@ -299,6 +299,37 @@ export async function PATCH(request, { params }) {
       }
     })
     console.log(`${t} [15] all comms done`)
+
+    // ── Also notify provider when customer cancels ────────────────────────────
+    if (statusCode.startsWith('cancelled')) {
+      try {
+        const { data: providerRow } = await sc
+          .from('service_providers')
+          .select('owner_user_id, id')
+          .eq('id', booking.service_provider?.id)
+          .maybeSingle()
+
+        if (providerRow?.owner_user_id) {
+          const { error: pne } = await supabase.from('notifications').insert({
+            user_id:           providerRow.owner_user_id,
+            recipient_user_id: providerRow.owner_user_id,
+            notification_type: 'booking_cancelled_by_customer',
+            type:              'booking_cancelled_by_customer',
+            title:             'Booking Cancelled by Customer',
+            message:           `Booking #${booking.booking_number} for ${booking.vehicle?.plate_number} on ${booking.booking_date} has been cancelled by the customer.`,
+            reference_id:      id,
+            reference_type:    'booking',
+            reference_table:   'bookings',
+            is_read:           false,
+          })
+          if (pne) console.warn(`${t} provider notification failed:`, pne.message)
+          else console.log(`${t} ✓ provider notified of customer cancellation`)
+        }
+      } catch (e) {
+        console.warn(`${t} provider notification error (non-fatal):`, e.message)
+      }
+    }
+
     console.log(`${t} ── END ────────────────────────────────────`)
 
     return NextResponse.json({ success: true })
