@@ -62,6 +62,7 @@ function calcEndTime(startTime) {
 export async function POST(request) {
   try {
     const supabase = await createClient()
+    const sc       = getServiceClient()   // service client for queue inserts (bypasses RLS)
     const body     = await request.json()
 
     const {
@@ -259,7 +260,7 @@ export async function POST(request) {
 
     if (custEmail) {
       commTasks.push(
-        sendBookingConfirmationEmail(supabase, {
+        sendBookingConfirmationEmail(sc, {
           to: custEmail, customerName, isCompany, ...sharedArgs,
         }).then(() => console.log(`[/api/bookings] ✓ customer email → ${custEmail}`))
           .catch(e => console.error('[/api/bookings] ✗ customer email:', e.message))
@@ -270,7 +271,7 @@ export async function POST(request) {
 
     if (custPhone) {
       commTasks.push(
-        sendBookingConfirmationSms(supabase, {
+        sendBookingConfirmationSms(sc, {
           phone: custPhone, customerName, isCompany, ...sharedArgs,
         }).then(() => console.log(`[/api/bookings] ✓ customer SMS → ${custPhone}`))
           .catch(e => console.error('[/api/bookings] ✗ customer SMS:', e.message))
@@ -281,7 +282,7 @@ export async function POST(request) {
 
     if (provOwnerEmail) {
       commTasks.push(
-        sendNewBookingProviderEmail(supabase, {
+        sendNewBookingProviderEmail(sc, {
           to: provOwnerEmail, providerOwnerName: provOwnerName,
           customerName, customerPhone: custPhone || null, ...sharedArgs,
         }).then(() => console.log(`[/api/bookings] ✓ provider email → ${provOwnerEmail}`))
@@ -293,7 +294,7 @@ export async function POST(request) {
 
     if (provOwnerPhone) {
       commTasks.push(
-        sendNewBookingProviderSms(supabase, {
+        sendNewBookingProviderSms(sc, {
           phone: provOwnerPhone, providerOwnerName: provOwnerName,
           customerName, ...sharedArgs,
         }).then(() => console.log(`[/api/bookings] ✓ provider SMS → ${provOwnerPhone}`))
