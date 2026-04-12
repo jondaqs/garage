@@ -1,0 +1,307 @@
+/**
+ * lib/email/bookingEmails.js
+ * ──────────────────────────
+ * Email notifications sent when a booking is created.
+ *
+ *  sendBookingConfirmationEmail  — to the customer/company booker
+ *  sendNewBookingProviderEmail   — to the service provider owner
+ *
+ * Server-only — never import in client components.
+ */
+
+import { sendAndQueueEmail } from './transport.js'
+
+const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const BRAND_NAME = 'Motiifix'
+
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-KE', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  }) : '—'
+
+const fmtTime = (t) => {
+  if (!t) return '—'
+  const [h, m] = t.split(':')
+  const hr = parseInt(h)
+  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+}
+
+// ─── 1. Customer / booker confirmation ───────────────────────────────────────
+
+/**
+ * sendBookingConfirmationEmail(supabase, {
+ *   to, customerName,
+ *   bookingNumber, bookingId,
+ *   bookingDate, bookingTime,
+ *   providerName, shopName, shopTown,
+ *   vehiclePlate, vehicleMake, vehicleModel,
+ *   services,        — string[]
+ *   isCompany,       — boolean (tweaks copy slightly)
+ * })
+ */
+export async function sendBookingConfirmationEmail(supabase, {
+  to,
+  customerName,
+  bookingNumber,
+  bookingId,
+  bookingDate,
+  bookingTime,
+  providerName,
+  shopName,
+  shopTown,
+  vehiclePlate,
+  vehicleMake,
+  vehicleModel,
+  services = [],
+  isCompany = false,
+}) {
+  const bookingUrl = `${APP_URL()}/${isCompany ? 'company' : 'dashboard'}/bookings/${bookingId}`
+  const servicesList = services.length > 0
+    ? services.map(s => `<li style="padding:3px 0;color:#374151;">${s}</li>`).join('')
+    : '<li style="color:#6b7280;">To be confirmed with provider</li>'
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;max-width:600px;width:100%;">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px 24px;text-align:center;">
+      <p style="margin:0 0 4px;font-size:22px;font-weight:700;color:#fff;">${BRAND_NAME}</p>
+      <p style="margin:0;font-size:14px;color:#bfdbfe;">✅ Booking Confirmed</p>
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr><td style="padding:32px;">
+    <p style="color:#111827;font-size:16px;margin:0 0 20px;">Hello ${customerName},</p>
+    <p style="color:#374151;font-size:15px;margin:0 0 24px;">
+      Your service booking has been placed successfully. Here are the details:
+    </p>
+
+    <!-- Booking details card -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:0 0 24px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;width:38%;">Booking No.</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">${bookingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Date</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${fmtDate(bookingDate)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Time</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${fmtTime(bookingTime)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Provider</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${providerName}</td>
+        </tr>
+        ${shopName ? `<tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Location</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${shopName}${shopTown ? `, ${shopTown}` : ''}</td>
+        </tr>` : ''}
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Vehicle</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">${vehiclePlate}${vehicleMake ? ` · ${vehicleMake} ${vehicleModel || ''}` : ''}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Services -->
+    <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 6px;">Requested services:</p>
+    <ul style="margin:0 0 24px;padding-left:20px;">${servicesList}</ul>
+
+    <!-- Status note -->
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin:0 0 24px;">
+      <p style="margin:0;color:#1e40af;font-size:13px;">
+        ⏳ Your booking is <strong>pending confirmation</strong> from the service provider.
+        You'll receive another notification once they confirm.
+      </p>
+    </div>
+
+    <!-- CTA -->
+    <div style="text-align:center;margin:0 0 8px;">
+      <a href="${bookingUrl}"
+         style="display:inline-block;background:#2563eb;color:#fff;padding:13px 32px;
+                border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        View Booking
+      </a>
+    </div>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center;">
+      <p style="margin:0;font-size:12px;color:#9ca3af;">© ${new Date().getFullYear()} ${BRAND_NAME}</p>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
+
+  const text = `${BRAND_NAME} — Booking Confirmed
+
+Hello ${customerName},
+
+Your booking (${bookingNumber}) has been placed successfully.
+
+Date: ${fmtDate(bookingDate)}
+Time: ${fmtTime(bookingTime)}
+Provider: ${providerName}${shopTown ? `\nLocation: ${shopName || ''}, ${shopTown}` : ''}
+Vehicle: ${vehiclePlate}${vehicleMake ? ` · ${vehicleMake} ${vehicleModel || ''}` : ''}
+
+Your booking is pending confirmation from the provider.
+
+View booking: ${bookingUrl}
+— ${BRAND_NAME}`
+
+  return sendAndQueueEmail(supabase, {
+    to:             [{ Email: to, Name: customerName }],
+    subject:        `Booking Confirmed — ${bookingNumber} · ${providerName}`,
+    html,
+    text,
+    referenceTable: 'bookings',
+    referenceId:    bookingId,
+  })
+}
+
+// ─── 2. Provider new booking alert ───────────────────────────────────────────
+
+/**
+ * sendNewBookingProviderEmail(supabase, {
+ *   to, providerOwnerName,
+ *   bookingNumber, bookingId,
+ *   bookingDate, bookingTime,
+ *   customerName, customerPhone,
+ *   vehiclePlate, vehicleMake, vehicleModel,
+ *   services,
+ *   problemDescription,
+ * })
+ */
+export async function sendNewBookingProviderEmail(supabase, {
+  to,
+  providerOwnerName,
+  bookingNumber,
+  bookingId,
+  bookingDate,
+  bookingTime,
+  customerName,
+  customerPhone,
+  vehiclePlate,
+  vehicleMake,
+  vehicleModel,
+  services = [],
+  problemDescription,
+}) {
+  const bookingUrl  = `${APP_URL()}/provider/bookings/${bookingId}`
+  const servicesList = services.length > 0
+    ? services.map(s => `<li style="padding:3px 0;color:#374151;">${s}</li>`).join('')
+    : '<li style="color:#6b7280;">Not specified</li>'
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;max-width:600px;width:100%;">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:28px 32px 24px;text-align:center;">
+      <p style="margin:0 0 4px;font-size:22px;font-weight:700;color:#fff;">${BRAND_NAME}</p>
+      <p style="margin:0;font-size:14px;color:#bbf7d0;">📋 New Booking Request</p>
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr><td style="padding:32px;">
+    <p style="color:#111827;font-size:16px;margin:0 0 20px;">Hello ${providerOwnerName},</p>
+    <p style="color:#374151;font-size:15px;margin:0 0 24px;">
+      You have a new booking request. Please review and confirm as soon as possible.
+    </p>
+
+    <!-- Details card -->
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:0 0 24px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;width:38%;">Booking No.</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">${bookingNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Date</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${fmtDate(bookingDate)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Time</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${fmtTime(bookingTime)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Customer</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;">${customerName}${customerPhone ? ` · ${customerPhone}` : ''}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#6b7280;font-size:13px;">Vehicle</td>
+          <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">${vehiclePlate}${vehicleMake ? ` · ${vehicleMake} ${vehicleModel || ''}` : ''}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Services -->
+    <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 6px;">Requested services:</p>
+    <ul style="margin:0 0 ${problemDescription ? '16px' : '24px'};padding-left:20px;">${servicesList}</ul>
+
+    ${problemDescription ? `
+    <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 6px;">Problem description:</p>
+    <p style="color:#374151;font-size:13px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin:0 0 24px;">${problemDescription}</p>
+    ` : ''}
+
+    <!-- CTA -->
+    <div style="text-align:center;margin:0 0 8px;">
+      <a href="${bookingUrl}"
+         style="display:inline-block;background:#16a34a;color:#fff;padding:13px 32px;
+                border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+        Review &amp; Confirm Booking
+      </a>
+    </div>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center;">
+      <p style="margin:0;font-size:12px;color:#9ca3af;">© ${new Date().getFullYear()} ${BRAND_NAME}</p>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
+
+  const text = `${BRAND_NAME} — New Booking Request
+
+Hello ${providerOwnerName},
+
+You have a new booking (${bookingNumber}).
+
+Date: ${fmtDate(bookingDate)}
+Time: ${fmtTime(bookingTime)}
+Customer: ${customerName}${customerPhone ? ` · ${customerPhone}` : ''}
+Vehicle: ${vehiclePlate}${vehicleMake ? ` · ${vehicleMake} ${vehicleModel || ''}` : ''}
+${services.length > 0 ? `Services: ${services.join(', ')}\n` : ''}${problemDescription ? `Issue: ${problemDescription}\n` : ''}
+Review booking: ${bookingUrl}
+— ${BRAND_NAME}`
+
+  return sendAndQueueEmail(supabase, {
+    to:             [{ Email: to, Name: providerOwnerName }],
+    subject:        `New Booking Request — ${bookingNumber} · ${vehiclePlate}`,
+    html,
+    text,
+    referenceTable: 'bookings',
+    referenceId:    bookingId,
+  })
+}

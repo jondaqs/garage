@@ -150,52 +150,28 @@ export default function CompanyNewBookingPage() {
 
       const bookingNumber = `BKCO${Date.now()}`
 
-      const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .insert({
-          booking_number:        bookingNumber,
-          service_provider_id:   providerId,
-          shop_id:               formData.shop_id,
-          vehicle_id:            vehicleId,
-          customer_user_id:      profile.id,
-          status_id:             pendingStatus.id,
-          booking_date:          formData.booking_date,
-          booking_time_start:    formData.booking_time,
-          booking_time_end:      calculateEndTime(formData.booking_time),
-          requested_services:    formData.requested_services,
-          problem_description:   formData.problem_description || null,
-          special_instructions:  formData.special_instructions || null,
-          customer_phone:        formData.customer_phone || null,
-          customer_email:        formData.customer_email || null,
-          priority:              'normal',
-          created_by:            user.id,
-        })
-        .select().single()
+      // Submit via API — handles booking insert + email + SMS to both parties
+      const res  = await fetch('/api/bookings', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId:          providerId,
+          vehicleId:           vehicleId,
+          shopId:              formData.shop_id || null,
+          bookingDate:         formData.booking_date,
+          bookingTime:         formData.booking_time,
+          requestedServices:   formData.requested_services,
+          problemDescription:  formData.problem_description || null,
+          specialInstructions: formData.special_instructions || null,
+          customerPhone:       formData.customer_phone || null,
+          customerEmail:       formData.customer_email || null,
+          isCompany:           true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to create booking')
 
-      if (bookingError) throw bookingError
-
-      // Create booking_services records
-      await Promise.all(
-        formData.requested_services.map(serviceId =>
-          supabase.from('booking_services').insert({ booking_id: booking.id, service_id: serviceId })
-        )
-      )
-
-      // Notify provider
-      if (provider?.owner_user_id) {
-        await supabase.from('notifications').insert({
-          recipient_user_id: provider.owner_user_id,
-          notification_type: 'new_booking',
-          type:              'new_booking',
-          title:             'New Booking Request',
-          message:           `New booking from ${vehicle?.plate_number} for ${formData.booking_date}`,
-          reference_id:      booking.id,
-          reference_type:    'booking',
-          is_read:           false,
-        })
-      }
-
-      router.push(`/company/bookings/${booking.id}`)
+      router.push(`/company/bookings/${data.bookingId}`)
 
     } catch (err) {
       console.error('Booking error:', err)
