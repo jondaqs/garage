@@ -153,12 +153,10 @@ export async function queueSmsRecord(supabase, {
       .from('sms_queue')
       .insert({
         recipient_phone: recipientPhone,
-        recipient_name:  recipientName  || null,
+        // recipient_name, reference_table, reference_id not on this table
         message,
         status,
-        reference_table: referenceTable || null,
-        reference_id:    referenceId    || null,
-        error_message:   errorMessage   || null,
+        error_message:   errorMessage || null,
       })
       .select('id')
       .single()
@@ -179,11 +177,11 @@ export async function markSmsQueued(supabase, queueId, { status, sentAt, errorMe
   try {
     await supabase.from('sms_queue').update({
       status,
-      sent_at:             sentAt       || null,
-      error_message:       errorMessage || null,
-      provider_message_id: messageId    || null,
-      cost:                cost         || null,
+      sent_at:       sentAt       || null,
+      error_message: errorMessage || null,
+      // provider_message_id, cost not on this table
     }).eq('id', queueId)
+    if (messageId) console.log(`[sms_queue] messageId=${messageId}`)
   } catch (err) {
     console.warn('⚠️  sms_queue update failed (non-fatal):', err.message)
   }

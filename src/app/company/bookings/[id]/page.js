@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import AddToCalendarButton from '@/components/calendar/AddToCalendarButton'
 import {
   ArrowLeft, Truck, MapPin, Calendar, Clock,
   Phone, Mail, Wrench, XCircle, AlertCircle, CheckCircle
@@ -134,6 +135,17 @@ export default function CompanyBookingDetailPage() {
             Created {new Date(booking.created_at).toLocaleDateString('en-KE', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
+        {/* Add to Calendar — shown for non-cancelled bookings */}
+        {!['cancelled'].includes(booking?.status?.code) && (
+          <AddToCalendarButton
+            booking={{
+              ...booking,
+              // company page uses 'provider' alias; addToCalendar expects 'service_provider'
+              service_provider: booking.provider,
+            }}
+            variant="dropdown"
+          />
+        )}
         {canCancel && (
           <button
             onClick={handleCancel}

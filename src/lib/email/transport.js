@@ -24,8 +24,8 @@ function getMailjetConfig() {
   return {
     auth: `Basic ${Buffer.from(`${apiKey}:${secretKey}`).toString('base64')}`,
     from: {
-      Email: process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com',
-      Name:  process.env.MAILJET_FROM_NAME  || 'Motiifix',
+      Email: process.env.MAILJET_FROM_EMAIL || 'noreply@garicare.com',
+      Name:  process.env.MAILJET_FROM_NAME  || 'GariCare',
     },
   }
 }
@@ -102,11 +102,11 @@ export async function queueEmailRecord(supabase, {
         recipient_email: recipientEmail,
         subject,
         body_html:       bodyHtml,
-        body_text:       bodyText,
+        body_text:       bodyText || null,
         status,
         error_message:   errorMessage || null,
-        reference_table: referenceTable || null,
-        reference_id:    referenceId   || null,
+        // note: reference_table / reference_id / provider_message_id
+        // are not on this table — logged via console only
       })
       .select('id')
       .single()
@@ -135,9 +135,10 @@ export async function markEmailQueued(supabase, queueId, { status, sentAt, error
         status,
         sent_at:       sentAt       || null,
         error_message: errorMessage || null,
-        provider_message_id: messageId || null,
+        // provider_message_id not on table — log instead
       })
       .eq('id', queueId)
+    if (messageId) console.log(`[email_queue] messageId=${messageId}`)
   } catch (err) {
     console.warn('⚠️  email_queue update failed (non-fatal):', err.message)
   }
