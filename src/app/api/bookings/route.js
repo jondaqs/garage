@@ -143,18 +143,20 @@ export async function POST(request) {
 
     // ── In-app notification to provider ──────────────────────────────────────
     if (provider?.owner_user_id) {
-      await supabase.from('notifications').insert({
-        recipient_user_id:  provider.owner_user_id,
-        user_id:            provider.owner_user_id,
-        type:               'new_booking',
-        notification_type:  'new_booking',
-        title:              'New Booking Request',
-        message:            `New booking ${bookingNumber} from ${vehicle?.plate_number} for ${bookingDate}`,
-        reference_id:       booking.id,
-        reference_type:     'booking',
-        reference_table:    'bookings',
-        is_read:            false,
-      }).catch(e => console.error('Notification insert failed (non-fatal):', e.message))
+      try {
+        await supabase.from('notifications').insert({
+          recipient_user_id:  provider.owner_user_id,
+          user_id:            provider.owner_user_id,
+          type:               'new_booking',
+          notification_type:  'new_booking',
+          title:              'New Booking Request',
+          message:            `New booking ${bookingNumber} from ${vehicle?.plate_number} for ${bookingDate}`,
+          reference_id:       booking.id,
+          reference_type:     'booking',
+          reference_table:    'bookings',
+          is_read:            false,
+        })
+      } catch (e) { console.error('Notification insert failed (non-fatal):', e.message) }
     }
 
     // ── Fetch service names for comms ─────────────────────────────────────────
@@ -199,43 +201,34 @@ export async function POST(request) {
 
     // ── Customer email ────────────────────────────────────────────────────────
     if (effectiveEmail) {
-      sendBookingConfirmationEmail(supabase, {
-        to:           effectiveEmail,
-        customerName,
-        isCompany,
-        ...sharedArgs,
-      }).catch(e => console.error('Customer email failed (non-fatal):', e.message))
+      ;(async () => {
+        try { await sendBookingConfirmationEmail(supabase, { to: effectiveEmail, customerName, isCompany, ...sharedArgs }) }
+        catch (e) { console.error('Customer email failed (non-fatal):', e.message) }
+      })()
     }
 
     // ── Customer SMS ──────────────────────────────────────────────────────────
     if (effectivePhone) {
-      sendBookingConfirmationSms(supabase, {
-        phone:        effectivePhone,
-        customerName,
-        isCompany,
-        ...sharedArgs,
-      }).catch(e => console.error('Customer SMS failed (non-fatal):', e.message))
+      ;(async () => {
+        try { await sendBookingConfirmationSms(supabase, { phone: effectivePhone, customerName, isCompany, ...sharedArgs }) }
+        catch (e) { console.error('Customer SMS failed (non-fatal):', e.message) }
+      })()
     }
 
     // ── Provider email ────────────────────────────────────────────────────────
     if (providerOwner?.email) {
-      sendNewBookingProviderEmail(supabase, {
-        to:               providerOwner.email,
-        providerOwnerName: provOwnerName,
-        customerName,
-        customerPhone:    effectivePhone || null,
-        ...sharedArgs,
-      }).catch(e => console.error('Provider email failed (non-fatal):', e.message))
+      ;(async () => {
+        try { await sendNewBookingProviderEmail(supabase, { to: providerOwner.email, providerOwnerName: provOwnerName, customerName, customerPhone: effectivePhone || null, ...sharedArgs }) }
+        catch (e) { console.error('Provider email failed (non-fatal):', e.message) }
+      })()
     }
 
     // ── Provider SMS ──────────────────────────────────────────────────────────
     if (providerOwner?.phone) {
-      sendNewBookingProviderSms(supabase, {
-        phone:             providerOwner.phone,
-        providerOwnerName: provOwnerName,
-        customerName,
-        ...sharedArgs,
-      }).catch(e => console.error('Provider SMS failed (non-fatal):', e.message))
+      ;(async () => {
+        try { await sendNewBookingProviderSms(supabase, { phone: providerOwner.phone, providerOwnerName: provOwnerName, customerName, ...sharedArgs }) }
+        catch (e) { console.error('Provider SMS failed (non-fatal):', e.message) }
+      })()
     }
 
     return NextResponse.json({
