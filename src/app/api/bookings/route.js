@@ -254,79 +254,58 @@ export async function POST(request) {
       problemDescription: problemDescription   || null,
     }
 
-    // ── Customer email ────────────────────────────────────────────────────────
+    // ── Send all comms in parallel, awaited so logs appear before response ──────
+    const commTasks = []
+
     if (custEmail) {
-      ;(async () => {
-        try {
-            console.log(`[/api/bookings] sending customer email to ${custEmail} with args:`)
-          await sendBookingConfirmationEmail(supabase, {
-            to: custEmail, customerName, isCompany, ...sharedArgs,
-          })
-          console.log(`[/api/bookings] customer email sent → ${custEmail}`)
-        } catch (e) {
-          console.error('[/api/bookings] customer email failed:', e.message)
-        }
-      })()
+      commTasks.push(
+        sendBookingConfirmationEmail(supabase, {
+          to: custEmail, customerName, isCompany, ...sharedArgs,
+        }).then(() => console.log(`[/api/bookings] ✓ customer email → ${custEmail}`))
+          .catch(e => console.error('[/api/bookings] ✗ customer email:', e.message))
+      )
     } else {
-      console.warn('[/api/bookings] no customer email — skipping customer email')
+      console.warn('[/api/bookings] no customer email — skipped')
     }
 
-    // ── Customer SMS ──────────────────────────────────────────────────────────
     if (custPhone) {
-      ;(async () => {
-        try {
-          await sendBookingConfirmationSms(supabase, {
-            phone: custPhone, customerName, isCompany, ...sharedArgs,
-          })
-          console.log(`[/api/bookings] customer SMS sent → ${custPhone}`)
-        } catch (e) {
-          console.error('[/api/bookings] customer SMS failed:', e.message)
-        }
-      })()
+      commTasks.push(
+        sendBookingConfirmationSms(supabase, {
+          phone: custPhone, customerName, isCompany, ...sharedArgs,
+        }).then(() => console.log(`[/api/bookings] ✓ customer SMS → ${custPhone}`))
+          .catch(e => console.error('[/api/bookings] ✗ customer SMS:', e.message))
+      )
     } else {
-      console.warn('[/api/bookings] no customer phone — skipping customer SMS')
+      console.warn('[/api/bookings] no customer phone — skipped')
     }
 
-    // ── Provider email ────────────────────────────────────────────────────────
     if (provOwnerEmail) {
-      ;(async () => {
-        try {
-            console.log(`[/api/bookings] sending provider email to ${provOwnerEmail} with args:`)
-          await sendNewBookingProviderEmail(supabase, {
-            to:               provOwnerEmail,
-            providerOwnerName: provOwnerName,
-            customerName,
-            customerPhone:    custPhone || null,
-            ...sharedArgs,
-          })
-          console.log(`[/api/bookings] provider email sent → ${provOwnerEmail}`)
-        } catch (e) {
-          console.error('[/api/bookings] provider email failed:', e.message)
-        }
-      })()
+      commTasks.push(
+        sendNewBookingProviderEmail(supabase, {
+          to: provOwnerEmail, providerOwnerName: provOwnerName,
+          customerName, customerPhone: custPhone || null, ...sharedArgs,
+        }).then(() => console.log(`[/api/bookings] ✓ provider email → ${provOwnerEmail}`))
+          .catch(e => console.error('[/api/bookings] ✗ provider email:', e.message))
+      )
     } else {
-      console.warn('[/api/bookings] no provider owner email — skipping provider email')
+      console.warn('[/api/bookings] no provider email — skipped')
     }
 
-    // ── Provider SMS ──────────────────────────────────────────────────────────
     if (provOwnerPhone) {
-      ;(async () => {
-        try {
-            console.log(`[/api/bookings] sending provider SMS to ${provOwnerPhone} with args:`)
-          await sendNewBookingProviderSms(supabase, {
-            phone:             provOwnerPhone,
-            providerOwnerName: provOwnerName,
-            customerName,
-            ...sharedArgs,
-          })
-          console.log(`[/api/bookings] provider SMS sent → ${provOwnerPhone}`)
-        } catch (e) {
-          console.error('[/api/bookings] provider SMS failed:', e.message)
-        }
-      })()
+      commTasks.push(
+        sendNewBookingProviderSms(supabase, {
+          phone: provOwnerPhone, providerOwnerName: provOwnerName,
+          customerName, ...sharedArgs,
+        }).then(() => console.log(`[/api/bookings] ✓ provider SMS → ${provOwnerPhone}`))
+          .catch(e => console.error('[/api/bookings] ✗ provider SMS:', e.message))
+      )
     } else {
-      console.warn('[/api/bookings] no provider phone — skipping provider SMS')
+      console.warn('[/api/bookings] no provider phone — skipped')
     }
+
+    // Wait for all — allSettled so one failure never blocks others
+    await Promise.allSettled(commTasks)
+    console.log(`[/api/bookings] comms complete (${commTasks.length} tasks)`)
 
     return NextResponse.json({
       success:       true,
