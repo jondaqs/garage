@@ -258,6 +258,7 @@ export async function POST(request) {
     if (custEmail) {
       ;(async () => {
         try {
+            console.log(`[/api/bookings] sending customer email to ${custEmail} with args:`)
           await sendBookingConfirmationEmail(supabase, {
             to: custEmail, customerName, isCompany, ...sharedArgs,
           })
@@ -290,6 +291,7 @@ export async function POST(request) {
     if (provOwnerEmail) {
       ;(async () => {
         try {
+            console.log(`[/api/bookings] sending provider email to ${provOwnerEmail} with args:`)
           await sendNewBookingProviderEmail(supabase, {
             to:               provOwnerEmail,
             providerOwnerName: provOwnerName,
@@ -310,6 +312,7 @@ export async function POST(request) {
     if (provOwnerPhone) {
       ;(async () => {
         try {
+            console.log(`[/api/bookings] sending provider SMS to ${provOwnerPhone} with args:`)
           await sendNewBookingProviderSms(supabase, {
             phone:             provOwnerPhone,
             providerOwnerName: provOwnerName,
