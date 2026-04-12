@@ -24,8 +24,8 @@ function getMailjetConfig() {
   return {
     auth: `Basic ${Buffer.from(`${apiKey}:${secretKey}`).toString('base64')}`,
     from: {
-      Email: process.env.MAILJET_FROM_EMAIL || 'noreply@garicare.com',
-      Name:  process.env.MAILJET_FROM_NAME  || 'GariCare',
+      Email: process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com',
+      Name:  process.env.MAILJET_FROM_NAME  || 'Motiifix',
     },
   }
 }
@@ -45,9 +45,8 @@ function getMailjetConfig() {
  * @throws on network error or Mailjet non-2xx response
  */
 export async function sendEmail({ to, subject, html, text, replyTo }) {
+    console.log('sendEmail called with args:', { to, subject, replyTo }) // Debug log
   const { auth, from } = getMailjetConfig()
-  const toStr = Array.isArray(to) ? to.map(t => t.Email).join(', ') : to
-  console.log(`[sendEmail] Sending "${subject}" to ${toStr}`)
 
   const message = {
     From:     from,
@@ -66,6 +65,7 @@ export async function sendEmail({ to, subject, html, text, replyTo }) {
 
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}))
+    console.error('sendEmail: Mailjet request failed:', { status: response.status, body: errBody })
     throw new Error(
       `Mailjet HTTP ${response.status}: ${JSON.stringify(errBody)}`
     )
@@ -73,7 +73,6 @@ export async function sendEmail({ to, subject, html, text, replyTo }) {
 
   const data      = await response.json()
   const messageId = data.Messages?.[0]?.To?.[0]?.MessageID ?? null
-  console.log(`[sendEmail] Sent OK messageId=${messageId}`)
   return { messageId }
 }
 
@@ -175,6 +174,7 @@ export async function sendAndQueueEmail(supabase, {
   })
 
   try {
+    console.log('SendAndQueueEmail: Attempting to send email with args:', { to, subject, referenceTable, referenceId }) // Debug log
     const { messageId } = await sendEmail({ to: Array.isArray(to) ? to : [{ Email: to }], subject, html, text, replyTo })
 
     await markEmailQueued(supabase, queueId, {
@@ -185,6 +185,7 @@ export async function sendAndQueueEmail(supabase, {
 
     return { sent: true, messageId, queueId }
   } catch (err) {
+    console.error('SendAndQueueEmail: Email send failed:', err.message)
     await markEmailQueued(supabase, queueId, {
       status:       'failed',
       errorMessage: err.message,
