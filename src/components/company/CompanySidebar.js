@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
-  Home, Truck, Users, Calendar, ClipboardList,
+  Home, Truck, Users, Calendar, CalendarDays, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle,
   Bell, Menu, X
 } from 'lucide-react'
@@ -66,6 +66,7 @@ export default function CompanySidebar({ company, userRole }) {
     { name: 'Fleet',       href: '/company/fleet',        icon: Truck        },
     { name: 'Team',        href: '/company/team',         icon: Users        },
     { name: 'Bookings',    href: '/company/bookings',     icon: Calendar     },
+    { name: 'Calendar',    href: '/company/calendar',     icon: CalendarDays },
     { name: 'Work Orders', href: '/company/work-orders',  icon: ClipboardList,
       badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
     { name: 'Reminders',   href: '/company/reminders',   icon: Bell,
