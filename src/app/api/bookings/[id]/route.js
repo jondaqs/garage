@@ -49,8 +49,8 @@ const fmtTime = (t) => {
   return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
 }
 
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garicare.com'
-const BRAND   = 'GariCare'
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const BRAND   = 'Motiifix' // Brand name used in communications
 
 function buildEmail({ status, booking, customerName, bookingUrl }) {
   const isConfirmed = status === 'confirmed'
