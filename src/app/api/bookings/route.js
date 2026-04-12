@@ -122,6 +122,7 @@ export async function POST(request) {
     if (!pendingStatus) {
       return NextResponse.json({ error: '"pending" booking status not found' }, { status: 500 })
     }
+    console.log(`[/api/bookings] provider=${provider?.name} owner_user_id=${provider?.owner_user_id||'MISSING'}`)
 
     // ── Load shop (optional) ──────────────────────────────────────────────────
     let shop = null
@@ -198,17 +199,34 @@ export async function POST(request) {
     let provOwnerPhone = null
 
     if (provider?.owner_user_id) {
-      const { data: provProfile } = await supabase
-        .from('user_profiles')
-        .select('id, first_name, last_name, phone, email')
-        .eq('id', provider.owner_user_id)
-        .maybeSingle()
+      // Must use service client — RLS on user_profiles only allows reading own row
+      try {
+        const sc = getServiceClient()
+        const { data: provProfile } = await sc
+          .from('user_profiles')
+          .select('id, first_name, last_name, phone, email, auth_user_id')
+          .eq('id', provider.owner_user_id)
+          .maybeSingle()
 
-      if (provProfile) {
-        provOwnerName  = `${provProfile.first_name || ''} ${provProfile.last_name || ''}`.trim() || 'Provider'
-        provOwnerPhone = provProfile.phone || null
-        provOwnerEmail = provProfile.email || await resolveEmail(provProfile.id)
+        if (provProfile) {
+          provOwnerName  = `${provProfile.first_name || ''} ${provProfile.last_name || ''}`.trim() || 'Provider'
+          provOwnerPhone = provProfile.phone || null
+          // email is synced by handle_new_user trigger; fallback to auth.users
+          if (provProfile.email) {
+            provOwnerEmail = provProfile.email
+          } else if (provProfile.auth_user_id) {
+            const { data: au } = await sc.auth.admin.getUserById(provProfile.auth_user_id)
+            provOwnerEmail = au?.user?.email || null
+          }
+          console.log(`[/api/bookings] provider profile: name=${provOwnerName} email=${provOwnerEmail||'none'} phone=${provOwnerPhone||'none'}`)
+        } else {
+          console.warn(`[/api/bookings] provider owner profile not found for id=${provider.owner_user_id}`)
+        }
+      } catch (e) {
+        console.error('[/api/bookings] provider profile lookup failed:', e.message)
       }
+    } else {
+      console.warn('[/api/bookings] provider has no owner_user_id — cannot resolve provider contact')
     }
 
     console.log(`[/api/bookings] booking=${booking.id} customer=${custEmail||'no-email'} provider=${provOwnerEmail||'no-email'}`)
