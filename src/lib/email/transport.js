@@ -45,6 +45,7 @@ function getMailjetConfig() {
  * @throws on network error or Mailjet non-2xx response
  */
 export async function sendEmail({ to, subject, html, text, replyTo }) {
+    console.log('sendEmail called with args:', { to, subject, replyTo }) // Debug log
   const { auth, from } = getMailjetConfig()
 
   const message = {
@@ -64,6 +65,7 @@ export async function sendEmail({ to, subject, html, text, replyTo }) {
 
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}))
+    console.error('sendEmail: Mailjet request failed:', { status: response.status, body: errBody })
     throw new Error(
       `Mailjet HTTP ${response.status}: ${JSON.stringify(errBody)}`
     )
@@ -172,6 +174,7 @@ export async function sendAndQueueEmail(supabase, {
   })
 
   try {
+    console.log('SendAndQueueEmail: Attempting to send email with args:', { to, subject, referenceTable, referenceId }) // Debug log
     const { messageId } = await sendEmail({ to: Array.isArray(to) ? to : [{ Email: to }], subject, html, text, replyTo })
 
     await markEmailQueued(supabase, queueId, {
@@ -182,6 +185,7 @@ export async function sendAndQueueEmail(supabase, {
 
     return { sent: true, messageId, queueId }
   } catch (err) {
+    console.error('SendAndQueueEmail: Email send failed:', err.message)
     await markEmailQueued(supabase, queueId, {
       status:       'failed',
       errorMessage: err.message,
