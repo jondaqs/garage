@@ -30,8 +30,12 @@ const TYPE_CONFIG = {
   payment_received:            { icon: DollarSign,   bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Payment Received' },
 
   // Work order lifecycle
-  work_order_created:          { icon: ClipboardList, bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'WO Created'     },
-  work_order_completed:        { icon: Wrench,        bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'WO Complete'    },
+  work_order_created:          { icon: ClipboardList, bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'WO Created'       },
+  work_order_completed:        { icon: Wrench,        bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'WO Complete'      },
+  work_order_assigned:         { icon: Wrench,        bg: 'bg-orange-100', iconCls: 'text-orange-600', label: 'WO Assigned'      },
+  mechanic_acknowledged:       { icon: Wrench,        bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Assignment Ack.'  },
+  mechanic_declined:           { icon: Wrench,        bg: 'bg-red-100',    iconCls: 'text-red-600',    label: 'Assignment Dec.'  },
+  internal_review_needed:      { icon: ClipboardList, bg: 'bg-violet-100', iconCls: 'text-violet-600', label: 'Review Needed'    },
   booking_accepted:            { icon: Car,           bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Booking Accepted' },
 
   // Existing types
@@ -84,6 +88,10 @@ function getNotificationHref(n, isProvider, isCompany) {
     // booking_accepted creates a work_order — always route to the WO page
     if (isProvider) return `/provider/work-orders/${refId}`
     if (isCompany)  return `/company/work-orders/${refId}`
+    // Mechanic assignment notifications — route to my-teams work order page
+    if (type === 'work_order_assigned' || type === 'mechanic_acknowledged' || type === 'mechanic_declined') {
+      return `/dashboard/my-teams/work-order/${refId}`
+    }
     return `/dashboard/work-orders/${refId}`
   }
   if (refType === 'booking' || type.includes('booking')) {

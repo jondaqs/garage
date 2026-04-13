@@ -56,6 +56,10 @@ export default function MechanicWorkOrderPage() {
   const [acting,      setActing]      = useState(false)
   const [activeTab,   setActiveTab]   = useState('overview')
 
+  // Gating counts
+  const [issueCount,   setIssueCount]   = useState(null)
+  const [serviceCount, setServiceCount] = useState(null)
+
   // Decline form
   const [showDecline,   setShowDecline]   = useState(false)
   const [declineReason, setDeclineReason] = useState('')
@@ -76,6 +80,13 @@ export default function MechanicWorkOrderPage() {
       if (!result?.success) throw new Error(result?.error || 'Access denied or work order not found')
       setWo(result.work_order)
       setPerms(result.mechanic_permissions)
+
+      // Fetch gate counts
+      const woId = result.work_order.id
+      supabase.from('work_order_issues').select('id', { count: 'exact', head: true })
+        .eq('work_order_id', woId).then(({ count }) => setIssueCount(count || 0)).catch(() => {})
+      supabase.from('work_order_services').select('id', { count: 'exact', head: true })
+        .eq('work_order_id', woId).then(({ count }) => setServiceCount(count || 0)).catch(() => {})
     } catch (err) {
       setError(err.message)
     } finally {
@@ -356,8 +367,19 @@ export default function MechanicWorkOrderPage() {
                 )}
                 {statusCode === 'diagnosing' && (
                   <div className="flex flex-col gap-1.5">
-                    <button onClick={() => { handleAdvanceStatus('services_estimates'); setActiveTab('services') }}
-                      disabled={acting} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50">
+                    {issueCount !== null && issueCount === 0 && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        ⚠️ Document at least one issue/diagnostic before moving to estimates
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!issueCount) { setActiveTab('issues'); return }
+                        handleAdvanceStatus('services_estimates')
+                        setActiveTab('services')
+                      }}
+                      disabled={acting}
+                      className={`px-3 py-1.5 text-white rounded-lg text-xs font-medium disabled:opacity-50 ${!issueCount ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
                       Move to Services &amp; Parts Estimates
                     </button>
                     <p className="text-xs text-purple-700">Document all issues first, then move to add service &amp; parts estimates.</p>
@@ -365,8 +387,18 @@ export default function MechanicWorkOrderPage() {
                 )}
                 {statusCode === 'services_estimates' && (
                   <div className="flex flex-col gap-1.5">
-                    <button onClick={() => handleAdvanceStatus('internal_review')}
-                      disabled={acting} className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50">
+                    {serviceCount !== null && serviceCount === 0 && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        ⚠️ Add at least one service or part before submitting for review
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!serviceCount) { setActiveTab('services'); return }
+                        handleAdvanceStatus('internal_review')
+                      }}
+                      disabled={acting}
+                      className={`px-3 py-1.5 text-white rounded-lg text-xs font-medium disabled:opacity-50 ${!serviceCount ? 'bg-violet-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700'}`}>
                       Submit for Internal Review
                     </button>
                     <p className="text-xs text-blue-700">Add all service &amp; parts estimates, then submit for provider review before sending to customer.</p>

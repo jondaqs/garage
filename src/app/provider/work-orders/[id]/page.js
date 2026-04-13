@@ -42,7 +42,7 @@ const TIMELINE = [
 const NEXT_STATUS_MAP = {
   intake:            [{ code: 'assigned',          label: 'Transition to Assigned',   color: 'bg-blue-600 hover:bg-blue-700'     }],
   assigned:          [{ code: 'diagnosing',         label: 'Begin Diagnostics',            color: 'bg-purple-600 hover:bg-purple-700' }],
-  diagnosing:        [{ code: 'services_estimates', label: 'Move to Services & Parts Estimates', color: 'bg-blue-600 hover:bg-blue-700' }],
+  diagnosing:        [{ code: 'services_estimates', label: 'Move to Services & Parts Estimates', color: 'bg-blue-600 hover:bg-blue-700', requires_issues: true }],
   services_estimates:[{ code: 'internal_review',   label: 'Submit for Internal Review',         color: 'bg-violet-600 hover:bg-violet-700', requires_estimates: true }],
   internal_review:   [{ code: 'awaiting_approval', label: 'Send Estimates for Approval',         color: 'bg-yellow-500 hover:bg-yellow-600', via_internal_review: true }],
   approved:          [{ code: 'in_progress',       label: 'Start Service',                       color: 'bg-orange-500 hover:bg-orange-600' }],
@@ -181,6 +181,18 @@ export default function WorkOrderDetailPage() {
     }
   }, [params.id])
 
+  // ── Load estimate independently (not relying on ServicesTab mount) ────────
+  const loadEstimate = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data } = await supabase.rpc('calculate_work_order_estimate', {
+        p_work_order_id:    params.id,
+        p_provider_user_id: user.id,
+      })
+      if (data?.success) setEstimate(data)
+    } catch {}
+  }, [params.id])
+
   const loadMechanics = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -227,8 +239,9 @@ export default function WorkOrderDetailPage() {
     if (params.id) {
       loadWorkOrder()
       loadMechanics()
+      loadEstimate()
     }
-  }, [params.id, loadWorkOrder, loadMechanics])
+  }, [params.id, loadWorkOrder, loadMechanics, loadEstimate])
 
   // ── Actions ─────────────────────────────────────────────────────────────
   const handleCheckIn = async () => {
@@ -305,8 +318,8 @@ export default function WorkOrderDetailPage() {
     finally { setUpdating(false) }
   }
 
-  const advanceStatus = async (newStatusCode) => {
-    if (!confirm(`Move to "${newStatusCode.replace(/_/g,' ')}"?`)) return
+  const advanceStatus = async (newStatusCode, skipConfirm = false) => {
+    if (!skipConfirm && !confirm(`Move to "${newStatusCode.replace(/_/g,' ')}"?`)) return
     setUpdating(true); setError('')
     try {
       const { data: newStatus } = await supabase
@@ -317,6 +330,7 @@ export default function WorkOrderDetailPage() {
       const { error: upErr } = await supabase.from('work_orders').update(patch).eq('id', params.id)
       if (upErr) throw upErr
       setSuccess(`Status → ${newStatusCode.replace(/_/g,' ')}`)
+      loadEstimate()
       await loadWorkOrder()
     } catch (e) { setError(e.message) }
     finally { setUpdating(false) }
@@ -543,6 +557,35 @@ export default function WorkOrderDetailPage() {
 
             {/* Status advances — intercept special actions */}
             {nextActions.map(action => {
+              {/* Diagnosing → Services & Parts Estimates (requires issues populated) */}
+              if (action.requires_issues) {
+                const issuesReady = issueCount !== null && issueCount > 0
+                return (
+                  <div key={action.code} className="flex flex-col gap-1.5">
+                    {!issuesReady && issueCount !== null && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        Document at least one issue/diagnostic before moving to estimates
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!issuesReady) {
+                          setActiveTab('issues')
+                          setError('Please document at least one issue/diagnostic finding before moving to Services & Parts Estimates.')
+                          return
+                        }
+                        advanceStatus(action.code)
+                      }}
+                      disabled={updating}
+                      className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${!issuesReady ? 'opacity-60' : ''} ${action.color}`}>
+                      {updating && <Loader2 size={13} className="animate-spin" />}
+                      {action.label}
+                    </button>
+                  </div>
+                )
+              }
+
               {/* Services & Parts Estimates → Internal Review (requires services populated) */}
               if (action.requires_estimates) {
                 const servicesReady = serviceCount !== null && serviceCount > 0
@@ -561,8 +604,10 @@ export default function WorkOrderDetailPage() {
                           setError('Add at least one service or part estimate before submitting for internal review.')
                           return
                         }
-                        advanceStatus('internal_review')
-                        .then(() => handleInternalReview().catch(() => {}))
+                        ;(async () => {
+                          await advanceStatus('internal_review', true)
+                          await handleInternalReview().catch(() => {})
+                        })()
                       }}
                       disabled={updating}
                       className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${!servicesReady ? 'opacity-60' : ''} ${action.color}`}>
