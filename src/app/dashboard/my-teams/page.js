@@ -14,16 +14,11 @@ export default function MyTeamsPage() {
   const [editing, setEditing] = useState(null)
   const [editData, setEditData] = useState({})
   const [pendingInvitations, setPendingInvitations] = useState([])
-  const [assignedWorkOrders, setAssignedWorkOrders] = useState([])
   const [responding, setResponding] = useState(null)   // invitation id being responded to
-  const [acknowledging, setAcknowledging] = useState(null)  // wo id being actioned
-  const [declineReason, setDeclineReason] = useState('')
-  const [showDeclineForm, setShowDeclineForm] = useState(null)  // wo id
 
   useEffect(() => {
     loadTeams()
     loadPendingInvitations()
-    loadAssignedWorkOrders()
   }, [])
 
   const loadTeams = async () => {
@@ -115,17 +110,6 @@ export default function MyTeamsPage() {
     } catch (e) { console.error('loadPendingInvitations error:', e) }
   }
 
-  const loadAssignedWorkOrders = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: result } = await supabase.rpc(
-        'get_mechanic_assigned_work_orders',
-        { p_mechanic_user_id: user.id }
-      )
-      if (result?.success) setAssignedWorkOrders(result.work_orders || [])
-    } catch (e) { console.error('loadAssignedWorkOrders error:', e) }
-  }
-
   const respondToInvitation = async (invitationId, action) => {
     setResponding(invitationId)
     try {
@@ -140,39 +124,6 @@ export default function MyTeamsPage() {
       if (action === 'accept') loadTeams()
     } catch (e) { alert(e.message) }
     finally { setResponding(null) }
-  }
-
-  const acknowledgeWorkOrder = async (woId) => {
-    setAcknowledging(woId)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data, error } = await supabase.rpc('acknowledge_work_order_assignment', {
-        p_work_order_id:    woId,
-        p_mechanic_user_id: user.id,
-      })
-      if (error) throw error
-      if (!data.success) throw new Error(data.error)
-      await loadAssignedWorkOrders()
-    } catch (e) { alert(e.message) }
-    finally { setAcknowledging(null) }
-  }
-
-  const declineWorkOrder = async (woId) => {
-    setAcknowledging(woId)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data, error } = await supabase.rpc('decline_work_order_assignment', {
-        p_work_order_id:    woId,
-        p_mechanic_user_id: user.id,
-        p_decline_reason:   declineReason || null,
-      })
-      if (error) throw error
-      if (!data.success) throw new Error(data.error)
-      setShowDeclineForm(null)
-      setDeclineReason('')
-      await loadAssignedWorkOrders()
-    } catch (e) { alert(e.message) }
-    finally { setAcknowledging(null) }
   }
 
   const handleLeaveTeam = async (mechanicId, providerName) => {
@@ -313,112 +264,6 @@ export default function MyTeamsPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Assigned Work Orders */}
-        {assignedWorkOrders.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
-            <h2 className="text-base font-semibold text-blue-900 mb-3 flex items-center gap-2">
-              <span className="text-blue-600">🔧</span>
-              Assigned Work Orders ({assignedWorkOrders.length})
-            </h2>
-            <div className="space-y-3">
-              {assignedWorkOrders.map(wo => {
-                const isPending = wo.mechanic_assignment_status === 'pending'
-                const isAcknowledged = wo.mechanic_assignment_status === 'acknowledged'
-                return (
-                  <div key={wo.id} className="bg-white rounded-lg border border-blue-200 p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-gray-900">{wo.work_order_number}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            isAcknowledged ? 'bg-green-100 text-green-700' :
-                            isPending      ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {isAcknowledged ? '✓ Acknowledged' : isPending ? '⏳ Awaiting your response' : wo.mechanic_assignment_status}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-0.5">
-                          {wo.vehicle?.plate_number}{wo.vehicle?.make ? ` · ${wo.vehicle.make} ${wo.vehicle.model || ''}` : ''}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {wo.provider?.name} · Status: {wo.status?.display_name}
-                        </p>
-                        {wo.problem_description && (
-                          <p className="text-xs text-gray-500 mt-1 italic line-clamp-1">"{wo.problem_description}"</p>
-                        )}
-
-                        {/* Decline form */}
-                        {showDeclineForm === wo.id && (
-                          <div className="mt-3 space-y-2">
-                            <textarea
-                              value={declineReason}
-                              onChange={e => setDeclineReason(e.target.value)}
-                              placeholder="Reason for declining (optional)..."
-                              rows={2}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => declineWorkOrder(wo.id)}
-                                disabled={acknowledging === wo.id}
-                                className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                              >
-                                {acknowledging === wo.id ? 'Declining…' : 'Confirm Decline'}
-                              </button>
-                              <button
-                                onClick={() => { setShowDeclineForm(null); setDeclineReason('') }}
-                                className="px-4 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {isPending && showDeclineForm !== wo.id && (
-                        <div className="flex gap-2 flex-shrink-0 flex-wrap">
-                          <button
-                            onClick={() => router.push(`/dashboard/my-teams/work-order/${wo.id}`)}
-                            className="px-3 py-2 border border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50"
-                          >
-                            View Details
-                          </button>
-                          <button
-                            onClick={() => acknowledgeWorkOrder(wo.id)}
-                            disabled={acknowledging === wo.id}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-                          >
-                            {acknowledging === wo.id ? '…' : 'Acknowledge'}
-                          </button>
-                          <button
-                            onClick={() => setShowDeclineForm(wo.id)}
-                            className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      )}
-
-                      {isAcknowledged && (
-                        <div className="flex-shrink-0">
-                          <button
-                            onClick={() => router.push(`/dashboard/my-teams/work-order/${wo.id}`)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                          >
-                            Open Work Order
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
             </div>
           </div>
         )}

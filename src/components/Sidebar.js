@@ -4,7 +4,8 @@ import {
   Car, User, Plus, Calendar, CalendarDays, History, Bell,
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
-  AlertCircle, ClipboardList} from 'lucide-react'
+  AlertCircle, Wrench,
+  ClipboardList} from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect } from 'react'
@@ -39,6 +40,8 @@ export default function Sidebar({ user }) {
   const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }
   const [companyNavOpen,  setCompanyNavOpen]  = useState(true)       // expanded by default
   const [membershipLoading, setMembershipLoading] = useState(true)
+  const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory }]
+  const [providerNavOpen, setProviderNavOpen] = useState({})         // { [providerId]: bool }
 
   // ── Fetch company membership once on mount ────────────────────────────────
   useEffect(() => {
@@ -88,6 +91,44 @@ export default function Sidebar({ user }) {
     } finally {
       setMembershipLoading(false)
     }
+
+    // ── Fetch mechanic (service provider team) memberships ─────────────────
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      if (!profile) return
+
+      const { data: mechs } = await supabase
+        .from('mechanics')
+        .select(`
+          id,
+          role,
+          can_approve_work,
+          can_manage_inventory,
+          service_provider:service_providers(id, name)
+        `)
+        .eq('user_id', profile.id)
+        .eq('is_active', true)
+
+      if (mechs?.length) {
+        setMechanicMemberships(mechs.map(m => ({
+          mechanicId:          m.id,
+          providerId:          m.service_provider?.id,
+          providerName:        m.service_provider?.name || 'Unknown Garage',
+          role:                m.role || 'mechanic',
+          can_approve_work:    m.can_approve_work,
+          can_manage_inventory:m.can_manage_inventory,
+        })))
+        // Auto-open if already on my-teams path
+        if (pathname.includes('/dashboard/my-teams')) {
+          const openState = {}
+          mechs.forEach(m => { openState[m.service_provider?.id] = true })
+          setProviderNavOpen(openState)
+        }
+      }
+    } catch (err) {
+      console.error('Sidebar mechanic fetch error:', err)
+    }
   }
 
   const handleLogout = async () => {
@@ -125,6 +166,12 @@ export default function Sidebar({ user }) {
     // Filter out admin-only items for non-admins
     return items.filter(item => item.everyone || membership.is_admin)
   }
+
+  // ── Provider (mechanic) nav items ────────────────────────────────────────
+  const providerNavItems = (m) => [
+    { icon: ClipboardList, label: 'My Teams',     path: '/dashboard/my-teams'                              },
+    { icon: Wrench,        label: 'Work Orders',  path: `/dashboard/my-teams`                              },
+  ]
 
   // ── Status config ─────────────────────────────────────────────────────────
   const statusBadge = (status) => {
@@ -247,6 +294,66 @@ export default function Sidebar({ user }) {
                 ))}
               </>
             )}
+          </div>
+        )}
+
+        {/* ── Service Provider Membership — only for mechanics ── */}
+        {!membershipLoading && mechanicMemberships.length > 0 && (
+          <div className="mt-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
+              Service Provider Membership
+            </p>
+
+            {mechanicMemberships.map(m => {
+              const isOpen = providerNavOpen[m.providerId] ?? false
+              return (
+                <div key={m.providerId} className="mb-3">
+                  {/* Provider identity card — collapsible */}
+                  <button
+                    onClick={() => setProviderNavOpen(prev => ({ ...prev, [m.providerId]: !isOpen }))}
+                    className="w-full flex items-center justify-between px-1 mb-1.5 group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 bg-green-600 rounded-md flex items-center justify-center flex-shrink-0">
+                        <Wrench size={12} className="text-white" />
+                      </div>
+                      <span className="text-xs font-semibold text-gray-700 truncate">
+                        {m.providerName}
+                      </span>
+                    </div>
+                    {isOpen
+                      ? <ChevronDown  size={13} className="text-gray-400 flex-shrink-0" />
+                      : <ChevronRight size={13} className="text-gray-400 flex-shrink-0" />
+                    }
+                  </button>
+
+                  {isOpen && (
+                    <>
+                      {/* Role / permissions pill */}
+                      <div className="mx-1 mb-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+                        <p className="text-[10px] text-gray-500 capitalize">{m.role}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {m.can_approve_work     && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">WO access</span>}
+                          {m.can_manage_inventory && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Inventory</span>}
+                        </div>
+                      </div>
+
+                      {/* Nav items */}
+                      <NavItem compact item={{
+                        icon: Users,
+                        label: 'Overview',
+                        path:  '/dashboard/my-teams',
+                      }} />
+                      <NavItem compact item={{
+                        icon: ClipboardList,
+                        label: 'Assigned Work Orders',
+                        path:  '/dashboard/my-teams/work-orders',
+                      }} />
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </nav>
