@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin } from 'lucide-react'
 
 export default function MyTeamsPage() {
+  const router   = useRouter()
   const supabase = createClient()
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
@@ -380,7 +382,13 @@ export default function MyTeamsPage() {
                       </div>
 
                       {isPending && showDeclineForm !== wo.id && (
-                        <div className="flex gap-2 flex-shrink-0">
+                        <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                          <button
+                            onClick={() => router.push(`/dashboard/my-teams/work-order/${wo.id}`)}
+                            className="px-3 py-2 border border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50"
+                          >
+                            View Details
+                          </button>
                           <button
                             onClick={() => acknowledgeWorkOrder(wo.id)}
                             disabled={acknowledging === wo.id}
@@ -399,7 +407,12 @@ export default function MyTeamsPage() {
 
                       {isAcknowledged && (
                         <div className="flex-shrink-0">
-                          <span className="text-xs text-green-600 font-medium">Ready to start</span>
+                          <button
+                            onClick={() => router.push(`/dashboard/my-teams/work-order/${wo.id}`)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                          >
+                            Open Work Order
+                          </button>
                         </div>
                       )}
                     </div>

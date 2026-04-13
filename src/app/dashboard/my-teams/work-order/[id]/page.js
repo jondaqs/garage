@@ -1,0 +1,394 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import {
+  ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle,
+  Wrench, Package, MessageSquare, Shield, ClipboardList,
+  Star, ChevronDown, Car, Gauge
+} from 'lucide-react'
+import ServicesTab       from '@/app/provider/work-orders/[id]/components/ServicesTab'
+import PartsTab          from '@/app/provider/work-orders/[id]/components/PartsTab'
+import IssuesTab         from '@/app/provider/work-orders/[id]/components/IssuesTab'
+import CommentsTab       from '@/app/provider/work-orders/[id]/components/CommentsTab'
+import QualityCheckTab   from '@/app/provider/work-orders/[id]/components/QualityCheckTab'
+import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
+
+const STATUS_COLORS = {
+  intake:            'bg-gray-100 text-gray-600',
+  assigned:          'bg-blue-100 text-blue-700',
+  diagnosing:        'bg-purple-100 text-purple-700',
+  awaiting_approval: 'bg-yellow-100 text-yellow-700',
+  approved:          'bg-cyan-100 text-cyan-700',
+  in_progress:       'bg-orange-100 text-orange-700',
+  quality_check:     'bg-indigo-100 text-indigo-700',
+  rework:            'bg-red-100 text-red-700',
+  completed:         'bg-green-100 text-green-700',
+  cancelled:         'bg-red-100 text-red-500',
+  closed:            'bg-gray-100 text-gray-500',
+}
+
+// Tabs available and their minimum permission requirement
+// 'any' = all mechanics can see, 'can_approve_work' = gated
+const ALL_TABS = [
+  { id: 'overview',       label: 'Overview',         icon: ClipboardList, perm: 'any'             },
+  { id: 'services',       label: 'Services',          icon: Wrench,        perm: 'can_approve_work' },
+  { id: 'parts',          label: 'Parts',             icon: Package,       perm: 'can_approve_work' },
+  { id: 'issues',         label: 'Issues/Diagnostics',icon: AlertCircle,   perm: 'can_approve_work' },
+  { id: 'recommendations',label: 'Recommendations',   icon: Star,          perm: 'can_approve_work' },
+  { id: 'qc',             label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
+  { id: 'comments',       label: 'Comments',          icon: MessageSquare, perm: 'any'             },
+]
+
+export default function MechanicWorkOrderPage() {
+  const router  = useRouter()
+  const params  = useParams()
+  const supabase = createClient()
+
+  const [wo,          setWo]          = useState(null)
+  const [perms,       setPerms]       = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState('')
+  const [success,     setSuccess]     = useState('')
+  const [acting,      setActing]      = useState(false)
+  const [activeTab,   setActiveTab]   = useState('overview')
+
+  // Decline form
+  const [showDecline,   setShowDecline]   = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setError('')
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: result, error: rpcErr } = await supabase.rpc(
+        'get_mechanic_work_order',
+        { p_work_order_id: params.id, p_mechanic_user_id: user.id }
+      )
+      if (rpcErr) throw rpcErr
+      if (!result?.success) throw new Error(result?.error || 'Access denied or work order not found')
+      setWo(result.work_order)
+      setPerms(result.mechanic_permissions)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [params.id])
+
+  useEffect(() => { load() }, [load])
+
+  const handleAcknowledge = async () => {
+    setActing(true); setError(''); setSuccess('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error: rpcErr } = await supabase.rpc(
+        'acknowledge_work_order_assignment',
+        { p_work_order_id: params.id, p_mechanic_user_id: user.id }
+      )
+      if (rpcErr) throw rpcErr
+      if (!data.success) throw new Error(data.error)
+      setSuccess('Assignment acknowledged. You can now start work.')
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setActing(false) }
+  }
+
+  const handleDecline = async () => {
+    setActing(true); setError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error: rpcErr } = await supabase.rpc(
+        'decline_work_order_assignment',
+        { p_work_order_id: params.id, p_mechanic_user_id: user.id, p_decline_reason: declineReason || null }
+      )
+      if (rpcErr) throw rpcErr
+      if (!data.success) throw new Error(data.error)
+      // Redirect back to My Teams after declining
+      router.push('/dashboard/my-teams')
+    } catch (err) { setError(err.message); setActing(false) }
+  }
+
+  const handleAdvanceStatus = async (newCode) => {
+    setActing(true); setError(''); setSuccess('')
+    try {
+      const { data: statusRow } = await supabase
+        .from('work_order_statuses').select('id').eq('code', newCode).single()
+      const { error: upErr } = await supabase
+        .from('work_orders')
+        .update({ status_id: statusRow.id, updated_at: new Date().toISOString() })
+        .eq('id', params.id)
+      if (upErr) throw upErr
+      setSuccess(`Status updated to ${newCode.replace(/_/g, ' ')}`)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setActing(false) }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <Loader2 className="animate-spin text-blue-600" size={32} />
+    </div>
+  )
+
+  if (error && !wo) return (
+    <div className="max-w-2xl mx-auto p-6">
+      <button onClick={() => router.push('/dashboard/my-teams')}
+        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 text-sm">
+        <ArrowLeft size={16} /> Back to My Teams
+      </button>
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
+        <AlertCircle className="text-red-500 flex-shrink-0" size={20} />
+        <div>
+          <p className="font-semibold text-red-900">Access denied</p>
+          <p className="text-red-700 text-sm mt-1">{error}</p>
+        </div>
+      </div>
+    </div>
+  )
+
+  const statusCode    = wo.status?.code || ''
+  const assignStatus  = wo.mechanic_assignment_status
+  const isPending     = assignStatus === 'pending'
+  const isAcknowledged= assignStatus === 'acknowledged'
+  const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
+  const canApprove    = !!perms?.can_approve_work
+  const isAssigned    = !!perms?.is_assigned
+
+  // Build woWithProvider shape that tabs expect
+  const woWithProvider = {
+    ...wo,
+    id: params.id,
+    service_provider_id: wo.service_provider?.id,
+  }
+
+  // Available tabs based on permissions
+  const tabs = ALL_TABS.filter(t =>
+    t.perm === 'any' || (t.perm === 'can_approve_work' && canApprove)
+  )
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-5">
+      {/* Back */}
+      <button onClick={() => router.push('/dashboard/my-teams')}
+        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm">
+        <ArrowLeft size={16} /> Back to My Teams
+      </button>
+
+      {/* Header */}
+      <div className="bg-white rounded-xl shadow-sm p-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-gray-900">{wo.work_order_number}</h1>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_COLORS[statusCode] || 'bg-gray-100 text-gray-600'}`}>
+                {wo.status?.display_name}
+              </span>
+              {assignStatus && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  isAcknowledged ? 'bg-green-100 text-green-700' :
+                  isPending      ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>
+                  {isAcknowledged ? '✓ Acknowledged' : isPending ? '⏳ Awaiting response' : assignStatus}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 mt-1">{wo.service_provider?.name}</p>
+          </div>
+          <div className="text-right text-sm text-gray-500">
+            <p className="flex items-center gap-1 justify-end">
+              <Car size={13} /> {wo.vehicle?.plate_number}
+              {wo.vehicle?.make && ` · ${wo.vehicle.make} ${wo.vehicle.model || ''}`}
+            </p>
+            <p className="text-xs mt-0.5">{new Date(wo.opened_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          </div>
+        </div>
+
+        {wo.problem_description && (
+          <p className="mt-3 text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+            {wo.problem_description}
+          </p>
+        )}
+      </div>
+
+      {/* Feedback */}
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-sm">
+          <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-start gap-2 text-sm">
+          <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+          <p className="text-green-700">{success}</p>
+        </div>
+      )}
+
+      {/* Assignment action card */}
+      {isAssigned && !isTerminal && (
+        <div className={`rounded-xl p-4 border space-y-3 ${
+          isPending      ? 'bg-yellow-50 border-yellow-300' :
+          isAcknowledged ? 'bg-green-50 border-green-300' :
+                           'bg-gray-50 border-gray-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{isAcknowledged ? '✅' : '🔧'}</span>
+            <p className="font-semibold text-sm text-gray-900">
+              {isAcknowledged
+                ? 'Assignment acknowledged — you are working on this'
+                : 'You have been assigned to this work order'}
+            </p>
+          </div>
+
+          {/* Acknowledge / Decline */}
+          {isPending && !showDecline && (
+            <div className="flex gap-2">
+              <button onClick={handleAcknowledge} disabled={acting}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                {acting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                Acknowledge
+              </button>
+              <button onClick={() => setShowDecline(true)}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50">
+                Decline
+              </button>
+            </div>
+          )}
+
+          {showDecline && (
+            <div className="space-y-2">
+              <textarea value={declineReason} onChange={e => setDeclineReason(e.target.value)}
+                placeholder="Reason for declining (optional)..." rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" />
+              <div className="flex gap-2">
+                <button onClick={handleDecline} disabled={acting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5">
+                  {acting ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                  Confirm Decline
+                </button>
+                <button onClick={() => { setShowDecline(false); setDeclineReason('') }}
+                  className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Status advance actions */}
+          {isAcknowledged && canApprove && (
+            <div className="border-t border-green-200 pt-3">
+              <p className="text-xs font-medium text-green-800 mb-2">Advance status:</p>
+              <div className="flex flex-wrap gap-2">
+                {statusCode === 'assigned'    && <button onClick={() => handleAdvanceStatus('diagnosing')}    disabled={acting} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-50">Start Diagnosing</button>}
+                {statusCode === 'diagnosing'  && <button onClick={() => handleAdvanceStatus('in_progress')}   disabled={acting} className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 disabled:opacity-50">Start Work</button>}
+                {statusCode === 'approved'    && <button onClick={() => handleAdvanceStatus('in_progress')}   disabled={acting} className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 disabled:opacity-50">Begin Work</button>}
+                {statusCode === 'in_progress' && <button onClick={() => handleAdvanceStatus('quality_check')} disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">Quality Check</button>}
+                {statusCode === 'rework'      && <button onClick={() => handleAdvanceStatus('quality_check')} disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">Back to QC</button>}
+              </div>
+            </div>
+          )}
+
+          {/* Permissions summary */}
+          {perms && (
+            <div className="border-t border-current border-opacity-20 pt-2 flex flex-wrap gap-2">
+              <span className="text-xs text-gray-500">Your access:</span>
+              {canApprove           && <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Manage work order</span>}
+              {perms.can_manage_inventory && <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Manage inventory</span>}
+              {!canApprove && !perms.can_manage_inventory && (
+                <span className="text-xs text-gray-400">View only · acknowledge or decline assignment</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tabs — only shown after acknowledged */}
+      {(isAcknowledged || !isPending) && tabs.length > 1 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {/* Tab bar */}
+          <div className="flex overflow-x-auto border-b border-gray-200">
+            {tabs.map(t => {
+              const Icon = t.icon
+              return (
+                <button key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    activeTab === t.id
+                      ? 'border-blue-600 text-blue-700 bg-blue-50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}>
+                  <Icon size={14} /> {t.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Tab content */}
+          <div className="p-4">
+            {activeTab === 'overview' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Work Order</p>
+                    <p className="font-semibold text-gray-900">{wo.work_order_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Status</p>
+                    <p className="font-medium text-gray-900">{wo.status?.display_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Priority</p>
+                    <p className="font-medium capitalize text-gray-900">{wo.priority || 'Normal'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Vehicle</p>
+                    <p className="font-medium text-gray-900">{wo.vehicle?.plate_number}</p>
+                    <p className="text-xs text-gray-500">{wo.vehicle?.make} {wo.vehicle?.model}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Garage</p>
+                    <p className="font-medium text-gray-900">{wo.service_provider?.name}</p>
+                  </div>
+                  {wo.total_amount > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">Total</p>
+                      <p className="font-semibold text-gray-900">KES {Number(wo.total_amount).toLocaleString()}</p>
+                    </div>
+                  )}
+                </div>
+                {wo.problem_description && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Problem Description</p>
+                    <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{wo.problem_description}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'services' && canApprove && (
+              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} />
+            )}
+            {activeTab === 'parts' && canApprove && (
+              <PartsTab workOrder={woWithProvider} />
+            )}
+            {activeTab === 'issues' && canApprove && (
+              <IssuesTab workOrder={woWithProvider} />
+            )}
+            {activeTab === 'recommendations' && canApprove && (
+              <RecommendationsTab workOrder={woWithProvider} />
+            )}
+            {activeTab === 'qc' && canApprove && (
+              <QualityCheckTab workOrder={woWithProvider} onStatusChange={load} />
+            )}
+            {activeTab === 'comments' && (
+              <CommentsTab workOrder={woWithProvider} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
