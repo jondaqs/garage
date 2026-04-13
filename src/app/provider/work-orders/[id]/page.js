@@ -38,7 +38,7 @@ const TIMELINE = [
 ]
 
 const NEXT_STATUS_MAP = {
-  intake:            [{ code: 'assigned',          label: 'Assign Mechanic',          color: 'bg-blue-600 hover:bg-blue-700'     }],
+  intake:            [{ code: 'assigned',          label: 'Transition to Assigned',   color: 'bg-blue-600 hover:bg-blue-700'     }],
   assigned:          [{ code: 'diagnosing',         label: 'Begin Diagnostics',        color: 'bg-purple-600 hover:bg-purple-700' }],
   diagnosing:        [{ code: 'awaiting_approval',  label: 'Send Estimate for Approval', color: 'bg-yellow-500 hover:bg-yellow-600' }],
   approved:          [{ code: 'in_progress',        label: 'Start Service',            color: 'bg-orange-500 hover:bg-orange-600' }],
@@ -83,6 +83,7 @@ export default function WorkOrderDetailPage() {
   const [checkinMileage, setCheckinMileage]     = useState('')
   // Assign mechanic
   const [selectedMechanic, setSelectedMechanic] = useState('')
+  const [mechanicName,     setMechanicName]     = useState('')   // resolved via SECURITY DEFINER fn
   // Internal notes (overview tab)
   const [internalNote, setInternalNote]         = useState('')
   const [savingNote, setSavingNote]             = useState(false)
@@ -114,7 +115,7 @@ export default function WorkOrderDetailPage() {
           service_provider:service_providers(id, name),
           shop:shops(name, town, county, street, phone),
           mechanic:mechanics(
-            id, specialization,
+            id, user_id, specialization,
             user:user_profiles(first_name, last_name, phone)
           ),
           booking:bookings!booking_id(
@@ -128,6 +129,21 @@ export default function WorkOrderDetailPage() {
 
       if (fetchErr) throw fetchErr
       setWo(data)
+
+      // Resolve mechanic name — mechanic.user is null due to user_profiles RLS
+      // Use get_team_member_profiles which is SECURITY DEFINER
+      if (data.assigned_mechanic_id && data.mechanic?.user_id) {
+        try {
+          const { data: profiles } = await supabase.rpc(
+            'get_team_member_profiles',
+            { provider_owner_auth_id: user.id }
+          )
+          const p = (profiles || []).find(pr => pr.user_id_from_mechanics === data.mechanic.user_id)
+          if (p) setMechanicName(`${p.first_name || ''} ${p.last_name || ''}`.trim())
+        } catch {}
+      } else {
+        setMechanicName('')
+      }
     } catch (err) {
       setError(err.message || 'Failed to load work order')
     } finally {
@@ -445,7 +461,7 @@ export default function WorkOrderDetailPage() {
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse flex-shrink-0" />
                   <span className="text-yellow-800 font-medium">
-                    Waiting for {mechanicUser.first_name || 'mechanic'} to acknowledge
+                    Waiting for {mechanicName || 'mechanic'} to acknowledge
                   </span>
                 </div>
                 <button
@@ -625,10 +641,10 @@ export default function WorkOrderDetailPage() {
                     )}
                     <div>
                       <p className="text-xs text-gray-400">Mechanic</p>
-                      {mechanicUser.first_name ? (
+                      {(mechanicName || mechanic.id) ? (
                         <div className="space-y-1">
                           <p className="font-medium text-gray-900">
-                            {mechanicUser.first_name} {mechanicUser.last_name}
+                            {mechanicName || 'Mechanic'}
                             {mechanic.specialization && (
                               <span className="text-gray-400 font-normal"> · {mechanic.specialization}</span>
                             )}
@@ -656,7 +672,7 @@ export default function WorkOrderDetailPage() {
                           )}
                         </div>
                       ) : (
-                        <p className="text-amber-600 text-sm">Not assigned</p>
+                        <p className="text-gray-400 text-sm italic">Not assigned</p>
                       )}
                     </div>
                   </div>
