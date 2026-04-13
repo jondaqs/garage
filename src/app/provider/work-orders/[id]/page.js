@@ -422,7 +422,7 @@ export default function WorkOrderDetailPage() {
                   <option value="">Select mechanic...</option>
                   {mechanics.map(m => (
                     <option key={m.id} value={m.id}>
-                      {m.user?.first_name} {m.user?.last_name}{m.specialization ? ` (${m.specialization})` : ''}
+                      {m.user?.first_name} --{m.user?.last_name}{m.specialization ? ` (${m.specialization})` : ''}
                     </option>
                   ))}
                 </select>
