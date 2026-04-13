@@ -11,9 +11,17 @@ export default function MyTeamsPage() {
   const [leaving, setLeaving] = useState(null)
   const [editing, setEditing] = useState(null)
   const [editData, setEditData] = useState({})
+  const [pendingInvitations, setPendingInvitations] = useState([])
+  const [assignedWorkOrders, setAssignedWorkOrders] = useState([])
+  const [responding, setResponding] = useState(null)   // invitation id being responded to
+  const [acknowledging, setAcknowledging] = useState(null)  // wo id being actioned
+  const [declineReason, setDeclineReason] = useState('')
+  const [showDeclineForm, setShowDeclineForm] = useState(null)  // wo id
 
   useEffect(() => {
     loadTeams()
+    loadPendingInvitations()
+    loadAssignedWorkOrders()
   }, [])
 
   const loadTeams = async () => {
@@ -86,6 +94,83 @@ export default function MyTeamsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadPendingInvitations = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data } = await supabase
+        .from('team_invitations')
+        .select(`
+          id, role, specialization, experience_years, invited_at, expires_at,
+          service_provider:service_providers(id, name, email, phone)
+        `)
+        .eq('invited_email', user.email)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .order('invited_at', { ascending: false })
+      setPendingInvitations(data || [])
+    } catch (e) { console.error('loadPendingInvitations error:', e) }
+  }
+
+  const loadAssignedWorkOrders = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: result } = await supabase.rpc(
+        'get_mechanic_assigned_work_orders',
+        { p_mechanic_user_id: user.id }
+      )
+      if (result?.success) setAssignedWorkOrders(result.work_orders || [])
+    } catch (e) { console.error('loadAssignedWorkOrders error:', e) }
+  }
+
+  const respondToInvitation = async (invitationId, action) => {
+    setResponding(invitationId)
+    try {
+      const res  = await fetch('/api/team/respond-invitation', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ invitation_id: invitationId, action }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to respond')
+      setPendingInvitations(prev => prev.filter(i => i.id !== invitationId))
+      if (action === 'accept') loadTeams()
+    } catch (e) { alert(e.message) }
+    finally { setResponding(null) }
+  }
+
+  const acknowledgeWorkOrder = async (woId) => {
+    setAcknowledging(woId)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase.rpc('acknowledge_work_order_assignment', {
+        p_work_order_id:    woId,
+        p_mechanic_user_id: user.id,
+      })
+      if (error) throw error
+      if (!data.success) throw new Error(data.error)
+      await loadAssignedWorkOrders()
+    } catch (e) { alert(e.message) }
+    finally { setAcknowledging(null) }
+  }
+
+  const declineWorkOrder = async (woId) => {
+    setAcknowledging(woId)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase.rpc('decline_work_order_assignment', {
+        p_work_order_id:    woId,
+        p_mechanic_user_id: user.id,
+        p_decline_reason:   declineReason || null,
+      })
+      if (error) throw error
+      if (!data.success) throw new Error(data.error)
+      setShowDeclineForm(null)
+      setDeclineReason('')
+      await loadAssignedWorkOrders()
+    } catch (e) { alert(e.message) }
+    finally { setAcknowledging(null) }
   }
 
   const handleLeaveTeam = async (mechanicId, providerName) => {
@@ -186,6 +271,144 @@ export default function MyTeamsPage() {
             Manage your team memberships and update your details
           </p>
         </div>
+
+        {/* Pending Invitations */}
+        {pendingInvitations.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 mb-6">
+            <h2 className="text-base font-semibold text-yellow-900 mb-3 flex items-center gap-2">
+              <span className="text-yellow-600">📬</span>
+              Pending Team Invitations ({pendingInvitations.length})
+            </h2>
+            <div className="space-y-3">
+              {pendingInvitations.map(inv => (
+                <div key={inv.id} className="bg-white rounded-lg border border-yellow-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900">{inv.service_provider?.name || 'Unknown Garage'}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Role: <span className="capitalize font-medium">{inv.role || 'Mechanic'}</span>
+                      {inv.specialization && ` · ${inv.specialization}`}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Invited {new Date(inv.invited_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {' · '}Expires {new Date(inv.expires_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => respondToInvitation(inv.id, 'accept')}
+                      disabled={responding === inv.id}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {responding === inv.id ? 'Accepting…' : 'Accept'}
+                    </button>
+                    <button
+                      onClick={() => respondToInvitation(inv.id, 'reject')}
+                      disabled={responding === inv.id}
+                      className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Assigned Work Orders */}
+        {assignedWorkOrders.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+            <h2 className="text-base font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <span className="text-blue-600">🔧</span>
+              Assigned Work Orders ({assignedWorkOrders.length})
+            </h2>
+            <div className="space-y-3">
+              {assignedWorkOrders.map(wo => {
+                const isPending = wo.mechanic_assignment_status === 'pending'
+                const isAcknowledged = wo.mechanic_assignment_status === 'acknowledged'
+                return (
+                  <div key={wo.id} className="bg-white rounded-lg border border-blue-200 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-900">{wo.work_order_number}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            isAcknowledged ? 'bg-green-100 text-green-700' :
+                            isPending      ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {isAcknowledged ? '✓ Acknowledged' : isPending ? '⏳ Awaiting your response' : wo.mechanic_assignment_status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-0.5">
+                          {wo.vehicle?.plate_number}{wo.vehicle?.make ? ` · ${wo.vehicle.make} ${wo.vehicle.model || ''}` : ''}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {wo.provider?.name} · Status: {wo.status?.display_name}
+                        </p>
+                        {wo.problem_description && (
+                          <p className="text-xs text-gray-500 mt-1 italic line-clamp-1">"{wo.problem_description}"</p>
+                        )}
+
+                        {/* Decline form */}
+                        {showDeclineForm === wo.id && (
+                          <div className="mt-3 space-y-2">
+                            <textarea
+                              value={declineReason}
+                              onChange={e => setDeclineReason(e.target.value)}
+                              placeholder="Reason for declining (optional)..."
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => declineWorkOrder(wo.id)}
+                                disabled={acknowledging === wo.id}
+                                className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                              >
+                                {acknowledging === wo.id ? 'Declining…' : 'Confirm Decline'}
+                              </button>
+                              <button
+                                onClick={() => { setShowDeclineForm(null); setDeclineReason('') }}
+                                className="px-4 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {isPending && showDeclineForm !== wo.id && (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => acknowledgeWorkOrder(wo.id)}
+                            disabled={acknowledging === wo.id}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {acknowledging === wo.id ? '…' : 'Acknowledge'}
+                          </button>
+                          <button
+                            onClick={() => setShowDeclineForm(wo.id)}
+                            className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+
+                      {isAcknowledged && (
+                        <div className="flex-shrink-0">
+                          <span className="text-xs text-green-600 font-medium">Ready to start</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Teams List */}
         {teams.length === 0 ? (

@@ -27,6 +27,10 @@ export default function ProviderTeamPage() {
     experience_years: 0
   })
 
+  const [editingMember, setEditingMember]   = useState(null)
+  const [editMemberForm, setEditMemberForm] = useState({})
+  const [savingMember, setSavingMember]     = useState(false)
+
   useEffect(() => {
     loadData()
   }, [])
@@ -230,6 +234,41 @@ export default function ProviderTeamPage() {
       console.error('Cancel error:', error)
       alert('Failed to cancel invitation')
     }
+  }
+
+  const startEditMember = (member) => {
+    setEditingMember(member.id)
+    setEditMemberForm({
+      role:                 member.role                 || 'mechanic',
+      specialization:       member.specialization       || '',
+      experience_years:     member.experience_years     || 0,
+      can_approve_work:     member.can_approve_work     || false,
+      can_manage_inventory: member.can_manage_inventory || false,
+      can_manage_team:      member.can_manage_team      || false,
+    })
+  }
+
+  const saveMemberEdit = async () => {
+    setSavingMember(true)
+    try {
+      const { error } = await supabase
+        .from('mechanics')
+        .update({
+          role:                 editMemberForm.role,
+          specialization:       editMemberForm.specialization || null,
+          experience_years:     parseInt(editMemberForm.experience_years) || 0,
+          can_approve_work:     editMemberForm.can_approve_work,
+          can_manage_inventory: editMemberForm.can_manage_inventory,
+          can_manage_team:      editMemberForm.can_manage_team,
+          updated_at:           new Date().toISOString(),
+        })
+        .eq('id', editingMember)
+      if (error) throw error
+      setEditingMember(null)
+      const { data: { user } } = await supabase.auth.getUser()
+      await loadTeamMembers(user.id)
+    } catch (e) { alert('Failed to save: ' + e.message) }
+    finally { setSavingMember(false) }
   }
 
   const toggleMemberStatus = async (mechanicId, currentStatus) => {
@@ -459,7 +498,25 @@ export default function ProviderTeamPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Permissions badges */}
+                  <div className="flex gap-1 mr-2">
+                    {member.can_approve_work && (
+                      <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium" title="Can approve work">WO</span>
+                    )}
+                    {member.can_manage_inventory && (
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium" title="Can manage inventory">INV</span>
+                    )}
+                    {member.can_manage_team && (
+                      <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => startEditMember(member)}
+                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                  >
+                    <SettingsIcon size={13} /> Edit
+                  </button>
                   {!member.is_verified && (
                     <button
                       onClick={() => verifyMember(member.id)}
@@ -539,6 +596,75 @@ export default function ProviderTeamPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Member Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4">
+            <h3 className="text-lg font-semibold">Edit Team Member</h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select value={editMemberForm.role}
+                  onChange={e => setEditMemberForm(f => ({ ...f, role: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                  <option value="mechanic">Mechanic</option>
+                  <option value="senior_mechanic">Senior Mechanic</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Experience (yrs)</label>
+                <input type="number" min="0" value={editMemberForm.experience_years}
+                  onChange={e => setEditMemberForm(f => ({ ...f, experience_years: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
+              <input type="text" value={editMemberForm.specialization}
+                onChange={e => setEditMemberForm(f => ({ ...f, specialization: e.target.value }))}
+                placeholder="e.g. Engine Specialist, Electrician"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+              <div className="space-y-2">
+                {[
+                  { key: 'can_approve_work',     label: 'Can approve work orders',     desc: 'Can advance WO status and approve service quality' },
+                  { key: 'can_manage_inventory', label: 'Can manage inventory',         desc: 'Can add, edit, and adjust stock levels' },
+                  { key: 'can_manage_team',      label: 'Can manage team',              desc: 'Can view and manage other team members' },
+                ].map(p => (
+                  <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="checkbox" checked={editMemberForm[p.key] || false}
+                      onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                      className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{p.label}</p>
+                      <p className="text-xs text-gray-500">{p.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setEditingMember(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={saveMemberEdit} disabled={savingMember}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {savingMember ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invite Modal - keeping same as before */}
       {showInviteModal && selectedUser && (

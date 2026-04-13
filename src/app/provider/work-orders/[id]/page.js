@@ -182,11 +182,14 @@ export default function WorkOrderDetailPage() {
     if (!selectedMechanic) { setError('Select a mechanic'); return }
     setUpdating(true); setError('')
     try {
-      const { error: upErr } = await supabase.from('work_orders').update({
-        assigned_mechanic_id: selectedMechanic,
-      }).eq('id', params.id)
-      if (upErr) throw upErr
-      setSuccess('Mechanic assigned')
+      const res  = await fetch(`/api/work-orders/${params.id}/assign-mechanic`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ mechanicId: selectedMechanic }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to assign')
+      setSuccess(`Mechanic assigned — notification sent${data.email_sent ? ' (email ✓)' : ''}${data.sms_sent ? ' (SMS ✓)' : ''}`)
       setSelectedMechanic('')
       await loadWorkOrder()
     } catch (e) { setError(e.message) }
@@ -283,6 +286,7 @@ export default function WorkOrderDetailPage() {
   const shop          = wo.shop     || {}
   const mechanic      = wo.mechanic || {}
   const mechanicUser  = mechanic.user || wo.mechanic_profile || {}
+  const assignStatus  = wo.mechanic_assignment_status
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
 
   // Inject service_provider_id into wo for tab components (needed for parts search)
