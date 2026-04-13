@@ -39,9 +39,9 @@ const TIMELINE = [
 
 const NEXT_STATUS_MAP = {
   intake:            [{ code: 'assigned',          label: 'Transition to Assigned',   color: 'bg-blue-600 hover:bg-blue-700'     }],
-  assigned:          [{ code: 'diagnosing',         label: 'Begin Diagnostics',        color: 'bg-purple-600 hover:bg-purple-700' }],
-  diagnosing:        [{ code: 'awaiting_approval',  label: 'Send Estimate for Approval', color: 'bg-yellow-500 hover:bg-yellow-600' }],
-  approved:          [{ code: 'in_progress',        label: 'Start Service',            color: 'bg-orange-500 hover:bg-orange-600' }],
+  assigned:          [{ code: 'diagnosing',         label: 'Begin Diagnostics',            color: 'bg-purple-600 hover:bg-purple-700' }],
+  diagnosing:        [{ code: 'awaiting_approval',  label: 'Send Estimates for Approval',  color: 'bg-yellow-500 hover:bg-yellow-600' }],
+  approved:          [{ code: 'in_progress',        label: 'Start Service',                color: 'bg-orange-500 hover:bg-orange-600' }],
   in_progress:       [{ code: 'quality_check',      label: 'Submit for QC',            color: 'bg-indigo-600 hover:bg-indigo-700' }],
   quality_check:     [
     { code: 'completed',    label: 'Complete Work Order',   color: 'bg-green-600 hover:bg-green-700', via_api: true },
@@ -52,14 +52,14 @@ const NEXT_STATUS_MAP = {
 }
 
 const TABS = [
-  { id: 'overview',  label: 'Overview',   icon: ClipboardList  },
-  { id: 'services',  label: 'Services',   icon: Wrench         },
-  { id: 'parts',     label: 'Parts',      icon: Package        },
-  { id: 'issues',    label: 'Issues',     icon: AlertTriangle  },
-  { id: 'invoice',   label: 'Invoice',        icon: FileText       },
-  { id: 'recommendations', label: 'Next Service', icon: Bell },
-  { id: 'qc',        label: 'QC & Complete', icon: ClipboardCheck },
-  { id: 'comments',  label: 'Comments',   icon: MessageSquare  },
+  { id: 'overview',        label: 'Overview',            icon: ClipboardList  },
+  { id: 'issues',          label: 'Issues/Diagnostics',  icon: AlertTriangle  },
+  { id: 'services',        label: 'Services',            icon: Wrench         },
+  { id: 'parts',           label: 'Parts',               icon: Package        },
+  { id: 'invoice',         label: 'Invoice',             icon: FileText       },
+  { id: 'recommendations', label: 'Next Service',        icon: Bell           },
+  { id: 'qc',              label: 'QC & Complete',       icon: ClipboardCheck },
+  { id: 'comments',        label: 'Comments',            icon: MessageSquare  },
 ]
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -69,6 +69,7 @@ export default function WorkOrderDetailPage() {
   const supabase = createClient()
 
   const [wo, setWo]                   = useState(null)
+  const [issueCount, setIssueCount]   = useState(null)  // null = not yet checked
   const [mechanics, setMechanics]     = useState([])
   const [loading, setLoading]         = useState(true)
   const [updating, setUpdating]       = useState(false)
@@ -129,6 +130,13 @@ export default function WorkOrderDetailPage() {
 
       if (fetchErr) throw fetchErr
       setWo(data)
+
+      // Check if issues are populated (for Send Estimates gate)
+      supabase.from('work_order_issues')
+        .select('id', { count: 'exact', head: true })
+        .eq('work_order_id', params.id)
+        .then(({ count }) => setIssueCount(count || 0))
+        .catch(() => {})
 
       // Resolve mechanic name — mechanic.user is null due to user_profiles RLS
       // Use get_team_member_profiles which is SECURITY DEFINER
@@ -495,15 +503,31 @@ export default function WorkOrderDetailPage() {
             {/* Status advances — intercept special actions */}
             {nextActions.map(action => {
               if (action.code === 'awaiting_approval') {
+                const issuesReady = issueCount !== null && issueCount > 0
                 return (
-                  <button key={action.code}
-                    onClick={handleSendEstimate}
-                    disabled={sendingEstimate || updating}
-                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
-                    {sendingEstimate
-                      ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
-                      : action.label}
-                  </button>
+                  <div key={action.code} className="flex flex-col gap-1.5">
+                    {!issuesReady && issueCount !== null && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        Document at least one issue/diagnostic before sending estimates
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!issuesReady) {
+                          setActiveTab('issues')
+                          setError('Please document at least one issue/diagnostic before sending estimates to the customer.')
+                          return
+                        }
+                        handleSendEstimate()
+                      }}
+                      disabled={sendingEstimate || updating}
+                      className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${!issuesReady ? 'opacity-60' : ''} ${action.color}`}>
+                      {sendingEstimate
+                        ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
+                        : action.label}
+                    </button>
+                  </div>
                 )
               }
               if (action.code === 'quality_check') {

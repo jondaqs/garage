@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, AlertTriangle, AlertCircle, CheckCircle,
-  ChevronDown, X, Loader2, Shield
+  ChevronDown, X, Loader2, Shield, MessageSquare, User
 } from 'lucide-react'
 
 const SEVERITY_STYLES = {
@@ -104,6 +104,21 @@ export default function IssuesTab({ workOrder }) {
         <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2 text-sm">
           <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
           <span className="text-green-700">{success}</span>
+        </div>
+      )}
+
+      {/* Customer reported problem — always shown as reference */}
+      {workOrder.problem_description && (
+        <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg">
+          <div className="flex items-start gap-2">
+            <User size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">
+                Customer Reported Problem
+              </p>
+              <p className="text-sm text-amber-900">{workOrder.problem_description}</p>
+            </div>
+          </div>
         </div>
       )}
 

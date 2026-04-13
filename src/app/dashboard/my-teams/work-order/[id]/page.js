@@ -32,13 +32,13 @@ const STATUS_COLORS = {
 // Tabs available and their minimum permission requirement
 // 'any' = all mechanics can see, 'can_approve_work' = gated
 const ALL_TABS = [
-  { id: 'overview',       label: 'Overview',         icon: ClipboardList, perm: 'any'             },
-  { id: 'services',       label: 'Services',          icon: Wrench,        perm: 'can_approve_work' },
-  { id: 'parts',          label: 'Parts',             icon: Package,       perm: 'can_approve_work' },
-  { id: 'issues',         label: 'Issues/Diagnostics',icon: AlertCircle,   perm: 'can_approve_work' },
-  { id: 'recommendations',label: 'Recommendations',   icon: Star,          perm: 'can_approve_work' },
-  { id: 'qc',             label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
-  { id: 'comments',       label: 'Comments',          icon: MessageSquare, perm: 'any'             },
+  { id: 'overview',        label: 'Overview',          icon: ClipboardList, perm: 'any'             },
+  { id: 'issues',          label: 'Issues/Diagnostics',icon: AlertCircle,   perm: 'can_approve_work' },
+  { id: 'services',        label: 'Services',          icon: Wrench,        perm: 'can_approve_work' },
+  { id: 'parts',           label: 'Parts',             icon: Package,       perm: 'can_approve_work' },
+  { id: 'recommendations', label: 'Recommendations',   icon: Star,          perm: 'can_approve_work' },
+  { id: 'qc',              label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
+  { id: 'comments',        label: 'Comments',          icon: MessageSquare, perm: 'any'             },
 ]
 
 export default function MechanicWorkOrderPage() {
@@ -346,11 +346,37 @@ export default function MechanicWorkOrderPage() {
             <div className="border-t border-green-200 pt-3">
               <p className="text-xs font-medium text-green-800 mb-2">Advance status:</p>
               <div className="flex flex-wrap gap-2">
-                {statusCode === 'assigned'    && <button onClick={() => handleAdvanceStatus('diagnosing')}    disabled={acting} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-50">Start Diagnosing</button>}
-                {statusCode === 'diagnosing'  && <button onClick={() => handleAdvanceStatus('in_progress')}   disabled={acting} className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 disabled:opacity-50">Start Work</button>}
-                {statusCode === 'approved'    && <button onClick={() => handleAdvanceStatus('in_progress')}   disabled={acting} className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 disabled:opacity-50">Begin Work</button>}
-                {statusCode === 'in_progress' && <button onClick={() => handleAdvanceStatus('quality_check')} disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">Quality Check</button>}
-                {statusCode === 'rework'      && <button onClick={() => handleAdvanceStatus('quality_check')} disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">Back to QC</button>}
+                {statusCode === 'assigned' && (
+                  <button onClick={() => { handleAdvanceStatus('diagnosing'); setActiveTab('issues') }}
+                    disabled={acting} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-50">
+                    Start Diagnosing
+                  </button>
+                )}
+                {statusCode === 'diagnosing' && (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs text-purple-700 font-medium">
+                      Document issues/diagnostics, then the provider will send estimates to the customer for approval.
+                    </p>
+                  </div>
+                )}
+                {statusCode === 'approved' && (
+                  <button onClick={() => handleAdvanceStatus('in_progress')}
+                    disabled={acting} className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 disabled:opacity-50">
+                    Begin Work
+                  </button>
+                )}
+                {statusCode === 'in_progress' && (
+                  <button onClick={() => handleAdvanceStatus('quality_check')}
+                    disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
+                    Submit for Quality Check
+                  </button>
+                )}
+                {statusCode === 'rework' && (
+                  <button onClick={() => handleAdvanceStatus('quality_check')}
+                    disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
+                    Resubmit for QC
+                  </button>
+                )}
               </div>
             </div>
           )}
