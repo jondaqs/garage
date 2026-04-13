@@ -245,6 +245,7 @@ export default function ProviderTeamPage() {
       can_approve_work:     member.can_approve_work     || false,
       can_manage_inventory: member.can_manage_inventory || false,
       can_manage_team:      member.can_manage_team      || false,
+      can_send_estimates:   member.can_send_estimates   || false,
     })
   }
 
@@ -260,6 +261,7 @@ export default function ProviderTeamPage() {
           can_approve_work:     editMemberForm.can_approve_work,
           can_manage_inventory: editMemberForm.can_manage_inventory,
           can_manage_team:      editMemberForm.can_manage_team,
+          can_send_estimates:   editMemberForm.can_send_estimates,
           updated_at:           new Date().toISOString(),
         })
         .eq('id', editingMember)
@@ -500,9 +502,12 @@ export default function ProviderTeamPage() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Permissions badges */}
-                  <div className="flex gap-1 mr-2">
+                  <div className="flex gap-1 mr-2 flex-wrap">
                     {member.can_approve_work && (
                       <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium" title="Can approve work">WO</span>
+                    )}
+                    {member.can_send_estimates && (
+                      <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium" title="Can send estimates">EST</span>
                     )}
                     {member.can_manage_inventory && (
                       <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium" title="Can manage inventory">INV</span>
@@ -635,9 +640,10 @@ export default function ProviderTeamPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
               <div className="space-y-2">
                 {[
-                  { key: 'can_approve_work',     label: 'Can approve work orders',     desc: 'Can advance WO status and approve service quality' },
-                  { key: 'can_manage_inventory', label: 'Can manage inventory',         desc: 'Can add, edit, and adjust stock levels' },
-                  { key: 'can_manage_team',      label: 'Can manage team',              desc: 'Can view and manage other team members' },
+                  { key: 'can_approve_work',     label: 'Can approve work orders',       desc: 'Can advance WO status and approve service quality' },
+                  { key: 'can_send_estimates',   label: 'Can send estimates to customer', desc: 'Can send services & parts estimates directly to customer without owner review' },
+                  { key: 'can_manage_inventory', label: 'Can manage inventory',           desc: 'Can add, edit, and adjust stock levels' },
+                  { key: 'can_manage_team',      label: 'Can manage team',                desc: 'Can view and manage other team members' },
                 ].map(p => (
                   <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
                     <input type="checkbox" checked={editMemberForm[p.key] || false}

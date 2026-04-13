@@ -38,7 +38,7 @@ export default function ProviderOverviewPage() {
         .select(`
           id, role, specialization, experience_years,
           is_verified, is_active,
-          can_approve_work, can_manage_inventory, can_manage_team,
+          can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates,
           created_at
         `)
         .eq('user_id', profile.id)
@@ -301,6 +301,11 @@ export default function ProviderOverviewPage() {
                 <Wrench size={11} /> Can approve & manage work orders
               </span>
             )}
+            {mechanic.can_send_estimates && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-medium text-yellow-700">
+                <Award size={11} /> Can send estimates to customer
+              </span>
+            )}
             {mechanic.can_manage_inventory && (
               <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700">
                 <Award size={11} /> Can manage inventory
@@ -311,7 +316,7 @@ export default function ProviderOverviewPage() {
                 <Users size={11} /> Can manage team
               </span>
             )}
-            {!mechanic.can_approve_work && !mechanic.can_manage_inventory && !mechanic.can_manage_team && (
+            {!mechanic.can_approve_work && !mechanic.can_send_estimates && !mechanic.can_manage_inventory && !mechanic.can_manage_team && (
               <span className="text-xs text-gray-400 italic">Acknowledge / decline assignments only</span>
             )}
           </div>

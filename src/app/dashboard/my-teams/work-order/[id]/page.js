@@ -19,7 +19,9 @@ const STATUS_COLORS = {
   intake:            'bg-gray-100 text-gray-600',
   assigned:          'bg-blue-100 text-blue-700',
   diagnosing:        'bg-purple-100 text-purple-700',
-  awaiting_approval: 'bg-yellow-100 text-yellow-700',
+  services_estimates:  'bg-blue-100 text-blue-700',
+  internal_review:     'bg-violet-100 text-violet-700',
+  awaiting_approval:   'bg-yellow-100 text-yellow-700',
   approved:          'bg-cyan-100 text-cyan-700',
   in_progress:       'bg-orange-100 text-orange-700',
   quality_check:     'bg-indigo-100 text-indigo-700',
@@ -353,11 +355,28 @@ export default function MechanicWorkOrderPage() {
                   </button>
                 )}
                 {statusCode === 'diagnosing' && (
-                  <div className="flex flex-col gap-1">
-                    <p className="text-xs text-purple-700 font-medium">
-                      Document issues/diagnostics, then the provider will send estimates to the customer for approval.
-                    </p>
+                  <div className="flex flex-col gap-1.5">
+                    <button onClick={() => { handleAdvanceStatus('services_estimates'); setActiveTab('services') }}
+                      disabled={acting} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50">
+                      Move to Services &amp; Parts Estimates
+                    </button>
+                    <p className="text-xs text-purple-700">Document all issues first, then move to add service &amp; parts estimates.</p>
                   </div>
+                )}
+                {statusCode === 'services_estimates' && (
+                  <div className="flex flex-col gap-1.5">
+                    <button onClick={() => handleAdvanceStatus('internal_review')}
+                      disabled={acting} className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50">
+                      Submit for Internal Review
+                    </button>
+                    <p className="text-xs text-blue-700">Add all service &amp; parts estimates, then submit for provider review before sending to customer.</p>
+                  </div>
+                )}
+                {statusCode === 'internal_review' && (
+                  <p className="text-xs text-violet-700 font-medium">⏳ Awaiting provider review of estimates before sending to customer.</p>
+                )}
+                {statusCode === 'awaiting_approval' && (
+                  <p className="text-xs text-yellow-700 font-medium">⏳ Awaiting customer approval of estimates.</p>
                 )}
                 {statusCode === 'approved' && (
                   <button onClick={() => handleAdvanceStatus('in_progress')}

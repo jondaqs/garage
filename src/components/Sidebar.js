@@ -105,6 +105,8 @@ export default function Sidebar({ user }) {
           role,
           can_approve_work,
           can_manage_inventory,
+          can_manage_team,
+          can_send_estimates,
           service_provider:service_providers(id, name)
         `)
         .eq('user_id', profile.id)
@@ -118,6 +120,8 @@ export default function Sidebar({ user }) {
           role:                m.role || 'mechanic',
           can_approve_work:    m.can_approve_work,
           can_manage_inventory:m.can_manage_inventory,
+          can_manage_team:     m.can_manage_team,
+          can_send_estimates:  m.can_send_estimates,
         })))
         // Auto-open if already on my-teams path
         if (pathname.includes('/dashboard/my-teams')) {
@@ -334,7 +338,9 @@ export default function Sidebar({ user }) {
                         <p className="text-[10px] text-gray-500 capitalize">{m.role}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {m.can_approve_work     && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">WO access</span>}
+                          {m.can_send_estimates   && <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded">Estimates</span>}
                           {m.can_manage_inventory && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Inventory</span>}
+                          {m.can_manage_team      && <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">Team</span>}
                         </div>
                       </div>
 

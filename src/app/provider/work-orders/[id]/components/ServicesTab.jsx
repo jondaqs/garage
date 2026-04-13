@@ -17,6 +17,10 @@ const STATUS_STYLES = {
 }
 
 export default function ServicesTab({ workOrder, onEstimateChange }) {
+  const estimateApproved = workOrder.status?.code === 'in_progress' ||
+    ['in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
+  // Also approved if WO status is 'approved' (customer approved estimate)
+  const customerApproved = ['approved','in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
   const supabase = createClient()
 
   const [services, setServices]         = useState([])
@@ -28,6 +32,7 @@ export default function ServicesTab({ workOrder, onEstimateChange }) {
   const [estimate, setEstimate]         = useState(null)
   const [seeding, setSeeding]           = useState(false)
   const [seedDone, setSeedDone]         = useState(false)
+  const [toast, setToast]               = useState('')
 
   // Add service form
   const [showAdd, setShowAdd]           = useState(false)
@@ -37,6 +42,11 @@ export default function ServicesTab({ workOrder, onEstimateChange }) {
 
   // Inline edit state per row
   const [editing, setEditing]           = useState({})   // { [id]: { actual_cost, notes } }
+
+  const showToast = (msg) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }
 
   const hasBooking = !!workOrder.booking_id
   const isTerminal = ['completed','cancelled','closed'].includes(workOrder.status?.code)
@@ -198,6 +208,21 @@ export default function ServicesTab({ workOrder, onEstimateChange }) {
         </div>
       )}
 
+      {/* Toast — estimate not approved warning */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-gray-900 text-white text-sm rounded-xl shadow-xl animate-fade-in">
+          {toast}
+        </div>
+      )}
+
+      {/* Estimate approval status banner */}
+      {!customerApproved && workOrder.status?.code !== 'intake' && workOrder.status?.code !== 'assigned' && (
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-2 text-sm text-amber-800">
+          <AlertCircle size={15} className="flex-shrink-0" />
+          Service transitions are locked — awaiting customer estimate approval before work can begin.
+        </div>
+      )}
+
       {/* Booking seed banner */}
       {hasBooking && services.length === 0 && seedDone && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-3">
@@ -273,9 +298,17 @@ export default function ServicesTab({ workOrder, onEstimateChange }) {
                   {!isTerminal && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {statusCode === 'pending' && (
-                        <button onClick={() => handleUpdateStatus(svc.id, 'in_progress')}
+                        <button
+                          onClick={() => {
+                            if (!customerApproved) {
+                              showToast('⚠️ Cannot start — customer estimate approval is pending')
+                              return
+                            }
+                            handleUpdateStatus(svc.id, 'in_progress')
+                          }}
                           disabled={saving}
-                          className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg" title="Start">
+                          className={`p-1.5 rounded-lg ${customerApproved ? 'text-orange-600 hover:bg-orange-50' : 'text-gray-300 cursor-not-allowed'}`}
+                          title={customerApproved ? 'Start' : 'Awaiting customer approval'}>
                           <PlayCircle size={16} />
                         </button>
                       )}

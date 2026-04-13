@@ -21,8 +21,10 @@ import RecommendationsTab    from './components/RecommendationsTab'
 const STATUS_COLORS = {
   intake:            { bg: 'bg-gray-100',    text: 'text-gray-700',    dot: 'bg-gray-400'    },
   assigned:          { bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
-  diagnosing:        { bg: 'bg-purple-100',  text: 'text-purple-700',  dot: 'bg-purple-500'  },
-  awaiting_approval: { bg: 'bg-yellow-100',  text: 'text-yellow-700',  dot: 'bg-yellow-500'  },
+  diagnosing:          { bg: 'bg-purple-100',  text: 'text-purple-700',  dot: 'bg-purple-500'  },
+  services_estimates:  { bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
+  internal_review:     { bg: 'bg-violet-100',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
+  awaiting_approval:   { bg: 'bg-yellow-100',  text: 'text-yellow-700',  dot: 'bg-yellow-500'  },
   approved:          { bg: 'bg-cyan-100',    text: 'text-cyan-700',    dot: 'bg-cyan-500'    },
   in_progress:       { bg: 'bg-orange-100',  text: 'text-orange-700',  dot: 'bg-orange-500'  },
   quality_check:     { bg: 'bg-indigo-100',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
@@ -33,15 +35,17 @@ const STATUS_COLORS = {
 }
 
 const TIMELINE = [
-  'intake','assigned','diagnosing','awaiting_approval',
-  'approved','in_progress','quality_check','completed','closed'
+  'intake','assigned','diagnosing','services_estimates','internal_review',
+  'awaiting_approval','approved','in_progress','quality_check','completed','closed'
 ]
 
 const NEXT_STATUS_MAP = {
   intake:            [{ code: 'assigned',          label: 'Transition to Assigned',   color: 'bg-blue-600 hover:bg-blue-700'     }],
   assigned:          [{ code: 'diagnosing',         label: 'Begin Diagnostics',            color: 'bg-purple-600 hover:bg-purple-700' }],
-  diagnosing:        [{ code: 'awaiting_approval',  label: 'Send Estimates for Approval',  color: 'bg-yellow-500 hover:bg-yellow-600' }],
-  approved:          [{ code: 'in_progress',        label: 'Start Service',                color: 'bg-orange-500 hover:bg-orange-600' }],
+  diagnosing:        [{ code: 'services_estimates', label: 'Move to Services & Parts Estimates', color: 'bg-blue-600 hover:bg-blue-700' }],
+  services_estimates:[{ code: 'internal_review',   label: 'Submit for Internal Review',         color: 'bg-violet-600 hover:bg-violet-700', requires_estimates: true }],
+  internal_review:   [{ code: 'awaiting_approval', label: 'Send Estimates for Approval',         color: 'bg-yellow-500 hover:bg-yellow-600', via_internal_review: true }],
+  approved:          [{ code: 'in_progress',       label: 'Start Service',                       color: 'bg-orange-500 hover:bg-orange-600' }],
   in_progress:       [{ code: 'quality_check',      label: 'Submit for QC',            color: 'bg-indigo-600 hover:bg-indigo-700' }],
   quality_check:     [
     { code: 'completed',    label: 'Complete Work Order',   color: 'bg-green-600 hover:bg-green-700', via_api: true },
@@ -69,7 +73,9 @@ export default function WorkOrderDetailPage() {
   const supabase = createClient()
 
   const [wo, setWo]                   = useState(null)
-  const [issueCount, setIssueCount]   = useState(null)  // null = not yet checked
+  const [issueCount,   setIssueCount]   = useState(null)  // null = not yet checked
+  const [serviceCount, setServiceCount] = useState(null)  // null = not yet checked
+  const [isOwner,      setIsOwner]      = useState(false) // is current user the provider owner
   const [mechanics, setMechanics]     = useState([])
   const [loading, setLoading]         = useState(true)
   const [updating, setUpdating]       = useState(false)
@@ -136,6 +142,22 @@ export default function WorkOrderDetailPage() {
         .select('id', { count: 'exact', head: true })
         .eq('work_order_id', params.id)
         .then(({ count }) => setIssueCount(count || 0))
+        .catch(() => {})
+
+      // Check if services are populated (for Internal Review gate)
+      supabase.from('work_order_services')
+        .select('id', { count: 'exact', head: true })
+        .eq('work_order_id', params.id)
+        .then(({ count }) => setServiceCount(count || 0))
+        .catch(() => {})
+
+      // Is current user the provider owner?
+      supabase.from('service_providers')
+        .select('id')
+        .eq('owner_user_id', (await supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()).data?.id)
+        .eq('id', data.service_provider?.id)
+        .maybeSingle()
+        .then(({ data: provRow }) => setIsOwner(!!provRow?.id))
         .catch(() => {})
 
       // Resolve mechanic name — mechanic.user is null due to user_profiles RLS
@@ -262,6 +284,25 @@ export default function WorkOrderDetailPage() {
       await loadWorkOrder()
     } catch (err) { setError(err.message) }
     finally { setSendingEstimate(false) }
+  }
+
+  // ── Transition to internal_review — calls API for owner notification ──────
+  const handleInternalReview = async () => {
+    if (!confirm('Submit estimates for internal review?')) return
+    setUpdating(true); setError(''); setSuccess('')
+    try {
+      const resp = await fetch(`/api/work-orders/${params.id}/internal-review`, { method: 'POST' })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Failed')
+      if (data.notified) {
+        const channels = [data.email_sent && 'email', data.sms_sent && 'SMS', 'in-app notification'].filter(Boolean).join(', ')
+        setSuccess(`Submitted for internal review. Provider notified via ${channels}.`)
+      } else {
+        setSuccess('Submitted for internal review.')
+      }
+      await loadWorkOrder()
+    } catch (err) { setError(err.message) }
+    finally { setUpdating(false) }
   }
 
   const advanceStatus = async (newStatusCode) => {
@@ -502,33 +543,52 @@ export default function WorkOrderDetailPage() {
 
             {/* Status advances — intercept special actions */}
             {nextActions.map(action => {
-              if (action.code === 'awaiting_approval') {
-                const issuesReady = issueCount !== null && issueCount > 0
+              {/* Services & Parts Estimates → Internal Review (requires services populated) */}
+              if (action.requires_estimates) {
+                const servicesReady = serviceCount !== null && serviceCount > 0
                 return (
                   <div key={action.code} className="flex flex-col gap-1.5">
-                    {!issuesReady && issueCount !== null && (
+                    {!servicesReady && serviceCount !== null && (
                       <p className="text-xs text-amber-700 flex items-center gap-1">
                         <AlertTriangle size={12} />
-                        Document at least one issue/diagnostic before sending estimates
+                        Add at least one service or part before submitting for review
                       </p>
                     )}
                     <button
                       onClick={() => {
-                        if (!issuesReady) {
-                          setActiveTab('issues')
-                          setError('Please document at least one issue/diagnostic before sending estimates to the customer.')
+                        if (!servicesReady) {
+                          setActiveTab('services')
+                          setError('Add at least one service or part estimate before submitting for internal review.')
                           return
                         }
-                        handleSendEstimate()
+                        advanceStatus('internal_review')
+                        .then(() => handleInternalReview().catch(() => {}))
                       }}
-                      disabled={sendingEstimate || updating}
-                      className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${!issuesReady ? 'opacity-60' : ''} ${action.color}`}>
-                      {sendingEstimate
-                        ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
-                        : action.label}
+                      disabled={updating}
+                      className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${!servicesReady ? 'opacity-60' : ''} ${action.color}`}>
+                      {updating && <Loader2 size={13} className="animate-spin" />}
+                      {action.label}
                     </button>
                   </div>
                 )
+              }
+
+              {/* Internal Review → Send Estimates for Approval */}
+              if (action.via_internal_review) {
+                return (
+                  <button key={action.code}
+                    onClick={handleSendEstimate}
+                    disabled={sendingEstimate || updating}
+                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                    {sendingEstimate
+                      ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
+                      : action.label}
+                  </button>
+                )
+              }
+
+              if (action.code === 'awaiting_approval') {
+                return null  // handled by via_internal_review above
               }
               if (action.code === 'quality_check') {
                 return (
