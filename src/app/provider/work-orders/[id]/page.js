@@ -439,6 +439,24 @@ export default function WorkOrderDetailPage() {
               )
             )}
 
+            {/* Assigned mechanic pending acknowledgement banner */}
+            {wo.assigned_mechanic_id && assignStatus === 'pending' && (
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-yellow-50 border border-yellow-300 rounded-lg text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse flex-shrink-0" />
+                  <span className="text-yellow-800 font-medium">
+                    Waiting for {mechanicUser.first_name || 'mechanic'} to acknowledge
+                  </span>
+                </div>
+                <button
+                  onClick={() => { supabase.from('work_orders').update({ assigned_mechanic_id: null, mechanic_assignment_status: null }).eq('id', params.id).then(() => loadWorkOrder()) }}
+                  className="text-xs text-red-600 hover:underline flex-shrink-0"
+                >
+                  Reassign
+                </button>
+              </div>
+            )}
+
             {/* Assign mechanic */}
             {!wo.assigned_mechanic_id && ['intake','assigned'].includes(statusCode) && mechanics.length > 0 && (
               <div className="flex items-center gap-2">
@@ -607,10 +625,39 @@ export default function WorkOrderDetailPage() {
                     )}
                     <div>
                       <p className="text-xs text-gray-400">Mechanic</p>
-                      {mechanicUser.first_name
-                        ? <p className="font-medium text-gray-900">{mechanicUser.first_name} {mechanicUser.last_name}</p>
-                        : <p className="text-amber-600 text-sm">Not assigned</p>
-                      }
+                      {mechanicUser.first_name ? (
+                        <div className="space-y-1">
+                          <p className="font-medium text-gray-900">
+                            {mechanicUser.first_name} {mechanicUser.last_name}
+                            {mechanic.specialization && (
+                              <span className="text-gray-400 font-normal"> · {mechanic.specialization}</span>
+                            )}
+                          </p>
+                          {assignStatus === 'pending' && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse inline-block" />
+                              Awaiting acknowledgement
+                            </span>
+                          )}
+                          {assignStatus === 'acknowledged' && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                              Acknowledged
+                            </span>
+                          )}
+                          {assignStatus === 'declined' && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                              Declined
+                              {wo.mechanic_decline_reason && (
+                                <span className="text-red-600"> · {wo.mechanic_decline_reason}</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-amber-600 text-sm">Not assigned</p>
+                      )}
                     </div>
                   </div>
                 </div>
