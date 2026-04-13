@@ -138,18 +138,43 @@ export default function WorkOrderDetailPage() {
   const loadMechanics = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile }  = await supabase
+
+      // Fetch mechanics for this provider
+      const { data: profile } = await supabase
         .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
       const { data: provider } = await supabase
         .from('service_providers').select('id').eq('owner_user_id', profile.id).single()
       if (!provider) return
-      const { data } = await supabase
+
+      const { data: mechanicsData } = await supabase
         .from('mechanics')
-        .select('id, specialization, user:user_profiles(first_name, last_name)')
+        .select('id, specialization, user_id, can_approve_work, can_manage_inventory')
         .eq('service_provider_id', provider.id)
         .eq('is_active', true)
-      setMechanics(data || [])
-    } catch {}
+
+      if (!mechanicsData?.length) { setMechanics([]); return }
+
+      // Resolve names via SECURITY DEFINER function (bypasses user_profiles RLS)
+      const { data: profiles } = await supabase.rpc(
+        'get_team_member_profiles',
+        { provider_owner_auth_id: user.id }
+      )
+
+      const merged = mechanicsData.map(m => {
+        const p = (profiles || []).find(pr => pr.user_id_from_mechanics === m.user_id)
+        return {
+          ...m,
+          user: p ? {
+            first_name: p.first_name,
+            last_name:  p.last_name,
+          } : { first_name: 'Unknown', last_name: '' },
+        }
+      })
+
+      setMechanics(merged)
+    } catch (e) {
+      console.error('loadMechanics error:', e.message)
+    }
   }, [])
 
   useEffect(() => {
@@ -422,7 +447,7 @@ export default function WorkOrderDetailPage() {
                   <option value="">Select mechanic...</option>
                   {mechanics.map(m => (
                     <option key={m.id} value={m.id}>
-                      {m.user?.first_name} --{m.user?.last_name}{m.specialization ? ` (${m.specialization})` : ''}
+                      {m.user?.first_name} {m.user?.last_name}{m.specialization ? ` (${m.specialization})` : ''}
                     </option>
                   ))}
                 </select>
