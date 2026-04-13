@@ -618,17 +618,63 @@ export default function WorkOrderDetailPage() {
                 )
               }
 
-              {/* Internal Review → Send Estimates for Approval */}
+              {/* Internal Review → full review panel with estimate summary + Send button */}
               if (action.via_internal_review) {
                 return (
-                  <button key={action.code}
-                    onClick={handleSendEstimate}
-                    disabled={sendingEstimate || updating}
-                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
-                    {sendingEstimate
-                      ? <><Loader2 size={13} className="animate-spin" /> Sending...</>
-                      : action.label}
-                  </button>
+                  <div key={action.code} className="w-full space-y-3">
+                    {/* Review panel */}
+                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                        <p className="text-sm font-semibold text-violet-900">Internal Estimate Review</p>
+                      </div>
+                      <p className="text-xs text-violet-700">
+                        Review the services &amp; parts estimates below. Once satisfied, send to the customer for approval.
+                      </p>
+
+                      {/* Estimate summary */}
+                      {estimate ? (
+                        <div className="bg-white rounded-lg border border-violet-200 p-3">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estimate Summary</p>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Services</span>
+                              <span className="font-medium">KES {Number(estimate.services_total || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Parts</span>
+                              <span className="font-medium">KES {Number(estimate.parts_total || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-400 text-xs">
+                              <span>VAT 16%</span>
+                              <span>KES {Number(estimate.tax || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-gray-100 pt-1.5">
+                              <span className="font-semibold text-gray-900">Total</span>
+                              <span className="font-bold text-violet-900 text-base">KES {Number(estimate.total || 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setActiveTab('services')}
+                            className="mt-2 text-xs text-violet-600 hover:underline">
+                            Review full breakdown →
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-violet-600 italic">Loading estimate…</p>
+                      )}
+                    </div>
+
+                    {/* Send button */}
+                    <button
+                      onClick={handleSendEstimate}
+                      disabled={sendingEstimate || updating}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                      {sendingEstimate
+                        ? <><Loader2 size={13} className="animate-spin" /> Sending to customer…</>
+                        : <>{action.label}</>}
+                    </button>
+                  </div>
                 )
               }
 

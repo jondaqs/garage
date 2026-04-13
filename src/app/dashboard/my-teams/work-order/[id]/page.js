@@ -54,6 +54,8 @@ export default function MechanicWorkOrderPage() {
   const [error,       setError]       = useState('')
   const [success,     setSuccess]     = useState('')
   const [acting,      setActing]      = useState(false)
+  const [estimate,    setEstimate]    = useState(null)
+  const [sendingEst,  setSendingEst]  = useState(false)
   const [activeTab,   setActiveTab]   = useState('overview')
 
   // Gating counts
@@ -87,6 +89,12 @@ export default function MechanicWorkOrderPage() {
         .eq('work_order_id', woId).then(({ count }) => setIssueCount(count || 0)).catch(() => {})
       supabase.from('work_order_services').select('id', { count: 'exact', head: true })
         .eq('work_order_id', woId).then(({ count }) => setServiceCount(count || 0)).catch(() => {})
+      // Load estimate for internal review
+      supabase.auth.getUser().then(({ data: { user } }) =>
+        supabase.rpc('calculate_work_order_estimate', {
+          p_work_order_id: woId, p_provider_user_id: user.id
+        }).then(({ data: d }) => { if (d?.success) setEstimate(d) }).catch(() => {})
+      )
     } catch (err) {
       setError(err.message)
     } finally {
@@ -150,6 +158,19 @@ export default function MechanicWorkOrderPage() {
     finally { setActing(false) }
   }
 
+  const handleSendEstimate = async () => {
+    if (!confirm('Send estimates to the customer for approval?')) return
+    setSendingEst(true); setError(''); setSuccess('')
+    try {
+      const resp = await fetch(`/api/work-orders/${params.id}/send-estimate`, { method: 'POST' })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to send')
+      setSuccess('Estimates sent to customer for approval.')
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setSendingEst(false) }
+  }
+
   const handleAdvanceStatus = async (newCode) => {
     setActing(true); setError(''); setSuccess('')
     try {
@@ -193,7 +214,8 @@ export default function MechanicWorkOrderPage() {
   const isPending     = assignStatus === 'pending'
   const isAcknowledged= assignStatus === 'acknowledged'
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
-  const canApprove    = !!perms?.can_approve_work
+  const canApprove     = !!perms?.can_approve_work
+  const canSendEst    = !!perms?.can_send_estimates
   const isAssigned    = !!perms?.is_assigned
 
   // Build woWithProvider shape that tabs expect
@@ -405,7 +427,42 @@ export default function MechanicWorkOrderPage() {
                   </div>
                 )}
                 {statusCode === 'internal_review' && (
-                  <p className="text-xs text-violet-700 font-medium">⏳ Awaiting provider review of estimates before sending to customer.</p>
+                  canSendEst ? (
+                    // Mechanic with can_send_estimates — show full review panel
+                    <div className="space-y-3 w-full">
+                      <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                          <p className="text-sm font-semibold text-violet-900">Internal Estimate Review</p>
+                        </div>
+                        <p className="text-xs text-violet-700">You have permission to send estimates directly to the customer.</p>
+                        {estimate ? (
+                          <div className="bg-white rounded-lg border border-violet-200 p-3">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estimate Summary</p>
+                            <div className="space-y-1.5 text-sm">
+                              <div className="flex justify-between"><span className="text-gray-600">Services</span><span className="font-medium">KES {Number(estimate.services_total || 0).toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-600">Parts</span><span className="font-medium">KES {Number(estimate.parts_total || 0).toLocaleString()}</span></div>
+                              <div className="flex justify-between text-gray-400 text-xs"><span>VAT 16%</span><span>KES {Number(estimate.tax || 0).toLocaleString()}</span></div>
+                              <div className="flex justify-between border-t border-gray-100 pt-1.5">
+                                <span className="font-semibold text-gray-900">Total</span>
+                                <span className="font-bold text-violet-900 text-base">KES {Number(estimate.total || 0).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : <p className="text-xs text-violet-600 italic">Loading estimate…</p>}
+                      </div>
+                      <button onClick={handleSendEstimate} disabled={sendingEst || acting}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
+                        {sendingEst ? <><Loader2 size={13} className="animate-spin" /> Sending…</> : 'Send Estimates for Approval'}
+                      </button>
+                    </div>
+                  ) : (
+                    // Mechanic without can_send_estimates — waiting message
+                    <div className="px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
+                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates submitted for provider review.</p>
+                      <p className="text-xs text-violet-600 mt-0.5">The provider will review and send to the customer.</p>
+                    </div>
+                  )
                 )}
                 {statusCode === 'awaiting_approval' && (
                   <p className="text-xs text-yellow-700 font-medium">⏳ Awaiting customer approval of estimates.</p>
