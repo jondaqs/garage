@@ -308,20 +308,21 @@ export default function Sidebar({ user }) {
               Service Provider Membership
             </p>
 
+            {/* One collapsible block per provider */}
             {mechanicMemberships.map(m => {
               const isOpen = providerNavOpen[m.providerId] ?? false
               return (
-                <div key={m.providerId} className="mb-3">
-                  {/* Provider identity card — collapsible */}
+                <div key={m.providerId} className="mb-2">
+                  {/* Provider toggle */}
                   <button
                     onClick={() => setProviderNavOpen(prev => ({ ...prev, [m.providerId]: !isOpen }))}
-                    className="w-full flex items-center justify-between px-1 mb-1.5 group"
+                    className="w-full flex items-center justify-between px-1 mb-1 group"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-6 h-6 bg-green-600 rounded-md flex items-center justify-center flex-shrink-0">
                         <Wrench size={12} className="text-white" />
                       </div>
-                      <span className="text-xs font-semibold text-gray-700 truncate">
+                      <span className="text-xs font-semibold text-gray-700 truncate leading-tight">
                         {m.providerName}
                       </span>
                     </div>
@@ -333,9 +334,9 @@ export default function Sidebar({ user }) {
 
                   {isOpen && (
                     <>
-                      {/* Role / permissions pill */}
-                      <div className="mx-1 mb-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
-                        <p className="text-[10px] text-gray-500 capitalize">{m.role}</p>
+                      {/* Role + permissions chip */}
+                      <div className="mx-1 mb-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+                        <p className="text-[10px] text-gray-500 capitalize">{m.role?.replace(/_/g,' ')}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {m.can_approve_work     && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">WO access</span>}
                           {m.can_send_estimates   && <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded">Estimates</span>}
@@ -344,15 +345,31 @@ export default function Sidebar({ user }) {
                         </div>
                       </div>
 
-                      {/* Nav items */}
-                      {providerNavItems(m).map(item => (
-                        <NavItem key={item.path} compact item={item} />
-                      ))}
+                      {/* Overview is provider-specific */}
+                      <NavItem key={`${m.providerId}-overview`} compact item={{
+                        icon:  Building2,
+                        label: 'Overview',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}`,
+                      }} />
                     </>
                   )}
                 </div>
               )
             })}
+
+            {/* Shared pages — shown once regardless of how many providers */}
+            <div className="mt-1 border-t border-gray-100 pt-2">
+              <NavItem compact item={{
+                icon:  Users,
+                label: 'My Teams',
+                path:  '/dashboard/my-teams',
+              }} />
+              <NavItem compact item={{
+                icon:  ClipboardList,
+                label: 'Assigned Work Orders',
+                path:  '/dashboard/my-teams/work-orders',
+              }} />
+            </div>
           </div>
         )}
       </nav>
