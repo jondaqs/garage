@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
-  Star, ChevronDown, Car, Gauge
+  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon
 } from 'lucide-react'
 import ServicesTab       from '@/app/provider/work-orders/[id]/components/ServicesTab'
 import PartsTab          from '@/app/provider/work-orders/[id]/components/PartsTab'
@@ -58,6 +58,10 @@ export default function MechanicWorkOrderPage() {
   const [showDecline,   setShowDecline]   = useState(false)
   const [declineReason, setDeclineReason] = useState('')
 
+  // Check-in
+  const [showCheckin,    setShowCheckin]    = useState(false)
+  const [checkinMileage, setCheckinMileage] = useState('')
+
   const load = useCallback(async () => {
     try {
       setError('')
@@ -108,6 +112,29 @@ export default function MechanicWorkOrderPage() {
       // Redirect back to My Teams after declining
       router.push('/dashboard/my-teams')
     } catch (err) { setError(err.message); setActing(false) }
+  }
+
+  const handleCheckIn = async () => {
+    if (!checkinMileage || isNaN(Number(checkinMileage))) {
+      setError('Enter a valid mileage reading')
+      return
+    }
+    setActing(true); setError(''); setSuccess('')
+    try {
+      const { error: upErr } = await supabase
+        .from('work_orders')
+        .update({
+          initial_mileage:       parseInt(checkinMileage),
+          vehicle_checked_in_at: new Date().toISOString(),
+        })
+        .eq('id', params.id)
+      if (upErr) throw upErr
+      setShowCheckin(false)
+      setCheckinMileage('')
+      setSuccess('Vehicle checked in')
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setActing(false) }
   }
 
   const handleAdvanceStatus = async (newCode) => {
@@ -242,6 +269,43 @@ export default function MechanicWorkOrderPage() {
                 : 'You have been assigned to this work order'}
             </p>
           </div>
+
+          {/* Check-in vehicle — shown when acknowledged and not yet checked in */}
+          {isAcknowledged && !wo.vehicle_checked_in_at && (
+            <div className="border-t border-green-200 pt-3">
+              {showCheckin ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="number"
+                    value={checkinMileage}
+                    onChange={e => setCheckinMileage(e.target.value)}
+                    placeholder="Current mileage (km)"
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-44 focus:ring-2 focus:ring-blue-400"
+                  />
+                  <button onClick={handleCheckIn} disabled={acting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+                    {acting ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
+                    Confirm Check-in
+                  </button>
+                  <button onClick={() => { setShowCheckin(false); setCheckinMileage('') }}
+                    className="text-sm text-gray-400 hover:text-gray-600">Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowCheckin(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                  <Car size={14} /> Check In Vehicle
+                </button>
+              )}
+            </div>
+          )}
+
+          {wo.vehicle_checked_in_at && (
+            <div className="border-t border-green-200 pt-2 flex items-center gap-2 text-xs text-green-700">
+              <CheckCircle size={13} />
+              Vehicle checked in
+              {wo.initial_mileage && <span className="text-green-600">· {wo.initial_mileage.toLocaleString()} km</span>}
+            </div>
+          )}
 
           {/* Acknowledge / Decline */}
           {isPending && !showDecline && (
