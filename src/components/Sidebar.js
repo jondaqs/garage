@@ -146,7 +146,6 @@ export default function Sidebar({ user }) {
     { icon: Bell,          label: 'Reminders',    path: '/dashboard/reminders',
       badge: remindersCount > 0 ? remindersCount : null },
     { icon: CalendarDays,label: 'Calendar',    path: '/dashboard/calendar' },
-    { icon: Users,       label: 'My Teams',    path: '/dashboard/my-teams' },
     { icon: History,     label: 'History',     path: '/dashboard/history' },
     { icon: Settings,    label: 'Profile',     path: '/dashboard/profile' },
   ]
@@ -169,8 +168,9 @@ export default function Sidebar({ user }) {
 
   // ── Provider (mechanic) nav items ────────────────────────────────────────
   const providerNavItems = (m) => [
-    { icon: ClipboardList, label: 'My Teams',     path: '/dashboard/my-teams'                              },
-    { icon: Wrench,        label: 'Work Orders',  path: `/dashboard/my-teams`                              },
+    { icon: Building2,     label: 'Overview',              path: `/dashboard/my-teams/provider/${m.providerId}`  },
+    { icon: Users,         label: 'My Teams',              path: '/dashboard/my-teams'                           },
+    { icon: ClipboardList, label: 'Assigned Work Orders',  path: '/dashboard/my-teams/work-orders'               },
   ]
 
   // ── Status config ─────────────────────────────────────────────────────────
@@ -339,16 +339,9 @@ export default function Sidebar({ user }) {
                       </div>
 
                       {/* Nav items */}
-                      <NavItem compact item={{
-                        icon: Users,
-                        label: 'Overview',
-                        path:  '/dashboard/my-teams',
-                      }} />
-                      <NavItem compact item={{
-                        icon: ClipboardList,
-                        label: 'Assigned Work Orders',
-                        path:  '/dashboard/my-teams/work-orders',
-                      }} />
+                      {providerNavItems(m).map(item => (
+                        <NavItem key={item.path} compact item={item} />
+                      ))}
                     </>
                   )}
                 </div>
