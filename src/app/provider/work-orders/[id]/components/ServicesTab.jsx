@@ -32,6 +32,10 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
   const [estimate, setEstimate]         = useState(null)
   const [seeding, setSeeding]           = useState(false)
   const [seedDone, setSeedDone]         = useState(false)
+  const [showNewServiceForm, setShowNewServiceForm] = useState(false)
+  const [newServiceName, setNewServiceName]         = useState('')
+  const [newServiceDesc, setNewServiceDesc]         = useState('')
+  const [savingNewSvc, setSavingNewSvc]             = useState(false)
   const [toast, setToast]               = useState('')
 
   // Add service form
@@ -74,13 +78,27 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
     }
   }, [workOrder.id])
 
+  const [providerServiceIds, setProviderServiceIds] = useState(new Set())
+
   const loadAllServices = useCallback(async () => {
-    const { data } = await supabase
+    // Load all services
+    const { data: svcs } = await supabase
       .from('services')
       .select('id, name')
+      .eq('is_active', true)
       .order('name')
-    setAllServices(data || [])
-  }, [])
+    setAllServices(svcs || [])
+
+    // Load provider-specific services for highlighting
+    if (workOrder.service_provider_id) {
+      const { data: provSvcs } = await supabase
+        .from('service_provider_services')
+        .select('service_id')
+        .eq('service_provider_id', workOrder.service_provider_id)
+        .eq('is_active', true)
+      setProviderServiceIds(new Set((provSvcs || []).map(s => s.service_id)))
+    }
+  }, [workOrder.service_provider_id])
 
   const refreshEstimate = useCallback(async () => {
     try {
@@ -157,6 +175,57 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       setError(e.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleCreateAndAddService = async (force = false) => {
+    if (!newServiceName.trim()) return
+    setSavingNewSvc(true)
+    setError('')
+    try {
+      const resp = await fetch('/api/services/create', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          name:                newServiceName.trim(),
+          description:         newServiceDesc.trim() || null,
+          service_provider_id: workOrder.service_provider_id,
+          force,
+        }),
+      })
+      const result = await resp.json()
+
+      // Exact duplicate — offer to use existing
+      if (resp.status === 409 && result.duplicate) {
+        if (window.confirm(`${result.error}\n\nUse the existing service instead?`)) {
+          setNewService(s => ({ ...s, service_id: result.existing_id }))
+          setNewServiceName('')
+          setNewServiceDesc('')
+          setShowNewServiceForm(false)
+        }
+        return
+      }
+
+      // Similarity warning — confirm before proceeding
+      if (result.warning) {
+        if (window.confirm(`${result.message}\n\nClick OK to add it anyway, or Cancel to go back.`)) {
+          await handleCreateAndAddService(true)  // retry with force=true
+        }
+        return
+      }
+
+      if (!resp.ok || !result.service_id) throw new Error(result.error || 'Failed to create service')
+
+      setNewService(s => ({ ...s, service_id: result.service_id }))
+      setNewServiceName('')
+      setNewServiceDesc('')
+      setShowNewServiceForm(false)
+      setSuccess(`Service "${result.name}" created and selected`)
+      await loadAllServices()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSavingNewSvc(false)
     }
   }
 
@@ -471,14 +540,77 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                 <div className="sm:col-span-1">
                   <label className="text-xs text-gray-500 block mb-1">Service *</label>
                   <select value={newService.service_id}
-                    onChange={e => setNewService(s => ({ ...s, service_id: e.target.value }))}
+                    onChange={e => {
+                      if (e.target.value === '__other__') {
+                        setShowNewServiceForm(true)
+                        setNewService(s => ({ ...s, service_id: '' }))
+                      } else {
+                        setNewService(s => ({ ...s, service_id: e.target.value }))
+                        setShowNewServiceForm(false)
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500">
                     <option value="">Select service...</option>
-                    {allServices.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
+                    {/* Provider services group */}
+                    {allServices.filter(s => providerServiceIds.has(s.id)).length > 0 && (
+                      <optgroup label="— This Provider's Services —">
+                        {allServices.filter(s => providerServiceIds.has(s.id)).map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {/* All other services */}
+                    {allServices.filter(s => !providerServiceIds.has(s.id)).length > 0 && (
+                      <optgroup label="— All Other Services —">
+                        {allServices.filter(s => !providerServiceIds.has(s.id)).map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__other__">＋ Other (add new service…)</option>
                   </select>
+                  {/* Provider services legend */}
+                  {providerServiceIds.size > 0 && (
+                    <p className="text-[10px] text-green-700 mt-1 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm bg-green-100 border border-green-400 inline-block" />
+                      Services listed under "This Provider's Services" are offered by this garage
+                    </p>
+                  )}
                 </div>
+                {/* Inline create new service form */}
+                {showNewServiceForm && (
+                  <div className="sm:col-span-3 bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-semibold text-green-800">Define new service</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Service Name *</label>
+                        <input type="text" value={newServiceName}
+                          onChange={e => setNewServiceName(e.target.value)}
+                          placeholder="e.g. Brake pad replacement"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-400" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Description</label>
+                        <input type="text" value={newServiceDesc}
+                          onChange={e => setNewServiceDesc(e.target.value)}
+                          placeholder="Optional"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-400" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleCreateAndAddService} disabled={savingNewSvc || !newServiceName.trim()}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50">
+                        {savingNewSvc ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        Create &amp; Select
+                      </button>
+                      <button onClick={() => { setShowNewServiceForm(false); setNewServiceName(''); setNewServiceDesc('') }}
+                        className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-xs">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Estimated Cost (KES)</label>
                   <input type="number" value={newService.estimated_cost}
