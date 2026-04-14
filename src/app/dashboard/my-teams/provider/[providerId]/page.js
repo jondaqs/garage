@@ -55,6 +55,7 @@ export default function ProviderOverviewPage() {
 
       // Merge: SPU is source of truth for role, mechanic for specialization
       const memberRecord = {
+        created_at: spuRow.joined_at,  // alias so JSX using mechanic.created_at still works
         ...spuRow,
         mechanic_id:      mechanic?.id || null,
         specialization:   mechanic?.specialization || null,
@@ -121,7 +122,7 @@ export default function ProviderOverviewPage() {
 
       setData({
         provider,
-        mechanic,
+        mechanic: memberRecord,
         ownerName,
         teamCount:  teamCount || 0,
         assignedWOs,
@@ -334,7 +335,7 @@ export default function ProviderOverviewPage() {
                 <Users size={11} /> Can manage team
               </span>
             )}
-            {!mechanic.can_approve_work && !mechanic.can_send_estimates && !mechanic.can_manage_inventory && !mechanic.can_manage_team && (
+            {!mechanic.can_approve_work && !mechanic.can_send_estimates && !mechanic.can_manage_inventory && !mechanic.can_manage_team && !mechanic.can_send_invoice && (
               <span className="text-xs text-gray-400 italic">Acknowledge / decline assignments only</span>
             )}
           </div>
