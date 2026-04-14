@@ -651,36 +651,38 @@ export default function ProviderTeamPage() {
                       <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => startEditMember(member)}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
-                  >
-                    <SettingsIcon size={13} /> Edit
-                  </button>
-                  {!member.is_verified && (
+                  {member.role !== 'service_provider_owner' && (<>
                     <button
-                      onClick={() => verifyMember(member.id)}
-                      className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                      onClick={() => startEditMember(member)}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
                     >
-                      Verify
+                      <SettingsIcon size={13} /> Edit
                     </button>
-                  )}
-                  <button
-                    onClick={() => toggleMemberStatus(member.id, member.is_active)}
-                    className={`px-3 py-1 text-sm rounded ${
-                      member.is_active
-                        ? 'bg-gray-600 text-white hover:bg-gray-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    {member.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button
-                    onClick={() => removeMember(member.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                    {!member.is_verified && (
+                      <button
+                        onClick={() => verifyMember(member.id)}
+                        className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                      >
+                        Verify
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleMemberStatus(member.id, member.is_active)}
+                      className={`px-3 py-1 text-sm rounded ${
+                        member.is_active
+                          ? 'bg-gray-600 text-white hover:bg-gray-700'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {member.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      onClick={() => removeMember(member.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </>)}
                 </div>
               </div>
             ))}
