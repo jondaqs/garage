@@ -160,6 +160,32 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
     }
   }
 
+  const handleSaveEstimate = async (wosId) => {
+    const data = estimating[wosId]
+    if (!data) return
+    setSaving(true)
+    setError('')
+    try {
+      const { error: upErr } = await supabase
+        .from('work_order_services')
+        .update({
+          estimated_cost: data.estimated_cost !== '' ? parseFloat(data.estimated_cost) : null,
+          notes:          data.notes || null,
+        })
+        .eq('id', wosId)
+      if (upErr) throw upErr
+      setEstimating(e => { const n = { ...e }; delete n[wosId]; return n })
+      setSuccess('Estimate saved')
+      onServiceAdded?.()
+      await loadServices()
+      await refreshEstimate()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleUpdateStatus = async (wosId, newStatus, actualCost = null) => {
     setSaving(true)
     setError('')
