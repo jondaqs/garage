@@ -85,7 +85,7 @@ export default function MechanicWorkOrderPage() {
 
       // Fetch gate counts
       const woId = result.work_order.id
-      supabase.from('work_order_issues').select('id', { count: 'exact', head: true })
+      supabase.from('vehicle_issues').select('id', { count: 'exact', head: true })
         .eq('work_order_id', woId).then(({ count }) => setIssueCount(count || 0)).catch(() => {})
       supabase.from('work_order_services').select('id', { count: 'exact', head: true })
         .eq('work_order_id', woId).then(({ count }) => setServiceCount(count || 0)).catch(() => {})

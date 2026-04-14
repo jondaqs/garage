@@ -138,7 +138,7 @@ export default function WorkOrderDetailPage() {
       setWo(data)
 
       // Check if issues are populated (for Send Estimates gate)
-      supabase.from('work_order_issues')
+      supabase.from('vehicle_issues')
         .select('id', { count: 'exact', head: true })
         .eq('work_order_id', params.id)
         .then(({ count }) => setIssueCount(count || 0))
