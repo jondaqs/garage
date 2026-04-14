@@ -964,6 +964,7 @@ export default function WorkOrderDetailPage() {
             <ServicesTab
               workOrder={woWithProvider}
               onEstimateChange={setEstimate}
+              onServiceAdded={() => setServiceCount(c => (c || 0) + 1)}
             />
           )}
 
@@ -974,7 +975,7 @@ export default function WorkOrderDetailPage() {
 
           {/* ── ISSUES TAB ── */}
           {activeTab === 'issues' && (
-            <IssuesTab workOrder={woWithProvider} />
+            <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
           )}
 
           {/* ── INVOICE TAB ── */}

@@ -16,7 +16,7 @@ const STATUS_STYLES = {
   cancelled:   'bg-red-100 text-red-600',
 }
 
-export default function ServicesTab({ workOrder, onEstimateChange }) {
+export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded }) {
   const estimateApproved = workOrder.status?.code === 'in_progress' ||
     ['in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
   // Also approved if WO status is 'approved' (customer approved estimate)
@@ -149,6 +149,7 @@ export default function ServicesTab({ workOrder, onEstimateChange }) {
       setNewService({ service_id: '', estimated_cost: '', notes: '' })
       setShowAdd(false)
       setSuccess('Service added')
+      onServiceAdded?.()
       await loadServices()
       await refreshEstimate()
     } catch (e) {

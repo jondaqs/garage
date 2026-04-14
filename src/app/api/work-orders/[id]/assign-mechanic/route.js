@@ -88,7 +88,7 @@ export async function POST(request, { params }) {
       .select('scheduled_start, problem_description')
       .eq('id', woId).single()
 
-    const woUrl = `${APP_URL()}/dashboard/work-orders/${woId}`
+    const woUrl = `${APP_URL()}/dashboard/my-teams/work-order/${woId}`
 
     console.log(`[assign-mechanic] mechanic: name=${mechName} email=${mechEmail||'NONE'} phone=${mechPhone||'NONE'}`)
 

@@ -567,13 +567,13 @@ export default function MechanicWorkOrderPage() {
             )}
 
             {activeTab === 'services' && canApprove && (
-              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} />
+              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} />
             )}
             {activeTab === 'parts' && canApprove && (
               <PartsTab workOrder={woWithProvider} />
             )}
             {activeTab === 'issues' && canApprove && (
-              <IssuesTab workOrder={woWithProvider} />
+              <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
             )}
             {activeTab === 'recommendations' && canApprove && (
               <RecommendationsTab workOrder={woWithProvider} />

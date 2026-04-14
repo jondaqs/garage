@@ -22,7 +22,7 @@ const STATUS_STYLES = {
   closed:           'bg-gray-100 text-gray-400',
 }
 
-export default function IssuesTab({ workOrder }) {
+export default function IssuesTab({ workOrder, onIssueAdded }) {
   const supabase = createClient()
 
   const [issues, setIssues]   = useState([])
@@ -78,6 +78,7 @@ export default function IssuesTab({ workOrder }) {
       setSuccess('Issue recorded')
       setShowForm(false)
       setForm({ title: '', description: '', severity: 'medium', requires_approval: false })
+      onIssueAdded?.()
       await loadIssues()
     } catch (e) {
       setError(e.message)
