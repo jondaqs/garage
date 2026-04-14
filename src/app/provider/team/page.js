@@ -248,10 +248,12 @@ export default function ProviderTeamPage() {
   }
 
   const [editingMemberData, setEditingMemberData] = useState(null)
+  const [editModalTab,    setEditModalTab]    = useState('role')  // 'role' | 'mechanic'
 
   const startEditMember = (member) => {
     setEditingMember(member.mechanic_id || member.id)
     setEditingMemberData(member)
+    setEditModalTab('role')
     setEditMemberForm({
       role:                 member.role                 || 'mechanic',
       specialization:       member.specialization       || '',
@@ -710,89 +712,152 @@ export default function ProviderTeamPage() {
           <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-auto space-y-5 max-h-[90vh] overflow-y-auto">
 
             {/* Header */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Edit Team Member</h3>
-              <p className="text-sm text-gray-500 mt-0.5">{memberName}</p>
-            </div>
-
-            {/* ── Provider Role ── */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Provider Role</p>
+            <div className="flex items-start justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select value={editMemberForm.role}
-                  onChange={e => setEditMemberForm(f => ({ ...f, role: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
-                  <option value="mechanic">Mechanic</option>
-                  <option value="senior_mechanic">Senior Mechanic</option>
-                  <option value="manager">Manager</option>
-                  <option value="accountant">Accountant</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <h3 className="text-lg font-semibold text-gray-900">Edit Team Member</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{memberName}</p>
               </div>
-              {!isMechRole && (
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-500">
-                    {editMemberForm.role === 'admin'      && 'Admins can manage the provider account, team, and settings.'}
-                    {editMemberForm.role === 'accountant' && 'Accountants can review and send estimates and invoices.'}
-                    {editMemberForm.role === 'manager'    && 'Managers can oversee team operations and work orders.'}
-                  </p>
-                  <div className="space-y-1.5 pt-1">
-                    {[
-                      { key: 'can_approve_work',     label: 'Can approve work orders'     },
-                      { key: 'can_send_estimates',   label: 'Can send estimates to customer' },
-                      { key: 'can_send_invoice',     label: 'Can send invoices'           },
-                      { key: 'can_manage_inventory', label: 'Can manage inventory'        },
-                      { key: 'can_manage_team',      label: 'Can manage team'             },
-                    ].map(p => (
-                      <label key={p.key} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={editMemberForm[p.key] || false}
-                          onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
-                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
-                        <span className="text-xs text-gray-700">{p.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {editingMemberData?.role !== editMemberForm.role && (
-                <div className={`text-xs px-3 py-2 rounded-lg ${isMechRole && !editingMemberData?.mechanic_id ? 'bg-blue-50 text-blue-700 border border-blue-200' : !isMechRole && editingMemberData?.mechanic_id ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-600'}`}>
-                  {isMechRole && !editingMemberData?.mechanic_id
-                    ? '⚡ A mechanic record will be created for this member'
-                    : !isMechRole && editingMemberData?.mechanic_id
-                    ? '⚠️ Changing to a non-mechanic role will deactivate their mechanic record and remove work order access'
-                    : `Role will be updated from "${editingMemberData?.role?.replace(/_/g,' ')}" to "${editMemberForm.role?.replace(/_/g,' ')}"`
-                  }
-                </div>
-              )}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setEditModalTab('role')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${editModalTab === 'role' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  Provider Role
+                </button>
+                {(isMechRole || editingMemberData?.mechanic_id) && (
+                  <button
+                    onClick={() => setEditModalTab('mechanic')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${editModalTab === 'mechanic' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    <Wrench size={11} /> Mechanic
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* ── Mechanic Details (only for mechanic roles) ── */}
-            {isMechRole && (
-              <div className="bg-blue-50 rounded-lg p-4 space-y-3 border border-blue-100">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Mechanic Details</p>
+            {/* ── TAB: Provider Role ── */}
+            {editModalTab === 'role' && (
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Provider Role</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select value={editMemberForm.role}
+                    onChange={e => {
+                      const newRole = e.target.value
+                      setEditMemberForm(f => ({ ...f, role: newRole }))
+                      // If switching to mechanic role, auto-switch to mechanic tab
+                      if (['mechanic','senior_mechanic'].includes(newRole)) {
+                        setEditModalTab('mechanic')
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="mechanic">Mechanic</option>
+                    <option value="senior_mechanic">Senior Mechanic</option>
+                    <option value="manager">Manager</option>
+                    <option value="accountant">Accountant</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                {/* Permissions for non-mechanic roles */}
+                {!isMechRole && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">
+                      {editMemberForm.role === 'admin'      && 'Admins can manage the provider account, team, and settings.'}
+                      {editMemberForm.role === 'accountant' && 'Accountants can review and send estimates and invoices.'}
+                      {editMemberForm.role === 'manager'    && 'Managers can oversee team operations and work orders.'}
+                    </p>
+                    <div className="space-y-1.5 pt-1">
+                      {[
+                        { key: 'can_approve_work',     label: 'Can approve work orders'        },
+                        { key: 'can_send_estimates',   label: 'Can send estimates to customer'  },
+                        { key: 'can_send_invoice',     label: 'Can send invoices'               },
+                        { key: 'can_manage_inventory', label: 'Can manage inventory'            },
+                        { key: 'can_manage_team',      label: 'Can manage team'                 },
+                      ].map(p => (
+                        <label key={p.key} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editMemberForm[p.key] || false}
+                            onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                            className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
+                          <span className="text-xs text-gray-700">{p.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cascade note for mechanic roles */}
+                {isMechRole && (
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                    Role is set here and cascades to the mechanic record. Switch to the <strong>Mechanic</strong> tab to set work permissions and specialization.
+                  </p>
+                )}
+
+                {/* Role change warning */}
+                {editingMemberData?.role !== editMemberForm.role && (
+                  <div className={`text-xs px-3 py-2 rounded-lg ${
+                    isMechRole && !editingMemberData?.mechanic_id
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : !isMechRole && editingMemberData?.mechanic_id
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {isMechRole && !editingMemberData?.mechanic_id
+                      ? '⚡ A mechanic record will be created for this member'
+                      : !isMechRole && editingMemberData?.mechanic_id
+                      ? '⚠️ Changing to a non-mechanic role will deactivate their mechanic record and remove work order access'
+                      : `Role will be updated from "${editingMemberData?.role?.replace(/_/g,' ')}" to "${editMemberForm.role?.replace(/_/g,' ')}"`
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── TAB: Mechanic Details (reads/writes mechanics table) ── */}
+            {editModalTab === 'mechanic' && (isMechRole || editingMemberData?.mechanic_id) && (
+              <div className="bg-blue-50 rounded-lg p-4 space-y-4 border border-blue-100">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Mechanic Record</p>
+                  <span className="text-[10px] text-blue-500">mechanics table</span>
+                </div>
+
+                {/* Role display (read from SPU, applied to mechanic) */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+                  <Wrench size={13} className="text-blue-600" />
+                  <div>
+                    <p className="text-xs text-gray-500">Role (set in Provider Role tab)</p>
+                    <p className="text-sm font-medium text-gray-900 capitalize">{editMemberForm.role?.replace(/_/g,' ')}</p>
+                  </div>
+                  <button
+                    onClick={() => setEditModalTab('role')}
+                    className="ml-auto text-xs text-blue-600 hover:underline">
+                    Change →
+                  </button>
+                </div>
+
+                {/* Specialization + Experience */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
-                    <input type="text" value={editMemberForm.specialization}
+                    <input type="text" value={editMemberForm.specialization || ''}
                       onChange={e => setEditMemberForm(f => ({ ...f, specialization: e.target.value }))}
                       placeholder="e.g. Engine Specialist"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Experience (yrs)</label>
-                    <input type="number" min="0" value={editMemberForm.experience_years}
+                    <input type="number" min="0" value={editMemberForm.experience_years || 0}
                       onChange={e => setEditMemberForm(f => ({ ...f, experience_years: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white" />
                   </div>
                 </div>
 
+                {/* Work Permissions — stored in both mechanics + SPU */}
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Permissions</p>
                   <div className="space-y-2">
                     {[
                       { key: 'can_approve_work',     label: 'Can approve work orders',        desc: 'Advance WO status and approve service quality' },
                       { key: 'can_send_estimates',   label: 'Can send estimates to customer',  desc: 'Send estimates directly without owner review' },
+                      { key: 'can_send_invoice',     label: 'Can send invoices',               desc: 'Generate and send invoices to customers' },
                       { key: 'can_manage_inventory', label: 'Can manage inventory',            desc: 'Add, edit, and adjust stock levels' },
                       { key: 'can_manage_team',      label: 'Can manage team',                 desc: 'View and manage other team members' },
                     ].map(p => (
