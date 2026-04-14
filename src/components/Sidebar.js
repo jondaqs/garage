@@ -98,33 +98,37 @@ export default function Sidebar({ user }) {
         .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
-      // Read from service_provider_users (covers all roles: mechanic, admin, accountant etc.)
-      // Left-join mechanics for permission columns which only exist for mechanic roles
-      const { data: spuRows } = await supabase
+      // 1. Fetch service_provider_users (all roles)
+      const { data: spuRows, error: spuErr } = await supabase
         .from('service_provider_users')
-        .select(`
-          id,
-          role,
-          service_provider:service_providers(id, name),
-          mechanic:mechanics!left(
-            id,
-            can_approve_work,
-            can_manage_inventory,
-            can_manage_team,
-            can_send_estimates
-          )
-        `)
+        .select('id, role, service_provider_id, service_provider:service_providers(id, name)')
         .eq('user_id', profile.id)
         .eq('is_active', true)
 
+      if (spuErr) {
+        console.error('SPU fetch error:', spuErr)
+      }
+
       if (spuRows?.length) {
+        // 2. Fetch mechanic records for this user separately
+        const providerIds = spuRows.map(r => r.service_provider_id)
+        const { data: mechRows } = await supabase
+          .from('mechanics')
+          .select('id, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates')
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .in('service_provider_id', providerIds)
+
+        // Index mechanic rows by provider_id for O(1) lookup
+        const mechByProvider = {}
+        ;(mechRows || []).forEach(m => { mechByProvider[m.service_provider_id] = m })
+
         setMechanicMemberships(spuRows.map(m => {
-          // mechanics is an array from the left join — take first match
-          const mech = Array.isArray(m.mechanic) ? m.mechanic[0] : m.mechanic
+          const mech = mechByProvider[m.service_provider_id] || null
           return {
             spuId:               m.id,
             mechanicId:          mech?.id || null,
-            providerId:          m.service_provider?.id,
+            providerId:          m.service_provider?.id || m.service_provider_id,
             providerName:        m.service_provider?.name || 'Unknown Garage',
             role:                m.role || 'mechanic',
             can_approve_work:    mech?.can_approve_work    || false,
@@ -133,10 +137,11 @@ export default function Sidebar({ user }) {
             can_send_estimates:  mech?.can_send_estimates  || false,
           }
         }))
+
         // Auto-open if already on my-teams path
         if (pathname.includes('/dashboard/my-teams')) {
           const openState = {}
-          spuRows.forEach(m => { openState[m.service_provider?.id] = true })
+          spuRows.forEach(m => { openState[m.service_provider?.id || m.service_provider_id] = true })
           setProviderNavOpen(openState)
         }
       }
