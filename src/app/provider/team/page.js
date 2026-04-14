@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
-  Users, UserPlus, Search, Mail, Shield, Award, 
+  Users, UserPlus, Search, Mail, Shield, Award, Wrench,
   Clock, Check, X, AlertCircle, MoreVertical, Trash2,
   Settings as SettingsIcon
 } from 'lucide-react'
