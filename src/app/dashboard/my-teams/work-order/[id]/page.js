@@ -50,6 +50,7 @@ export default function MechanicWorkOrderPage() {
 
   const [wo,          setWo]          = useState(null)
   const [perms,       setPerms]       = useState(null)
+  const [memberPerms, setMemberPerms] = useState(null)  // SPU-level perms for non-mechanics
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState('')
   const [success,     setSuccess]     = useState('')
@@ -74,14 +75,37 @@ export default function MechanicWorkOrderPage() {
     try {
       setError('')
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: result, error: rpcErr } = await supabase.rpc(
+      // Try mechanic RPC first
+      let result = null
+      const { data: mechResult } = await supabase.rpc(
         'get_mechanic_work_order',
         { p_work_order_id: params.id, p_mechanic_user_id: user.id }
       )
-      if (rpcErr) throw rpcErr
-      if (!result?.success) throw new Error(result?.error || 'Access denied or work order not found')
-      setWo(result.work_order)
-      setPerms(result.mechanic_permissions)
+
+      if (mechResult?.success) {
+        result = mechResult
+        setWo(result.work_order)
+        setPerms(result.mechanic_permissions)
+      } else {
+        // Fall back to SPU-based access (admin, accountant, manager, owner)
+        const { data: spuResult, error: spuErr } = await supabase.rpc(
+          'get_provider_member_work_order',
+          { p_work_order_id: params.id, p_user_id: user.id }
+        )
+        if (spuErr) throw spuErr
+        if (!spuResult?.success) throw new Error(spuResult?.error || 'Access denied or work order not found')
+        result = spuResult
+        setWo(result.work_order)
+        setMemberPerms(result.member_permissions)
+        // Create a compatible perms object for components that use mechanic perms
+        setPerms({
+          can_approve_work:     result.member_permissions.can_approve_work,
+          can_manage_inventory: result.member_permissions.can_manage_inventory,
+          can_manage_team:      result.member_permissions.can_manage_team,
+          can_send_estimates:   result.member_permissions.can_send_estimates,
+          is_assigned:          false,
+        })
+      }
 
       // Fetch gate counts
       const woId = result.work_order.id
@@ -234,7 +258,9 @@ export default function MechanicWorkOrderPage() {
   const isAcknowledged= assignStatus === 'acknowledged'
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
   const canApprove     = !!perms?.can_approve_work
-  const canSendEst    = !!perms?.can_send_estimates
+  const canSendEst  = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
+  const isMechanic  = !!perms?.mechanic_id || !memberPerms   // has mechanic record
+  const memberRole  = memberPerms?.role || (isMechanic ? (wo?.status?.code === 'assigned' ? 'mechanic' : 'mechanic') : null)
   const isAssigned    = !!perms?.is_assigned
 
   // Build woWithProvider shape that tabs expect

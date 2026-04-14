@@ -46,12 +46,24 @@ export default function MechanicWorkOrdersPage() {
     setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: result, error: rpcErr } = await supabase.rpc(
+      // Try mechanic-specific RPC first (for assigned WOs + acknowledge/decline)
+      const { data: mechResult } = await supabase.rpc(
         'get_mechanic_assigned_work_orders',
         { p_mechanic_user_id: user.id }
       )
-      if (rpcErr) throw rpcErr
-      setWorkOrders(result?.work_orders || [])
+
+      // Also try SPU-based RPC (for admin/accountant — sees all provider WOs)
+      const { data: spuResult } = await supabase.rpc(
+        'get_provider_member_work_orders',
+        { p_user_id: user.id }
+      )
+
+      // Merge, dedup by id — SPU result may include more WOs
+      const mechWOs = mechResult?.work_orders || []
+      const spuWOs  = spuResult?.work_orders  || []
+      const seen    = new Set(mechWOs.map(w => w.id))
+      const extra   = spuWOs.filter(w => !seen.has(w.id))
+      setWorkOrders([...mechWOs, ...extra])
     } catch (e) {
       setError(e.message)
     } finally {
