@@ -24,8 +24,8 @@ function getServiceClient() {
   })
 }
 
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garicare.com'
-const BRAND   = 'GariCare'
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const BRAND   = 'Motiifix' 
 
 const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString('en-KE', {

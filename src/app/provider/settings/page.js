@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Settings, User, Store, Lock, CheckCircle, AlertCircle,
-  Loader2, Save, Eye, EyeOff, Clock, Info, Wrench
+  Loader2, Save, Eye, EyeOff, Clock, Info, Wrench, Plus, X
 } from 'lucide-react'
 
 const TABS = [
@@ -33,6 +33,11 @@ export default function ProviderSettingsPage() {
   const [allServices,      setAllServices]      = useState([])
   const [selectedServices, setSelectedServices] = useState(new Set())
   const [servicesSaving,   setServicesSaving]   = useState(false)
+  const [showNewSvcForm,   setShowNewSvcForm]   = useState(false)
+  const [newSvcName,       setNewSvcName]       = useState('')
+  const [newSvcDesc,       setNewSvcDesc]       = useState('')
+  const [newSvcSaving,     setNewSvcSaving]     = useState(false)
+  const [newSvcError,      setNewSvcError]      = useState('')
 
   const [business, setBusiness] = useState({
     name: '', email: '', phone: '', description: '',
@@ -210,6 +215,57 @@ export default function ProviderSettingsPage() {
   )
 
   const isPending = status === 'pending_verification'
+
+  const handleCreateService = async (force = false) => {
+    if (!newSvcName.trim()) return
+    setNewSvcSaving(true)
+    setNewSvcError('')
+    try {
+      const resp = await fetch('/api/services/create', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          name:                newSvcName.trim(),
+          description:         newSvcDesc.trim() || null,
+          service_provider_id: providerId,
+          force,
+        }),
+      })
+      const result = await resp.json()
+
+      // Exact duplicate
+      if (resp.status === 409 && result.duplicate) {
+        if (window.confirm(`${result.error}\n\nAdd this service to your offered list instead?`)) {
+          setSelectedServices(prev => new Set([...prev, result.existing_id]))
+          setShowNewSvcForm(false)
+          setNewSvcName(''); setNewSvcDesc('')
+        }
+        return
+      }
+
+      // Similarity warning
+      if (result.warning) {
+        if (window.confirm(`${result.message}\n\nClick OK to create it anyway.`)) {
+          await handleCreateService(true)
+        }
+        return
+      }
+
+      if (!resp.ok || !result.service_id) throw new Error(result.error || 'Failed to create')
+
+      // Add to allServices list + auto-check it
+      setAllServices(prev => [...prev, { id: result.service_id, name: result.name, description: newSvcDesc.trim() || null }]
+        .sort((a, b) => a.name.localeCompare(b.name)))
+      setSelectedServices(prev => new Set([...prev, result.service_id]))
+      setShowNewSvcForm(false)
+      setNewSvcName(''); setNewSvcDesc('')
+      setSuccess(`Service "${result.name}" created and added to your list`)
+    } catch (e) {
+      setNewSvcError(e.message)
+    } finally {
+      setNewSvcSaving(false)
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -391,6 +447,54 @@ export default function ProviderSettingsPage() {
                   </label>
                 )
               })}
+            </div>
+          )}
+
+          {/* Add new service */}
+          {!showNewSvcForm ? (
+            <button
+              onClick={() => { setShowNewSvcForm(true); setNewSvcError('') }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
+              <Plus size={15} /> Can't find a service? Add it here
+            </button>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-green-800">Define new service</p>
+                <button onClick={() => { setShowNewSvcForm(false); setNewSvcName(''); setNewSvcDesc(''); setNewSvcError('') }}
+                  className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+              </div>
+              {newSvcError && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <AlertCircle size={12} /> {newSvcError}
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={lbl}>Service Name *</label>
+                  <input type="text" value={newSvcName}
+                    onChange={e => setNewSvcName(e.target.value)}
+                    placeholder="e.g. Brake pad replacement"
+                    className={inp} />
+                </div>
+                <div>
+                  <label className={lbl}>Description (optional)</label>
+                  <input type="text" value={newSvcDesc}
+                    onChange={e => setNewSvcDesc(e.target.value)}
+                    placeholder="Brief description"
+                    className={inp} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => handleCreateService(false)} disabled={newSvcSaving || !newSvcName.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                  {newSvcSaving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  Create &amp; Add to My Services
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                The new service will be saved to the system catalog, added to your services list, and reviewed by admin.
+              </p>
             </div>
           )}
 
