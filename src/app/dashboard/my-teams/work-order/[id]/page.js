@@ -271,8 +271,11 @@ export default function MechanicWorkOrderPage() {
   }
 
   // Available tabs based on permissions
+  // Reviewers (can_send_estimates) can access services/parts tabs during internal_review
+  const isReviewer = canSendEst && statusCode === 'internal_review'
   const tabs = ALL_TABS.filter(t =>
-    t.perm === 'any' || (t.perm === 'can_approve_work' && canApprove)
+    t.perm === 'any' ||
+    (t.perm === 'can_approve_work' && (canApprove || isReviewer))
   )
 
   return (
@@ -495,6 +498,11 @@ export default function MechanicWorkOrderPage() {
                             </div>
                           </div>
                         ) : <p className="text-xs text-violet-600 italic">Loading estimate…</p>}
+                        <button
+                          onClick={() => setActiveTab('services')}
+                          className="text-xs text-violet-600 hover:underline">
+                          Review services &amp; parts breakdown →
+                        </button>
                       </div>
                       <button onClick={handleSendEstimate} disabled={sendingEst || acting}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
@@ -502,10 +510,13 @@ export default function MechanicWorkOrderPage() {
                       </button>
                     </div>
                   ) : (
-                    // Mechanic without can_send_estimates — waiting message
                     <div className="px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
-                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates submitted for provider review.</p>
-                      <p className="text-xs text-violet-600 mt-0.5">The provider will review and send to the customer.</p>
+                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates under internal review.</p>
+                      <p className="text-xs text-violet-600 mt-0.5">
+                        {memberPerms?.role === 'accountant' || memberPerms?.role === 'admin'
+                          ? 'Contact the provider owner to grant you estimate-sending permissions.'
+                          : 'Awaiting review by owner, admin, or accountant before sending to customer.'}
+                      </p>
                     </div>
                   )
                 )}
@@ -611,13 +622,13 @@ export default function MechanicWorkOrderPage() {
               </div>
             )}
 
-            {activeTab === 'services' && canApprove && (
+            {activeTab === 'services' && (canApprove || isReviewer) && (
               <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} />
             )}
-            {activeTab === 'parts' && canApprove && (
+            {activeTab === 'parts' && (canApprove || isReviewer) && (
               <PartsTab workOrder={woWithProvider} />
             )}
-            {activeTab === 'issues' && canApprove && (
+            {activeTab === 'issues' && (canApprove || isReviewer) && (
               <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
             )}
             {activeTab === 'recommendations' && canApprove && (
