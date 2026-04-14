@@ -171,6 +171,25 @@ export default function MechanicWorkOrderPage() {
     finally { setSendingEst(false) }
   }
 
+  // Transition to internal_review — must go through API to trigger notifications
+  const handleSubmitForInternalReview = async () => {
+    setActing(true); setError(''); setSuccess('')
+    try {
+      const resp = await fetch(`/api/work-orders/${params.id}/internal-review`, {
+        method: 'POST',
+      })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to submit for review')
+      if (data.notified) {
+        setSuccess(`Submitted for internal review. ${data.recipient_count} recipient(s) notified.`)
+      } else {
+        setSuccess('Submitted for internal review.')
+      }
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setActing(false) }
+  }
+
   const handleAdvanceStatus = async (newCode) => {
     setActing(true); setError(''); setSuccess('')
     try {
@@ -417,7 +436,7 @@ export default function MechanicWorkOrderPage() {
                     <button
                       onClick={() => {
                         if (!serviceCount) { setActiveTab('services'); return }
-                        handleAdvanceStatus('internal_review')
+                        handleSubmitForInternalReview()
                       }}
                       disabled={acting}
                       className={`px-3 py-1.5 text-white rounded-lg text-xs font-medium disabled:opacity-50 ${!serviceCount ? 'bg-violet-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700'}`}>
