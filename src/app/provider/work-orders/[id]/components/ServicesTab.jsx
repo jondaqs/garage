@@ -598,7 +598,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={handleCreateAndAddService} disabled={savingNewSvc || !newServiceName.trim()}
+                      <button onClick={() => handleCreateAndAddService(false)} disabled={savingNewSvc || !newServiceName.trim()}
                         className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50">
                         {savingNewSvc ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                         Create &amp; Select
