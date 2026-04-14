@@ -260,7 +260,8 @@ export default function MechanicWorkOrderPage() {
   const canApprove     = !!perms?.can_approve_work
   const canSendEst  = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
   const isMechanic  = !!perms?.mechanic_id || !memberPerms   // has mechanic record
-  const memberRole  = memberPerms?.role || (isMechanic ? (wo?.status?.code === 'assigned' ? 'mechanic' : 'mechanic') : null)
+  const memberRole  = memberPerms?.role || (isMechanic ? 'mechanic' : null)
+  const isAdmin     = ['admin', 'service_provider_owner'].includes(memberPerms?.role)
   const isAssigned    = !!perms?.is_assigned
 
   // Build woWithProvider shape that tabs expect
@@ -271,11 +272,8 @@ export default function MechanicWorkOrderPage() {
   }
 
   // Available tabs based on permissions
-  // Reviewers (can_send_estimates) can access services/parts tabs during internal_review
-  const isReviewer = canSendEst && statusCode === 'internal_review'
   const tabs = ALL_TABS.filter(t =>
-    t.perm === 'any' ||
-    (t.perm === 'can_approve_work' && (canApprove || isReviewer))
+    t.perm === 'any' || (t.perm === 'can_approve_work' && (canApprove || isAdmin))
   )
 
   return (
@@ -424,8 +422,41 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
+          {/* Internal Estimate Review — standalone for any member with can_send_estimates */}
+          {statusCode === 'internal_review' && canSendEst && (
+            <div className="border-t border-violet-100 pt-3 space-y-3">
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                  <p className="text-sm font-semibold text-violet-900">Internal Estimate Review</p>
+                </div>
+                <p className="text-xs text-violet-700">
+                  Review the services &amp; parts estimates below. Once satisfied, send to the customer for approval.
+                </p>
+                {estimate ? (
+                  <div className="bg-white rounded-lg border border-violet-200 p-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estimate Summary</p>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex justify-between"><span className="text-gray-600">Services</span><span className="font-medium">KES {Number(estimate.services_total || 0).toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Parts</span><span className="font-medium">KES {Number(estimate.parts_total || 0).toLocaleString()}</span></div>
+                      <div className="flex justify-between text-gray-400 text-xs"><span>VAT 16%</span><span>KES {Number(estimate.tax || 0).toLocaleString()}</span></div>
+                      <div className="flex justify-between border-t border-gray-100 pt-1.5">
+                        <span className="font-semibold text-gray-900">Total</span>
+                        <span className="font-bold text-violet-900 text-base">KES {Number(estimate.total || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : <p className="text-xs text-violet-600 italic">Loading estimate…</p>}
+              </div>
+              <button onClick={handleSendEstimate} disabled={sendingEst || acting}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
+                {sendingEst ? <><Loader2 size={13} className="animate-spin" /> Sending…</> : 'Send Estimates for Approval'}
+              </button>
+            </div>
+          )}
+
           {/* Status advance actions */}
-          {isAcknowledged && canApprove && (
+          {((isAcknowledged && canApprove) || (isAdmin && !isTerminal)) && (<>
             <div className="border-t border-green-200 pt-3">
               <p className="text-xs font-medium text-green-800 mb-2">Advance status:</p>
               <div className="flex flex-wrap gap-2">
@@ -475,48 +506,11 @@ export default function MechanicWorkOrderPage() {
                   </div>
                 )}
                 {statusCode === 'internal_review' && (
-                  canSendEst ? (
-                    // Mechanic with can_send_estimates — show full review panel
-                    <div className="space-y-3 w-full">
-                      <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
-                          <p className="text-sm font-semibold text-violet-900">Internal Estimate Review</p>
-                        </div>
-                        <p className="text-xs text-violet-700">You have permission to send estimates directly to the customer.</p>
-                        {estimate ? (
-                          <div className="bg-white rounded-lg border border-violet-200 p-3">
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estimate Summary</p>
-                            <div className="space-y-1.5 text-sm">
-                              <div className="flex justify-between"><span className="text-gray-600">Services</span><span className="font-medium">KES {Number(estimate.services_total || 0).toLocaleString()}</span></div>
-                              <div className="flex justify-between"><span className="text-gray-600">Parts</span><span className="font-medium">KES {Number(estimate.parts_total || 0).toLocaleString()}</span></div>
-                              <div className="flex justify-between text-gray-400 text-xs"><span>VAT 16%</span><span>KES {Number(estimate.tax || 0).toLocaleString()}</span></div>
-                              <div className="flex justify-between border-t border-gray-100 pt-1.5">
-                                <span className="font-semibold text-gray-900">Total</span>
-                                <span className="font-bold text-violet-900 text-base">KES {Number(estimate.total || 0).toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : <p className="text-xs text-violet-600 italic">Loading estimate…</p>}
-                        <button
-                          onClick={() => setActiveTab('services')}
-                          className="text-xs text-violet-600 hover:underline">
-                          Review services &amp; parts breakdown →
-                        </button>
-                      </div>
-                      <button onClick={handleSendEstimate} disabled={sendingEst || acting}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
-                        {sendingEst ? <><Loader2 size={13} className="animate-spin" /> Sending…</> : 'Send Estimates for Approval'}
-                      </button>
-                    </div>
-                  ) : (
+                  canSendEst ? null : (
+                    // Mechanic without can_send_estimates — waiting message
                     <div className="px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
-                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates under internal review.</p>
-                      <p className="text-xs text-violet-600 mt-0.5">
-                        {memberPerms?.role === 'accountant' || memberPerms?.role === 'admin'
-                          ? 'Contact the provider owner to grant you estimate-sending permissions.'
-                          : 'Awaiting review by owner, admin, or accountant before sending to customer.'}
-                      </p>
+                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates submitted for provider review.</p>
+                      <p className="text-xs text-violet-600 mt-0.5">The provider will review and send to the customer.</p>
                     </div>
                   )
                 )}
@@ -543,7 +537,7 @@ export default function MechanicWorkOrderPage() {
                 )}
               </div>
             </div>
-          )}
+          </>)}
 
           {/* Permissions summary */}
           {perms && (
@@ -622,19 +616,19 @@ export default function MechanicWorkOrderPage() {
               </div>
             )}
 
-            {activeTab === 'services' && (canApprove || isReviewer) && (
+            {activeTab === 'services' && (canApprove || isAdmin) && (
               <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} />
             )}
-            {activeTab === 'parts' && (canApprove || isReviewer) && (
+            {activeTab === 'parts' && (canApprove || isAdmin) && (
               <PartsTab workOrder={woWithProvider} />
             )}
-            {activeTab === 'issues' && (canApprove || isReviewer) && (
+            {activeTab === 'issues' && (canApprove || isAdmin) && (
               <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
             )}
-            {activeTab === 'recommendations' && canApprove && (
+            {activeTab === 'recommendations' && (canApprove || isAdmin) && (
               <RecommendationsTab workOrder={woWithProvider} />
             )}
-            {activeTab === 'qc' && canApprove && (
+            {activeTab === 'qc' && (canApprove || isAdmin) && (
               <QualityCheckTab workOrder={woWithProvider} onStatusChange={load} />
             )}
             {activeTab === 'comments' && (
