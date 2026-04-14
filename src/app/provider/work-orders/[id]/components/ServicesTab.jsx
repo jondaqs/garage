@@ -18,7 +18,7 @@ const STATUS_STYLES = {
 
 export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded }) {
   // Resolve service_provider_id from either flat field or nested object (provider vs mechanic page)
-  const providerSvcId = providerSvcId || workOrder.service_provider?.id
+  const providerSvcId = workOrder.service_provider_id || workOrder.service_provider?.id
 
   const estimateApproved = workOrder.status?.code === 'in_progress' ||
     ['in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
