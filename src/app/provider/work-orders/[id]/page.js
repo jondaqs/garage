@@ -75,7 +75,8 @@ export default function WorkOrderDetailPage() {
   const [wo, setWo]                   = useState(null)
   const [issueCount,   setIssueCount]   = useState(null)  // null = not yet checked
   const [serviceCount, setServiceCount] = useState(null)  // null = not yet checked
-  const [isOwner,      setIsOwner]      = useState(false) // is current user the provider owner
+  const [isOwner,         setIsOwner]         = useState(false) // is current user the provider owner
+  const [spuPermissions,  setSpuPermissions]  = useState({})    // SPU-level permissions for current user
   const [mechanics, setMechanics]     = useState([])
   const [loading, setLoading]         = useState(true)
   const [updating, setUpdating]       = useState(false)
@@ -152,12 +153,24 @@ export default function WorkOrderDetailPage() {
         .catch(() => {})
 
       // Is current user the provider owner?
-      supabase.from('service_providers')
-        .select('id')
-        .eq('owner_user_id', (await supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()).data?.id)
-        .eq('id', data.service_provider?.id)
-        .maybeSingle()
-        .then(({ data: provRow }) => setIsOwner(!!provRow?.id))
+      supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .then(async ({ data: prof }) => {
+          if (!prof) return
+          // Check if owner
+          const { data: provRow } = await supabase.from('service_providers')
+            .select('id').eq('owner_user_id', prof.id)
+            .eq('id', data.service_provider?.id).maybeSingle()
+          setIsOwner(!!provRow?.id)
+
+          // Fetch SPU permissions for current user on this provider
+          const { data: spuRow } = await supabase.from('service_provider_users')
+            .select('role, can_approve_work, can_manage_team, can_manage_inventory, can_send_estimates, can_send_invoice')
+            .eq('user_id', prof.id)
+            .eq('service_provider_id', data.service_provider?.id)
+            .eq('is_active', true)
+            .maybeSingle()
+          if (spuRow) setSpuPermissions(spuRow)
+        })
         .catch(() => {})
 
       // Resolve mechanic name — mechanic.user is null due to user_profiles RLS
@@ -392,6 +405,11 @@ export default function WorkOrderDetailPage() {
   const mechanicUser  = mechanic.user || wo.mechanic_profile || {}
   const assignStatus  = wo.mechanic_assignment_status
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
+  // User can send estimates if they are owner, admin, or have SPU can_send_estimates
+  const canSendEstimatesAll = isOwner ||
+    ['service_provider_owner','admin'].includes(spuPermissions.role) ||
+    spuPermissions.can_send_estimates ||
+    (wo.mechanic?.user_id && spuPermissions.can_send_estimates)
 
   // Inject service_provider_id into wo for tab components (needed for parts search)
   const woWithProvider = { ...wo, service_provider_id: wo.service_provider?.id || wo.service_provider_id }
@@ -618,8 +636,18 @@ export default function WorkOrderDetailPage() {
                 )
               }
 
-              {/* Internal Review → full review panel with estimate summary + Send button */}
+              {/* Internal Review → full review panel (owner, admin, accountant, or can_send_estimates) */}
               if (action.via_internal_review) {
+                if (!canSendEstimatesAll) {
+                  return (
+                    <div key={action.code} className="px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
+                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates submitted for review.</p>
+                      <p className="text-xs text-violet-600 mt-0.5">Waiting for owner, admin, or accountant to send to customer.</p>
+                    </div>
+                  )
+                }
+                // fall through to show the full panel
+                if (false) {}  // placeholder to maintain if-chain
                 return (
                   <div key={action.code} className="w-full space-y-3">
                     {/* Review panel */}

@@ -221,6 +221,7 @@ export default function ProviderTeamPage() {
       can_manage_inventory: member.can_manage_inventory || false,
       can_manage_team:      member.can_manage_team      || false,
       can_send_estimates:   member.can_send_estimates   || false,
+      can_send_invoice:     member.can_send_invoice     || false,
     })
   }
 
@@ -235,7 +236,15 @@ export default function ProviderTeamPage() {
       if (editingMemberData?.spu_id) {
         const { error: spuErr } = await supabase
           .from('service_provider_users')
-          .update({ role: newRole, updated_at: new Date().toISOString() })
+          .update({
+            role:                 newRole,
+            can_approve_work:     editMemberForm.can_approve_work,
+            can_manage_team:      editMemberForm.can_manage_team,
+            can_manage_inventory: editMemberForm.can_manage_inventory,
+            can_send_estimates:   editMemberForm.can_send_estimates,
+            can_send_invoice:     editMemberForm.can_send_invoice,
+            updated_at:           new Date().toISOString(),
+          })
           .eq('id', editingMemberData.spu_id)
         if (spuErr) throw spuErr
       }
@@ -665,11 +674,29 @@ export default function ProviderTeamPage() {
                 </select>
               </div>
               {!isMechRole && (
-                <p className="text-xs text-gray-500">
-                  {editMemberForm.role === 'admin'      && 'Admins can manage the provider account, team, and settings.'}
-                  {editMemberForm.role === 'accountant' && 'Accountants can view invoices, payments, and financial reports.'}
-                  {editMemberForm.role === 'manager'    && 'Managers can oversee team operations and work orders.'}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500">
+                    {editMemberForm.role === 'admin'      && 'Admins can manage the provider account, team, and settings.'}
+                    {editMemberForm.role === 'accountant' && 'Accountants can review and send estimates and invoices.'}
+                    {editMemberForm.role === 'manager'    && 'Managers can oversee team operations and work orders.'}
+                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    {[
+                      { key: 'can_approve_work',     label: 'Can approve work orders'     },
+                      { key: 'can_send_estimates',   label: 'Can send estimates to customer' },
+                      { key: 'can_send_invoice',     label: 'Can send invoices'           },
+                      { key: 'can_manage_inventory', label: 'Can manage inventory'        },
+                      { key: 'can_manage_team',      label: 'Can manage team'             },
+                    ].map(p => (
+                      <label key={p.key} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={editMemberForm[p.key] || false}
+                          onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
+                        <span className="text-xs text-gray-700">{p.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               )}
               {editingMemberData?.role !== editMemberForm.role && (
                 <div className={`text-xs px-3 py-2 rounded-lg ${isMechRole && !editingMemberData?.mechanic_id ? 'bg-blue-50 text-blue-700 border border-blue-200' : !isMechRole && editingMemberData?.mechanic_id ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-600'}`}>
