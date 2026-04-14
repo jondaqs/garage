@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Trash2, CheckCircle, PlayCircle, SkipForward,
   AlertCircle, ChevronDown, ChevronUp, Loader2, RefreshCw,
-  Info, DollarSign
+  Info, DollarSign, Edit3
 } from 'lucide-react'
 
 const STATUS_STYLES = {
@@ -42,6 +42,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
 
   // Inline edit state per row
   const [editing, setEditing]           = useState({})   // { [id]: { actual_cost, notes } }
+  const [estimating, setEstimating]     = useState({})   // { [id]: { estimated_cost, notes } } for seeded services
 
   const showToast = (msg) => {
     setToast(msg)
@@ -280,7 +281,10 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                      <span>Est: {fmt(svc.estimated_cost)}</span>
+                      {svc.estimated_cost != null
+                        ? <span className="text-blue-700 font-medium">Est: {fmt(svc.estimated_cost)}</span>
+                        : <span className="text-amber-600 font-medium italic">No estimate set</span>
+                      }
                       {svc.actual_cost != null && (
                         <span className="text-green-700 font-medium">Actual: {fmt(svc.actual_cost)}</span>
                       )}
@@ -290,7 +294,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                         </span>
                       )}
                     </div>
-                    {svc.notes && !isEditing && (
+                    {svc.notes && !isEditing && !estimating[svc.id] && (
                       <p className="text-xs text-gray-500 mt-1 italic">{svc.notes}</p>
                     )}
                   </div>
@@ -298,6 +302,18 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                   {/* Action buttons */}
                   {!isTerminal && (
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Edit estimate — for pending services without pricing */}
+                      {statusCode === 'pending' && !estimating[svc.id] && !isEditing && (
+                        <button
+                          onClick={() => setEstimating(e => ({
+                            ...e,
+                            [svc.id]: { estimated_cost: svc.estimated_cost ?? '', notes: svc.notes ?? '' }
+                          }))}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"
+                          title="Set estimate cost">
+                          <Edit3 size={15} />
+                        </button>
+                      )}
                       {statusCode === 'pending' && (
                         <button
                           onClick={() => {
@@ -333,6 +349,44 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                     </div>
                   )}
                 </div>
+
+                {/* Inline estimate form — for setting estimated_cost on seeded services */}
+                {estimating[svc.id] && (
+                  <div className="border-t border-blue-100 bg-blue-50 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                      <Edit3 size={11} /> Set Service Estimate
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Estimated Cost (KES)</label>
+                        <input type="number" min="0"
+                          value={estimating[svc.id]?.estimated_cost}
+                          onChange={e => setEstimating(ed => ({ ...ed, [svc.id]: { ...ed[svc.id], estimated_cost: e.target.value } }))}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-400" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Notes</label>
+                        <input type="text"
+                          value={estimating[svc.id]?.notes}
+                          onChange={e => setEstimating(ed => ({ ...ed, [svc.id]: { ...ed[svc.id], notes: e.target.value } }))}
+                          placeholder="Optional"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-400" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleSaveEstimate(svc.id)} disabled={saving}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50">
+                        {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                        Save Estimate
+                      </button>
+                      <button onClick={() => setEstimating(e => { const n = { ...e }; delete n[svc.id]; return n })}
+                        className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-xs">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Inline complete form */}
                 {isEditing && (
