@@ -114,11 +114,17 @@ export default function ProviderTeamPage() {
         experience_years:    m.experience_years,
         is_active:           m.is_active,
         is_verified:         m.is_verified,
-        can_approve_work:    m.can_approve_work,
-        can_manage_inventory:m.can_manage_inventory,
-        can_manage_team:     m.can_manage_team,
-        can_send_estimates:  m.can_send_estimates,
-        can_send_invoice:    m.can_send_invoice,
+        // SPU-level permissions
+        spu_can_approve_work:     m.spu_can_approve_work,
+        spu_can_manage_inventory: m.spu_can_manage_inventory,
+        spu_can_manage_team:      m.spu_can_manage_team,
+        spu_can_send_estimates:   m.spu_can_send_estimates,
+        spu_can_send_invoice:     m.spu_can_send_invoice,
+        // Mechanic-level permissions
+        mech_can_approve_work:     m.mech_can_approve_work,
+        mech_can_manage_inventory: m.mech_can_manage_inventory,
+        mech_can_manage_team:      m.mech_can_manage_team,
+        mech_can_send_estimates:   m.mech_can_send_estimates,
         source:              'spu',
         user: {
           first_name: m.first_name,
@@ -138,11 +144,15 @@ export default function ProviderTeamPage() {
         experience_years:    m.experience_years,
         is_active:           m.is_active,
         is_verified:         m.is_verified,
-        can_approve_work:    m.can_approve_work,
-        can_manage_inventory:m.can_manage_inventory,
-        can_manage_team:     m.can_manage_team,
-        can_send_estimates:  m.can_send_estimates,
-        can_send_invoice:    false,
+        spu_can_approve_work:     false,
+        spu_can_manage_inventory: false,
+        spu_can_manage_team:      false,
+        spu_can_send_estimates:   false,
+        spu_can_send_invoice:     false,
+        mech_can_approve_work:     !!m.can_approve_work,
+        mech_can_manage_inventory: !!m.can_manage_inventory,
+        mech_can_manage_team:      !!m.can_manage_team,
+        mech_can_send_estimates:   !!m.can_send_estimates,
         source:              'mechanic_only',
         user: {
           first_name: m.user?.first_name,
@@ -255,14 +265,20 @@ export default function ProviderTeamPage() {
     setEditingMemberData(member)
     setEditModalTab('role')
     setEditMemberForm({
-      role:                 member.role                 || 'mechanic',
-      specialization:       member.specialization       || '',
-      experience_years:     member.experience_years     || 0,
-      can_approve_work:     member.can_approve_work     || false,
-      can_manage_inventory: member.can_manage_inventory || false,
-      can_manage_team:      member.can_manage_team      || false,
-      can_send_estimates:   member.can_send_estimates   || false,
-      can_send_invoice:     member.can_send_invoice     || false,
+      role:                 member.role            || 'mechanic',
+      specialization:       member.specialization  || '',
+      experience_years:     member.experience_years || 0,
+      // SPU permissions (Provider Role tab)
+      spu_can_approve_work:     !!member.spu_can_approve_work,
+      spu_can_manage_inventory: !!member.spu_can_manage_inventory,
+      spu_can_manage_team:      !!member.spu_can_manage_team,
+      spu_can_send_estimates:   !!member.spu_can_send_estimates,
+      spu_can_send_invoice:     !!member.spu_can_send_invoice,
+      // Mechanic permissions (Mechanic tab)
+      mech_can_approve_work:     !!member.mech_can_approve_work,
+      mech_can_manage_inventory: !!member.mech_can_manage_inventory,
+      mech_can_manage_team:      !!member.mech_can_manage_team,
+      mech_can_send_estimates:   !!member.mech_can_send_estimates,
     })
   }
 
@@ -279,11 +295,11 @@ export default function ProviderTeamPage() {
           .from('service_provider_users')
           .update({
             role:                 newRole,
-            can_approve_work:     editMemberForm.can_approve_work,
-            can_manage_team:      editMemberForm.can_manage_team,
-            can_manage_inventory: editMemberForm.can_manage_inventory,
-            can_send_estimates:   editMemberForm.can_send_estimates,
-            can_send_invoice:     editMemberForm.can_send_invoice,
+            can_approve_work:     editMemberForm.spu_can_approve_work,
+            can_manage_team:      editMemberForm.spu_can_manage_team,
+            can_manage_inventory: editMemberForm.spu_can_manage_inventory,
+            can_send_estimates:   editMemberForm.spu_can_send_estimates,
+            can_send_invoice:     editMemberForm.spu_can_send_invoice,
             updated_at:           new Date().toISOString(),
           })
           .eq('id', editingMemberData.spu_id)
@@ -299,10 +315,10 @@ export default function ProviderTeamPage() {
               role:                 newRole,
               specialization:       editMemberForm.specialization || null,
               experience_years:     parseInt(editMemberForm.experience_years) || 0,
-              can_approve_work:     editMemberForm.can_approve_work,
-              can_manage_inventory: editMemberForm.can_manage_inventory,
-              can_manage_team:      editMemberForm.can_manage_team,
-              can_send_estimates:   editMemberForm.can_send_estimates,
+              can_approve_work:     editMemberForm.mech_can_approve_work,
+              can_manage_inventory: editMemberForm.mech_can_manage_inventory,
+              can_manage_team:      editMemberForm.mech_can_manage_team,
+              can_send_estimates:   editMemberForm.mech_can_send_estimates,
               is_active:            true,
               updated_at:           new Date().toISOString(),
             })
@@ -601,19 +617,19 @@ export default function ProviderTeamPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Permissions badges */}
                   <div className="flex gap-1 mr-2 flex-wrap">
-                    {member.can_approve_work && (
+                    {(member.spu_can_approve_work || member.mech_can_approve_work) && (
                       <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium" title="Can approve work">WO</span>
                     )}
-                    {member.can_send_estimates && (
+                    {(member.spu_can_send_estimates || member.mech_can_send_estimates) && (
                       <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium" title="Can send estimates">EST</span>
                     )}
                     {member.can_send_invoice && (
                       <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium" title="Can send invoices">INV$</span>
                     )}
-                    {member.can_manage_inventory && (
+                    {(member.spu_can_manage_inventory || member.mech_can_manage_inventory) && (
                       <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium" title="Can manage inventory">INV</span>
                     )}
-                    {member.can_manage_team && (
+                    {(member.spu_can_manage_team || member.mech_can_manage_team) && (
                       <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>
                     )}
                   </div>
@@ -757,37 +773,39 @@ export default function ProviderTeamPage() {
                   </select>
                 </div>
 
-                {/* Permissions for non-mechanic roles */}
-                {!isMechRole && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">
-                      {editMemberForm.role === 'admin'      && 'Admins can manage the provider account, team, and settings.'}
-                      {editMemberForm.role === 'accountant' && 'Accountants can review and send estimates and invoices.'}
-                      {editMemberForm.role === 'manager'    && 'Managers can oversee team operations and work orders.'}
-                    </p>
-                    <div className="space-y-1.5 pt-1">
-                      {[
-                        { key: 'can_approve_work',     label: 'Can approve work orders'        },
-                        { key: 'can_send_estimates',   label: 'Can send estimates to customer'  },
-                        { key: 'can_send_invoice',     label: 'Can send invoices'               },
-                        { key: 'can_manage_inventory', label: 'Can manage inventory'            },
-                        { key: 'can_manage_team',      label: 'Can manage team'                 },
-                      ].map(p => (
-                        <label key={p.key} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={editMemberForm[p.key] || false}
-                            onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
-                            className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
-                          <span className="text-xs text-gray-700">{p.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Role description */}
+                <p className="text-xs text-gray-500">
+                  {editMemberForm.role === 'admin'           && 'Admins can manage the provider account, team, and settings.'}
+                  {editMemberForm.role === 'accountant'      && 'Accountants can review and send estimates and invoices.'}
+                  {editMemberForm.role === 'manager'         && 'Managers can oversee team operations and work orders.'}
+                  {editMemberForm.role === 'mechanic'        && 'Mechanics handle vehicle diagnostics, services, and work orders.'}
+                  {editMemberForm.role === 'senior_mechanic' && 'Senior Mechanics can lead work and may have additional permissions.'}
+                </p>
 
-                {/* Cascade note for mechanic roles */}
+                {/* Work permissions — shown for all roles */}
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-1.5">Work Permissions</p>
+                  <div className="space-y-1.5">
+                    {[
+                      { key: 'spu_can_approve_work',     label: 'Can approve work orders'        },
+                      { key: 'spu_can_send_estimates',   label: 'Can send estimates to customer'  },
+                      { key: 'spu_can_send_invoice',     label: 'Can send invoices'               },
+                      { key: 'spu_can_manage_inventory', label: 'Can manage inventory'            },
+                      { key: 'spu_can_manage_team',      label: 'Can manage team'                 },
+                    ].map(p => (
+                      <label key={p.key} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={editMemberForm[p.key] || false}
+                          onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
+                        <span className="text-xs text-gray-700">{p.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 {isMechRole && (
-                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                    Role is set here and cascades to the mechanic record. Switch to the <strong>Mechanic</strong> tab to set work permissions and specialization.
+                  <p className="text-xs text-blue-600">
+                    💡 Switch to the <button className="underline font-medium" onClick={() => setEditModalTab('mechanic')}>Mechanic tab</button> to set specialization and experience.
                   </p>
                 )}
 
@@ -850,16 +868,14 @@ export default function ProviderTeamPage() {
                   </div>
                 </div>
 
-                {/* Work Permissions — stored in both mechanics + SPU */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Permissions</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Mechanic Work Permissions</p>
                   <div className="space-y-2">
                     {[
-                      { key: 'can_approve_work',     label: 'Can approve work orders',        desc: 'Advance WO status and approve service quality' },
-                      { key: 'can_send_estimates',   label: 'Can send estimates to customer',  desc: 'Send estimates directly without owner review' },
-                      { key: 'can_send_invoice',     label: 'Can send invoices',               desc: 'Generate and send invoices to customers' },
-                      { key: 'can_manage_inventory', label: 'Can manage inventory',            desc: 'Add, edit, and adjust stock levels' },
-                      { key: 'can_manage_team',      label: 'Can manage team',                 desc: 'View and manage other team members' },
+                      { key: 'mech_can_approve_work',     label: 'Can approve work orders',       desc: 'Advance WO status and approve service quality' },
+                      { key: 'mech_can_send_estimates',   label: 'Can send estimates to customer', desc: 'Send estimates directly without owner review' },
+                      { key: 'mech_can_manage_inventory', label: 'Can manage inventory',           desc: 'Add, edit, and adjust stock levels' },
+                      { key: 'mech_can_manage_team',      label: 'Can manage team',                desc: 'View and manage other team members' },
                     ].map(p => (
                       <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-white bg-white/60">
                         <input type="checkbox" checked={editMemberForm[p.key] || false}
