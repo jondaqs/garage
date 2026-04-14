@@ -98,35 +98,45 @@ export default function Sidebar({ user }) {
         .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
-      const { data: mechs } = await supabase
-        .from('mechanics')
+      // Read from service_provider_users (covers all roles: mechanic, admin, accountant etc.)
+      // Left-join mechanics for permission columns which only exist for mechanic roles
+      const { data: spuRows } = await supabase
+        .from('service_provider_users')
         .select(`
           id,
           role,
-          can_approve_work,
-          can_manage_inventory,
-          can_manage_team,
-          can_send_estimates,
-          service_provider:service_providers(id, name)
+          service_provider:service_providers(id, name),
+          mechanic:mechanics!left(
+            id,
+            can_approve_work,
+            can_manage_inventory,
+            can_manage_team,
+            can_send_estimates
+          )
         `)
         .eq('user_id', profile.id)
         .eq('is_active', true)
 
-      if (mechs?.length) {
-        setMechanicMemberships(mechs.map(m => ({
-          mechanicId:          m.id,
-          providerId:          m.service_provider?.id,
-          providerName:        m.service_provider?.name || 'Unknown Garage',
-          role:                m.role || 'mechanic',
-          can_approve_work:    m.can_approve_work,
-          can_manage_inventory:m.can_manage_inventory,
-          can_manage_team:     m.can_manage_team,
-          can_send_estimates:  m.can_send_estimates,
-        })))
+      if (spuRows?.length) {
+        setMechanicMemberships(spuRows.map(m => {
+          // mechanics is an array from the left join — take first match
+          const mech = Array.isArray(m.mechanic) ? m.mechanic[0] : m.mechanic
+          return {
+            spuId:               m.id,
+            mechanicId:          mech?.id || null,
+            providerId:          m.service_provider?.id,
+            providerName:        m.service_provider?.name || 'Unknown Garage',
+            role:                m.role || 'mechanic',
+            can_approve_work:    mech?.can_approve_work    || false,
+            can_manage_inventory:mech?.can_manage_inventory || false,
+            can_manage_team:     mech?.can_manage_team     || false,
+            can_send_estimates:  mech?.can_send_estimates  || false,
+          }
+        }))
         // Auto-open if already on my-teams path
         if (pathname.includes('/dashboard/my-teams')) {
           const openState = {}
-          mechs.forEach(m => { openState[m.service_provider?.id] = true })
+          spuRows.forEach(m => { openState[m.service_provider?.id] = true })
           setProviderNavOpen(openState)
         }
       }

@@ -79,69 +79,41 @@ export default function ProviderTeamPage() {
 
   const loadTeamMembers = async (authUserId) => {
     try {
-      // Get mechanics data first
-      const { data: mechanicsData, error: mechanicsError } = await supabase
-        .from('mechanics')
-        .select('*')
-        .eq('service_provider_id', provider?.id || (await getProviderId()))
-        .order('created_at', { ascending: false })
+      const pId = provider?.id || (await getProviderId())
+      if (!pId) return
 
-      if (mechanicsError) {
-        console.error('Error loading mechanics:', mechanicsError)
-        return
-      }
+      const { data, error } = await supabase.rpc('get_provider_team_members', {
+        p_provider_id: pId
+      })
 
-      if (!mechanicsData || mechanicsData.length === 0) {
+      if (error) {
+        console.error('get_provider_team_members error:', error)
         setTeamMembers([])
         return
       }
 
-      // Use the security definer function to get user profiles
-      const { data: userProfiles, error: profilesError } = await supabase
-        .rpc('get_team_member_profiles', {
-          provider_owner_auth_id: authUserId
-        })
-
-      if (profilesError) {
-        console.error('Error loading profiles via function:', profilesError)
-        // Fallback: show mechanics with "Unknown User"
-        setTeamMembers(mechanicsData.map(m => ({
-          ...m,
-          user: {
-            id: m.user_id,
-            first_name: 'Unknown',
-            last_name: 'User',
-            phone: null,
-            email: null
-          }
-        })))
-        return
-      }
-
-      // Combine mechanics with user profiles
-      const membersWithUsers = mechanicsData.map(mechanic => {
-        const userProfile = userProfiles?.find(up => up.user_id_from_mechanics === mechanic.user_id)
-        
-        return {
-          ...mechanic,
-          user: userProfile ? {
-            id: userProfile.id,
-            first_name: userProfile.first_name,
-            last_name: userProfile.last_name,
-            phone: userProfile.phone,
-            email: userProfile.email
-          } : {
-            id: mechanic.user_id,
-            first_name: 'Unknown',
-            last_name: 'User',
-            phone: null,
-            email: null
-          }
+      // Shape each row to match existing template expectations
+      setTeamMembers((data || []).map(m => ({
+        id:                  m.mechanic_id || m.spu_id,  // use mechanic_id if available
+        spu_id:              m.spu_id,
+        mechanic_id:         m.mechanic_id,
+        user_id:             m.user_id,
+        role:                m.role,
+        specialization:      m.specialization,
+        experience_years:    m.experience_years,
+        is_active:           m.is_active,
+        is_verified:         m.is_verified,
+        can_approve_work:    m.can_approve_work,
+        can_manage_inventory:m.can_manage_inventory,
+        can_manage_team:     m.can_manage_team,
+        can_send_estimates:  m.can_send_estimates,
+        user: {
+          first_name: m.first_name,
+          last_name:  m.last_name,
+          email:      m.email,
+          phone:      m.phone,
         }
-      })
-
-      setTeamMembers(membersWithUsers)
-
+      })))
     } catch (error) {
       console.error('Error in loadTeamMembers:', error)
       setTeamMembers([])
@@ -236,8 +208,11 @@ export default function ProviderTeamPage() {
     }
   }
 
+  const [editingMemberData, setEditingMemberData] = useState(null)
+
   const startEditMember = (member) => {
-    setEditingMember(member.id)
+    setEditingMember(member.mechanic_id || member.id)
+    setEditingMemberData(member)
     setEditMemberForm({
       role:                 member.role                 || 'mechanic',
       specialization:       member.specialization       || '',
@@ -252,21 +227,67 @@ export default function ProviderTeamPage() {
   const saveMemberEdit = async () => {
     setSavingMember(true)
     try {
-      const { error } = await supabase
-        .from('mechanics')
-        .update({
-          role:                 editMemberForm.role,
-          specialization:       editMemberForm.specialization || null,
-          experience_years:     parseInt(editMemberForm.experience_years) || 0,
-          can_approve_work:     editMemberForm.can_approve_work,
-          can_manage_inventory: editMemberForm.can_manage_inventory,
-          can_manage_team:      editMemberForm.can_manage_team,
-          can_send_estimates:   editMemberForm.can_send_estimates,
-          updated_at:           new Date().toISOString(),
-        })
-        .eq('id', editingMember)
-      if (error) throw error
+      const newRole      = editMemberForm.role
+      const isMechRole   = ['mechanic','senior_mechanic'].includes(newRole)
+      const wasMechRole  = ['mechanic','senior_mechanic'].includes(editingMemberData?.role)
+
+      // 1. Update role in service_provider_users
+      if (editingMemberData?.spu_id) {
+        const { error: spuErr } = await supabase
+          .from('service_provider_users')
+          .update({ role: newRole, updated_at: new Date().toISOString() })
+          .eq('id', editingMemberData.spu_id)
+        if (spuErr) throw spuErr
+      }
+
+      if (isMechRole) {
+        if (editingMemberData?.mechanic_id) {
+          // 2a. Already a mechanic — update existing record
+          const { error: mechErr } = await supabase
+            .from('mechanics')
+            .update({
+              role:                 newRole,
+              specialization:       editMemberForm.specialization || null,
+              experience_years:     parseInt(editMemberForm.experience_years) || 0,
+              can_approve_work:     editMemberForm.can_approve_work,
+              can_manage_inventory: editMemberForm.can_manage_inventory,
+              can_manage_team:      editMemberForm.can_manage_team,
+              can_send_estimates:   editMemberForm.can_send_estimates,
+              is_active:            true,
+              updated_at:           new Date().toISOString(),
+            })
+            .eq('id', editingMemberData.mechanic_id)
+          if (mechErr) throw mechErr
+        } else {
+          // 2b. Upgrading to mechanic role — create mechanics record
+          const { error: mechErr } = await supabase
+            .from('mechanics')
+            .insert({
+              user_id:             editingMemberData.user_id,
+              service_provider_id: provider.id,
+              role:                newRole,
+              specialization:      editMemberForm.specialization || null,
+              experience_years:    parseInt(editMemberForm.experience_years) || 0,
+              can_approve_work:    editMemberForm.can_approve_work,
+              can_manage_inventory:editMemberForm.can_manage_inventory,
+              can_manage_team:     editMemberForm.can_manage_team,
+              can_send_estimates:  editMemberForm.can_send_estimates,
+              is_active:           true,
+              is_verified:         false,
+            })
+          if (mechErr) throw mechErr
+        }
+      } else if (wasMechRole && editingMemberData?.mechanic_id) {
+        // 2c. Downgrading from mechanic — deactivate their mechanics record
+        const { error: deactErr } = await supabase
+          .from('mechanics')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', editingMemberData.mechanic_id)
+        if (deactErr) throw deactErr
+      }
+
       setEditingMember(null)
+      setEditingMemberData(null)
       const { data: { user } } = await supabase.auth.getUser()
       await loadTeamMembers(user.id)
     } catch (e) { alert('Failed to save: ' + e.message) }
@@ -468,9 +489,21 @@ export default function ProviderTeamPage() {
               <div key={member.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <p className="font-medium">
-                      {member.user?.first_name || 'Unknown'} {member.user?.last_name || 'User'}
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">
+                        {member.user?.first_name || 'Unknown'} {member.user?.last_name || 'User'}
+                      </p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        member.role === 'service_provider_owner' ? 'bg-blue-100 text-blue-700' :
+                        member.role === 'admin'          ? 'bg-red-100 text-red-700' :
+                        member.role === 'accountant'     ? 'bg-purple-100 text-purple-700' :
+                        member.role === 'manager'        ? 'bg-orange-100 text-orange-700' :
+                        member.role === 'senior_mechanic'? 'bg-cyan-100 text-cyan-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {(member.role || 'mechanic').replace(/_/g,' ')}
+                      </span>
+                    </div>
                     {member.is_verified && (
                       <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
                         Verified
@@ -603,12 +636,22 @@ export default function ProviderTeamPage() {
       </div>
 
       {/* Edit Member Modal */}
-      {editingMember && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4">
-            <h3 className="text-lg font-semibold">Edit Team Member</h3>
+      {editingMember && (() => {
+        const isMechRole = ['mechanic','senior_mechanic'].includes(editMemberForm.role)
+        const memberName = `${editingMemberData?.user?.first_name || ''} ${editingMemberData?.user?.last_name || ''}`.trim() || 'Team Member'
+        return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-auto space-y-5 max-h-[90vh] overflow-y-auto">
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Header */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Edit Team Member</h3>
+              <p className="text-sm text-gray-500 mt-0.5">{memberName}</p>
+            </div>
+
+            {/* ── Provider Role ── */}
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Provider Role</p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select value={editMemberForm.role}
@@ -617,60 +660,89 @@ export default function ProviderTeamPage() {
                   <option value="mechanic">Mechanic</option>
                   <option value="senior_mechanic">Senior Mechanic</option>
                   <option value="manager">Manager</option>
+                  <option value="accountant">Accountant</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Experience (yrs)</label>
-                <input type="number" min="0" value={editMemberForm.experience_years}
-                  onChange={e => setEditMemberForm(f => ({ ...f, experience_years: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+              {!isMechRole && (
+                <p className="text-xs text-gray-500">
+                  {editMemberForm.role === 'admin'      && 'Admins can manage the provider account, team, and settings.'}
+                  {editMemberForm.role === 'accountant' && 'Accountants can view invoices, payments, and financial reports.'}
+                  {editMemberForm.role === 'manager'    && 'Managers can oversee team operations and work orders.'}
+                </p>
+              )}
+              {editingMemberData?.role !== editMemberForm.role && (
+                <div className={`text-xs px-3 py-2 rounded-lg ${isMechRole && !editingMemberData?.mechanic_id ? 'bg-blue-50 text-blue-700 border border-blue-200' : !isMechRole && editingMemberData?.mechanic_id ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-600'}`}>
+                  {isMechRole && !editingMemberData?.mechanic_id
+                    ? '⚡ A mechanic record will be created for this member'
+                    : !isMechRole && editingMemberData?.mechanic_id
+                    ? '⚠️ Changing to a non-mechanic role will deactivate their mechanic record and remove work order access'
+                    : `Role will be updated from "${editingMemberData?.role?.replace(/_/g,' ')}" to "${editMemberForm.role?.replace(/_/g,' ')}"`
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* ── Mechanic Details (only for mechanic roles) ── */}
+            {isMechRole && (
+              <div className="bg-blue-50 rounded-lg p-4 space-y-3 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Mechanic Details</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
+                    <input type="text" value={editMemberForm.specialization}
+                      onChange={e => setEditMemberForm(f => ({ ...f, specialization: e.target.value }))}
+                      placeholder="e.g. Engine Specialist"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Experience (yrs)</label>
+                    <input type="number" min="0" value={editMemberForm.experience_years}
+                      onChange={e => setEditMemberForm(f => ({ ...f, experience_years: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white" />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Permissions</p>
+                  <div className="space-y-2">
+                    {[
+                      { key: 'can_approve_work',     label: 'Can approve work orders',        desc: 'Advance WO status and approve service quality' },
+                      { key: 'can_send_estimates',   label: 'Can send estimates to customer',  desc: 'Send estimates directly without owner review' },
+                      { key: 'can_manage_inventory', label: 'Can manage inventory',            desc: 'Add, edit, and adjust stock levels' },
+                      { key: 'can_manage_team',      label: 'Can manage team',                 desc: 'View and manage other team members' },
+                    ].map(p => (
+                      <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-white bg-white/60">
+                        <input type="checkbox" checked={editMemberForm[p.key] || false}
+                          onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                          className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{p.label}</p>
+                          <p className="text-xs text-gray-500">{p.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
-              <input type="text" value={editMemberForm.specialization}
-                onChange={e => setEditMemberForm(f => ({ ...f, specialization: e.target.value }))}
-                placeholder="e.g. Engine Specialist, Electrician"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
-              <div className="space-y-2">
-                {[
-                  { key: 'can_approve_work',     label: 'Can approve work orders',       desc: 'Can advance WO status and approve service quality' },
-                  { key: 'can_send_estimates',   label: 'Can send estimates to customer', desc: 'Can send services & parts estimates directly to customer without owner review' },
-                  { key: 'can_manage_inventory', label: 'Can manage inventory',           desc: 'Can add, edit, and adjust stock levels' },
-                  { key: 'can_manage_team',      label: 'Can manage team',                desc: 'Can view and manage other team members' },
-                ].map(p => (
-                  <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                    <input type="checkbox" checked={editMemberForm[p.key] || false}
-                      onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
-                      className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{p.label}</p>
-                      <p className="text-xs text-gray-500">{p.desc}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setEditingMember(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => { setEditingMember(null); setEditingMemberData(null) }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
                 Cancel
               </button>
               <button onClick={saveMemberEdit} disabled={savingMember}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
                 {savingMember ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
+
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Invite Modal - keeping same as before */}
       {showInviteModal && selectedUser && (
@@ -694,7 +766,9 @@ export default function ProviderTeamPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="mechanic">Mechanic</option>
+                  <option value="senior_mechanic">Senior Mechanic</option>
                   <option value="manager">Manager</option>
+                  <option value="accountant">Accountant</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
