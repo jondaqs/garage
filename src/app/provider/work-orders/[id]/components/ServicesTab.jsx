@@ -17,6 +17,9 @@ const STATUS_STYLES = {
 }
 
 export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded }) {
+  // Resolve service_provider_id from either flat field or nested object (provider vs mechanic page)
+  const providerSvcId = providerSvcId || workOrder.service_provider?.id
+
   const estimateApproved = workOrder.status?.code === 'in_progress' ||
     ['in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
   // Also approved if WO status is 'approved' (customer approved estimate)
@@ -90,15 +93,15 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
     setAllServices(svcs || [])
 
     // Load provider-specific services for highlighting
-    if (workOrder.service_provider_id) {
+    if (providerSvcId) {
       const { data: provSvcs } = await supabase
         .from('service_provider_services')
         .select('service_id')
-        .eq('service_provider_id', workOrder.service_provider_id)
+        .eq('service_provider_id', providerSvcId)
         .eq('is_active', true)
       setProviderServiceIds(new Set((provSvcs || []).map(s => s.service_id)))
     }
-  }, [workOrder.service_provider_id])
+  }, [providerSvcId])
 
   const refreshEstimate = useCallback(async () => {
     try {
@@ -189,7 +192,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
         body:    JSON.stringify({
           name:                newServiceName.trim(),
           description:         newServiceDesc.trim() || null,
-          service_provider_id: workOrder.service_provider_id,
+          service_provider_id: providerSvcId,
           force,
         }),
       })
