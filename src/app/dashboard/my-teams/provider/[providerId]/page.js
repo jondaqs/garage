@@ -32,22 +32,40 @@ export default function ProviderOverviewPage() {
 
       if (!profile) throw new Error('Profile not found')
 
-      // ── 2. Verify mechanic membership + get own role/perms ─────────────────
-      const { data: mechanic, error: mechErr } = await supabase
-        .from('mechanics')
-        .select(`
-          id, role, specialization, experience_years,
-          is_verified, is_active,
-          can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates,
-          created_at
-        `)
+      // ── 2. Verify membership via service_provider_users (all roles) ──────────
+      const { data: spuRow, error: spuErr } = await supabase
+        .from('service_provider_users')
+        .select('id, role, is_verified, is_active, joined_at, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice')
         .eq('user_id', profile.id)
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
         .maybeSingle()
 
-      if (mechErr) throw mechErr
-      if (!mechanic) throw new Error('You are not a member of this service provider.')
+      if (spuErr) throw spuErr
+      if (!spuRow) throw new Error('You are not a member of this service provider.')
+
+      // Also get mechanic-specific data if they have a mechanic role
+      const { data: mechanic } = await supabase
+        .from('mechanics')
+        .select('id, role, specialization, experience_years, is_verified, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates')
+        .eq('user_id', profile.id)
+        .eq('service_provider_id', params.providerId)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      // Merge: SPU is source of truth for role, mechanic for specialization
+      const memberRecord = {
+        ...spuRow,
+        mechanic_id:      mechanic?.id || null,
+        specialization:   mechanic?.specialization || null,
+        experience_years: mechanic?.experience_years || null,
+        // Merge permissions from both sources
+        can_approve_work:     !!(spuRow.can_approve_work     || mechanic?.can_approve_work),
+        can_manage_inventory: !!(spuRow.can_manage_inventory || mechanic?.can_manage_inventory),
+        can_manage_team:      !!(spuRow.can_manage_team      || mechanic?.can_manage_team),
+        can_send_estimates:   !!(spuRow.can_send_estimates   || mechanic?.can_send_estimates),
+        can_send_invoice:     !!(spuRow.can_send_invoice),
+      }
 
       // ── 3. Get service provider details (public read) ──────────────────────
       const { data: provider, error: provErr } = await supabase
@@ -64,7 +82,7 @@ export default function ProviderOverviewPage() {
 
       // ── 4. Get team member count ───────────────────────────────────────────
       const { count: teamCount } = await supabase
-        .from('mechanics')
+        .from('service_provider_users')
         .select('id', { count: 'exact', head: true })
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)

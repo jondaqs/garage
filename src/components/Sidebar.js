@@ -49,6 +49,13 @@ export default function Sidebar({ user }) {
     fetchMembership()
   }, [user])
 
+  // Re-fetch when invitation is accepted (event dispatched from my-teams page)
+  useEffect(() => {
+    const handler = () => { if (user) fetchMembership() }
+    window.addEventListener('spu-membership-updated', handler)
+    return () => window.removeEventListener('spu-membership-updated', handler)
+  }, [user])
+
   const fetchMembership = async () => {
     try {
       const { data: profile } = await supabase
@@ -101,7 +108,7 @@ export default function Sidebar({ user }) {
       // 1. Fetch service_provider_users (all roles)
       const { data: spuRows, error: spuErr } = await supabase
         .from('service_provider_users')
-        .select('id, role, service_provider_id, service_provider:service_providers(id, name)')
+        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, service_provider:service_providers(id, name)')
         .eq('user_id', profile.id)
         .eq('is_active', true)
 
@@ -131,10 +138,12 @@ export default function Sidebar({ user }) {
             providerId:          m.service_provider?.id || m.service_provider_id,
             providerName:        m.service_provider?.name || 'Unknown Garage',
             role:                m.role || 'mechanic',
-            can_approve_work:    mech?.can_approve_work    || false,
-            can_manage_inventory:mech?.can_manage_inventory || false,
-            can_manage_team:     mech?.can_manage_team     || false,
-            can_send_estimates:  mech?.can_send_estimates  || false,
+            // Merge SPU + mechanic permissions — either source grants the badge
+            can_approve_work:    !!(m.can_approve_work    || mech?.can_approve_work),
+            can_manage_inventory:!!(m.can_manage_inventory || mech?.can_manage_inventory),
+            can_manage_team:     !!(m.can_manage_team     || mech?.can_manage_team),
+            can_send_estimates:  !!(m.can_send_estimates  || mech?.can_send_estimates),
+            can_send_invoice:    !!(m.can_send_invoice),
           }
         }))
 

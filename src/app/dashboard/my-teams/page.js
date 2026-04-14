@@ -34,31 +34,46 @@ export default function MyTeamsPage() {
 
       if (!profile) return
 
-      // Get all team memberships with provider info
-      const { data, error } = await supabase
-        .from('mechanics')
+      // Get all team memberships — from service_provider_users (all roles)
+      const { data: spuData, error } = await supabase
+        .from('service_provider_users')
         .select(`
           id,
           user_id,
           service_provider_id,
-          specialization,
-          experience_years,
-          bio,
-          is_verified,
-          is_active,
           role,
-          created_at,
+          is_active,
+          is_verified,
+          joined_at,
           service_provider:service_providers(
-            id,
-            name,
-            phone,
-            email,
-            country
+            id, name, phone, email, country
           )
         `)
         .eq('user_id', profile.id)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
+        .order('joined_at', { ascending: false })
+
+      // Also get mechanic-specific data for mechanic roles
+      const { data: mechData } = await supabase
+        .from('mechanics')
+        .select('id, service_provider_id, specialization, experience_years, bio, is_verified, role')
+        .eq('user_id', profile.id)
+        .eq('is_active', true)
+
+      const mechByProvider = {}
+      ;(mechData || []).forEach(m => { mechByProvider[m.service_provider_id] = m })
+
+      // Merge: use SPU as base, attach mechanic details where available
+      const data = (spuData || []).map(spu => ({
+        ...spu,
+        id:              spu.id,
+        created_at:      spu.joined_at,
+        specialization:  mechByProvider[spu.service_provider_id]?.specialization || null,
+        experience_years:mechByProvider[spu.service_provider_id]?.experience_years || null,
+        bio:             mechByProvider[spu.service_provider_id]?.bio || null,
+        is_verified:     spu.is_verified || mechByProvider[spu.service_provider_id]?.is_verified || false,
+        mechanic_id:     mechByProvider[spu.service_provider_id]?.id || null,
+      }))
 
       if (error) {
         console.error('Error loading teams:', error)
@@ -121,7 +136,11 @@ export default function MyTeamsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to respond')
       setPendingInvitations(prev => prev.filter(i => i.id !== invitationId))
-      if (action === 'accept') loadTeams()
+      if (action === 'accept') {
+        loadTeams()
+        // Trigger sidebar to re-fetch memberships
+        window.dispatchEvent(new CustomEvent('spu-membership-updated'))
+      }
     } catch (e) { alert(e.message) }
     finally { setResponding(null) }
   }
