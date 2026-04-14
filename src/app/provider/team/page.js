@@ -82,19 +82,30 @@ export default function ProviderTeamPage() {
       const pId = provider?.id || (await getProviderId())
       if (!pId) return
 
-      const { data, error } = await supabase.rpc('get_provider_team_members', {
+      // Primary: get all SPU members (all roles)
+      const { data: spuData, error } = await supabase.rpc('get_provider_team_members', {
         p_provider_id: pId
       })
+      if (error) console.error('get_provider_team_members error:', error)
 
-      if (error) {
-        console.error('get_provider_team_members error:', error)
-        setTeamMembers([])
-        return
-      }
+      const spuUserIds = new Set((spuData || []).map(m => m.user_id))
 
-      // Shape each row to match existing template expectations
-      setTeamMembers((data || []).map(m => ({
-        id:                  m.mechanic_id || m.spu_id,  // use mechanic_id if available
+      // Also fetch mechanics that don't have an SPU row yet (legacy / backfill gaps)
+      const { data: mechOnly } = await supabase
+        .from('mechanics')
+        .select(`
+          id, user_id, role, specialization, experience_years,
+          is_active, is_verified,
+          can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates,
+          user:user_profiles!user_id(first_name, last_name, email, phone)
+        `)
+        .eq('service_provider_id', pId)
+        .eq('is_active', true)
+
+      const mechOnlyExtra = (mechOnly || []).filter(m => !spuUserIds.has(m.user_id))
+
+      const spuRows = (spuData || []).map(m => ({
+        id:                  m.mechanic_id || m.spu_id,
         spu_id:              m.spu_id,
         mechanic_id:         m.mechanic_id,
         user_id:             m.user_id,
@@ -107,13 +118,41 @@ export default function ProviderTeamPage() {
         can_manage_inventory:m.can_manage_inventory,
         can_manage_team:     m.can_manage_team,
         can_send_estimates:  m.can_send_estimates,
+        can_send_invoice:    m.can_send_invoice,
+        source:              'spu',
         user: {
           first_name: m.first_name,
           last_name:  m.last_name,
           email:      m.email,
           phone:      m.phone,
         }
-      })))
+      }))
+
+      const mechRows = mechOnlyExtra.map(m => ({
+        id:                  m.id,
+        spu_id:              null,
+        mechanic_id:         m.id,
+        user_id:             m.user_id,
+        role:                m.role || 'mechanic',
+        specialization:      m.specialization,
+        experience_years:    m.experience_years,
+        is_active:           m.is_active,
+        is_verified:         m.is_verified,
+        can_approve_work:    m.can_approve_work,
+        can_manage_inventory:m.can_manage_inventory,
+        can_manage_team:     m.can_manage_team,
+        can_send_estimates:  m.can_send_estimates,
+        can_send_invoice:    false,
+        source:              'mechanic_only',
+        user: {
+          first_name: m.user?.first_name,
+          last_name:  m.user?.last_name,
+          email:      m.user?.email,
+          phone:      m.user?.phone,
+        }
+      }))
+
+      setTeamMembers([...spuRows, ...mechRows])
     } catch (error) {
       console.error('Error in loadTeamMembers:', error)
       setTeamMembers([])
@@ -530,14 +569,29 @@ export default function ProviderTeamPage() {
                   {member.user?.email && (
                     <p className="text-sm text-gray-600">✉️ {member.user.email}</p>
                   )}
-                  {member.specialization && (
-                    <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                      <Award size={14} />
-                      {member.specialization}
-                      {member.experience_years > 0 && ` • ${member.experience_years} years experience`}
-                    </p>
+                  {member.mechanic_id && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      <span className="text-xs px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-full font-medium flex items-center gap-1">
+                        <Wrench size={10} /> Mechanic
+                      </span>
+                      {member.specialization && (
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Award size={12} /> {member.specialization}
+                        </span>
+                      )}
+                      {member.experience_years > 0 && (
+                        <span className="text-xs text-gray-500">
+                          {member.experience_years} yr{member.experience_years !== 1 ? 's' : ''} exp
+                        </span>
+                      )}
+                      {member.source === 'mechanic_only' && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 border border-amber-300 text-amber-700 rounded">
+                          ⚠ Not in SPU
+                        </span>
+                      )}
+                    </div>
                   )}
-                  {member.bio && (
+                  {!member.mechanic_id && member.bio && (
                     <p className="text-sm text-gray-500 mt-1 italic">"{member.bio}"</p>
                   )}
                 </div>
@@ -550,6 +604,9 @@ export default function ProviderTeamPage() {
                     )}
                     {member.can_send_estimates && (
                       <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium" title="Can send estimates">EST</span>
+                    )}
+                    {member.can_send_invoice && (
+                      <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium" title="Can send invoices">INV$</span>
                     )}
                     {member.can_manage_inventory && (
                       <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium" title="Can manage inventory">INV</span>
