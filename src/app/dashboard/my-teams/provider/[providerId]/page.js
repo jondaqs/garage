@@ -66,6 +66,7 @@ export default function ProviderOverviewPage() {
         can_manage_team:      !!(spuRow.can_manage_team      || mechanic?.can_manage_team),
         can_send_estimates:   !!(spuRow.can_send_estimates   || mechanic?.can_send_estimates),
         can_send_invoice:     !!(spuRow.can_send_invoice),
+        is_verified:          !!(spuRow.is_verified || mechanic?.is_verified),
       }
 
       // ── 3. Get service provider details (public read) ──────────────────────

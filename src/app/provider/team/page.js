@@ -390,28 +390,46 @@ export default function ProviderTeamPage() {
     }
   }
 
-  const verifyMember = async (mechanicId) => {
-    try {
-      const { error } = await supabase
-        .from('mechanics')
-        .update({ is_verified: true })
-        .eq('id', mechanicId)
+  const verifyMember = async (memberId) => {
+    // memberId is member.id which equals mechanic_id || spu_id
+    // Find the full member object to get both spu_id and mechanic_id
+    const member = teamMembers.find(m => m.id === memberId)
+    if (!member) return
 
-      if (error) {
-        console.error('Verify error:', error)
+    try {
+      const updates = []
+
+      // Always update service_provider_users (all roles)
+      if (member.spu_id) {
+        updates.push(
+          supabase.from('service_provider_users')
+            .update({ is_verified: true, updated_at: new Date().toISOString() })
+            .eq('id', member.spu_id)
+        )
+      }
+
+      // Also update mechanics table if they have a mechanic record
+      if (member.mechanic_id) {
+        updates.push(
+          supabase.from('mechanics')
+            .update({ is_verified: true, updated_at: new Date().toISOString() })
+            .eq('id', member.mechanic_id)
+        )
+      }
+
+      const results = await Promise.all(updates)
+      const failed  = results.find(r => r.error)
+      if (failed) {
+        console.error('Verify error:', failed.error)
         alert('Failed to verify member')
         return
       }
 
-      setTeamMembers(prevMembers => 
-        prevMembers.map(member => 
-          member.id === mechanicId 
-            ? { ...member, is_verified: true }
-            : member
-        )
+      setTeamMembers(prev =>
+        prev.map(m => m.id === memberId ? { ...m, is_verified: true } : m)
       )
 
-      alert('Team member verified')
+      alert('Team member verified successfully')
     } catch (error) {
       console.error('Verify error:', error)
       alert('Failed to verify member')
