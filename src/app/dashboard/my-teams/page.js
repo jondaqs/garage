@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin } from 'lucide-react'
+import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin, ClipboardList, Wrench, ChevronRight, Shield } from 'lucide-react'
 
 export default function MyTeamsPage() {
   const router   = useRouter()
@@ -498,13 +498,31 @@ export default function MyTeamsPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-2 pt-4 border-t">
+                      <div className="flex flex-wrap gap-2 pt-4 border-t">
+                        {/* View provider details — all members */}
                         <button
-                          onClick={() => startEditing(team)}
+                          onClick={() => router.push(`/dashboard/my-teams/provider/${team.service_provider_id}`)}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                        >
+                          <Building2 size={16} />
+                          Provider Details
+                        </button>
+
+                        {/* Work orders — all members */}
+                        <button
+                          onClick={() => router.push('/dashboard/my-teams/work-orders')}
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                         >
-                          <Edit2 size={18} />
-                          Update My Details
+                          <ClipboardList size={16} />
+                          Work Orders
+                        </button>
+
+                        <button
+                          onClick={() => startEditing(team)}
+                          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                        >
+                          <Edit2 size={16} />
+                          My Details
                         </button>
 
                         <button
