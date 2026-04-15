@@ -125,6 +125,7 @@ export default function ProviderTeamPage() {
         mech_can_manage_inventory: m.mech_can_manage_inventory,
         mech_can_manage_team:      m.mech_can_manage_team,
         mech_can_send_estimates:   m.mech_can_send_estimates,
+        mech_can_send_invoice:     m.mech_can_send_invoice,
         source:              'spu',
         user: {
           first_name: m.first_name,
@@ -153,6 +154,7 @@ export default function ProviderTeamPage() {
         mech_can_manage_inventory: !!m.can_manage_inventory,
         mech_can_manage_team:      !!m.can_manage_team,
         mech_can_send_estimates:   !!m.can_send_estimates,
+        mech_can_send_invoice:     !!m.can_send_invoice,
         source:              'mechanic_only',
         user: {
           first_name: m.user?.first_name,
@@ -279,6 +281,7 @@ export default function ProviderTeamPage() {
       mech_can_manage_inventory: !!member.mech_can_manage_inventory,
       mech_can_manage_team:      !!member.mech_can_manage_team,
       mech_can_send_estimates:   !!member.mech_can_send_estimates,
+      mech_can_send_invoice:     !!member.mech_can_send_invoice,
     })
   }
 
@@ -319,6 +322,7 @@ export default function ProviderTeamPage() {
               can_manage_inventory: editMemberForm.mech_can_manage_inventory,
               can_manage_team:      editMemberForm.mech_can_manage_team,
               can_send_estimates:   editMemberForm.mech_can_send_estimates,
+              can_send_invoice:     editMemberForm.mech_can_send_invoice,
               is_active:            true,
               updated_at:           new Date().toISOString(),
             })
@@ -894,6 +898,7 @@ export default function ProviderTeamPage() {
                     {[
                       { key: 'mech_can_approve_work',     label: 'Can approve work orders',       desc: 'Advance WO status and approve service quality' },
                       { key: 'mech_can_send_estimates',   label: 'Can send estimates to customer', desc: 'Send estimates directly without owner review' },
+                      { key: 'mech_can_send_invoice',     label: 'Can send invoices to customer',  desc: 'Send invoices and accept payment directly' },
                       { key: 'mech_can_manage_inventory', label: 'Can manage inventory',           desc: 'Add, edit, and adjust stock levels' },
                       { key: 'mech_can_manage_team',      label: 'Can manage team',                desc: 'View and manage other team members' },
                     ].map(p => (

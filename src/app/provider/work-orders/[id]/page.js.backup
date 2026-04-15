@@ -16,7 +16,6 @@ import CommentsTab      from './components/CommentsTab'
 import QualityCheckTab  from './components/QualityCheckTab'
 import InvoiceTab            from './components/InvoiceTab'
 import RecommendationsTab    from './components/RecommendationsTab'
-import EstimateReviewPanel  from './components/EstimateReviewPanel'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const STATUS_COLORS = {
@@ -406,16 +405,11 @@ export default function WorkOrderDetailPage() {
   const mechanicUser  = mechanic.user || wo.mechanic_profile || {}
   const assignStatus  = wo.mechanic_assignment_status
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
-  // User can send estimates if they are owner, admin, accountant, or have SPU can_send_estimates
-  const isAdminOrOwner      = isOwner || ['service_provider_owner','admin','accountant'].includes(spuPermissions.role)
-  const canSendEstimatesAll = isAdminOrOwner || spuPermissions.can_send_estimates
-  // Invoice permissions — owner/admin/accountant get full access; can_send_invoice gives send+record
-  const canSendInvoice   = isAdminOrOwner || spuPermissions.can_send_invoice
-  const invoicePerms = {
-    canGenerate:      isAdminOrOwner,
-    canSendInvoice:   canSendInvoice,
-    canRecordPayment: canSendInvoice,
-  }
+  // User can send estimates if they are owner, admin, or have SPU can_send_estimates
+  const canSendEstimatesAll = isOwner ||
+    ['service_provider_owner','admin'].includes(spuPermissions.role) ||
+    spuPermissions.can_send_estimates ||
+    (wo.mechanic?.user_id && spuPermissions.can_send_estimates)
 
   // Inject service_provider_id into wo for tab components (needed for parts search)
   const woWithProvider = { ...wo, service_provider_id: wo.service_provider?.id || wo.service_provider_id }
@@ -642,16 +636,72 @@ export default function WorkOrderDetailPage() {
                 )
               }
 
-              {/* Internal Review → EstimateReviewPanel (owner, admin, accountant, or can_send_estimates) */}
+              {/* Internal Review → full review panel (owner, admin, accountant, or can_send_estimates) */}
               if (action.via_internal_review) {
+                if (!canSendEstimatesAll) {
+                  return (
+                    <div key={action.code} className="px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
+                      <p className="text-xs text-violet-800 font-medium">⏳ Estimates submitted for review.</p>
+                      <p className="text-xs text-violet-600 mt-0.5">Waiting for owner, admin, or accountant to send to customer.</p>
+                    </div>
+                  )
+                }
+                // fall through to show the full panel
+                if (false) {}  // placeholder to maintain if-chain
                 return (
-                  <div key={action.code} className="w-full">
-                    <EstimateReviewPanel
-                      workOrder={woWithProvider}
-                      canSend={canSendEstimatesAll}
-                      estimate={estimate}
-                      onSent={() => { loadWorkOrder(); setSuccess('Estimate sent to customer for approval.') }}
-                    />
+                  <div key={action.code} className="w-full space-y-3">
+                    {/* Review panel */}
+                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                        <p className="text-sm font-semibold text-violet-900">Internal Estimate Review</p>
+                      </div>
+                      <p className="text-xs text-violet-700">
+                        Review the services &amp; parts estimates below. Once satisfied, send to the customer for approval.
+                      </p>
+
+                      {/* Estimate summary */}
+                      {estimate ? (
+                        <div className="bg-white rounded-lg border border-violet-200 p-3">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estimate Summary</p>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Services</span>
+                              <span className="font-medium">KES {Number(estimate.services_total || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Parts</span>
+                              <span className="font-medium">KES {Number(estimate.parts_total || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-400 text-xs">
+                              <span>VAT 16%</span>
+                              <span>KES {Number(estimate.tax || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-gray-100 pt-1.5">
+                              <span className="font-semibold text-gray-900">Total</span>
+                              <span className="font-bold text-violet-900 text-base">KES {Number(estimate.total || 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setActiveTab('services')}
+                            className="mt-2 text-xs text-violet-600 hover:underline">
+                            Review full breakdown →
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-violet-600 italic">Loading estimate…</p>
+                      )}
+                    </div>
+
+                    {/* Send button */}
+                    <button
+                      onClick={handleSendEstimate}
+                      disabled={sendingEstimate || updating}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                      {sendingEstimate
+                        ? <><Loader2 size={13} className="animate-spin" /> Sending to customer…</>
+                        : <>{action.label}</>}
+                    </button>
                   </div>
                 )
               }
@@ -958,7 +1008,7 @@ export default function WorkOrderDetailPage() {
 
           {/* ── INVOICE TAB ── */}
           {activeTab === 'invoice' && (
-            <InvoiceTab workOrder={woWithProvider} permissions={invoicePerms} />
+            <InvoiceTab workOrder={woWithProvider} />
           )}
 
           {/* ── RECOMMENDATIONS TAB ── */}

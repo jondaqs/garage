@@ -6,14 +6,16 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
-  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon
+  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText
 } from 'lucide-react'
-import ServicesTab       from '@/app/provider/work-orders/[id]/components/ServicesTab'
-import PartsTab          from '@/app/provider/work-orders/[id]/components/PartsTab'
-import IssuesTab         from '@/app/provider/work-orders/[id]/components/IssuesTab'
-import CommentsTab       from '@/app/provider/work-orders/[id]/components/CommentsTab'
-import QualityCheckTab   from '@/app/provider/work-orders/[id]/components/QualityCheckTab'
+import ServicesTab        from '@/app/provider/work-orders/[id]/components/ServicesTab'
+import PartsTab           from '@/app/provider/work-orders/[id]/components/PartsTab'
+import IssuesTab          from '@/app/provider/work-orders/[id]/components/IssuesTab'
+import CommentsTab        from '@/app/provider/work-orders/[id]/components/CommentsTab'
+import QualityCheckTab    from '@/app/provider/work-orders/[id]/components/QualityCheckTab'
 import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
+import InvoiceTab         from '@/app/provider/work-orders/[id]/components/InvoiceTab'
+import EstimateReviewPanel from '@/app/provider/work-orders/[id]/components/EstimateReviewPanel'
 
 const STATUS_COLORS = {
   intake:            'bg-gray-100 text-gray-600',
@@ -34,13 +36,14 @@ const STATUS_COLORS = {
 // Tabs available and their minimum permission requirement
 // 'any' = all mechanics can see, 'can_approve_work' = gated
 const ALL_TABS = [
-  { id: 'overview',        label: 'Overview',          icon: ClipboardList, perm: 'any'             },
+  { id: 'overview',        label: 'Overview',          icon: ClipboardList, perm: 'any'              },
   { id: 'issues',          label: 'Issues/Diagnostics',icon: AlertCircle,   perm: 'can_approve_work' },
   { id: 'services',        label: 'Services',          icon: Wrench,        perm: 'can_approve_work' },
   { id: 'parts',           label: 'Parts',             icon: Package,       perm: 'can_approve_work' },
+  { id: 'invoice',         label: 'Invoice',           icon: FileText,      perm: 'can_send_invoice' },
   { id: 'recommendations', label: 'Recommendations',   icon: Star,          perm: 'can_approve_work' },
   { id: 'qc',              label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
-  { id: 'comments',        label: 'Comments',          icon: MessageSquare, perm: 'any'             },
+  { id: 'comments',        label: 'Comments',          icon: MessageSquare, perm: 'any'              },
 ]
 
 export default function MechanicWorkOrderPage() {
@@ -103,7 +106,9 @@ export default function MechanicWorkOrderPage() {
           can_manage_inventory: result.member_permissions.can_manage_inventory,
           can_manage_team:      result.member_permissions.can_manage_team,
           can_send_estimates:   result.member_permissions.can_send_estimates,
+          can_send_invoice:     result.member_permissions.can_send_invoice,
           is_assigned:          false,
+          is_mechanic:          result.member_permissions.is_mechanic,
         })
       }
 
@@ -257,12 +262,20 @@ export default function MechanicWorkOrderPage() {
   const isPending     = assignStatus === 'pending'
   const isAcknowledged= assignStatus === 'acknowledged'
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
-  const canApprove     = !!perms?.can_approve_work
-  const canSendEst  = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
-  const isMechanic  = !!perms?.mechanic_id || !memberPerms   // has mechanic record
-  const memberRole  = memberPerms?.role || (isMechanic ? 'mechanic' : null)
-  const isAdmin     = ['admin', 'service_provider_owner'].includes(memberPerms?.role)
-  const isAssigned    = !!perms?.is_assigned
+  const canApprove      = !!perms?.can_approve_work
+  const canSendEst      = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
+  const canSendInvoice  = !!(perms?.can_send_invoice   || memberPerms?.can_send_invoice)
+  const isMechanic      = !!perms?.mechanic_id || !memberPerms   // has mechanic record
+  const memberRole      = memberPerms?.role || (isMechanic ? 'mechanic' : null)
+  const isAdmin         = ['admin', 'service_provider_owner', 'accountant'].includes(memberPerms?.role)
+  const isAssigned      = !!perms?.is_assigned
+
+  // Invoice permissions — admins/accountants/owners get full access; can_send_invoice gets send+record
+  const invoicePerms = {
+    canGenerate:      isAdmin,
+    canSendInvoice:   isAdmin || canSendInvoice,
+    canRecordPayment: isAdmin || canSendInvoice,
+  }
 
   // Build woWithProvider shape that tabs expect
   const woWithProvider = {
@@ -272,9 +285,12 @@ export default function MechanicWorkOrderPage() {
   }
 
   // Available tabs based on permissions
-  const tabs = ALL_TABS.filter(t =>
-    t.perm === 'any' || (t.perm === 'can_approve_work' && (canApprove || isAdmin))
-  )
+  const tabs = ALL_TABS.filter(t => {
+    if (t.perm === 'any') return true
+    if (t.perm === 'can_approve_work') return canApprove || isAdmin
+    if (t.perm === 'can_send_invoice') return isAdmin || canSendInvoice
+    return false
+  })
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -422,36 +438,15 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
-          {/* Internal Estimate Review — standalone for any member with can_send_estimates */}
-          {statusCode === 'internal_review' && canSendEst && (
-            <div className="border-t border-violet-100 pt-3 space-y-3">
-              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
-                  <p className="text-sm font-semibold text-violet-900">Internal Estimate Review</p>
-                </div>
-                <p className="text-xs text-violet-700">
-                  Review the services &amp; parts estimates below. Once satisfied, send to the customer for approval.
-                </p>
-                {estimate ? (
-                  <div className="bg-white rounded-lg border border-violet-200 p-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estimate Summary</p>
-                    <div className="space-y-1.5 text-sm">
-                      <div className="flex justify-between"><span className="text-gray-600">Services</span><span className="font-medium">KES {Number(estimate.services_total || 0).toLocaleString()}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Parts</span><span className="font-medium">KES {Number(estimate.parts_total || 0).toLocaleString()}</span></div>
-                      <div className="flex justify-between text-gray-400 text-xs"><span>VAT 16%</span><span>KES {Number(estimate.tax || 0).toLocaleString()}</span></div>
-                      <div className="flex justify-between border-t border-gray-100 pt-1.5">
-                        <span className="font-semibold text-gray-900">Total</span>
-                        <span className="font-bold text-violet-900 text-base">KES {Number(estimate.total || 0).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : <p className="text-xs text-violet-600 italic">Loading estimate…</p>}
-              </div>
-              <button onClick={handleSendEstimate} disabled={sendingEst || acting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
-                {sendingEst ? <><Loader2 size={13} className="animate-spin" /> Sending…</> : 'Send Estimates for Approval'}
-              </button>
+          {/* Internal Estimate Review — EstimateReviewPanel for authorised members */}
+          {statusCode === 'internal_review' && (
+            <div className="border-t border-violet-100 pt-3">
+              <EstimateReviewPanel
+                workOrder={woWithProvider}
+                canSend={canSendEst || isAdmin}
+                estimate={estimate}
+                onSent={() => { load(); setSuccess('Estimate sent to customer for approval.') }}
+              />
             </div>
           )}
 
@@ -624,6 +619,9 @@ export default function MechanicWorkOrderPage() {
             )}
             {activeTab === 'issues' && (canApprove || isAdmin) && (
               <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
+            )}
+            {activeTab === 'invoice' && (isAdmin || canSendInvoice) && (
+              <InvoiceTab workOrder={woWithProvider} permissions={invoicePerms} />
             )}
             {activeTab === 'recommendations' && (canApprove || isAdmin) && (
               <RecommendationsTab workOrder={woWithProvider} />

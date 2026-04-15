@@ -385,3 +385,53 @@ View full details: ${detailUrl}
     referenceId:    workOrderId,
   })
 }
+/**
+ * sendInvoiceEmail(supabase, { to, ownerName, workOrderNumber,
+ *   providerName, invoiceNumber, totalAmount, workOrderId })
+ */
+export async function sendInvoiceEmail(supabase, {
+  to, ownerName, workOrderNumber, providerName,
+  invoiceNumber, totalAmount, workOrderId,
+}) {
+  const detailUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
+  const greeting  = ownerName ? `Hello ${ownerName},` : 'Hello,'
+  const amount    = `KES ${Number(totalAmount || 0).toLocaleString()}`
+
+  const bodyHtml = `
+    <p style="color:#374151;font-size:16px;margin:0 0 20px;">${greeting}</p>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:24px;margin:0 0 24px;text-align:center;">
+      <p style="font-size:32px;margin:0 0 8px;">🧾</p>
+      <p style="color:#92400e;font-size:18px;font-weight:700;margin:0 0 4px;">Your invoice is ready</p>
+      <p style="color:#b45309;font-size:24px;font-weight:800;margin:0;">${amount}</p>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      ${infoRow('Invoice Number', `<strong>${invoiceNumber}</strong>`)}
+      ${infoRow('Work Order',     workOrderNumber)}
+      ${infoRow('Service Provider', providerName)}
+      ${infoRow('Amount Due',     `<strong style="color:#16a34a;">${amount}</strong>`)}
+    </table>
+    <p style="color:#374151;font-size:14px;margin:0;">
+      Please arrange payment at your earliest convenience. You can view your full invoice
+      and service breakdown in your GariCare dashboard.
+    </p>`
+
+  const html = emailWrapper({
+    title:       'Invoice Ready for Payment',
+    previewText: `Invoice ${invoiceNumber} — ${amount} due`,
+    bodyHtml,
+    ctaHref:     detailUrl,
+    ctaLabel:    'View Invoice',
+    footerNote:  'Contact the service provider if you have any questions about this invoice.',
+  })
+
+  const text = `${greeting}\n\nYour invoice is ready.\n\nInvoice: ${invoiceNumber}\nWork Order: ${workOrderNumber}\nProvider: ${providerName}\nAmount Due: ${amount}\n\nView invoice: ${detailUrl}\n\n— ${BRAND_NAME}`
+
+  return sendAndQueueEmail(supabase, {
+    to:             [{ Email: to, Name: ownerName || to }],
+    subject:        `🧾 Invoice Ready — ${invoiceNumber} (${amount})`,
+    html,
+    text,
+    referenceTable: 'invoices',
+    referenceId:    workOrderId,
+  })
+}

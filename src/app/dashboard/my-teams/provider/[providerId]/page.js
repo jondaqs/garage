@@ -47,7 +47,7 @@ export default function ProviderOverviewPage() {
       // Also get mechanic-specific data if they have a mechanic role
       const { data: mechanic } = await supabase
         .from('mechanics')
-        .select('id, role, specialization, experience_years, is_verified, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates')
+        .select('id, role, specialization, experience_years, is_verified, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice')
         .eq('user_id', profile.id)
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
@@ -65,7 +65,7 @@ export default function ProviderOverviewPage() {
         can_manage_inventory: !!(spuRow.can_manage_inventory || mechanic?.can_manage_inventory),
         can_manage_team:      !!(spuRow.can_manage_team      || mechanic?.can_manage_team),
         can_send_estimates:   !!(spuRow.can_send_estimates   || mechanic?.can_send_estimates),
-        can_send_invoice:     !!(spuRow.can_send_invoice),
+        can_send_invoice:     !!(spuRow.can_send_invoice || mechanic?.can_send_invoice),
         is_verified:          !!(spuRow.is_verified || mechanic?.is_verified),
       }
 

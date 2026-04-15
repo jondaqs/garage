@@ -123,3 +123,16 @@ export async function sendWorkOrderCompletedSms(supabase, {
     referenceId:    workOrderId,
   })
 }
+/**
+ * sendInvoiceSms(supabase, { phone, ownerName, workOrderNumber,
+ *   providerName, totalAmount, workOrderId })
+ */
+export async function sendInvoiceSms(supabase, {
+  phone, ownerName, workOrderNumber, providerName, totalAmount, workOrderId,
+}) {
+  const { sendSms } = await import('./transport.js')
+  const amount = `KES ${Number(totalAmount || 0).toLocaleString()}`
+  const greeting = ownerName ? `Hi ${ownerName.split(' ')[0]},` : 'Hi,'
+  const message = `${greeting} Your invoice of ${amount} for WO ${workOrderNumber} at ${providerName} is ready. Please arrange payment. View: ${process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'}/dashboard/work-orders/${workOrderId}`
+  return sendSms(supabase, { phone, message })
+}
