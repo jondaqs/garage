@@ -118,12 +118,31 @@ export default function MechanicWorkOrderPage() {
         .eq('work_order_id', woId).then(({ count }) => setIssueCount(count || 0)).catch(() => {})
       supabase.from('work_order_services').select('id', { count: 'exact', head: true })
         .eq('work_order_id', woId).then(({ count }) => setServiceCount(count || 0)).catch(() => {})
-      // Load estimate for internal review
-      supabase.auth.getUser().then(({ data: { user } }) =>
-        supabase.rpc('calculate_work_order_estimate', {
-          p_work_order_id: woId, p_provider_user_id: user.id
-        }).then(({ data: d }) => { if (d?.success) setEstimate(d) }).catch(() => {})
-      )
+      // Load estimate via direct query — RPC is staff/mechanic only, won't work for accountants
+      ;(async () => {
+        try {
+          const [{ data: svcs }, { data: pts }] = await Promise.all([
+            supabase
+              .from('work_order_services')
+              .select('estimated_cost, status:work_order_services_statuses!status_id(code)')
+              .eq('work_order_id', woId),
+            supabase
+              .from('work_order_parts')
+              .select('quantity, unit_price, status:work_order_parts_statuses!status_id(code)')
+              .eq('work_order_id', woId),
+          ])
+          const servicesTotal = (svcs || [])
+            .filter(s => !['cancelled','skipped'].includes(s.status?.code))
+            .reduce((sum, s) => sum + Number(s.estimated_cost || 0), 0)
+          const partsTotal = (pts || [])
+            .filter(p => ['reserved','in_use'].includes(p.status?.code))
+            .reduce((sum, p) => sum + Number(p.quantity || 0) * Number(p.unit_price || 0), 0)
+          const subtotal = servicesTotal + partsTotal
+          const tax      = Math.round(subtotal * 0.16 * 100) / 100
+          const total    = Math.round(subtotal * 1.16 * 100) / 100
+          setEstimate({ success: true, services_total: servicesTotal, parts_total: partsTotal, subtotal, tax, total })
+        } catch {}
+      })()
     } catch (err) {
       setError(err.message)
     } finally {

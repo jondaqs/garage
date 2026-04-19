@@ -30,28 +30,46 @@ export default function EstimateReviewPanel({
   const supabase   = createClient()
   const statusCode = workOrder?.status?.code
 
-  const [estimate,  setEstimate]  = useState(estimateProp)
-  const [services,  setServices]  = useState([])
-  const [parts,     setParts]     = useState([])
-  const [expanded,  setExpanded]  = useState(false)
-  const [sending,   setSending]   = useState(false)
-  const [error,     setError]     = useState('')
-  const [success,   setSuccess]   = useState('')
-  const [notes,     setNotes]     = useState('')
+  const [estimate,       setEstimate]       = useState(estimateProp)
+  const [estimateLoading,setEstimateLoading] = useState(!estimateProp)
+  const [services,       setServices]        = useState([])
+  const [parts,          setParts]           = useState([])
+  const [expanded,       setExpanded]        = useState(false)
+  const [sending,        setSending]         = useState(false)
+  const [error,          setError]           = useState('')
+  const [success,        setSuccess]         = useState('')
+  const [notes,          setNotes]           = useState('')
 
   const fmt = (n) => `KES ${Number(n || 0).toLocaleString()}`
 
-  // ── Fetch estimate if not passed in ────────────────────────────────────
+  // ── Fetch estimate — direct query so all SPU roles (accountant, admin) work ──
+  // calculate_work_order_estimate RPC is staff-only (checks mechanics table).
+  // We calculate directly from work_order_services + work_order_parts instead.
   const fetchEstimate = useCallback(async () => {
     if (estimateProp) { setEstimate(estimateProp); return }
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data } = await supabase.rpc('calculate_work_order_estimate', {
-        p_work_order_id:    workOrder.id,
-        p_provider_user_id: user.id,
-      })
-      if (data?.success) setEstimate(data)
+      const [{ data: svcs }, { data: parts }] = await Promise.all([
+        supabase
+          .from('work_order_services')
+          .select('estimated_cost, status:work_order_services_statuses!status_id(code)')
+          .eq('work_order_id', workOrder.id),
+        supabase
+          .from('work_order_parts')
+          .select('quantity, unit_price, status:work_order_parts_statuses!status_id(code)')
+          .eq('work_order_id', workOrder.id),
+      ])
+      const servicesTotal = (svcs || [])
+        .filter(s => !['cancelled','skipped'].includes(s.status?.code))
+        .reduce((sum, s) => sum + Number(s.estimated_cost || 0), 0)
+      const partsTotal = (parts || [])
+        .filter(p => ['reserved','in_use'].includes(p.status?.code))
+        .reduce((sum, p) => sum + Number(p.quantity || 0) * Number(p.unit_price || 0), 0)
+      const subtotal = servicesTotal + partsTotal
+      const tax      = Math.round(subtotal * 0.16 * 100) / 100
+      const total    = Math.round(subtotal * 1.16 * 100) / 100
+      setEstimate({ success: true, services_total: servicesTotal, parts_total: partsTotal, subtotal, tax, total })
     } catch {}
+    finally { setEstimateLoading(false) }
   }, [workOrder.id, estimateProp])
 
   // ── Fetch line-item breakdown for expanded view ─────────────────────────
@@ -223,9 +241,15 @@ export default function EstimateReviewPanel({
           </div>
         )}
 
-        {!estimate && !success && (
+        {estimateLoading && !success && (
           <div className="flex items-center gap-2 text-xs text-violet-500 italic">
             <Loader2 size={12} className="animate-spin" /> Loading estimate…
+          </div>
+        )}
+        {!estimateLoading && !estimate && !success && (
+          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <AlertTriangle size={12} />
+            No estimate data found. Ensure the mechanic has added services and parts before sending.
           </div>
         )}
 
@@ -260,11 +284,11 @@ export default function EstimateReviewPanel({
           </button>
         )}
 
-        {/* Warning if no estimate loaded yet */}
-        {!estimate && canSend && !sending && !success && (
+        {/* Warning if estimate loaded but has zero value */}
+        {!estimateLoading && estimate && estimate.total === 0 && canSend && !sending && !success && (
           <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertTriangle size={12} />
-            Estimate is still loading. Ensure services and parts are added before sending.
+            Estimate total is zero. Ensure services and parts have been added with pricing before sending.
           </div>
         )}
       </div>
