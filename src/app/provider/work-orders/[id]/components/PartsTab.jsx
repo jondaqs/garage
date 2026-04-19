@@ -17,7 +17,7 @@ const PART_STATUS_STYLES = {
   cancelled:     'bg-red-100 text-red-500 line-through',
 }
 
-export default function PartsTab({ workOrder }) {
+export default function PartsTab({ workOrder, readOnly = false }) {
   const supabase = createClient()
 
   const [reservedParts, setReservedParts] = useState([])
@@ -165,7 +165,7 @@ export default function PartsTab({ workOrder }) {
         <div className="text-center py-10 text-gray-400">
           <Package size={32} className="mx-auto mb-2 opacity-40" />
           <p className="text-sm">No parts reserved yet.</p>
-          {!isTerminal && (
+          {!isTerminal && !readOnly && (
             <button onClick={() => setShowSearch(true)}
               className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
               + Reserve a part from inventory
@@ -183,7 +183,7 @@ export default function PartsTab({ workOrder }) {
                   <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Unit</th>
                   <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Total</th>
                   <th className="text-center py-2 px-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                  {!isTerminal && <th className="py-2 px-3" />}
+                  {!isTerminal && !readOnly && <th className="py-2 px-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -204,7 +204,7 @@ export default function PartsTab({ workOrder }) {
                         {p.status?.display_name}
                       </span>
                     </td>
-                    {!isTerminal && (
+                    {!isTerminal && !readOnly && (
                       <td className="py-3 px-3">
                         {p.status?.code === 'reserved' && (
                           <button onClick={() => handleRelease(p.id, p.part?.name)}
@@ -230,7 +230,7 @@ export default function PartsTab({ workOrder }) {
       )}
 
       {/* Add part */}
-      {!isTerminal && (
+      {!isTerminal && !readOnly && (
         <div>
           {!showSearch ? (
             <button onClick={() => setShowSearch(true)}

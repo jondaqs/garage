@@ -16,7 +16,7 @@ const STATUS_STYLES = {
   cancelled:   'bg-red-100 text-red-600',
 }
 
-export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded }) {
+export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded, readOnly = false }) {
   // Resolve service_provider_id from either flat field or nested object (provider vs mechanic page)
   const providerSvcId = workOrder.service_provider_id || workOrder.service_provider?.id
 
@@ -316,7 +316,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       )}
 
       {/* Estimate approval status banner */}
-      {!customerApproved && workOrder.status?.code !== 'intake' && workOrder.status?.code !== 'assigned' && (
+      {!customerApproved && !readOnly && workOrder.status?.code !== 'intake' && workOrder.status?.code !== 'assigned' && (
         <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-2 text-sm text-amber-800">
           <AlertCircle size={15} className="flex-shrink-0" />
           Service transitions are locked — awaiting customer estimate approval before work can begin.
@@ -355,7 +355,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       {services.length === 0 ? (
         <div className="text-center py-10 text-gray-400">
           <p className="text-sm">No services added yet.</p>
-          {!isTerminal && (
+          {!isTerminal && !readOnly && (
             <button onClick={() => setShowAdd(true)}
               className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
               + Add the first service
@@ -398,7 +398,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                   </div>
 
                   {/* Action buttons */}
-                  {!isTerminal && (
+                  {!isTerminal && !readOnly && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {/* Edit estimate — for pending services without pricing */}
                       {statusCode === 'pending' && !estimating[svc.id] && !isEditing && (
@@ -473,7 +473,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleSaveEstimate(svc.id)} disabled={saving}
+                      <button onClick={() => handleSaveEstimate(svc.id)} disabled={saving || readOnly}
                         className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50">
                         {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
                         Save Estimate
@@ -529,7 +529,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       )}
 
       {/* Add service */}
-      {!isTerminal && (
+      {!isTerminal && !readOnly && (
         <div>
           {!showAdd ? (
             <button onClick={() => setShowAdd(true)}

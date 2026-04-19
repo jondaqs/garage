@@ -276,6 +276,8 @@ export default function MechanicWorkOrderPage() {
     canSendInvoice:   isAdmin || canSendInvoice,
     canRecordPayment: isAdmin || canSendInvoice,
   }
+  // readOnly: admin/accountant role but no can_approve_work — can view but not mutate work order content
+  const isReadOnly = isAdmin && !canApprove
 
   // Build woWithProvider shape that tabs expect
   const woWithProvider = {
@@ -438,12 +440,12 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
-          {/* Internal Estimate Review — EstimateReviewPanel for authorised members */}
-          {statusCode === 'internal_review' && (
+          {/* Internal Estimate Review — only for mechanics with can_send_estimates, not for admin/accountant viewers */}
+          {statusCode === 'internal_review' && canSendEst && !isAdmin && (
             <div className="border-t border-violet-100 pt-3">
               <EstimateReviewPanel
                 workOrder={woWithProvider}
-                canSend={canSendEst || isAdmin}
+                canSend={true}
                 estimate={estimate}
                 onSent={() => { load(); setSuccess('Estimate sent to customer for approval.') }}
               />
@@ -548,6 +550,16 @@ export default function MechanicWorkOrderPage() {
         </div>
       )}
 
+      {/* EstimateReviewPanel for admin/accountant — outside assignment card, always visible when status = internal_review */}
+      {statusCode === 'internal_review' && isAdmin && (
+        <EstimateReviewPanel
+          workOrder={woWithProvider}
+          canSend={canSendEst || isAdmin}
+          estimate={estimate}
+          onSent={() => { load(); setSuccess('Estimate sent to customer for approval.') }}
+        />
+      )}
+
       {/* Tabs — only shown after acknowledged */}
       {(isAcknowledged || !isPending) && tabs.length > 1 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -612,13 +624,13 @@ export default function MechanicWorkOrderPage() {
             )}
 
             {activeTab === 'services' && (canApprove || isAdmin) && (
-              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} />
+              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} readOnly={isReadOnly} />
             )}
             {activeTab === 'parts' && (canApprove || isAdmin) && (
-              <PartsTab workOrder={woWithProvider} />
+              <PartsTab workOrder={woWithProvider} readOnly={isReadOnly} />
             )}
             {activeTab === 'issues' && (canApprove || isAdmin) && (
-              <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
+              <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} readOnly={isReadOnly} />
             )}
             {activeTab === 'invoice' && (isAdmin || canSendInvoice) && (
               <InvoiceTab workOrder={woWithProvider} permissions={invoicePerms} />
@@ -626,7 +638,7 @@ export default function MechanicWorkOrderPage() {
             {activeTab === 'recommendations' && (canApprove || isAdmin) && (
               <RecommendationsTab workOrder={woWithProvider} />
             )}
-            {activeTab === 'qc' && (canApprove || isAdmin) && (
+            {activeTab === 'qc' && (canApprove || (isAdmin && !isReadOnly)) && (
               <QualityCheckTab workOrder={woWithProvider} onStatusChange={load} />
             )}
             {activeTab === 'comments' && (
