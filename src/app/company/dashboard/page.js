@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 
 export default function CompanyDashboard() {
+  const router = useRouter()
   const [companyId, setCompanyId] = useState(null)
   const [company, setCompany] = useState(null)
   const [stats, setStats] = useState({
