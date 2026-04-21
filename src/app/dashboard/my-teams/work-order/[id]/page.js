@@ -238,6 +238,20 @@ export default function MechanicWorkOrderPage() {
     finally { setActing(false) }
   }
 
+  const handleReApprovalNeeded = async () => {
+    try {
+      const { data: statusRow } = await supabase
+        .from('work_order_statuses').select('id').eq('code', 'internal_review').single()
+      if (!statusRow) return
+      await supabase.from('work_orders')
+        .update({ status_id: statusRow.id, updated_at: new Date().toISOString() })
+        .eq('id', params.id)
+      await fetch('/api/work-orders/' + params.id + '/internal-review', { method: 'POST' }).catch(() => {})
+      setSuccess('New item added. Estimate sent back for re-approval — accountant/admin has been notified.')
+      await load()
+    } catch (e) { setError(e.message) }
+  }
+
   const handleAdvanceStatus = async (newCode) => {
     setActing(true); setError(''); setSuccess('')
     try {
@@ -643,10 +657,10 @@ export default function MechanicWorkOrderPage() {
             )}
 
             {activeTab === 'services' && (canApprove || isAdmin) && (
-              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} readOnly={isReadOnly} />
+              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} readOnly={isReadOnly} onReApprovalNeeded={handleReApprovalNeeded} />
             )}
             {activeTab === 'parts' && (canApprove || isAdmin) && (
-              <PartsTab workOrder={woWithProvider} readOnly={isReadOnly} />
+              <PartsTab workOrder={woWithProvider} readOnly={isReadOnly} onReApprovalNeeded={handleReApprovalNeeded} />
             )}
             {activeTab === 'issues' && (canApprove || isAdmin) && (
               <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} readOnly={isReadOnly} />

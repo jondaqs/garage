@@ -16,7 +16,7 @@ const STATUS_STYLES = {
   cancelled:   'bg-red-100 text-red-600',
 }
 
-export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded, readOnly = false }) {
+export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded, readOnly = false, onReApprovalNeeded }) {
   // Resolve service_provider_id from either flat field or nested object (provider vs mechanic page)
   const providerSvcId = workOrder.service_provider_id || workOrder.service_provider?.id
 
@@ -170,10 +170,15 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       if (!data.success) throw new Error(data.error)
       setNewService({ service_id: '', estimated_cost: '', notes: '' })
       setShowAdd(false)
-      setSuccess('Service added')
       onServiceAdded?.()
       await loadServices()
       await refreshEstimate()
+      if (customerApproved) {
+        setSuccess('Service added. Since the customer already approved the estimate, re-approval is required.')
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess('Service added')
+      }
     } catch (e) {
       setError(e.message)
     } finally {

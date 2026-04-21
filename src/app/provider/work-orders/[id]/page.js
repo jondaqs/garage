@@ -350,6 +350,22 @@ export default function WorkOrderDetailPage() {
     finally { setUpdating(false) }
   }
 
+  // Called when a service/part is added after customer already approved —
+  // silently transitions back to internal_review for re-review and re-send
+  const handleReApprovalNeeded = async () => {
+    try {
+      const { data: statusRow } = await supabase
+        .from('work_order_statuses').select('id').eq('code', 'internal_review').single()
+      if (!statusRow) return
+      await supabase.from('work_orders')
+        .update({ status_id: statusRow.id, updated_at: new Date().toISOString() })
+        .eq('id', params.id)
+      // Notify accountant/admin/owner that re-review is needed
+      await fetch('/api/work-orders/' + params.id + '/internal-review', { method: 'POST' }).catch(() => {})
+      await loadWorkOrder()
+    } catch (e) { setError(e.message) }
+  }
+
   const saveInternalNote = async () => {
     if (!internalNote.trim()) return
     setSavingNote(true)
@@ -943,12 +959,13 @@ export default function WorkOrderDetailPage() {
               workOrder={woWithProvider}
               onEstimateChange={setEstimate}
               onServiceAdded={() => setServiceCount(c => (c || 0) + 1)}
+                onReApprovalNeeded={handleReApprovalNeeded}
             />
           )}
 
           {/* ── PARTS TAB ── */}
           {activeTab === 'parts' && (
-            <PartsTab workOrder={woWithProvider} />
+            <PartsTab workOrder={woWithProvider} onReApprovalNeeded={handleReApprovalNeeded} />
           )}
 
           {/* ── ISSUES TAB ── */}

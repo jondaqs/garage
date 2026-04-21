@@ -18,7 +18,7 @@ const PART_STATUS_STYLES = {
   cancelled:     'bg-red-100 text-red-500 line-through',
 }
 
-export default function PartsTab({ workOrder, readOnly = false }) {
+export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeeded }) {
   const supabase = createClient()
 
   const [reservedParts, setReservedParts] = useState([])
@@ -111,9 +111,14 @@ export default function PartsTab({ workOrder, readOnly = false }) {
       })
       if (rpcErr) throw rpcErr
       if (!data.success) throw new Error(data.error)
-      setSuccess(`${part.name} × ${quantity} reserved. Stock remaining: ${data.remaining_stock}`)
       setShowSearch(false); setSearch(''); setSearchResults([]); setQty({})
       await loadParts()
+      if (customerApproved) {
+        setSuccess(`${part.name} × ${quantity} reserved. Since the customer already approved the estimate, re-approval is required.`)
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess(`${part.name} × ${quantity} reserved. Stock remaining: ${data.remaining_stock}`)
+      }
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
   }
