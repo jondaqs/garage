@@ -128,7 +128,7 @@ export async function sendEstimateApprovalEmail(supabase, {
       ${infoRow('Vehicle', vehiclePlate)}
       ${infoRow('Service Provider', providerName)}
     </table>
-    ${estimateTable(estimate)}
+    ${estimateTable({ servicesTotal: estimate?.services_total, partsTotal: estimate?.parts_total, tax: estimate?.tax, total: estimate?.total })}
     <p style="color:#374151;font-size:14px;margin:0 0 12px;">
       Please review the estimate breakdown and either <strong>approve</strong> to authorise
       the work, <strong>reject</strong> to cancel, or <strong>request changes</strong> if
