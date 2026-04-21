@@ -152,9 +152,15 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
         .update({ unit_price: val })
         .eq('id', wopId)
       if (upErr) throw upErr
+      const orig = reservedParts.find(p => p.id === wopId)?.unit_price
       setReservedParts(prev => prev.map(p => p.id === wopId ? { ...p, unit_price: val } : p))
       setEditingPrice(e => { const n = { ...e }; delete n[wopId]; return n })
-      setSuccess('Price updated')
+      if (customerApproved && orig !== null && val !== Number(orig)) {
+        setSuccess('Price updated. Actual price differs from estimate — customer re-approval required.')
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess('Price updated')
+      }
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
   }
@@ -203,9 +209,16 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
       if (actualPrice !== null) {
         await supabase.from('work_order_parts').update({ unit_price: actualPrice }).eq('id', wopId)
       }
+      const originalPrice = reservedParts.find(p => p.id === wopId)?.unit_price
+      const priceChanged  = actualPrice !== null && originalPrice !== null && actualPrice !== Number(originalPrice)
       setMarkingUsed(m => { const n = { ...m }; delete n[wopId]; return n })
-      setSuccess('Part marked as installed/used')
       await loadParts()
+      if (priceChanged) {
+        setSuccess('Part marked as installed. Actual price differs from estimate — customer re-approval required.')
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess('Part marked as installed/used')
+      }
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
   }
@@ -359,7 +372,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                                 showToast('⚠️ Cannot mark installed — customer approval pending')
                                 return
                               }
-                              setMarkingUsed(m => ({ ...m, [p.id]: { actual_price: '' } }))
+                              setMarkingUsed(m => ({ ...m, [p.id]: { actual_price: String(p.unit_price ?? p.part?.unit_price ?? '') } }))
                             }}
                             disabled={saving}
                             className={`p-1.5 rounded-lg ${customerApproved ? 'text-green-600 hover:bg-green-50' : 'text-gray-300 cursor-not-allowed'}`}

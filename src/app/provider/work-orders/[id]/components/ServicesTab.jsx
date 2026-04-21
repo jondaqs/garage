@@ -251,11 +251,18 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
         })
         .eq('id', wosId)
       if (upErr) throw upErr
+      const orig = services.find(s => s.id === wosId)?.estimated_cost
+      const newVal = data.estimated_cost !== '' ? parseFloat(data.estimated_cost) : null
       setEstimating(e => { const n = { ...e }; delete n[wosId]; return n })
-      setSuccess('Estimate saved')
       onServiceAdded?.()
       await loadServices()
       await refreshEstimate()
+      if (customerApproved && orig !== null && newVal !== null && newVal !== Number(orig)) {
+        setSuccess('Estimate updated. Cost changed — customer re-approval required.')
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess('Estimate saved')
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -279,9 +286,17 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       if (rpcErr) throw rpcErr
       if (!data.success) throw new Error(data.error)
       setEditing(e => { const n = { ...e }; delete n[wosId]; return n })
-      setSuccess('Service updated')
       await loadServices()
       await refreshEstimate()
+      // If actual cost was set and differs from estimate, customer needs to re-approve
+      const svc = services.find(s => s.id === wosId)
+      const finalActual = actualCost ?? (editing[wosId]?.actual_cost ? parseFloat(editing[wosId].actual_cost) : null)
+      if (newStatus === 'completed' && finalActual !== null && svc && finalActual !== Number(svc.estimated_cost)) {
+        setSuccess('Service completed. Actual cost differs from estimate — customer re-approval required.')
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess('Service updated')
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -435,7 +450,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                       {statusCode === 'in_progress' && (
                         <button onClick={() => setEditing(e => ({
                           ...e,
-                          [svc.id]: { actual_cost: svc.actual_cost || '', notes: svc.notes || '' }
+                          [svc.id]: { actual_cost: String(svc.actual_cost ?? svc.estimated_cost ?? ''), notes: svc.notes || '' }
                         }))}
                           disabled={saving}
                           className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg" title="Complete">
