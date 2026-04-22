@@ -597,6 +597,23 @@ export default function MechanicWorkOrderPage() {
                     </button>
                   </div>
                 )}
+                {statusCode === 'quality_check' && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-indigo-700 font-medium">⏳ Under quality check — record the outcome:</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => setActiveTab('qc')}
+                        disabled={acting}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50">
+                        ✓ Go to QC &amp; Complete
+                      </button>
+                      <button onClick={() => handleAdvanceStatus('rework')}
+                        disabled={acting}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-50">
+                        ✗ QC Failed — Rework
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {statusCode === 'rework' && (
                   <div className="flex flex-col gap-1.5">
                     {qcBlockReason && (
