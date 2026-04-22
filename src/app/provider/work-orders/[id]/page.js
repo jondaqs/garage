@@ -61,9 +61,9 @@ const TABS = [
   { id: 'issues',          label: 'Issues/Diagnostics',  icon: AlertTriangle  },
   { id: 'services',        label: 'Services',            icon: Wrench         },
   { id: 'parts',           label: 'Parts',               icon: Package        },
-  { id: 'invoice',         label: 'Invoice',             icon: FileText       },
   { id: 'recommendations', label: 'Next Service',        icon: Bell           },
   { id: 'qc',              label: 'QC & Complete',       icon: ClipboardCheck },
+  { id: 'invoice',         label: 'Invoice',             icon: FileText       },
   { id: 'comments',        label: 'Comments',            icon: MessageSquare  },
 ]
 
