@@ -329,7 +329,7 @@ export default function MechanicWorkOrderPage() {
   const canSendInvoice  = !!(perms?.can_send_invoice   || memberPerms?.can_send_invoice)
   const isMechanic      = !!perms?.mechanic_id || !memberPerms   // has mechanic record
   const memberRole      = memberPerms?.role || (isMechanic ? 'mechanic' : null)
-  const isAdmin         = ['admin', 'service_provider_owner', 'accountant'].includes(memberPerms?.role)
+  const isAdmin         = ['admin', 'accountant'].includes(memberPerms?.role)
   const isAssigned      = !!perms?.is_assigned
 
   // Invoice permissions — admins/accountants/owners get full access; can_send_invoice gets send+record
@@ -736,7 +736,16 @@ export default function MechanicWorkOrderPage() {
               <RecommendationsTab workOrder={woWithProvider} />
             )}
             {activeTab === 'qc' && (canApprove || (isAdmin && !isReadOnly)) && (
-              <QualityCheckTab workOrder={woWithProvider} onStatusChange={load} />
+              <QualityCheckTab
+                workOrder={woWithProvider}
+                onStatusChange={(event) => {
+                  if (event === 'go_to_invoice') {
+                    setActiveTab('invoice')
+                    return
+                  }
+                  load()
+                }}
+              />
             )}
             {activeTab === 'comments' && (
               <CommentsTab workOrder={woWithProvider} />

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   CheckCircle, XCircle, AlertCircle, Loader2,
-  ClipboardCheck, Car, RefreshCw
+  ClipboardCheck, Car, RefreshCw, FileText
 } from 'lucide-react'
 
 // Standard QC checklist items — mechanic ticks these before submitting
@@ -38,9 +38,11 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
   const [failNotes, setFailNotes] = useState('')
 
   // Completion form
-  const [showCompleteForm, setShowCompleteForm] = useState(false)
-  const [finalMileage, setFinalMileage]         = useState(workOrder.initial_mileage?.toString() || '')
-  const [techNotes, setTechNotes]               = useState('')
+  const [showCompleteForm, setShowCompleteForm]   = useState(false)
+  const [finalMileage, setFinalMileage]           = useState(workOrder.initial_mileage?.toString() || '')
+  const [techNotes, setTechNotes]                 = useState('')
+  const [invoiceNotified, setInvoiceNotified]     = useState(false)
+  const [notifyingInvoice, setNotifyingInvoice]   = useState(false)
 
   const statusCode = workOrder.status?.code
 
@@ -126,6 +128,14 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
       setSuccess(`Work order completed! Owner notified via ${channels}.`)
       setShowCompleteForm(false)
       onStatusChange?.('completed')
+
+      // Notify internal team (owner, admin, accountant, can_send_invoice) to generate invoice
+      setNotifyingInvoice(true)
+      fetch(`/api/work-orders/${workOrder.id}/notify-invoice`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { if (d.success) setInvoiceNotified(true) })
+        .catch(() => {})
+        .finally(() => setNotifyingInvoice(false))
     } catch (err) { setError(err.message) }
     finally { setCompleting(false) }
   }
@@ -362,15 +372,43 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
 
       {/* ── Already completed ── */}
       {isTerminal && (
-        <div className="text-center py-10 text-gray-400">
-          <CheckCircle className="mx-auto mb-2 text-green-400" size={32} />
-          <p className="text-sm">Work order {workOrder.status?.display_name?.toLowerCase()}.</p>
-          {session?.completed_at && (
-            <p className="text-xs mt-1">
-              Completed {new Date(session.completed_at).toLocaleDateString('en-KE', {
-                day: 'numeric', month: 'short', year: 'numeric'
-              })}
-            </p>
+        <div className="space-y-4">
+          <div className="text-center py-6 text-gray-400">
+            <CheckCircle className="mx-auto mb-2 text-green-400" size={32} />
+            <p className="text-sm">Work order {workOrder.status?.display_name?.toLowerCase()}.</p>
+            {session?.completed_at && (
+              <p className="text-xs mt-1">
+                Completed {new Date(session.completed_at).toLocaleDateString('en-KE', {
+                  day: 'numeric', month: 'short', year: 'numeric'
+                })}
+              </p>
+            )}
+          </div>
+
+          {/* Invoice CTA — shown after completion */}
+          {(invoiceNotified || statusCode === 'completed') && (
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <FileText className="text-green-600 flex-shrink-0" size={20} />
+                <div>
+                  <p className="font-semibold text-green-900 text-sm">Ready to Invoice</p>
+                  <p className="text-green-700 text-xs mt-0.5">
+                    {invoiceNotified
+                      ? 'Team notified. Generate and send the invoice to the customer.'
+                      : 'Work order complete. Generate and send the invoice to the customer.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => onStatusChange?.('go_to_invoice')}
+                disabled={notifyingInvoice}
+                className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
+                {notifyingInvoice
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <FileText size={14} />}
+                Go to Invoice
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -60,7 +60,7 @@ export async function POST(request, { params }) {
       .maybeSingle()
 
     const isOwner     = provRow?.owner_user_id === profile.id
-    const isAdminRole = ['service_provider_owner', 'admin', 'accountant'].includes(spuRow?.role)
+    const isAdminRole = ['admin', 'accountant'].includes(spuRow?.role)
     const spuCanSend  = !!spuRow?.can_send_invoice
     const mechCanSend = !!mechRow?.can_send_invoice
 

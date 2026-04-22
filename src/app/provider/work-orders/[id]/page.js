@@ -453,7 +453,7 @@ export default function WorkOrderDetailPage() {
   const assignStatus  = wo.mechanic_assignment_status
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
   // User can send estimates if they are owner, admin, accountant, or have SPU can_send_estimates
-  const isAdminOrOwner      = isOwner || ['service_provider_owner','admin','accountant'].includes(spuPermissions.role)
+  const isAdminOrOwner      = isOwner || ['admin','accountant'].includes(spuPermissions.role)
   const canSendEstimatesAll = isAdminOrOwner || spuPermissions.can_send_estimates
   // Invoice permissions — owner/admin/accountant get full access; can_send_invoice gives send+record
   const canSendInvoice   = isAdminOrOwner || spuPermissions.can_send_invoice
@@ -1029,7 +1029,11 @@ export default function WorkOrderDetailPage() {
           {activeTab === 'qc' && (
             <QualityCheckTab
               workOrder={woWithProvider}
-              onStatusChange={async () => {
+              onStatusChange={async (event) => {
+                if (event === 'go_to_invoice') {
+                  setActiveTab('invoice')
+                  return
+                }
                 await loadWorkOrder()
                 setSuccess('')
               }}
