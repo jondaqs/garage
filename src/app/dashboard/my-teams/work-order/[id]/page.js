@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle,
+  ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
   Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText
 } from 'lucide-react'
