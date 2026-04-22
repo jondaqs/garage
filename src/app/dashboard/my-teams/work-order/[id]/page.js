@@ -40,9 +40,9 @@ const ALL_TABS = [
   { id: 'issues',          label: 'Issues/Diagnostics',icon: AlertCircle,   perm: 'can_approve_work' },
   { id: 'services',        label: 'Services',          icon: Wrench,        perm: 'can_approve_work' },
   { id: 'parts',           label: 'Parts',             icon: Package,       perm: 'can_approve_work' },
-  { id: 'invoice',         label: 'Invoice',           icon: FileText,      perm: 'can_send_invoice' },
   { id: 'recommendations', label: 'Recommendations',   icon: Star,          perm: 'can_approve_work' },
   { id: 'qc',              label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
+  { id: 'invoice',         label: 'Invoice',           icon: FileText,      perm: 'can_send_invoice' },
   { id: 'comments',        label: 'Comments',          icon: MessageSquare, perm: 'any'              },
 ]
 
