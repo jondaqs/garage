@@ -63,8 +63,9 @@ export default function MechanicWorkOrderPage() {
   const [activeTab,   setActiveTab]   = useState('overview')
 
   // Gating counts
-  const [issueCount,   setIssueCount]   = useState(null)
-  const [serviceCount, setServiceCount] = useState(null)
+  const [issueCount,    setIssueCount]    = useState(null)
+  const [serviceCount,  setServiceCount]  = useState(null)
+  const [qcBlockReason, setQcBlockReason] = useState(null)
 
   // Decline form
   const [showDecline,   setShowDecline]   = useState(false)
@@ -250,6 +251,34 @@ export default function MechanicWorkOrderPage() {
       setSuccess('New item added. Estimate sent back for re-approval — accountant/admin has been notified.')
       await load()
     } catch (e) { setError(e.message) }
+  }
+
+  const validateQcReady = async () => {
+    try {
+      const [{ data: svcs }, { data: parts }] = await Promise.all([
+        supabase
+          .from('work_order_services')
+          .select('id, status:work_order_services_statuses!status_id(code)')
+          .eq('work_order_id', params.id),
+        supabase
+          .from('work_order_parts')
+          .select('id, status:work_order_parts_statuses!status_id(code)')
+          .eq('work_order_id', params.id),
+      ])
+      const DONE_SVC  = ['completed','skipped','cancelled']
+      const DONE_PART = ['used','cancelled','returned']
+      const pendingSvcs  = (svcs  || []).filter(s => !DONE_SVC.includes(s.status?.code))
+      const pendingParts = (parts || []).filter(p => !DONE_PART.includes(p.status?.code))
+      if (pendingSvcs.length > 0 || pendingParts.length > 0) {
+        const msgs = []
+        if (pendingSvcs.length  > 0) msgs.push(`${pendingSvcs.length} service${pendingSvcs.length > 1 ? 's' : ''} not yet completed`)
+        if (pendingParts.length > 0) msgs.push(`${pendingParts.length} part${pendingParts.length > 1 ? 's' : ''} not yet installed`)
+        setQcBlockReason(msgs.join(' · '))
+        return false
+      }
+      setQcBlockReason(null)
+      return true
+    } catch { return true }
   }
 
   const handleAdvanceStatus = async (newCode) => {
@@ -554,16 +583,34 @@ export default function MechanicWorkOrderPage() {
                   </button>
                 )}
                 {statusCode === 'in_progress' && (
-                  <button onClick={() => handleAdvanceStatus('quality_check')}
-                    disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
-                    Submit for Quality Check
-                  </button>
+                  <div className="flex flex-col gap-1.5">
+                    {qcBlockReason && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        <AlertTriangle size={12} /> {qcBlockReason}
+                      </p>
+                    )}
+                    <button
+                      onClick={async () => { const ok = await validateQcReady(); if (ok) handleAdvanceStatus('quality_check') }}
+                      disabled={acting}
+                      className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
+                      Submit for Quality Check
+                    </button>
+                  </div>
                 )}
                 {statusCode === 'rework' && (
-                  <button onClick={() => handleAdvanceStatus('quality_check')}
-                    disabled={acting} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
-                    Resubmit for QC
-                  </button>
+                  <div className="flex flex-col gap-1.5">
+                    {qcBlockReason && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        <AlertTriangle size={12} /> {qcBlockReason}
+                      </p>
+                    )}
+                    <button
+                      onClick={async () => { const ok = await validateQcReady(); if (ok) handleAdvanceStatus('quality_check') }}
+                      disabled={acting}
+                      className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
+                      Resubmit for QC
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

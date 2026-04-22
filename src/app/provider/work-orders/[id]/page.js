@@ -74,8 +74,9 @@ export default function WorkOrderDetailPage() {
   const supabase = createClient()
 
   const [wo, setWo]                   = useState(null)
-  const [issueCount,   setIssueCount]   = useState(null)  // null = not yet checked
-  const [serviceCount, setServiceCount] = useState(null)  // null = not yet checked
+  const [issueCount,     setIssueCount]     = useState(null)  // null = not yet checked
+  const [serviceCount,   setServiceCount]   = useState(null)  // null = not yet checked
+  const [qcBlockReason,  setQcBlockReason]  = useState(null)  // null = ok, string = blocked
   const [isOwner,         setIsOwner]         = useState(false) // is current user the provider owner
   const [spuPermissions,  setSpuPermissions]  = useState({})    // SPU-level permissions for current user
   const [mechanics, setMechanics]     = useState([])
@@ -330,6 +331,35 @@ export default function WorkOrderDetailPage() {
       await loadWorkOrder()
     } catch (err) { setError(err.message) }
     finally { setUpdating(false) }
+  }
+
+  // Check all services are completed/skipped and all parts are used/cancelled before QC
+  const validateQcReady = async () => {
+    try {
+      const [{ data: svcs }, { data: parts }] = await Promise.all([
+        supabase
+          .from('work_order_services')
+          .select('id, status:work_order_services_statuses!status_id(code)')
+          .eq('work_order_id', params.id),
+        supabase
+          .from('work_order_parts')
+          .select('id, status:work_order_parts_statuses!status_id(code)')
+          .eq('work_order_id', params.id),
+      ])
+      const DONE_SVC   = ['completed','skipped','cancelled']
+      const DONE_PART  = ['used','cancelled','returned']
+      const pendingSvcs  = (svcs  || []).filter(s => !DONE_SVC.includes(s.status?.code))
+      const pendingParts = (parts || []).filter(p => !DONE_PART.includes(p.status?.code))
+      if (pendingSvcs.length > 0 || pendingParts.length > 0) {
+        const msgs = []
+        if (pendingSvcs.length  > 0) msgs.push(`${pendingSvcs.length} service${pendingSvcs.length > 1 ? 's' : ''} not yet completed`)
+        if (pendingParts.length > 0) msgs.push(`${pendingParts.length} part${pendingParts.length > 1 ? 's' : ''} not yet installed`)
+        setQcBlockReason(msgs.join(' · '))
+        return false
+      }
+      setQcBlockReason(null)
+      return true
+    } catch { return true }  // fail open — don't block on network error
   }
 
   const advanceStatus = async (newStatusCode, skipConfirm = false) => {
@@ -677,13 +707,25 @@ export default function WorkOrderDetailPage() {
               }
               if (action.code === 'quality_check') {
                 return (
-                  <button key={action.code}
-                    onClick={() => { advanceStatus('quality_check'); setActiveTab('qc') }}
-                    disabled={updating}
-                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
-                    {updating && <Loader2 size={13} className="animate-spin" />}
-                    {action.label}
-                  </button>
+                  <div key={action.code} className="flex flex-col gap-1.5">
+                    {qcBlockReason && (
+                      <p className="text-xs text-amber-700 flex items-center gap-1">
+                        <AlertTriangle size={12} /> {qcBlockReason}
+                      </p>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const ready = await validateQcReady()
+                        if (!ready) return
+                        advanceStatus('quality_check')
+                        setActiveTab('qc')
+                      }}
+                      disabled={updating}
+                      className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${action.color}`}>
+                      {updating && <Loader2 size={13} className="animate-spin" />}
+                      {action.label}
+                    </button>
+                  </div>
                 )
               }
               if (action.via_api) {
