@@ -43,22 +43,37 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
 
   const loadInvoice = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      // Load invoice row directly — RLS now covers all roles (owner, mechanic, SPU admin/accountant)
       const { data: inv } = await supabase
         .from('invoices')
-        .select('id, invoice_number, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at, sent_at')
+        .select('id, invoice_number, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at, sent_at, issued_to_user_id')
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
       if (inv) {
-        const { data: details } = await supabase.rpc('get_invoice_details', {
-          p_invoice_id: inv.id, p_requesting_user: user.id,
+        // Load line items directly
+        const { data: items } = await supabase
+          .from('invoice_items')
+          .select('id, item_type, item_name, description, quantity, unit_price, total_price')
+          .eq('invoice_id', inv.id)
+          .order('item_type')
+
+        // Load receipt if paid
+        const { data: receipt } = await supabase
+          .from('receipts')
+          .select('id, receipt_number, payment_method, amount_paid, change_given, paid_at, notes')
+          .eq('invoice_id', inv.id)
+          .maybeSingle()
+
+        setInvoice({
+          invoice:    inv,
+          line_items: items || [],
+          receipt:    receipt || null,
         })
-        setInvoice(details?.success ? details : { invoice: inv, line_items: null, receipt: null })
       } else {
         setInvoice(null)
       }
-    } catch {}
+    } catch (e) { console.error('loadInvoice error:', e.message) }
     finally { setLoading(false) }
   }, [workOrder.id])
 
@@ -72,9 +87,15 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
         p_work_order_id: workOrder.id, p_provider_user_id: user.id, p_tax_rate: 0.16, p_notes: null,
       })
       if (rpcErr) throw rpcErr
+      // If invoice already exists the RPC returns success:false with the existing invoice_id
+      // — treat this as success and just load the existing invoice
+      if (!result.success && result.invoice_id) {
+        setSuccess('Invoice already exists — loading it now.')
+        await loadInvoice()
+        return
+      }
       if (!result.success) throw new Error(result.error)
-      setSuccess(`Invoice ${result.invoice_number} generated successfully.`)
-      setAmountPaid(result.total?.toString() || '')
+      setSuccess(`Invoice ${result.invoice_number} generated.`)
       await loadInvoice()
     } catch (err) { setError(err.message) }
     finally { setGenerating(false) }
