@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import ReceiptCard from '@/components/ReceiptCard'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import {
@@ -63,6 +64,18 @@ export default function CompanyWorkOrderInvoicePage() {
       }
       const data = await resp.json()
       if (!data.success) throw new Error(data.error || 'Failed to load invoice')
+
+      // Enrich receipt with confirmed fields
+      if (data.invoice?.id) {
+        const { data: receipt } = await supabase
+          .from('receipts')
+          .select('id, receipt_number, payment_method, amount_paid, paid_at, notes, confirmed, confirmed_at')
+          .eq('invoice_id', data.invoice.id)
+          .order('paid_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        data.receipt = receipt || data.receipt
+      }
 
       setInvoice(data.invoice ? data : null)
     } catch (err) {
@@ -346,35 +359,14 @@ export default function CompanyWorkOrderInvoicePage() {
         </div>
       )}
 
-      {/* ── Receipt (paid) ────────────────────────────────────────────────── */}
-      {isPaid && receipt && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-          <p className="font-semibold text-green-900 text-sm flex items-center gap-2 mb-4">
-            <BadgeCheck size={18} className="text-green-600" /> Payment Confirmed
-          </p>
-          <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Receipt No.</p>
-              <p className="font-semibold text-gray-900">{receipt.receipt_number}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Method</p>
-              <p className="font-semibold text-gray-900 capitalize">{receipt.payment_method?.replace('_', ' ')}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Amount Paid</p>
-              <p className="font-semibold text-gray-900">{fmt(receipt.amount_paid)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Date</p>
-              <p className="font-semibold text-gray-900">
-                {new Date(receipt.paid_at).toLocaleDateString('en-KE', {
-                  day: 'numeric', month: 'short', year: 'numeric'
-                })}
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* ── Receipt ─────────────────────────────────────────────────────── */}
+      {receipt && (
+        <ReceiptCard
+          receipt={receipt}
+          canConfirm={false}
+          workOrderId={params.id}
+          onConfirmed={loadInvoice}
+        />
       )}
 
       {/* ── Pay now (company: owner/admin only) ───────────────────────────── */}

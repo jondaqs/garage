@@ -337,6 +337,7 @@ export default function MechanicWorkOrderPage() {
     canGenerate:      isAdmin,
     canSendInvoice:   isAdmin || canSendInvoice,
     canRecordPayment: isAdmin || canSendInvoice,
+    canConfirm:       isAdmin || canSendInvoice,
   }
   // readOnly: admin/accountant role but no can_approve_work — can view but not mutate work order content
   const isReadOnly = isAdmin && !canApprove

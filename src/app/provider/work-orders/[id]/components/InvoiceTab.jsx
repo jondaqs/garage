@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import ReceiptCard from '@/components/ReceiptCard'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileText, CheckCircle, AlertCircle, Loader2,
@@ -18,6 +19,7 @@ const PAYMENT_METHODS = [
 ]
 
 export default function InvoiceTab({ workOrder, permissions = null }) {
+  const canConfirm = permissions?.canConfirm ?? false
   const supabase = createClient()
 
   const [invoice,      setInvoice]      = useState(null)   // { invoice, line_items, receipt }
@@ -63,7 +65,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
             .order('item_type'),
           supabase
             .from('receipts')
-            .select('id, receipt_number, payment_method, amount_paid, paid_at, notes')
+            .select('id, receipt_number, payment_method, amount_paid, paid_at, notes, confirmed, confirmed_at')
             .eq('invoice_id', inv.id)
             .maybeSingle(),
         ])
@@ -368,30 +370,12 @@ Customer has been notified via email, SMS, and in-app notification.
 
       {/* ── Receipt ─────────────────────────────────────────────────────── */}
       {receipt && (
-        <div className="rounded-2xl overflow-hidden border border-emerald-200">
-          <div className="bg-emerald-600 px-5 py-3 flex items-center gap-2">
-            <BadgeCheck className="text-white" size={16} />
-            <span className="text-white font-bold text-sm">Payment Received</span>
-          </div>
-          <div className="px-5 py-4 bg-emerald-50 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Receipt No.</p>
-              <p className="font-bold text-gray-900">{receipt.receipt_number}</p>
-            </div>
-            <div>
-              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Method</p>
-              <p className="font-semibold text-gray-900 capitalize">{receipt.payment_method?.replace('_', ' ')}</p>
-            </div>
-            <div>
-              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Amount Paid</p>
-              <p className="font-bold text-emerald-700 text-base">{fmt(receipt.amount_paid)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Date</p>
-              <p className="font-semibold text-gray-900">{fmtD(receipt.paid_at)}</p>
-            </div>
-          </div>
-        </div>
+        <ReceiptCard
+          receipt={receipt}
+          canConfirm={canConfirm}
+          workOrderId={workOrder.id}
+          onConfirmed={loadInvoice}
+        />
       )}
 
       {/* ── Record payment ───────────────────────────────────────────────── */}

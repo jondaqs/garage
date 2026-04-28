@@ -461,6 +461,7 @@ export default function WorkOrderDetailPage() {
     canGenerate:      isAdminOrOwner,
     canSendInvoice:   canSendInvoice,
     canRecordPayment: canSendInvoice,
+    canConfirm:       canSendInvoice,
   }
 
   // Inject service_provider_id into wo for tab components (needed for parts search)

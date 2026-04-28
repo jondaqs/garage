@@ -105,7 +105,7 @@ export async function GET(request, { params }) {
     // Load receipt
     const { data: receipt } = await sc
       .from('receipts')
-      .select('id, receipt_number, payment_method, amount_paid, paid_at, notes')
+      .select('id, receipt_number, payment_method, amount_paid, paid_at, notes, confirmed, confirmed_at')
       .eq('invoice_id', inv.id)
       .order('paid_at', { ascending: false })
       .limit(1)
