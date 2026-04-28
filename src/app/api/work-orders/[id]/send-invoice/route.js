@@ -330,14 +330,16 @@ export async function POST(request, { params }) {
     // ── 7. In-app notification ────────────────────────────────────────────
     if (ownerId) {
       const woUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
-      await sc.from('notifications').insert({
-        user_id:           ownerId, recipient_user_id: ownerId,
-        type:              'invoice_issued', notification_type: 'invoice_issued',
-        title:             `Invoice ${inv.invoice_number} — KES ${Number(inv.total_amount).toLocaleString('en-KE')}`,
-        message:           `Your invoice for work order ${wo.work_order_number} (${vehiclePlate}) is ready. Total: KES ${Number(inv.total_amount).toLocaleString('en-KE')}. Please arrange payment.`,
-        reference_table:   'invoices', reference_id: inv.id, reference_type: 'invoice',
-        is_read:           false,
-      }).catch(() => {})
+      try {
+        await sc.from('notifications').insert({
+          user_id:           ownerId, recipient_user_id: ownerId,
+          type:              'invoice_issued', notification_type: 'invoice_issued',
+          title:             `Invoice ${inv.invoice_number} — KES ${Number(inv.total_amount).toLocaleString('en-KE')}`,
+          message:           `Your invoice for work order ${wo.work_order_number} (${vehiclePlate}) is ready. Total: KES ${Number(inv.total_amount).toLocaleString('en-KE')}. Please arrange payment.`,
+          reference_table:   'invoices', reference_id: inv.id, reference_type: 'invoice',
+          is_read:           false,
+        })
+      } catch (_) {}
     }
 
     // ── 8. Build invoice HTML ─────────────────────────────────────────────
