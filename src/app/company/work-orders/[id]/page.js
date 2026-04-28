@@ -7,7 +7,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
   Loader2, DollarSign, ThumbsUp, ThumbsDown, Edit3,
-  ChevronDown, ChevronUp, Building2, Star
+  ChevronDown, ChevronUp, Building2, Star, FileText, ChevronRight
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -46,6 +46,7 @@ export default function CompanyWorkOrderDetailPage() {
   const [changesText, setChangesText]     = useState('')
   const [showServices, setShowServices]   = useState(true)
   const [showParts, setShowParts]         = useState(false)
+  const [invoiceStatus, setInvoiceStatus]   = useState(null)
 
   const loadWorkOrder = useCallback(async () => {
     try {
@@ -80,6 +81,14 @@ export default function CompanyWorkOrderDetailPage() {
         .eq('work_order_id', params.id)
         .maybeSingle()
       if (revData) setExistingReview(revData)
+
+      // Check invoice
+      const { data: invRow } = await supabase
+        .from('invoices')
+        .select('status')
+        .eq('work_order_id', params.id)
+        .maybeSingle()
+      setInvoiceStatus(invRow?.status || null)
 
     } catch (err) {
       setError(err.message || 'Failed to load work order')
@@ -489,6 +498,43 @@ export default function CompanyWorkOrderDetailPage() {
                 })}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+
+      {/* ── Invoice banner ── */}
+      {invoiceStatus && (
+        <div className={`rounded-xl shadow-sm overflow-hidden border ${
+          invoiceStatus === 'paid'
+            ? 'border-green-200 bg-green-50'
+            : 'border-amber-200 bg-amber-50'
+        }`}>
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                invoiceStatus === 'paid' ? 'bg-green-100' : 'bg-amber-100'
+              }`}>
+                <FileText size={16} className={invoiceStatus === 'paid' ? 'text-green-600' : 'text-amber-600'} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Invoice</p>
+                <p className={`text-xs font-medium capitalize ${
+                  invoiceStatus === 'paid' ? 'text-green-600' : 'text-amber-700'
+                }`}>
+                  {invoiceStatus === 'paid' ? '✓ Paid' : invoiceStatus === 'overdue' ? 'Overdue' : 'Awaiting Payment'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/company/work-orders/${params.id}/invoice`)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                invoiceStatus === 'paid'
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
+              }`}>
+              View Invoice <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       )}
