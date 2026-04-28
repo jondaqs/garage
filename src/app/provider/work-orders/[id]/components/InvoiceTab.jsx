@@ -6,7 +6,7 @@ import {
   FileText, CheckCircle, AlertCircle, Loader2,
   DollarSign, Send, Lock, BadgeCheck, CreditCard,
   Banknote, Building2, ChevronDown, ChevronUp,
-  Wrench, Package, Clock
+  Wrench, Package, Clock, Bell, CheckCircle2
 } from 'lucide-react'
 
 const PAYMENT_METHODS = [
@@ -48,7 +48,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     try {
       const { data: inv, error: invErr } = await supabase
         .from('invoices')
-        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
+        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at, sent_at')
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
@@ -144,7 +144,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const lineItems = invoice?.line_items || []
   const receipt   = invoice?.receipt
   const isPaid    = inv?.status === 'paid'
-  const isSent    = inv?.status === 'sent' || (inv && inv.status !== 'draft' && inv.status !== 'issued')
+  const isSent    = !!(inv?.sent_at) || inv?.status === 'sent'
   const isOverdue = inv?.status === 'overdue'
   const serviceItems = lineItems.filter(i => i.item_type === 'service')
   const partItems    = lineItems.filter(i => i.item_type === 'part')
@@ -319,8 +319,38 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
         )}
       </div>
 
-      {/* ── Send invoice ────────────────────────────────────────────────── */}
-      {!isPaid && canSendInvoice && (
+      {/* ── Send invoice / Sent state ──────────────────────────────────── */}
+      {!isPaid && isSent ? (
+        // Invoice already sent — show confirmation + reminder option
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                <Send size={13} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Invoice sent to customer</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {inv.sent_at
+                    ? `Sent ${new Date(inv.sent_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                    : 'Customer has been notified via email, SMS, and in-app.'}
+                </p>
+              </div>
+            </div>
+          </div>
+          {canSendInvoice && (
+            <div className="flex items-center justify-between pt-2 border-t border-green-200">
+              <p className="text-xs text-gray-500">Customer hasn't paid yet? Send a reminder.</p>
+              <button onClick={handleSend} disabled={sending}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-green-300 text-green-800 rounded-lg text-xs font-semibold hover:bg-green-100 disabled:opacity-50 transition-colors">
+                {sending ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
+                Send Reminder
+              </button>
+            </div>
+          )}
+        </div>
+      ) : !isPaid && canSendInvoice ? (
+        // Not yet sent
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-gray-900">Send invoice to customer</p>
@@ -332,13 +362,11 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
             Send Invoice
           </button>
         </div>
-      )}
-
-      {!isPaid && !canSendInvoice && (
+      ) : !isPaid && !canSendInvoice ? (
         <p className="text-xs text-gray-400 flex items-center gap-1.5 py-1">
           <Lock size={12} /> Sending requires owner, admin, or accountant access.
         </p>
-      )}
+      ) : null}
 
       {/* ── Receipt ─────────────────────────────────────────────────────── */}
       {receipt && (

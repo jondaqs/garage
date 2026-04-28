@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft, FileText, CheckCircle, AlertCircle,
-  Loader2, Car, MapPin, Clock, CreditCard,
+  Loader2, Car, MapPin, CreditCard,
   Banknote, Building2, BadgeCheck, CircleDollarSign,
   Wrench, Package, ExternalLink, Lock
 } from 'lucide-react'
@@ -23,12 +23,12 @@ export default function CompanyWorkOrderInvoicePage() {
   const params   = useParams()
   const supabase = createClient()
 
-  const [invoice,     setInvoice]     = useState(null)
+  const [invoice,     setInvoice]     = useState(null)   // full response object
   const [loading,     setLoading]     = useState(true)
   const [paying,      setPaying]      = useState(false)
   const [error,       setError]       = useState('')
   const [success,     setSuccess]     = useState('')
-  const [canPay,      setCanPay]      = useState(false)   // owner or admin
+  const [canPay,      setCanPay]      = useState(false)
   const [showPayForm, setShowPayForm] = useState(false)
   const [payMethod,   setPayMethod]   = useState('mpesa')
   const [mpesaRef,    setMpesaRef]    = useState('')
@@ -41,9 +41,8 @@ export default function CompanyWorkOrderInvoicePage() {
 
   const loadInvoice = useCallback(async () => {
     try {
+      // Check pay permission (company owner or admin)
       const { data: { user } } = await supabase.auth.getUser()
-
-      // Check if this user can pay (company owner or admin)
       const { data: profile } = await supabase
         .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
 
@@ -56,24 +55,16 @@ export default function CompanyWorkOrderInvoicePage() {
         setCanPay(!!(owned || mem?.is_admin))
       }
 
-      // Fetch invoice linked to this work order
-      const { data: inv, error: invErr } = await supabase
-        .from('invoices')
-        .select('id')
-        .eq('work_order_id', params.id)
-        .maybeSingle()
+      // Use the API route (service-role backed) to bypass RLS
+      const resp = await fetch(`/api/work-orders/${params.id}/invoice`)
+      if (!resp.ok) {
+        const err = await resp.json()
+        throw new Error(err.error || 'Failed to load invoice')
+      }
+      const data = await resp.json()
+      if (!data.success) throw new Error(data.error || 'Failed to load invoice')
 
-      if (invErr) throw invErr
-      if (!inv) { setInvoice(null); setLoading(false); return }
-
-      // Full details via RPC
-      const { data: result, error: rpcErr } = await supabase.rpc('get_invoice_details', {
-        p_invoice_id:      inv.id,
-        p_requesting_user: user.id,
-      })
-      if (rpcErr) throw rpcErr
-      if (!result.success) throw new Error(result.error)
-      setInvoice(result)
+      setInvoice(data.invoice ? data : null)
     } catch (err) {
       setError(err.message || 'Failed to load invoice')
     } finally {
@@ -226,7 +217,7 @@ export default function CompanyWorkOrderInvoicePage() {
         {/* Amber accent */}
         <div className="h-0.5 bg-gradient-to-r from-amber-400 via-amber-300 to-transparent" />
 
-        {/* From / Bill to */}
+        {/* From / Vehicle */}
         <div className="px-6 py-4 grid grid-cols-2 gap-4 bg-gray-50 border-b border-gray-100">
           {provider && (
             <div className="flex items-start gap-2">

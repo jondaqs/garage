@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -49,9 +49,7 @@ const TYPE_CONFIG = {
 
 function getTypeConfig(type) {
   if (!type) return TYPE_CONFIG.default
-  // Exact match first
   if (TYPE_CONFIG[type]) return TYPE_CONFIG[type]
-  // Prefix match
   for (const key of Object.keys(TYPE_CONFIG)) {
     if (type.includes(key)) return TYPE_CONFIG[key]
   }
@@ -75,7 +73,6 @@ function getNotificationHref(n, isProvider, isCompany) {
     return null
   }
   if (refType === 'receipt' || type === 'payment_received') {
-    // Provider receives payment_received — no separate page needed, they see it in WO/invoice
     return null
   }
   if (refType === 'invoice' || type.includes('invoice')) {
@@ -85,10 +82,8 @@ function getNotificationHref(n, isProvider, isCompany) {
   }
   if (refType === 'work_order' || type.includes('work_order') || type.includes('estimate')
       || type === 'booking_accepted') {
-    // booking_accepted creates a work_order — always route to the WO page
     if (isProvider) return `/provider/work-orders/${refId}`
     if (isCompany)  return `/company/work-orders/${refId}`
-    // Mechanic assignment notifications — route to my-teams work order page
     if (type === 'work_order_assigned' || type === 'mechanic_acknowledged' || type === 'mechanic_declined') {
       return `/dashboard/my-teams/work-order/${refId}`
     }
@@ -132,36 +127,16 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
   const [loading, setLoading]             = useState(true)
   const [profileId, setProfileId]         = useState(null)
 
-  useEffect(() => { resolveProfile() }, [])
-
-  useEffect(() => {
-    if (!profileId) return
-    loadNotifications()
-    const channel = supabase
-      .channel(`notifications-${profileId}`)
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
-        () => loadNotifications()
-      )
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [profileId])
-
-  const resolveProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: profile } = await supabase
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
-    if (profile) setProfileId(profile.id)
-  }
-
-  const loadNotifications = async () => {
-    if (!profileId) return
+  // ── FIX: useCallback so the realtime closure always calls the latest version ──
+  const loadNotifications = useCallback(async (pid) => {
+    // Accept pid as argument so it's never stale from closure
+    const id = pid || profileId
+    if (!id) return
     try {
       const { data: personal } = await supabase
         .from('notifications')
         .select('*')
-        .or(`recipient_user_id.eq.${profileId},user_id.eq.${profileId}`)
+        .or(`recipient_user_id.eq.${id},user_id.eq.${id}`)
         .order('created_at', { ascending: false })
         .limit(25)
 
@@ -193,7 +168,58 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
     } finally {
       setLoading(false)
     }
-  }
+  }, [profileId, isAdmin])
+
+  // ── Resolve profile id on mount ───────────────────────────────────────────
+  useEffect(() => {
+    const resolveProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      const { data: profile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      if (profile) {
+        setProfileId(profile.id)
+        // ── FIX: pass the id directly so load doesn't wait for state update ──
+        loadNotifications(profile.id)
+      } else {
+        setLoading(false)
+      }
+    }
+    resolveProfile()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Realtime subscription — re-subscribes when profileId changes ──────────
+  useEffect(() => {
+    if (!profileId) return
+
+    // ── FIX: filter at the channel level so only relevant inserts fire ───────
+    const channel = supabase
+      .channel(`notifications-${profileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'notifications',
+          filter: `recipient_user_id=eq.${profileId}`,
+        },
+        () => loadNotifications(profileId)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'notifications',
+          filter: `user_id=eq.${profileId}`,
+        },
+        () => loadNotifications(profileId)
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [profileId, loadNotifications])
 
   const markAsRead = async (id) => {
     await supabase.from('notifications')

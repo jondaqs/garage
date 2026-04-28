@@ -82,13 +82,14 @@ export default function CompanyWorkOrderDetailPage() {
         .maybeSingle()
       if (revData) setExistingReview(revData)
 
-      // Check invoice
-      const { data: invRow } = await supabase
-        .from('invoices')
-        .select('status')
-        .eq('work_order_id', params.id)
-        .maybeSingle()
-      setInvoiceStatus(invRow?.status || null)
+      // Check invoice via API route (service-role backed, bypasses RLS)
+      try {
+        const invResp = await fetch(`/api/work-orders/${params.id}/invoice`)
+        if (invResp.ok) {
+          const invData = await invResp.json()
+          setInvoiceStatus(invData.invoice?.status || null)
+        }
+      } catch (_) {}
 
     } catch (err) {
       setError(err.message || 'Failed to load work order')
