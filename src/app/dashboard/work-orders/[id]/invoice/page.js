@@ -62,6 +62,7 @@ export default function UserWorkOrderInvoicePage() {
       if (!result.success) throw new Error(result.error)
 
       // Fetch receipt with confirmed fields (get_invoice_details receipt lacks them)
+      let enrichedResult = result
       if (result.invoice?.id) {
         const { data: receipt } = await supabase
           .from('receipts')
@@ -70,10 +71,10 @@ export default function UserWorkOrderInvoicePage() {
           .order('paid_at', { ascending: false })
           .limit(1)
           .maybeSingle()
-        result = { ...result, receipt: receipt || result.receipt }
+        enrichedResult = { ...result, receipt: receipt || result.receipt }
       }
 
-      setInvoice(result)
+      setInvoice(enrichedResult)
     } catch (err) {
       setError(err.message || 'Failed to load invoice')
     } finally {
