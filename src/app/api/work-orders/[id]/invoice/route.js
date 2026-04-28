@@ -90,7 +90,7 @@ export async function GET(request, { params }) {
     // Load invoice
     const { data: inv } = await sc
       .from('invoices')
-      .select('id, invoice_number, status, subtotal, tax_rate, tax_amount, discount, total_amount, notes, due_date, issued_at, paid_at, sent_at')
+      .select('id, invoice_number, status, subtotal, tax_rate, tax_amount, discount, total_amount, notes, due_date, issued_at, paid_at')
       .eq('work_order_id', workOrderId).maybeSingle()
 
     if (!inv) return NextResponse.json({ success: true, invoice: null })

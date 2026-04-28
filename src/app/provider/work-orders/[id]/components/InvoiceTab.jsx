@@ -48,7 +48,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     try {
       const { data: inv, error: invErr } = await supabase
         .from('invoices')
-        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at, sent_at')
+        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
@@ -144,7 +144,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const lineItems = invoice?.line_items || []
   const receipt   = invoice?.receipt
   const isPaid    = inv?.status === 'paid'
-  const isSent    = !!(inv?.sent_at) || inv?.status === 'sent'
+  const isSent    = inv?.status === 'sent'
   const isOverdue = inv?.status === 'overdue'
   const serviceItems = lineItems.filter(i => i.item_type === 'service')
   const partItems    = lineItems.filter(i => i.item_type === 'part')
@@ -331,9 +331,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
               <div>
                 <p className="text-sm font-semibold text-gray-900">Invoice sent to customer</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {inv.sent_at
-                    ? `Sent ${new Date(inv.sent_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-                    : 'Customer has been notified via email, SMS, and in-app.'}
+Customer has been notified via email, SMS, and in-app notification.
                 </p>
               </div>
             </div>
