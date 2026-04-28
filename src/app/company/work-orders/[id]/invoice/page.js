@@ -95,6 +95,18 @@ export default function CompanyWorkOrderInvoicePage() {
       if (!result.success) throw new Error(result.error)
       setSuccess(`Payment confirmed! Receipt ${result.receipt_number}`)
       setShowPayForm(false)
+      // Fire payment notifications (email + SMS to provider staff) — non-blocking
+      fetch(`/api/work-orders/${params.id}/payment-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receipt_number: result.receipt_number,
+          amount_paid:    result.amount_paid,
+          payment_method: payMethod,
+          invoice_number: invoice.invoice.invoice_number,
+        }),
+      }).catch(e => console.warn('[payment-notify]', e.message))
+
       await loadInvoice()
     } catch (err) {
       setError(err.message)
