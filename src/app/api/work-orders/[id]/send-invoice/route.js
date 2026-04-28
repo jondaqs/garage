@@ -336,7 +336,7 @@ export async function POST(request, { params }) {
           type:              'invoice_issued', notification_type: 'invoice_issued',
           title:             `Invoice ${inv.invoice_number} — KES ${Number(inv.total_amount).toLocaleString('en-KE')}`,
           message:           `Your invoice for work order ${wo.work_order_number} (${vehiclePlate}) is ready. Total: KES ${Number(inv.total_amount).toLocaleString('en-KE')}. Please arrange payment.`,
-          reference_table:   'invoices', reference_id: inv.id, reference_type: 'invoice',
+          reference_table:   'invoices', reference_id: workOrderId, reference_type: 'invoice',
           is_read:           false,
         })
       } catch (_) {}

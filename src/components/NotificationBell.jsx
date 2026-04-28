@@ -77,8 +77,8 @@ function getNotificationHref(n, isProvider, isCompany) {
   }
   if (refType === 'invoice' || type.includes('invoice')) {
     if (isProvider) return `/provider/work-orders/${refId}`
-    if (isCompany)  return `/company/work-orders/${refId}`
-    return `/dashboard/invoices/${refId}`
+    if (isCompany)  return `/company/work-orders/${refId}/invoice`
+    return `/dashboard/work-orders/${refId}/invoice`
   }
   if (refType === 'work_order' || type.includes('work_order') || type.includes('estimate')
       || type === 'booking_accepted') {
