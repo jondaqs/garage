@@ -98,30 +98,44 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         setProvider(sp)
       }
 
-      // 6. Customer — issued_to_user_id, then vehicle_ownership fallback
+      // 6. Customer — use local variable (not state) to track resolution across steps
+      let resolvedCustomer = null
+
       if (inv.issued_to_user_id) {
         const { data: cust } = await supabase
           .from('user_profiles')
           .select('first_name, last_name, email, phone')
           .eq('id', inv.issued_to_user_id)
           .maybeSingle()
-        if (cust?.first_name || cust?.last_name) {
-          setCustomer(cust)
+        if (cust?.first_name || cust?.last_name || cust?.email || cust?.phone) {
+          resolvedCustomer = cust
         }
       }
-      // Fallback: resolve from vehicle_ownership (individual or company)
-      if (!customer && inv.vehicle_id) {
+
+      // Fallback: resolve from vehicle_ownership (individual owner or company fleet)
+      if (!resolvedCustomer && inv.vehicle_id) {
         const { data: vo } = await supabase
           .from('vehicle_ownership')
-          .select('owner_user_id, owner_company_id, user_profiles!vehicle_ownership_owner_user_id_fkey(first_name, last_name, email, phone), company_profiles!vehicle_ownership_owner_company_id_fkey(name, phone, email)')
+          .select(`
+            owner_user_id, owner_company_id,
+            user_profiles!vehicle_ownership_owner_user_id_fkey(first_name, last_name, email, phone),
+            company_profiles!vehicle_ownership_owner_company_id_fkey(name, phone, email)
+          `)
           .eq('vehicle_id', inv.vehicle_id)
           .maybeSingle()
         if (vo?.user_profiles?.first_name || vo?.user_profiles?.last_name) {
-          setCustomer(vo.user_profiles)
+          resolvedCustomer = vo.user_profiles
         } else if (vo?.company_profiles?.name) {
-          setCustomer({ first_name: vo.company_profiles.name, last_name: '', phone: vo.company_profiles.phone, email: vo.company_profiles.email })
+          resolvedCustomer = {
+            first_name: vo.company_profiles.name,
+            last_name:  '',
+            phone:      vo.company_profiles.phone || null,
+            email:      vo.company_profiles.email || null,
+          }
         }
       }
+
+      if (resolvedCustomer) setCustomer(resolvedCustomer)
 
     } catch (e) {
       setError(e.message)
