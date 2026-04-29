@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
-  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText, Receipt
+  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText, Receipt, LogOut
 } from 'lucide-react'
 import ServicesTab        from '@/app/provider/work-orders/[id]/components/ServicesTab'
 import PartsTab           from '@/app/provider/work-orders/[id]/components/PartsTab'
@@ -16,6 +16,7 @@ import QualityCheckTab    from '@/app/provider/work-orders/[id]/components/Quali
 import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
 import InvoiceTab         from '@/app/provider/work-orders/[id]/components/InvoiceTab'
 import ReceiptTab         from '@/components/ReceiptTab'
+import CheckoutTab        from '@/app/provider/work-orders/[id]/components/CheckoutTab'
 import EstimateReviewPanel from '@/app/provider/work-orders/[id]/components/EstimateReviewPanel'
 
 const STATUS_COLORS = {
@@ -45,6 +46,7 @@ const ALL_TABS = [
   { id: 'qc',              label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
   { id: 'invoice',         label: 'Invoice',           icon: FileText,      perm: 'can_send_invoice' },
   { id: 'receipt',         label: 'Receipt',           icon: Receipt,       perm: 'can_send_invoice' },
+  { id: 'checkout',        label: 'Checkout',          icon: LogOut,        perm: 'can_approve_work' },
   { id: 'comments',        label: 'Comments',          icon: MessageSquare, perm: 'any'              },
 ]
 
@@ -329,6 +331,7 @@ export default function MechanicWorkOrderPage() {
   const canApprove      = !!perms?.can_approve_work
   const canSendEst      = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
   const canSendInvoice  = !!(perms?.can_send_invoice   || memberPerms?.can_send_invoice)
+  const canCheckout     = isAdmin || !!(perms?.can_approve_work || memberPerms?.can_approve_work)
   const isMechanic      = !!perms?.mechanic_id || !memberPerms   // has mechanic record
   const memberRole      = memberPerms?.role || (isMechanic ? 'mechanic' : null)
   const isAdmin         = ['admin', 'accountant'].includes(memberPerms?.role)
@@ -357,6 +360,7 @@ export default function MechanicWorkOrderPage() {
     if (t.perm === 'can_approve_work') return canApprove || isAdmin
     if (t.perm === 'can_send_invoice') return isAdmin || canSendInvoice
     if (t.id === 'receipt') return isAdmin || canSendInvoice
+    if (t.id === 'checkout') return canCheckout
     return false
   })
 
@@ -740,6 +744,15 @@ export default function MechanicWorkOrderPage() {
             {/* ── RECEIPT TAB ── */}
             {activeTab === 'receipt' && (isAdmin || canSendInvoice) && (
               <ReceiptTab workOrder={woWithProvider} canConfirm={invoicePerms.canConfirm} />
+            )}
+
+            {/* ── CHECKOUT TAB ── */}
+            {activeTab === 'checkout' && canCheckout && (
+              <CheckoutTab
+                workOrder={woWithProvider}
+                canCheckout={canCheckout}
+                onStatusChange={() => { loadWorkOrder() }}
+              />
             )}
             {activeTab === 'recommendations' && (canApprove || isAdmin) && (
               <RecommendationsTab workOrder={woWithProvider} />

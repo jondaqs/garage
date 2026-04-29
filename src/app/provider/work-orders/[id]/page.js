@@ -16,6 +16,7 @@ import CommentsTab      from './components/CommentsTab'
 import QualityCheckTab  from './components/QualityCheckTab'
 import InvoiceTab            from './components/InvoiceTab'
 import ReceiptTab            from '@/components/ReceiptTab'
+import CheckoutTab           from '@/app/provider/work-orders/[id]/components/CheckoutTab'
 import RecommendationsTab    from './components/RecommendationsTab'
 import EstimateReviewPanel  from './components/EstimateReviewPanel'
 
@@ -66,6 +67,7 @@ const TABS = [
   { id: 'qc',              label: 'QC & Complete',       icon: ClipboardCheck },
   { id: 'invoice',         label: 'Invoice',             icon: FileText       },
   { id: 'receipt',         label: 'Receipt',             icon: Receipt        },
+  { id: 'checkout',        label: 'Checkout',            icon: LogOut         },
   { id: 'comments',        label: 'Comments',            icon: MessageSquare  },
 ]
 
@@ -478,6 +480,7 @@ export default function WorkOrderDetailPage() {
   const canSendEstimatesAll = isAdminOrOwner || spuPermissions.can_send_estimates
   // Invoice permissions — owner/admin/accountant get full access; can_send_invoice gives full invoice access
   const canSendInvoice   = isAdminOrOwner || spuPermissions.can_send_invoice
+  const canCheckout      = isAdminOrOwner || spuPermissions.can_approve_work
   const invoicePerms = {
     canGenerate:      canSendInvoice,   // anyone who can send can also generate
     canSendInvoice:   canSendInvoice,
@@ -1045,6 +1048,15 @@ export default function WorkOrderDetailPage() {
           {/* ── RECEIPT TAB ── */}
           {activeTab === 'receipt' && (
             <ReceiptTab workOrder={woWithProvider} canConfirm={invoicePerms.canConfirm} />
+          )}
+
+          {/* ── CHECKOUT TAB ── */}
+          {activeTab === 'checkout' && (
+            <CheckoutTab
+              workOrder={woWithProvider}
+              canCheckout={canCheckout}
+              onStatusChange={(code) => { loadWorkOrder() }}
+            />
           )}
 
           {/* ── RECOMMENDATIONS TAB ── */}
