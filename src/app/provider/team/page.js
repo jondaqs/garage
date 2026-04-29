@@ -338,10 +338,11 @@ export default function ProviderTeamPage() {
               role:                newRole,
               specialization:      editMemberForm.specialization || null,
               experience_years:    parseInt(editMemberForm.experience_years) || 0,
-              can_approve_work:    editMemberForm.can_approve_work,
-              can_manage_inventory:editMemberForm.can_manage_inventory,
-              can_manage_team:     editMemberForm.can_manage_team,
-              can_send_estimates:  editMemberForm.can_send_estimates,
+              can_approve_work:    editMemberForm.mech_can_approve_work,
+              can_manage_inventory:editMemberForm.mech_can_manage_inventory,
+              can_manage_team:     editMemberForm.mech_can_manage_team,
+              can_send_estimates:  editMemberForm.mech_can_send_estimates,
+              can_send_invoice:    editMemberForm.mech_can_send_invoice,
               is_active:           true,
               is_verified:         false,
             })
@@ -811,15 +812,23 @@ export default function ProviderTeamPage() {
                   <p className="text-xs font-medium text-gray-600 mb-1.5">Work Permissions</p>
                   <div className="space-y-1.5">
                     {[
-                      { key: 'spu_can_approve_work',     label: 'Can approve work orders'        },
-                      { key: 'spu_can_send_estimates',   label: 'Can send estimates to customer'  },
-                      { key: 'spu_can_send_invoice',     label: 'Can send invoices'               },
-                      { key: 'spu_can_manage_inventory', label: 'Can manage inventory'            },
-                      { key: 'spu_can_manage_team',      label: 'Can manage team'                 },
+                      { key: 'spu_can_approve_work',     mech: 'mech_can_approve_work',     label: 'Can approve work orders'        },
+                      { key: 'spu_can_send_estimates',   mech: 'mech_can_send_estimates',   label: 'Can send estimates to customer'  },
+                      { key: 'spu_can_send_invoice',     mech: 'mech_can_send_invoice',     label: 'Can send invoices'               },
+                      { key: 'spu_can_manage_inventory', mech: 'mech_can_manage_inventory', label: 'Can manage inventory'            },
+                      { key: 'spu_can_manage_team',      mech: 'mech_can_manage_team',      label: 'Can manage team'                 },
                     ].map(p => (
                       <label key={p.key} className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={editMemberForm[p.key] || false}
-                          onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                          onChange={e => {
+                            const val = e.target.checked
+                            setEditMemberForm(f => ({
+                              ...f,
+                              [p.key]:  val,
+                              // Mirror to mechanic table field so both stay in sync
+                              [p.mech]: val,
+                            }))
+                          }}
                           className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
                         <span className="text-xs text-gray-700">{p.label}</span>
                       </label>
@@ -896,15 +905,23 @@ export default function ProviderTeamPage() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Mechanic Work Permissions</p>
                   <div className="space-y-2">
                     {[
-                      { key: 'mech_can_approve_work',     label: 'Can approve work orders',       desc: 'Advance WO status and approve service quality' },
-                      { key: 'mech_can_send_estimates',   label: 'Can send estimates to customer', desc: 'Send estimates directly without owner review' },
-                      { key: 'mech_can_send_invoice',     label: 'Can send invoices to customer',  desc: 'Send invoices and accept payment directly' },
-                      { key: 'mech_can_manage_inventory', label: 'Can manage inventory',           desc: 'Add, edit, and adjust stock levels' },
-                      { key: 'mech_can_manage_team',      label: 'Can manage team',                desc: 'View and manage other team members' },
+                      { key: 'mech_can_approve_work',     spu: 'spu_can_approve_work',     label: 'Can approve work orders',       desc: 'Advance WO status and approve service quality' },
+                      { key: 'mech_can_send_estimates',   spu: 'spu_can_send_estimates',   label: 'Can send estimates to customer', desc: 'Send estimates directly without owner review' },
+                      { key: 'mech_can_send_invoice',     spu: 'spu_can_send_invoice',     label: 'Can send invoices to customer',  desc: 'Send invoices and accept payment directly' },
+                      { key: 'mech_can_manage_inventory', spu: 'spu_can_manage_inventory', label: 'Can manage inventory',           desc: 'Add, edit, and adjust stock levels' },
+                      { key: 'mech_can_manage_team',      spu: 'spu_can_manage_team',      label: 'Can manage team',                desc: 'View and manage other team members' },
                     ].map(p => (
                       <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-white bg-white/60">
                         <input type="checkbox" checked={editMemberForm[p.key] || false}
-                          onChange={e => setEditMemberForm(f => ({ ...f, [p.key]: e.target.checked }))}
+                          onChange={e => {
+                            const val = e.target.checked
+                            setEditMemberForm(f => ({
+                              ...f,
+                              [p.key]:  val,
+                              // Mirror back to SPU field so both stay in sync
+                              [p.spu]:  val,
+                            }))
+                          }}
                           className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">{p.label}</p>
