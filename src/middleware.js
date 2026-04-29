@@ -94,11 +94,19 @@ export async function middleware(request) {
     return response
   }
 
-  // /company — company owners only
-  // Members are NOT sent here — they use /dashboard with company sidebar sections
+  // /company — company owners only, with one exception:
+  // Members (company_member role) can access /company/work-orders/* for fleet WO detail views
   if (pathname.startsWith('/company')) {
     if (role !== 'company') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      // Allow members to view company work order detail and receipt pages
+      const isMemberAllowed =
+        role === 'member' && (
+          pathname.startsWith('/company/work-orders') ||
+          pathname.startsWith('/company/bookings')
+        )
+      if (!isMemberAllowed) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
     }
     return response
   }
