@@ -174,7 +174,7 @@ export default function CompanyDashboardWorkOrdersPage() {
             </div>
           </div>
           <button
-            onClick={() => router.push(`/company/work-orders/${pendingApproval[0].id}`)}
+            onClick={() => router.push(`/dashboard/company/${companyId}/work-orders/${pendingApproval[0].id}`)}
             className="flex-shrink-0 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm font-semibold">
             Review Now
           </button>
@@ -224,7 +224,7 @@ export default function CompanyDashboardWorkOrdersPage() {
           {filtered.map(wo => (
             <button
               key={wo.id}
-              onClick={() => router.push(`/company/work-orders/${wo.id}`)}
+              onClick={() => router.push(`/dashboard/company/${companyId}/work-orders/${wo.id}`)}
               className="w-full bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition-shadow border border-transparent hover:border-blue-200"
             >
               <div className="flex items-start justify-between gap-3">
