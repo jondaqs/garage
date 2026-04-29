@@ -97,6 +97,24 @@ function ReceiptPageInner({ backPath }) {
 
   useEffect(() => { load() }, [load])
 
+  const stripModernColors = (doc) => {
+    const FALLBACKS = { color: '#000000', backgroundColor: 'transparent', borderColor: '#e5e7eb', outlineColor: 'transparent' }
+    const UNSUPPORTED = /oklch|oklab|lab|color-mix|lch/i
+    doc.querySelectorAll('*').forEach(el => {
+      Object.keys(FALLBACKS).forEach(prop => {
+        try {
+          const cs  = window.getComputedStyle(el)
+          const val = cs.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase())
+          if (val && UNSUPPORTED.test(val)) el.style[prop] = FALLBACKS[prop]
+        } catch (_) {}
+      })
+      const style = el.getAttribute('style')
+      if (style && UNSUPPORTED.test(style)) {
+        el.setAttribute('style', style.replace(/[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)[^;]+;?/gi, ''))
+      }
+    })
+  }
+
   const handleDownload = async () => {
     setDownloading(true)
     try {
@@ -107,8 +125,15 @@ function ReceiptPageInner({ backPath }) {
       const el = printRef.current
       if (!el) return
       const canvas = await html2canvas(el, {
-        scale: 2, useCORS: true, backgroundColor: '#ffffff',
-        width: el.scrollWidth, height: el.scrollHeight,
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
+          stripModernColors(clonedDoc)
+        },
       })
       const imgData = canvas.toDataURL('image/png')
       const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
