@@ -16,7 +16,7 @@ import QualityCheckTab    from '@/app/provider/work-orders/[id]/components/Quali
 import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
 import InvoiceTab         from '@/app/provider/work-orders/[id]/components/InvoiceTab'
 import ReceiptTab         from '@/components/ReceiptTab'
-import CheckoutTab        from '@/app/provider/work-orders/[id]/components/CheckoutTab'
+import CheckoutTab        from '@/components/CheckoutTab'
 import EstimateReviewPanel from '@/app/provider/work-orders/[id]/components/EstimateReviewPanel'
 
 const STATUS_COLORS = {

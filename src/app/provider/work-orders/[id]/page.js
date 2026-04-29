@@ -7,7 +7,7 @@ import {
   ArrowLeft, Car, MapPin, User, Calendar, Clock,
   ClipboardList, AlertCircle, CheckCircle, ChevronRight,
   Wrench, Package, MessageSquare, Hash, ExternalLink,
-  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell
+  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell, LogOut
 } from 'lucide-react'
 import ServicesTab      from './components/ServicesTab'
 import PartsTab         from './components/PartsTab'
@@ -16,7 +16,7 @@ import CommentsTab      from './components/CommentsTab'
 import QualityCheckTab  from './components/QualityCheckTab'
 import InvoiceTab            from './components/InvoiceTab'
 import ReceiptTab            from '@/components/ReceiptTab'
-import CheckoutTab           from '@/app/provider/work-orders/[id]/components/CheckoutTab'
+import CheckoutTab           from '@/components/CheckoutTab'
 import RecommendationsTab    from './components/RecommendationsTab'
 import EstimateReviewPanel  from './components/EstimateReviewPanel'
 
