@@ -370,15 +370,16 @@ export function ReceiptContent({
               <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>{provider.name}</p>
             )}
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0, maxWidth: '45%' }}>
-            <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#fff', wordBreak: 'break-all' }}>
+          <div style={{ flexShrink: 0, maxWidth: '45%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', wordBreak: 'break-all', textAlign: 'right' }}>
               {receipt.receipt_number}
             </p>
             <span style={{
-              display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              padding: '3px 10px', borderRadius: 20,
               fontSize: 11, fontWeight: 700,
               background: isConfirmed ? '#16a34a' : '#b45309',
-              color: '#fff',
+              color: '#fff', whiteSpace: 'nowrap',
             }}>
               {isConfirmed ? '✓ CONFIRMED' : 'PENDING'}
             </span>
