@@ -334,9 +334,9 @@ export default function MechanicWorkOrderPage() {
   const isAdmin         = ['admin', 'accountant'].includes(memberPerms?.role)
   const isAssigned      = !!perms?.is_assigned
 
-  // Invoice permissions — admins/accountants/owners get full access; can_send_invoice gets send+record
+  // Invoice permissions — admins get full access; can_send_invoice gives full invoice access including generate
   const invoicePerms = {
-    canGenerate:      isAdmin,
+    canGenerate:      isAdmin || canSendInvoice,
     canSendInvoice:   isAdmin || canSendInvoice,
     canRecordPayment: isAdmin || canSendInvoice,
     canConfirm:       isAdmin || canSendInvoice,

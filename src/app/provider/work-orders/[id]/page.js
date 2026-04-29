@@ -173,7 +173,26 @@ export default function WorkOrderDetailPage() {
             .eq('service_provider_id', data.service_provider?.id)
             .eq('is_active', true)
             .maybeSingle()
-          if (spuRow) setSpuPermissions(spuRow)
+
+          // Also fetch mechanic-level permissions (mechanic may not have an SPU row
+          // or the SPU row may not reflect the mechanics table can_send_invoice flag)
+          const { data: mechRow } = await supabase.from('mechanics')
+            .select('can_approve_work, can_manage_team, can_manage_inventory, can_send_estimates, can_send_invoice')
+            .eq('user_id', prof.id)
+            .eq('service_provider_id', data.service_provider?.id)
+            .eq('is_active', true)
+            .maybeSingle()
+
+          // Merge: SPU row wins for role; either source can grant a permission
+          const merged = {
+            ...(spuRow || {}),
+            can_approve_work:     !!(spuRow?.can_approve_work     || mechRow?.can_approve_work),
+            can_manage_team:      !!(spuRow?.can_manage_team      || mechRow?.can_manage_team),
+            can_manage_inventory: !!(spuRow?.can_manage_inventory || mechRow?.can_manage_inventory),
+            can_send_estimates:   !!(spuRow?.can_send_estimates   || mechRow?.can_send_estimates),
+            can_send_invoice:     !!(spuRow?.can_send_invoice     || mechRow?.can_send_invoice),
+          }
+          if (spuRow || mechRow) setSpuPermissions(merged)
         })
         .catch(() => {})
 
@@ -457,10 +476,10 @@ export default function WorkOrderDetailPage() {
   // User can send estimates if they are owner, admin, accountant, or have SPU can_send_estimates
   const isAdminOrOwner      = isOwner || ['admin','accountant'].includes(spuPermissions.role)
   const canSendEstimatesAll = isAdminOrOwner || spuPermissions.can_send_estimates
-  // Invoice permissions — owner/admin/accountant get full access; can_send_invoice gives send+record
+  // Invoice permissions — owner/admin/accountant get full access; can_send_invoice gives full invoice access
   const canSendInvoice   = isAdminOrOwner || spuPermissions.can_send_invoice
   const invoicePerms = {
-    canGenerate:      isAdminOrOwner,
+    canGenerate:      canSendInvoice,   // anyone who can send can also generate
     canSendInvoice:   canSendInvoice,
     canRecordPayment: canSendInvoice,
     canConfirm:       canSendInvoice,
