@@ -124,27 +124,59 @@ function ReceiptPageInner({ backPath }) {
       ])
       const el = printRef.current
       if (!el) return
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        onclone: (clonedDoc) => {
-          clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
-          stripModernColors(clonedDoc)
-        },
-      })
-      const imgData = canvas.toDataURL('image/png')
-      const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const pageW   = pdf.internal.pageSize.getWidth()
-      const pageH   = pdf.internal.pageSize.getHeight()
-      const ratio   = canvas.width / canvas.height
-      const pdfW    = pageW - 20
-      const pdfH    = pdfW / ratio
-      const yOff    = pdfH < pageH ? (pageH - pdfH) / 2 : 10
-      pdf.addImage(imgData, 'PNG', 10, yOff, pdfW, Math.min(pdfH, pageH - 20))
-      pdf.save(`Receipt-${receipt?.receipt_number || params.id}.pdf`)
+
+      const A4_PX = 794
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
+      const cloneEl = el.cloneNode(true)
+      cloneEl.style.cssText = 'width:100%;background:#ffffff;'
+      wrapper.appendChild(cloneEl)
+      document.body.appendChild(wrapper)
+
+      try {
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          width: A4_PX,
+          height: wrapper.scrollHeight,
+          windowWidth: A4_PX,
+          onclone: (clonedDoc) => {
+            clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
+            stripModernColors(clonedDoc)
+          },
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pageW  = pdf.internal.pageSize.getWidth()
+        const pageH  = pdf.internal.pageSize.getHeight()
+        const margin = 8
+        const pdfW   = pageW - margin * 2
+        const pdfH   = (canvas.height / canvas.width) * pdfW
+
+        if (pdfH <= pageH - margin * 2) {
+          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
+        } else {
+          const pxPerMm = canvas.width / pdfW
+          const slicePx = Math.floor((pageH - margin * 2) * pxPerMm)
+          let srcY = 0
+          while (srcY < canvas.height) {
+            if (srcY > 0) pdf.addPage()
+            const h = Math.min(slicePx, canvas.height - srcY)
+            const slice = document.createElement('canvas')
+            slice.width  = canvas.width
+            slice.height = h
+            slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
+            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, h / pxPerMm)
+            srcY += slicePx
+          }
+        }
+
+        pdf.save('Receipt-' + (receipt?.receipt_number || params.id) + '.pdf')
+      } finally {
+        document.body.removeChild(wrapper)
+      }
     } catch (e) {
       console.error('PDF error:', e)
     } finally {

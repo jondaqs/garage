@@ -98,11 +98,29 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         setProvider(sp)
       }
 
-      // 6. Customer
+      // 6. Customer — issued_to_user_id, then vehicle_ownership fallback
       if (inv.issued_to_user_id) {
         const { data: cust } = await supabase
-          .from('user_profiles').select('first_name, last_name, email, phone').eq('id', inv.issued_to_user_id).maybeSingle()
-        setCustomer(cust)
+          .from('user_profiles')
+          .select('first_name, last_name, email, phone')
+          .eq('id', inv.issued_to_user_id)
+          .maybeSingle()
+        if (cust?.first_name || cust?.last_name) {
+          setCustomer(cust)
+        }
+      }
+      // Fallback: resolve from vehicle_ownership (individual or company)
+      if (!customer && inv.vehicle_id) {
+        const { data: vo } = await supabase
+          .from('vehicle_ownership')
+          .select('owner_user_id, owner_company_id, user_profiles!vehicle_ownership_owner_user_id_fkey(first_name, last_name, email, phone), company_profiles!vehicle_ownership_owner_company_id_fkey(name, phone, email)')
+          .eq('vehicle_id', inv.vehicle_id)
+          .maybeSingle()
+        if (vo?.user_profiles?.first_name || vo?.user_profiles?.last_name) {
+          setCustomer(vo.user_profiles)
+        } else if (vo?.company_profiles?.name) {
+          setCustomer({ first_name: vo.company_profiles.name, last_name: '', phone: vo.company_profiles.phone, email: vo.company_profiles.email })
+        }
       }
 
     } catch (e) {
@@ -165,36 +183,71 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       ])
       const el = printRef.current
       if (!el) return
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        onclone: (clonedDoc) => {
-          // Remove all <link rel="stylesheet"> and <style> tags from the clone
-          // so Tailwind's oklch variables never reach html2canvas's CSS parser
-          clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
-          // Strip any remaining modern color functions from inline/computed styles
-          stripModernColors(clonedDoc)
-        },
-      })
-      const imgData = canvas.toDataURL('image/png')
-      const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const pageW  = pdf.internal.pageSize.getWidth()
-      const pageH  = pdf.internal.pageSize.getHeight()
-      const ratio  = canvas.width / canvas.height
-      const pdfW   = pageW - 20
-      const pdfH   = pdfW / ratio
-      const yOff   = pdfH < pageH ? (pageH - pdfH) / 2 : 10
-      pdf.addImage(imgData, 'PNG', 10, yOff, pdfW, Math.min(pdfH, pageH - 20))
-      pdf.save(`Receipt-${receipt?.receipt_number || workOrder.work_order_number}.pdf`)
+
+      // Render into a fixed A4-width (794px @96dpi) off-screen container so the
+      // capture is never constrained by the on-screen column layout
+      const A4_PX = 794
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
+      const cloneEl = el.cloneNode(true)
+      cloneEl.style.cssText = 'width:100%;background:#ffffff;'
+      wrapper.appendChild(cloneEl)
+      document.body.appendChild(wrapper)
+
+      try {
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          width: A4_PX,
+          height: wrapper.scrollHeight,
+          windowWidth: A4_PX,
+          onclone: (clonedDoc) => {
+            clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
+            stripModernColors(clonedDoc)
+          },
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pageW  = pdf.internal.pageSize.getWidth()   // 210mm
+        const pageH  = pdf.internal.pageSize.getHeight()  // 297mm
+        const margin = 8
+        const pdfW   = pageW - margin * 2                 // 194mm
+        const pdfH   = (canvas.height / canvas.width) * pdfW
+
+        if (pdfH <= pageH - margin * 2) {
+          // Single page — centre vertically
+          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
+        } else {
+          // Multi-page: slice canvas row by row
+          const pxPerMm  = canvas.width / pdfW
+          const slicePx  = Math.floor((pageH - margin * 2) * pxPerMm)
+          let srcY = 0
+          while (srcY < canvas.height) {
+            if (srcY > 0) pdf.addPage()
+            const h = Math.min(slicePx, canvas.height - srcY)
+            const slice = document.createElement('canvas')
+            slice.width  = canvas.width
+            slice.height = h
+            slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
+            const slicePdfH = (h / pxPerMm)
+            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, slicePdfH)
+            srcY += slicePx
+          }
+        }
+
+        pdf.save('Receipt-' + (receipt?.receipt_number || workOrder.work_order_number) + '.pdf')
+      } finally {
+        document.body.removeChild(wrapper)
+      }
     } catch (e) {
       console.error('PDF download error:', e)
     } finally {
       setDownloading(false)
     }
   }
+
 
   if (loading) return (
     <div className="flex justify-center items-center h-40">
@@ -304,8 +357,8 @@ export function ReceiptContent({
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       {/* Dark header */}
-      <div style={{ background: '#0f172a', padding: '28px 32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ background: '#0f172a', padding: '24px 28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
             <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, letterSpacing: 3, color: '#f59e0b', textTransform: 'uppercase' }}>
               Motiifix
@@ -317,8 +370,8 @@ export function ReceiptContent({
               <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>{provider.name}</p>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 800, color: '#fff' }}>
+          <div style={{ textAlign: 'right', flexShrink: 0, maxWidth: '45%' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#fff', wordBreak: 'break-all' }}>
               {receipt.receipt_number}
             </p>
             <span style={{
@@ -327,7 +380,7 @@ export function ReceiptContent({
               background: isConfirmed ? '#16a34a' : '#b45309',
               color: '#fff',
             }}>
-              {isConfirmed ? '✓ CONFIRMED' : 'AWAITING CONFIRMATION'}
+              {isConfirmed ? '✓ CONFIRMED' : 'PENDING'}
             </span>
           </div>
         </div>
@@ -362,7 +415,7 @@ export function ReceiptContent({
 
       {/* From / To row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, borderBottom: '1px solid #f1f5f9' }}>
-        <div style={{ padding: '18px 32px', borderRight: '1px solid #f1f5f9' }}>
+        <div style={{ padding: '16px 24px', borderRight: '1px solid #f1f5f9' }}>
           <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>FROM</p>
           {provider ? (
             <>
@@ -372,7 +425,7 @@ export function ReceiptContent({
             </>
           ) : <p style={{ fontSize: 13, color: '#94a3b8' }}>Service Provider</p>}
         </div>
-        <div style={{ padding: '18px 32px' }}>
+        <div style={{ padding: '16px 24px' }}>
           <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>BILLED TO</p>
           {custName ? (
             <>
@@ -391,14 +444,14 @@ export function ReceiptContent({
 
       {/* Line items */}
       {items.length > 0 && (
-        <div style={{ padding: '0 32px 8px' }}>
+        <div style={{ padding: '0 24px 8px' }}>
           {/* Services */}
           {services.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: 1 }}>
                 SERVICES
               </p>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
                     <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: '#64748b', fontSize: 11 }}>Description</th>
@@ -427,7 +480,7 @@ export function ReceiptContent({
               <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: 1 }}>
                 PARTS & MATERIALS
               </p>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
                     <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: '#64748b', fontSize: 11 }}>Part</th>
@@ -453,7 +506,7 @@ export function ReceiptContent({
       )}
 
       {/* Totals */}
-      <div style={{ margin: '8px 32px 0', borderTop: '1px solid #e2e8f0', paddingTop: 12, paddingBottom: 8 }}>
+      <div style={{ margin: '8px 24px 0', borderTop: '1px solid #e2e8f0', paddingTop: 12, paddingBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ minWidth: 240 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#64748b' }}>
@@ -477,14 +530,14 @@ export function ReceiptContent({
 
       {/* Notes */}
       {receipt.notes && (
-        <div style={{ margin: '12px 32px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px' }}>
+        <div style={{ margin: '12px 24px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px' }}>
           <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase' }}>Reference / Notes</p>
           <p style={{ margin: 0, fontSize: 13, color: '#78350f' }}>{receipt.notes}</p>
         </div>
       )}
 
       {/* Footer */}
-      <div style={{ margin: '16px 32px 28px', textAlign: 'center', paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+      <div style={{ margin: '16px 24px 28px', textAlign: 'center', paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
         <p style={{ margin: '0 0 2px', fontSize: 11, color: '#94a3b8' }}>Thank you for choosing {provider?.name || 'our service'}.</p>
         <p style={{ margin: 0, fontSize: 10, color: '#cbd5e1' }}>Powered by Motiifix · motiifix.com</p>
       </div>
