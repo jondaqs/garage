@@ -15,6 +15,7 @@ import IssuesTab        from './components/IssuesTab'
 import CommentsTab      from './components/CommentsTab'
 import QualityCheckTab  from './components/QualityCheckTab'
 import InvoiceTab            from './components/InvoiceTab'
+import ReceiptTab            from '@/components/ReceiptTab'
 import RecommendationsTab    from './components/RecommendationsTab'
 import EstimateReviewPanel  from './components/EstimateReviewPanel'
 
@@ -64,6 +65,7 @@ const TABS = [
   { id: 'recommendations', label: 'Next Service',        icon: Bell           },
   { id: 'qc',              label: 'QC & Complete',       icon: ClipboardCheck },
   { id: 'invoice',         label: 'Invoice',             icon: FileText       },
+  { id: 'receipt',         label: 'Receipt',             icon: Receipt        },
   { id: 'comments',        label: 'Comments',            icon: MessageSquare  },
 ]
 
@@ -1019,6 +1021,11 @@ export default function WorkOrderDetailPage() {
           {/* ── INVOICE TAB ── */}
           {activeTab === 'invoice' && (
             <InvoiceTab workOrder={woWithProvider} permissions={invoicePerms} />
+          )}
+
+          {/* ── RECEIPT TAB ── */}
+          {activeTab === 'receipt' && (
+            <ReceiptTab workOrder={woWithProvider} canConfirm={invoicePerms.canConfirm} />
           )}
 
           {/* ── RECOMMENDATIONS TAB ── */}

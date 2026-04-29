@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
-  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText
+  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText, Receipt
 } from 'lucide-react'
 import ServicesTab        from '@/app/provider/work-orders/[id]/components/ServicesTab'
 import PartsTab           from '@/app/provider/work-orders/[id]/components/PartsTab'
@@ -15,6 +15,7 @@ import CommentsTab        from '@/app/provider/work-orders/[id]/components/Comme
 import QualityCheckTab    from '@/app/provider/work-orders/[id]/components/QualityCheckTab'
 import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
 import InvoiceTab         from '@/app/provider/work-orders/[id]/components/InvoiceTab'
+import ReceiptTab         from '@/components/ReceiptTab'
 import EstimateReviewPanel from '@/app/provider/work-orders/[id]/components/EstimateReviewPanel'
 
 const STATUS_COLORS = {
@@ -43,6 +44,7 @@ const ALL_TABS = [
   { id: 'recommendations', label: 'Recommendations',   icon: Star,          perm: 'can_approve_work' },
   { id: 'qc',              label: 'Quality Check',     icon: Shield,        perm: 'can_approve_work' },
   { id: 'invoice',         label: 'Invoice',           icon: FileText,      perm: 'can_send_invoice' },
+  { id: 'receipt',         label: 'Receipt',           icon: Receipt,       perm: 'can_send_invoice' },
   { id: 'comments',        label: 'Comments',          icon: MessageSquare, perm: 'any'              },
 ]
 
@@ -354,6 +356,7 @@ export default function MechanicWorkOrderPage() {
     if (t.perm === 'any') return true
     if (t.perm === 'can_approve_work') return canApprove || isAdmin
     if (t.perm === 'can_send_invoice') return isAdmin || canSendInvoice
+    if (t.id === 'receipt') return isAdmin || canSendInvoice
     return false
   })
 
@@ -732,6 +735,11 @@ export default function MechanicWorkOrderPage() {
             )}
             {activeTab === 'invoice' && (isAdmin || canSendInvoice) && (
               <InvoiceTab workOrder={woWithProvider} permissions={invoicePerms} />
+            )}
+
+            {/* ── RECEIPT TAB ── */}
+            {activeTab === 'receipt' && (isAdmin || canSendInvoice) && (
+              <ReceiptTab workOrder={woWithProvider} canConfirm={invoicePerms.canConfirm} />
             )}
             {activeTab === 'recommendations' && (canApprove || isAdmin) && (
               <RecommendationsTab workOrder={woWithProvider} />

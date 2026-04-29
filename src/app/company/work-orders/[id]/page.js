@@ -7,7 +7,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
   Loader2, DollarSign, ThumbsUp, ThumbsDown, Edit3,
-  ChevronDown, ChevronUp, Building2, Star, FileText, ChevronRight
+  ChevronDown, ChevronUp, Building2, Star, FileText, ChevronRight, Receipt
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -535,6 +535,29 @@ export default function CompanyWorkOrderDetailPage() {
                   : 'bg-gray-900 text-white hover:bg-gray-800'
               }`}>
               View Invoice <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+
+      {/* ── Receipt banner (paid only) ── */}
+      {invoiceStatus === 'paid' && (
+        <div className="rounded-xl shadow-sm overflow-hidden border border-emerald-200 bg-emerald-50">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-100">
+                <Receipt size={16} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Payment Receipt</p>
+                <p className="text-xs font-medium text-emerald-600">✓ Payment Confirmed</p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/company/work-orders/${params.id}/receipt`)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-emerald-600 text-white hover:bg-emerald-700">
+              View Receipt <ChevronRight size={14} />
             </button>
           </div>
         </div>
