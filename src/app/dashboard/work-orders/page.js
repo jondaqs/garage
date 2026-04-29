@@ -38,27 +38,23 @@ export default function CustomerWorkOrdersPage() {
       const { data: profile }  = await supabase
         .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
 
-      // Get all vehicles owned by this user (individual + via company)
+      // Get vehicles directly owned by this user (individual ownership)
       const { data: owned } = await supabase
         .from('vehicle_ownership')
         .select('vehicle_id')
         .eq('owner_user_id', profile.id)
 
-      const { data: fleet } = await supabase
-        .from('vehicle_ownership')
+      // Get fleet vehicles explicitly assigned to this user
+      // (not all company vehicles — only ones assigned to this individual)
+      const { data: assigned } = await supabase
+        .from('company_vehicle_assignments')
         .select('vehicle_id')
-        .in('owner_company_id', (
-          await supabase
-            .from('company_users')
-            .select('company_id')
-            .eq('user_id', profile.id)
-            .eq('is_active', true)
-            .then(r => r.data?.map(c => c.company_id) || [])
-        ))
+        .eq('assigned_to_user_id', profile.id)
+        .eq('is_active', true)
 
       const vehicleIds = [
-        ...(owned || []).map(v => v.vehicle_id),
-        ...(fleet || []).map(v => v.vehicle_id),
+        ...(owned    || []).map(v => v.vehicle_id),
+        ...(assigned || []).map(v => v.vehicle_id),
       ]
 
       if (vehicleIds.length === 0) {

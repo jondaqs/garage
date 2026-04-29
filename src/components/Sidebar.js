@@ -170,7 +170,7 @@ export default function Sidebar({ user }) {
     { icon: User,        label: 'Dashboard',   path: '/dashboard' },
     { icon: Plus,        label: 'Add Vehicle', path: '/dashboard/vehicles/add' },
     { icon: Calendar,    label: 'Bookings',    path: '/dashboard/bookings' },
-    { icon: ClipboardList, label: 'Work Orders',  path: '/dashboard/work-orders' },
+    { icon: ClipboardList, label: 'My Work Orders',path: '/dashboard/work-orders' },
     { icon: Bell,          label: 'Reminders',    path: '/dashboard/reminders',
       badge: remindersCount > 0 ? remindersCount : null },
     { icon: CalendarDays,label: 'Calendar',    path: '/dashboard/calendar' },
@@ -183,12 +183,13 @@ export default function Sidebar({ user }) {
     if (!membership) return []
     const base = `/dashboard/company/${membership.id}`
     const items = [
-      { icon: Building2, label: 'Overview',  path: base,              everyone: true  },
-      { icon: Truck,     label: 'Fleet',     path: `${base}/fleet`,   everyone: true  },
-      { icon: Calendar,  label: 'Bookings',  path: `${base}/bookings`,everyone: true  },
-      { icon: Users,     label: 'Team',      path: `${base}/team`,    everyone: true  },
-      { icon: DollarSign,label: 'Budget',    path: `${base}/budget`,  everyone: false }, // admin only
-      { icon: BarChart3, label: 'Reports',   path: `${base}/reports`, everyone: false }, // admin only
+      { icon: Building2,    label: 'Overview',    path: base,                       everyone: true  },
+      { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
+      { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
+      { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
+      { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
+      { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // admin only
+      { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
     ]
     // Filter out admin-only items for non-admins
     return items.filter(item => item.everyone || membership.is_admin)
