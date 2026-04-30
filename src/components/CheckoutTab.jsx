@@ -2,44 +2,41 @@
 
 /**
  * CheckoutTab
- * Records car road-test results and vehicle checkout.
- * Accessible to: provider owner, SPU admin/accountant, mechanic with can_approve_work.
- * Shows in both provider WO page and my-teams WO page.
+ * Two-step checkout: Road Test → Vehicle Handover.
+ * Persists results to work_order_checkouts table.
+ * After confirmation the checklists remain visible as read-only.
  *
  * Props:
- *   workOrder   — full work order object (id, status, initial_mileage, vehicle_checked_out_at, ...)
- *   canCheckout — boolean: provider owner / admin / mechanic with can_approve_work
- *   onStatusChange — callback(newStatusCode) after successful checkout
+ *   workOrder      — full work order object
+ *   canCheckout    — boolean (SP owner / admin / mechanic with can_approve_work)
+ *   onStatusChange — callback(statusCode) after successful confirm
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Car, CheckCircle, AlertCircle, Loader2, ClipboardCheck,
-  Gauge, FileText, Clock, ChevronRight, BadgeCheck, X,
-  RotateCcw, Wrench
+  Gauge, ChevronRight, BadgeCheck, X, Wrench
 } from 'lucide-react'
 
-// ── Road-test checklist ───────────────────────────────────────────────────────
 const CHECKOUT_ROAD_TEST_ITEMS = [
-  { id: 'engine_smooth',        label: 'Engine runs smoothly'                     },
-  { id: 'no_unusual_noise',     label: 'No unusual noises during drive'           },
-  { id: 'brakes_responsive',    label: 'Brakes responsive and not pulling'        },
-  { id: 'steering_ok',          label: 'Steering straight and responsive'         },
-  { id: 'no_warning_lights',    label: 'No warning lights on dashboard'           },
-  { id: 'transmission_smooth',  label: 'Transmission shifts smoothly'             },
-  { id: 'ac_heater_ok',         label: 'A/C and heating working (if applicable)'  },
-  { id: 'all_electrics_ok',     label: 'All electrical systems functioning'       },
+  { id: 'rt_engine_smooth',       label: 'Engine runs smoothly'                    },
+  { id: 'rt_no_unusual_noise',    label: 'No unusual noises during drive'          },
+  { id: 'rt_brakes_responsive',   label: 'Brakes responsive and not pulling'       },
+  { id: 'rt_steering_ok',         label: 'Steering straight and responsive'        },
+  { id: 'rt_no_warning_lights',   label: 'No warning lights on dashboard'          },
+  { id: 'rt_transmission_smooth', label: 'Transmission shifts smoothly'            },
+  { id: 'rt_ac_heater_ok',        label: 'A/C and heating working (if applicable)' },
+  { id: 'rt_all_electrics_ok',    label: 'All electrical systems functioning'      },
 ]
 
-// ── Checkout checklist ────────────────────────────────────────────────────────
 const CHECKOUT_HANDOVER_ITEMS = [
-  { id: 'vehicle_clean',        label: 'Vehicle returned clean'                   },
-  { id: 'personal_items_ok',    label: 'Customer personal items in place'         },
-  { id: 'fuel_level_noted',     label: 'Fuel level noted and communicated'        },
-  { id: 'docs_handed_over',     label: 'Service documents handed to customer'     },
-  { id: 'customer_notified',    label: 'Customer notified vehicle is ready'       },
-  { id: 'payment_confirmed',    label: 'Payment confirmed / invoice settled'      },
+  { id: 'co_vehicle_clean',      label: 'Vehicle returned clean'                   },
+  { id: 'co_personal_items_ok',  label: 'Customer personal items in place'         },
+  { id: 'co_fuel_level_noted',   label: 'Fuel level noted and communicated'        },
+  { id: 'co_docs_handed_over',   label: 'Service documents handed to customer'     },
+  { id: 'co_customer_notified',  label: 'Customer notified vehicle is ready'       },
+  { id: 'co_payment_confirmed',  label: 'Payment confirmed / invoice settled'      },
 ]
 
 function checkoutFmtD(d) {
@@ -50,81 +47,194 @@ function checkoutFmtD(d) {
   })
 }
 
+// ── Shared checklist panel (interactive or read-only) ─────────────────────────
+function ChecklistPanel({ title, icon: Icon, color, items, values, onChange, readonly }) {
+  const done  = items.filter(i => values[i.id]).length
+  const total = items.length
+  const pct   = Math.round((done / total) * 100)
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+        <Icon size={16} className={color} />
+        <p className="font-semibold text-gray-900 text-sm">{title}</p>
+        <span className="ml-auto text-xs text-gray-500">{done}/{total}</span>
+      </div>
+      <div className="px-5 py-4 space-y-2">
+        {items.map(item => {
+          const checked = !!values[item.id]
+          return (
+            <label key={item.id}
+              className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                checked ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'
+              } ${readonly ? 'cursor-default' : 'cursor-pointer hover:border-gray-300'}`}>
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
+                checked ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'
+              }`}>
+                {checked && <CheckCircle size={12} className="text-white" />}
+              </div>
+              {!readonly && (
+                <input type="checkbox" className="sr-only"
+                  checked={checked}
+                  onChange={() => onChange?.(item.id)} />
+              )}
+              <span className={`text-sm ${checked ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
+                {item.label}
+              </span>
+            </label>
+          )
+        })}
+        <div className="pt-2">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Progress</span><span>{pct}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+              style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function CheckoutTab({ workOrder, canCheckout = false, onStatusChange }) {
   const supabase = createClient()
 
-  const [saving,        setSaving]        = useState(false)
-  const [error,         setError]         = useState('')
-  const [success,       setSuccess]       = useState('')
-  const [roadTest,      setRoadTest]      = useState(
-    Object.fromEntries(CHECKOUT_ROAD_TEST_ITEMS.map(i => [i.id, false]))
-  )
-  const [checkout,      setCheckout]      = useState(
-    Object.fromEntries(CHECKOUT_HANDOVER_ITEMS.map(i => [i.id, false]))
-  )
-  const [finalMileage,  setFinalMileage]  = useState(workOrder.final_mileage?.toString() || '')
-  const [testNotes,     setTestNotes]     = useState('')
-  const [checkoutNotes, setCheckoutNotes] = useState('')
-  const [activeSection, setActiveSection] = useState('road_test')  // 'road_test' | 'checkout'
+  const defaultRoadTest  = Object.fromEntries(CHECKOUT_ROAD_TEST_ITEMS.map(i => [i.id, false]))
+  const defaultHandover  = Object.fromEntries(CHECKOUT_HANDOVER_ITEMS.map(i  => [i.id, false]))
 
-  const statusCode     = workOrder.status?.code
-  const isCheckedOut   = !!(workOrder.vehicle_checked_out_at)
-  const isPaid         = statusCode === 'closed' || statusCode === 'paid'
-  const isCompleted    = ['completed', 'closed'].includes(statusCode)
+  const [roadTest,       setRoadTest]       = useState(defaultRoadTest)
+  const [handover,       setHandover]       = useState(defaultHandover)
+  const [finalMileage,   setFinalMileage]   = useState(workOrder.final_mileage?.toString() || '')
+  const [testNotes,      setTestNotes]      = useState('')
+  const [checkoutNotes,  setCheckoutNotes]  = useState('')
+  const [activeSection,  setActiveSection]  = useState('road_test')
+  const [checkoutRecord, setCheckoutRecord] = useState(null)  // row from work_order_checkouts
+  const [loading,        setLoading]        = useState(true)
+  const [saving,         setSaving]         = useState(false)
+  const [error,          setError]          = useState('')
+  const [success,        setSuccess]        = useState('')
 
-  const roadTestAll    = CHECKOUT_ROAD_TEST_ITEMS.every(i => roadTest[i.id])
-  const checkoutAll    = CHECKOUT_HANDOVER_ITEMS.every(i => checkout[i.id])
-  const roadTestCount  = CHECKOUT_ROAD_TEST_ITEMS.filter(i => roadTest[i.id]).length
-  const checkoutCount  = CHECKOUT_HANDOVER_ITEMS.filter(i => checkout[i.id]).length
+  const statusCode  = workOrder.status?.code
+  const isCheckedOut = !!(workOrder.vehicle_checked_out_at)
+  const isCompleted  = ['completed', 'closed'].includes(statusCode)
 
-  const handleRoadTestToggle = (id) =>
-    setRoadTest(r => ({ ...r, [id]: !r[id] }))
+  // ── Load existing checkout record ─────────────────────────────────────────
+  const loadCheckout = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await supabase
+        .from('work_order_checkouts')
+        .select('*')
+        .eq('work_order_id', workOrder.id)
+        .maybeSingle()
 
-  const handleCheckoutToggle = (id) =>
-    setCheckout(c => ({ ...c, [id]: !c[id] }))
+      if (data) {
+        setCheckoutRecord(data)
+        // Pre-fill checklist states from DB
+        const rt = {}
+        CHECKOUT_ROAD_TEST_ITEMS.forEach(i => { rt[i.id] = !!data[i.id] })
+        setRoadTest(rt)
 
+        const co = {}
+        CHECKOUT_HANDOVER_ITEMS.forEach(i => { co[i.id] = !!data[i.id] })
+        setHandover(co)
+
+        if (data.final_mileage)   setFinalMileage(data.final_mileage.toString())
+        if (data.road_test_notes) setTestNotes(data.road_test_notes)
+        if (data.checkout_notes)  setCheckoutNotes(data.checkout_notes)
+      }
+    } catch (e) {
+      console.error('CheckoutTab loadCheckout:', e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [workOrder.id])
+
+  useEffect(() => { loadCheckout() }, [loadCheckout])
+
+  const roadTestAll  = CHECKOUT_ROAD_TEST_ITEMS.every(i => roadTest[i.id])
+  const handoverAll  = CHECKOUT_HANDOVER_ITEMS.every(i => handover[i.id])
+  const roadTestDone = CHECKOUT_ROAD_TEST_ITEMS.filter(i => roadTest[i.id]).length
+  const handoverDone = CHECKOUT_HANDOVER_ITEMS.filter(i => handover[i.id]).length
+
+  // ── Save checklist progress via RPC (auto-save on each toggle) ─────────────
+  const saveProgress = async (rt, co) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.rpc('save_checkout_progress', {
+        p_work_order_id:           workOrder.id,
+        p_caller_auth_uid:         user.id,
+        p_rt_engine_smooth:        rt.rt_engine_smooth,
+        p_rt_no_unusual_noise:     rt.rt_no_unusual_noise,
+        p_rt_brakes_responsive:    rt.rt_brakes_responsive,
+        p_rt_steering_ok:          rt.rt_steering_ok,
+        p_rt_no_warning_lights:    rt.rt_no_warning_lights,
+        p_rt_transmission_smooth:  rt.rt_transmission_smooth,
+        p_rt_ac_heater_ok:         rt.rt_ac_heater_ok,
+        p_rt_all_electrics_ok:     rt.rt_all_electrics_ok,
+        p_road_test_notes:         testNotes     || null,
+        p_co_vehicle_clean:        co.co_vehicle_clean,
+        p_co_personal_items_ok:    co.co_personal_items_ok,
+        p_co_fuel_level_noted:     co.co_fuel_level_noted,
+        p_co_docs_handed_over:     co.co_docs_handed_over,
+        p_co_customer_notified:    co.co_customer_notified,
+        p_co_payment_confirmed:    co.co_payment_confirmed,
+        p_checkout_notes:          checkoutNotes || null,
+        p_final_mileage:           finalMileage  ? parseInt(finalMileage) : null,
+      })
+    } catch (e) {
+      console.error('CheckoutTab saveProgress:', e.message)
+    }
+  }
+
+  const handleRoadTestToggle = (id) => {
+    const updated = { ...roadTest, [id]: !roadTest[id] }
+    setRoadTest(updated)
+    saveProgress(updated, handover)
+  }
+
+  const handleHandoverToggle = (id) => {
+    const updated = { ...handover, [id]: !handover[id] }
+    setHandover(updated)
+    saveProgress(roadTest, updated)
+  }
+
+  // ── Confirm checkout via RPC (atomic: checkout record + close WO + history) ──
   const handleCheckout = async () => {
-    if (!roadTestAll) {
-      setError('Please complete all road-test items before proceeding to checkout.')
-      return
-    }
-    if (!checkoutAll) {
-      setError('Please complete all checkout items before confirming.')
-      return
-    }
+    if (!roadTestAll) { setError('Complete all road-test items to proceed.'); return }
+    if (!handoverAll) { setError('Complete all checkout items before confirming.'); return }
     setSaving(true); setError('')
     try {
-      const now   = new Date().toISOString()
-      const mileage = finalMileage ? parseInt(finalMileage) : null
-
-      // Build internal notes
-      const notes = [
-        testNotes    ? `Road-test notes: ${testNotes}`    : null,
-        checkoutNotes? `Checkout notes: ${checkoutNotes}` : null,
-      ].filter(Boolean).join('\n') || null
-
-      // Update work order: set checked_out_at, final mileage, close status
-      const { data: closedStatus } = await supabase
-        .from('work_order_statuses').select('id').eq('code', 'closed').maybeSingle()
-
-      const updatePayload = {
-        vehicle_checked_out_at: now,
-        updated_at:             now,
-      }
-      if (mileage)          updatePayload.final_mileage = mileage
-      if (closedStatus?.id) updatePayload.status_id     = closedStatus.id
-      if (notes)            updatePayload.internal_notes = [
-        workOrder.internal_notes, notes
-      ].filter(Boolean).join('\n---\n')
-
-      const { error: updateErr } = await supabase
-        .from('work_orders')
-        .update(updatePayload)
-        .eq('id', workOrder.id)
-
-      if (updateErr) throw updateErr
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: result, error: rpcErr } = await supabase.rpc('confirm_checkout', {
+        p_work_order_id:           workOrder.id,
+        p_caller_auth_uid:         user.id,
+        p_rt_engine_smooth:        roadTest.rt_engine_smooth,
+        p_rt_no_unusual_noise:     roadTest.rt_no_unusual_noise,
+        p_rt_brakes_responsive:    roadTest.rt_brakes_responsive,
+        p_rt_steering_ok:          roadTest.rt_steering_ok,
+        p_rt_no_warning_lights:    roadTest.rt_no_warning_lights,
+        p_rt_transmission_smooth:  roadTest.rt_transmission_smooth,
+        p_rt_ac_heater_ok:         roadTest.rt_ac_heater_ok,
+        p_rt_all_electrics_ok:     roadTest.rt_all_electrics_ok,
+        p_road_test_notes:         testNotes     || null,
+        p_co_vehicle_clean:        handover.co_vehicle_clean,
+        p_co_personal_items_ok:    handover.co_personal_items_ok,
+        p_co_fuel_level_noted:     handover.co_fuel_level_noted,
+        p_co_docs_handed_over:     handover.co_docs_handed_over,
+        p_co_customer_notified:    handover.co_customer_notified,
+        p_co_payment_confirmed:    handover.co_payment_confirmed,
+        p_checkout_notes:          checkoutNotes || null,
+        p_final_mileage:           finalMileage  ? parseInt(finalMileage) : null,
+      })
+      if (rpcErr) throw rpcErr
+      if (!result.success) throw new Error(result.error)
 
       setSuccess('Vehicle checked out successfully. Work order closed.')
+      await loadCheckout()
       onStatusChange?.('closed')
     } catch (e) {
       setError(e.message)
@@ -133,113 +243,90 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
     }
   }
 
-  // ── Already checked out ───────────────────────────────────────────────────
-  if (isCheckedOut) return (
-    <div className="space-y-4">
-      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl overflow-hidden">
-        <div className="bg-emerald-600 px-5 py-3 flex items-center gap-2">
-          <BadgeCheck className="text-white" size={18} />
-          <span className="text-white font-bold text-sm">Vehicle Checked Out</span>
-        </div>
-        <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-xs text-emerald-700 font-semibold mb-0.5">Checkout Time</p>
-            <p className="font-semibold text-gray-900">{checkoutFmtD(workOrder.vehicle_checked_out_at)}</p>
-          </div>
-          {workOrder.final_mileage && (
-            <div>
-              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Final Mileage</p>
-              <p className="font-semibold text-gray-900">
-                {Number(workOrder.final_mileage).toLocaleString('en-KE')} km
-              </p>
-            </div>
-          )}
-          {workOrder.initial_mileage && workOrder.final_mileage && (
-            <div>
-              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Distance During Service</p>
-              <p className="font-semibold text-gray-900">
-                {(workOrder.final_mileage - workOrder.initial_mileage).toLocaleString('en-KE')} km
-              </p>
-            </div>
-          )}
-          <div>
-            <p className="text-xs text-emerald-700 font-semibold mb-0.5">Status</p>
-            <p className="font-semibold text-gray-900 capitalize">{workOrder.status?.display_name}</p>
-          </div>
-        </div>
-      </div>
+  // ── Guard states ──────────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex justify-center items-center h-32">
+      <Loader2 className="animate-spin text-gray-400" size={28} />
     </div>
   )
 
-  // ── Not yet completed ─────────────────────────────────────────────────────
   if (!isCompleted) return (
     <div className="text-center py-12 text-gray-400">
       <Wrench size={40} className="mx-auto mb-3 opacity-40" />
       <p className="text-sm font-medium text-gray-600">Not ready for checkout</p>
       <p className="text-xs mt-1">
-        Checkout is available after the work order reaches <strong>Completed</strong> status.
+        Available after the work order reaches <strong>Completed</strong> status.
       </p>
       <p className="text-xs mt-1 text-gray-400">
-        Current status: <span className="font-medium">{workOrder.status?.display_name}</span>
+        Current: <span className="font-medium">{workOrder.status?.display_name}</span>
       </p>
     </div>
   )
 
-  // ── No permission ─────────────────────────────────────────────────────────
-  if (!canCheckout) return (
+  if (!canCheckout && !isCheckedOut) return (
     <div className="text-center py-12 text-gray-400">
       <Car size={40} className="mx-auto mb-3 opacity-40" />
-      <p className="text-sm font-medium text-gray-600">Checkout requires approval permission</p>
+      <p className="text-sm font-medium text-gray-600">Approval permission required</p>
       <p className="text-xs mt-1 text-gray-400">
-        Only the provider owner, admins, or mechanics with approval access can perform checkout.
+        Only provider owners, admins, or mechanics with approval access can perform checkout.
       </p>
     </div>
   )
 
-  // ── Active checkout flow ──────────────────────────────────────────────────
   return (
     <div className="space-y-4">
 
-      {/* Progress stepper */}
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => setActiveSection('road_test')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-            activeSection === 'road_test'
-              ? 'bg-gray-900 text-white'
-              : roadTestAll ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-          }`}>
-          {roadTestAll
-            ? <CheckCircle size={13} />
-            : <span className="w-4 h-4 rounded-full border-2 border-current text-center leading-3 text-[10px]">1</span>
-          }
-          Road Test ({roadTestCount}/{CHECKOUT_ROAD_TEST_ITEMS.length})
-        </button>
-        <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
-        <button
-          onClick={() => { if (roadTestAll) setActiveSection('checkout') }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-            activeSection === 'checkout'
-              ? 'bg-gray-900 text-white'
-              : checkoutAll ? 'bg-emerald-100 text-emerald-700'
-              : roadTestAll ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-          }`}>
-          {checkoutAll
-            ? <CheckCircle size={13} />
-            : <span className="w-4 h-4 rounded-full border-2 border-current text-center leading-3 text-[10px]">2</span>
-          }
-          Checkout ({checkoutCount}/{CHECKOUT_HANDOVER_ITEMS.length})
-        </button>
-      </div>
-
-      {/* Alerts */}
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-sm">
-          <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={14} />
-          <p className="text-red-700">{error}</p>
-          <button onClick={() => setError('')} className="ml-auto"><X size={14} className="text-red-400" /></button>
+      {/* ── Vehicle Checked Out card ── always shown once confirmed ── */}
+      {isCheckedOut && (
+        <div className="rounded-2xl overflow-hidden border border-emerald-200">
+          <div className="bg-emerald-600 px-5 py-3 flex items-center gap-2">
+            <BadgeCheck className="text-white" size={18} />
+            <span className="text-white font-bold text-sm">Vehicle Checked Out</span>
+          </div>
+          <div className="px-5 py-4 bg-emerald-50 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Checkout Time</p>
+              <p className="font-semibold text-gray-900">
+                {checkoutFmtD(workOrder.vehicle_checked_out_at)}
+              </p>
+            </div>
+            {checkoutRecord?.final_mileage && (
+              <div>
+                <p className="text-xs text-emerald-700 font-semibold mb-0.5">Final Mileage</p>
+                <p className="font-semibold text-gray-900">
+                  {Number(checkoutRecord.final_mileage).toLocaleString('en-KE')} km
+                </p>
+              </div>
+            )}
+            {workOrder.initial_mileage && checkoutRecord?.final_mileage && (
+              <div>
+                <p className="text-xs text-emerald-700 font-semibold mb-0.5">Distance During Service</p>
+                <p className="font-semibold text-gray-900">
+                  {(checkoutRecord.final_mileage - workOrder.initial_mileage).toLocaleString('en-KE')} km
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-emerald-700 font-semibold mb-0.5">Status</p>
+              <p className="font-semibold text-gray-900">{workOrder.status?.display_name}</p>
+            </div>
+            {checkoutRecord?.road_test_notes && (
+              <div className="col-span-2">
+                <p className="text-xs text-emerald-700 font-semibold mb-0.5">Road Test Notes</p>
+                <p className="text-sm text-gray-700">{checkoutRecord.road_test_notes}</p>
+              </div>
+            )}
+            {checkoutRecord?.checkout_notes && (
+              <div className="col-span-2">
+                <p className="text-xs text-emerald-700 font-semibold mb-0.5">Checkout Notes</p>
+                <p className="text-sm text-gray-700">{checkoutRecord.checkout_notes}</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
+
+      {/* Success alert */}
       {success && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2">
           <CheckCircle className="text-green-600 flex-shrink-0" size={18} />
@@ -247,157 +334,141 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         </div>
       )}
 
-      {/* ── Section 1: Road Test ── */}
-      {activeSection === 'road_test' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
-            <Car size={16} className="text-blue-600" />
-            <p className="font-semibold text-gray-900 text-sm">Road Test Checklist</p>
-            <span className="ml-auto text-xs text-gray-500">{roadTestCount}/{CHECKOUT_ROAD_TEST_ITEMS.length}</span>
-          </div>
+      {/* ── Road Test checklist — always visible after completion ── */}
+      <ChecklistPanel
+        title="Road Test Checklist"
+        icon={Car}
+        color="text-blue-600"
+        items={CHECKOUT_ROAD_TEST_ITEMS}
+        values={roadTest}
+        onChange={!isCheckedOut ? handleRoadTestToggle : undefined}
+        readonly={isCheckedOut}
+      />
 
-          <div className="px-5 py-4 space-y-2">
-            {CHECKOUT_ROAD_TEST_ITEMS.map(item => (
-              <label key={item.id}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  roadTest[item.id]
-                    ? 'bg-emerald-50 border-emerald-200'
-                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                }`}>
-                <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
-                  roadTest[item.id] ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'
-                }`}>
-                  {roadTest[item.id] && <CheckCircle size={12} className="text-white" />}
-                </div>
-                <input type="checkbox" className="sr-only"
-                  checked={roadTest[item.id]}
-                  onChange={() => handleRoadTestToggle(item.id)} />
-                <span className={`text-sm ${roadTest[item.id] ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                  {item.label}
-                </span>
-              </label>
-            ))}
+      {/* ── Handover checklist — always visible after completion ── */}
+      <ChecklistPanel
+        title="Vehicle Handover"
+        icon={ClipboardCheck}
+        color="text-emerald-600"
+        items={CHECKOUT_HANDOVER_ITEMS}
+        values={handover}
+        onChange={!isCheckedOut ? handleHandoverToggle : undefined}
+        readonly={isCheckedOut}
+      />
 
-            {/* Progress bar */}
-            <div className="pt-2">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Progress</span>
-                <span>{Math.round((roadTestCount / CHECKOUT_ROAD_TEST_ITEMS.length) * 100)}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                  style={{ width: `${(roadTestCount / CHECKOUT_ROAD_TEST_ITEMS.length) * 100}%` }} />
-              </div>
-            </div>
-          </div>
+      {/* ── Interactive flow (only when not yet checked out) ── */}
+      {!isCheckedOut && canCheckout && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
 
-          {/* Test notes */}
-          <div className="px-5 pb-4">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Test Notes (optional)</label>
-            <textarea value={testNotes} onChange={e => setTestNotes(e.target.value)}
-              placeholder="Any observations during the road test..."
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-gray-400" />
-          </div>
-
-          <div className="px-5 pb-4">
-            <button
-              onClick={() => {
-                if (!roadTestAll) { setError('Complete all road-test items to proceed.'); return }
-                setError(''); setActiveSection('checkout')
-              }}
-              disabled={!roadTestAll}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              <ChevronRight size={16} />
-              Proceed to Checkout
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Section 2: Checkout ── */}
-      {activeSection === 'checkout' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
-            <ClipboardCheck size={16} className="text-emerald-600" />
-            <p className="font-semibold text-gray-900 text-sm">Vehicle Checkout</p>
-            <span className="ml-auto text-xs text-gray-500">{checkoutCount}/{CHECKOUT_HANDOVER_ITEMS.length}</span>
-          </div>
-
-          <div className="px-5 py-4 space-y-2">
-            {CHECKOUT_HANDOVER_ITEMS.map(item => (
-              <label key={item.id}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  checkout[item.id]
-                    ? 'bg-emerald-50 border-emerald-200'
-                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                }`}>
-                <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
-                  checkout[item.id] ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'
-                }`}>
-                  {checkout[item.id] && <CheckCircle size={12} className="text-white" />}
-                </div>
-                <input type="checkbox" className="sr-only"
-                  checked={checkout[item.id]}
-                  onChange={() => handleCheckoutToggle(item.id)} />
-                <span className={`text-sm ${checkout[item.id] ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                  {item.label}
-                </span>
-              </label>
-            ))}
-
-            {/* Progress bar */}
-            <div className="pt-2">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Progress</span>
-                <span>{Math.round((checkoutCount / CHECKOUT_HANDOVER_ITEMS.length) * 100)}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                  style={{ width: `${(checkoutCount / CHECKOUT_HANDOVER_ITEMS.length) * 100}%` }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Final mileage + checkout notes */}
-          <div className="px-5 pb-4 space-y-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">
-                Final Mileage (km) — optional
-              </label>
-              <div className="relative">
-                <Gauge size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="number" value={finalMileage}
-                  onChange={e => setFinalMileage(e.target.value)}
-                  placeholder={workOrder.initial_mileage ? `Started at ${Number(workOrder.initial_mileage).toLocaleString('en-KE')} km` : 'Enter final odometer reading'}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-400" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Checkout Notes (optional)</label>
-              <textarea value={checkoutNotes} onChange={e => setCheckoutNotes(e.target.value)}
-                placeholder="Any handover notes for the customer..."
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-gray-400" />
-            </div>
-          </div>
-
-          <div className="px-5 pb-5 flex gap-2">
-            <button onClick={() => { setError(''); setActiveSection('road_test') }}
-              className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">
-              ← Back
-            </button>
-            <button
-              onClick={handleCheckout}
-              disabled={saving || !checkoutAll}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              {saving
-                ? <Loader2 size={16} className="animate-spin" />
-                : <BadgeCheck size={16} />
+          {/* Step indicator */}
+          <div className="flex items-center gap-1">
+            <button onClick={() => setActiveSection('road_test')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeSection === 'road_test'
+                  ? 'bg-gray-900 text-white'
+                  : roadTestAll ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+              {roadTestAll
+                ? <CheckCircle size={13} />
+                : <span className="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center text-[10px]">1</span>
               }
-              {saving ? 'Processing…' : 'Confirm Checkout & Close Work Order'}
+              Road Test ({roadTestDone}/{CHECKOUT_ROAD_TEST_ITEMS.length})
+            </button>
+            <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
+            <button onClick={() => { if (roadTestAll) setActiveSection('checkout') }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeSection === 'checkout'
+                  ? 'bg-gray-900 text-white'
+                  : handoverAll ? 'bg-emerald-100 text-emerald-700'
+                  : roadTestAll ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+              }`}>
+              {handoverAll
+                ? <CheckCircle size={13} />
+                : <span className="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center text-[10px]">2</span>
+              }
+              Checkout ({handoverDone}/{CHECKOUT_HANDOVER_ITEMS.length})
             </button>
           </div>
+
+          {/* Error */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-sm">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={14} />
+              <p className="text-red-700 flex-1">{error}</p>
+              <button onClick={() => setError('')}><X size={14} className="text-red-400" /></button>
+            </div>
+          )}
+
+          {/* Road test notes + proceed */}
+          {activeSection === 'road_test' && (
+            <>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Test Notes (optional)
+                </label>
+                <textarea value={testNotes} onChange={e => setTestNotes(e.target.value)}
+                  placeholder="Any observations during the road test..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-gray-400" />
+              </div>
+              <button
+                onClick={() => {
+                  if (!roadTestAll) { setError('Complete all road-test items to proceed.'); return }
+                  setError(''); setActiveSection('checkout')
+                }}
+                disabled={!roadTestAll}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-40 transition-colors">
+                <ChevronRight size={16} /> Proceed to Checkout
+              </button>
+            </>
+          )}
+
+          {/* Checkout details + confirm */}
+          {activeSection === 'checkout' && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Final Mileage (km) — optional
+                  </label>
+                  <div className="relative">
+                    <Gauge size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input type="number" value={finalMileage}
+                      onChange={e => setFinalMileage(e.target.value)}
+                      placeholder={workOrder.initial_mileage
+                        ? `Started at ${Number(workOrder.initial_mileage).toLocaleString('en-KE')} km`
+                        : 'Odometer reading'}
+                      className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-400" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Checkout Notes (optional)
+                  </label>
+                  <input type="text" value={checkoutNotes} onChange={e => setCheckoutNotes(e.target.value)}
+                    placeholder="Any handover notes..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-400" />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => { setError(''); setActiveSection('road_test') }}
+                  className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">
+                  ← Back
+                </button>
+                <button
+                  onClick={handleCheckout}
+                  disabled={saving || !handoverAll}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors">
+                  {saving
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <BadgeCheck size={16} />
+                  }
+                  {saving ? 'Processing…' : 'Confirm Checkout & Close Work Order'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
