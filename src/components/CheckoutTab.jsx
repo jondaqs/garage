@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 
 // ── Road-test checklist ───────────────────────────────────────────────────────
-const ROAD_TEST_ITEMS = [
+const CHECKOUT_ROAD_TEST_ITEMS = [
   { id: 'engine_smooth',        label: 'Engine runs smoothly'                     },
   { id: 'no_unusual_noise',     label: 'No unusual noises during drive'           },
   { id: 'brakes_responsive',    label: 'Brakes responsive and not pulling'        },
@@ -33,7 +33,7 @@ const ROAD_TEST_ITEMS = [
 ]
 
 // ── Checkout checklist ────────────────────────────────────────────────────────
-const CHECKOUT_ITEMS = [
+const CHECKOUT_HANDOVER_ITEMS = [
   { id: 'vehicle_clean',        label: 'Vehicle returned clean'                   },
   { id: 'personal_items_ok',    label: 'Customer personal items in place'         },
   { id: 'fuel_level_noted',     label: 'Fuel level noted and communicated'        },
@@ -57,10 +57,10 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
   const [error,         setError]         = useState('')
   const [success,       setSuccess]       = useState('')
   const [roadTest,      setRoadTest]      = useState(
-    Object.fromEntries(ROAD_TEST_ITEMS.map(i => [i.id, false]))
+    Object.fromEntries(CHECKOUT_ROAD_TEST_ITEMS.map(i => [i.id, false]))
   )
   const [checkout,      setCheckout]      = useState(
-    Object.fromEntries(CHECKOUT_ITEMS.map(i => [i.id, false]))
+    Object.fromEntries(CHECKOUT_HANDOVER_ITEMS.map(i => [i.id, false]))
   )
   const [finalMileage,  setFinalMileage]  = useState(workOrder.final_mileage?.toString() || '')
   const [testNotes,     setTestNotes]     = useState('')
@@ -72,10 +72,10 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
   const isPaid         = statusCode === 'closed' || statusCode === 'paid'
   const isCompleted    = ['completed', 'closed'].includes(statusCode)
 
-  const roadTestAll    = ROAD_TEST_ITEMS.every(i => roadTest[i.id])
-  const checkoutAll    = CHECKOUT_ITEMS.every(i => checkout[i.id])
-  const roadTestCount  = ROAD_TEST_ITEMS.filter(i => roadTest[i.id]).length
-  const checkoutCount  = CHECKOUT_ITEMS.filter(i => checkout[i.id]).length
+  const roadTestAll    = CHECKOUT_ROAD_TEST_ITEMS.every(i => roadTest[i.id])
+  const checkoutAll    = CHECKOUT_HANDOVER_ITEMS.every(i => checkout[i.id])
+  const roadTestCount  = CHECKOUT_ROAD_TEST_ITEMS.filter(i => roadTest[i.id]).length
+  const checkoutCount  = CHECKOUT_HANDOVER_ITEMS.filter(i => checkout[i.id]).length
 
   const handleRoadTestToggle = (id) =>
     setRoadTest(r => ({ ...r, [id]: !r[id] }))
@@ -144,7 +144,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-xs text-emerald-700 font-semibold mb-0.5">Checkout Time</p>
-            <p className="font-semibold text-gray-900">{fmtD(workOrder.vehicle_checked_out_at)}</p>
+            <p className="font-semibold text-gray-900">{checkoutFmtD(workOrder.vehicle_checked_out_at)}</p>
           </div>
           {workOrder.final_mileage && (
             <div>
@@ -213,7 +213,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
             ? <CheckCircle size={13} />
             : <span className="w-4 h-4 rounded-full border-2 border-current text-center leading-3 text-[10px]">1</span>
           }
-          Road Test ({roadTestCount}/{ROAD_TEST_ITEMS.length})
+          Road Test ({roadTestCount}/{CHECKOUT_ROAD_TEST_ITEMS.length})
         </button>
         <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
         <button
@@ -228,7 +228,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
             ? <CheckCircle size={13} />
             : <span className="w-4 h-4 rounded-full border-2 border-current text-center leading-3 text-[10px]">2</span>
           }
-          Checkout ({checkoutCount}/{CHECKOUT_ITEMS.length})
+          Checkout ({checkoutCount}/{CHECKOUT_HANDOVER_ITEMS.length})
         </button>
       </div>
 
@@ -253,11 +253,11 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
             <Car size={16} className="text-blue-600" />
             <p className="font-semibold text-gray-900 text-sm">Road Test Checklist</p>
-            <span className="ml-auto text-xs text-gray-500">{roadTestCount}/{ROAD_TEST_ITEMS.length}</span>
+            <span className="ml-auto text-xs text-gray-500">{roadTestCount}/{CHECKOUT_ROAD_TEST_ITEMS.length}</span>
           </div>
 
           <div className="px-5 py-4 space-y-2">
-            {ROAD_TEST_ITEMS.map(item => (
+            {CHECKOUT_ROAD_TEST_ITEMS.map(item => (
               <label key={item.id}
                 className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                   roadTest[item.id]
@@ -282,11 +282,11 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
             <div className="pt-2">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Progress</span>
-                <span>{Math.round((roadTestCount / ROAD_TEST_ITEMS.length) * 100)}%</span>
+                <span>{Math.round((roadTestCount / CHECKOUT_ROAD_TEST_ITEMS.length) * 100)}%</span>
               </div>
               <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                  style={{ width: `${(roadTestCount / ROAD_TEST_ITEMS.length) * 100}%` }} />
+                  style={{ width: `${(roadTestCount / CHECKOUT_ROAD_TEST_ITEMS.length) * 100}%` }} />
               </div>
             </div>
           </div>
@@ -321,11 +321,11 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
             <ClipboardCheck size={16} className="text-emerald-600" />
             <p className="font-semibold text-gray-900 text-sm">Vehicle Checkout</p>
-            <span className="ml-auto text-xs text-gray-500">{checkoutCount}/{CHECKOUT_ITEMS.length}</span>
+            <span className="ml-auto text-xs text-gray-500">{checkoutCount}/{CHECKOUT_HANDOVER_ITEMS.length}</span>
           </div>
 
           <div className="px-5 py-4 space-y-2">
-            {CHECKOUT_ITEMS.map(item => (
+            {CHECKOUT_HANDOVER_ITEMS.map(item => (
               <label key={item.id}
                 className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                   checkout[item.id]
@@ -350,11 +350,11 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
             <div className="pt-2">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Progress</span>
-                <span>{Math.round((checkoutCount / CHECKOUT_ITEMS.length) * 100)}%</span>
+                <span>{Math.round((checkoutCount / CHECKOUT_HANDOVER_ITEMS.length) * 100)}%</span>
               </div>
               <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                  style={{ width: `${(checkoutCount / CHECKOUT_ITEMS.length) * 100}%` }} />
+                  style={{ width: `${(checkoutCount / CHECKOUT_HANDOVER_ITEMS.length) * 100}%` }} />
               </div>
             </div>
           </div>
