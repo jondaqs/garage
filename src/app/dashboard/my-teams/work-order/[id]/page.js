@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import dynamic from 'next/dynamic'
+const CheckoutTab = dynamic(() => import('@/components/CheckoutTab'), { ssr: false })
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -16,7 +18,6 @@ import QualityCheckTab    from '@/app/provider/work-orders/[id]/components/Quali
 import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
 import InvoiceTab         from '@/app/provider/work-orders/[id]/components/InvoiceTab'
 import ReceiptTab         from '@/components/ReceiptTab'
-import CheckoutTab        from '@/components/CheckoutTab'
 import EstimateReviewPanel from '@/app/provider/work-orders/[id]/components/EstimateReviewPanel'
 
 const STATUS_COLORS = {
@@ -38,19 +39,36 @@ const STATUS_COLORS = {
 // Tabs available and their minimum permission requirement
 // 'any' = all mechanics can see, 'can_approve_work' = gated
 class WOErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null } }
+  constructor(props) { super(props); this.state = { error: null, errorInfo: null } }
   static getDerivedStateFromError(error) { return { error } }
   componentDidCatch(error, info) {
-    console.error('[MyTeams WO] Render error:', error?.message, info?.componentStack?.split('\n')[1])
+    console.error('[MyTeams WO] === RENDER ERROR ===')
+    console.error('[MyTeams WO] Message:', error?.message)
+    console.error('[MyTeams WO] Stack:', error?.stack)
+    console.error('[MyTeams WO] Component:', info?.componentStack)
+    this.setState({ errorInfo: info })
   }
   render() {
     if (this.state.error) {
       return (
-        <div className="p-6 bg-red-50 border border-red-200 rounded-xl m-4">
-          <p className="text-red-800 font-semibold text-sm mb-1">Failed to render work order</p>
-          <p className="text-red-600 text-xs font-mono break-all">{this.state.error.message}</p>
-          <button onClick={() => this.setState({ error: null })}
-            className="mt-3 px-3 py-1.5 bg-red-600 text-white rounded text-xs">Retry</button>
+        <div className="p-6 bg-red-50 border border-red-200 rounded-xl m-4 space-y-3">
+          <p className="text-red-800 font-bold text-sm">Work order failed to render</p>
+          <div className="bg-white border border-red-200 rounded-lg p-3">
+            <p className="text-xs font-semibold text-red-700 mb-1">Error</p>
+            <p className="text-xs font-mono text-red-600 break-all">{this.state.error.message}</p>
+          </div>
+          {this.state.errorInfo && (
+            <details className="text-xs">
+              <summary className="text-red-600 cursor-pointer font-medium">Component stack (click to expand)</summary>
+              <pre className="mt-2 text-red-500 bg-white rounded p-2 overflow-auto text-xs border border-red-100 max-h-40">
+                {this.state.errorInfo.componentStack}
+              </pre>
+            </details>
+          )}
+          <button onClick={() => this.setState({ error: null, errorInfo: null })}
+            className="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-medium">
+            Retry
+          </button>
         </div>
       )
     }
