@@ -791,7 +791,7 @@ export default function MechanicWorkOrderPage() {
               <CheckoutTab
                 workOrder={woWithProvider}
                 canCheckout={canCheckout}
-                onStatusChange={() => { loadWorkOrder() }}
+                onStatusChange={() => { load() }}
               />
             )}
             {activeTab === 'recommendations' && (canApprove || isAdmin) && (
