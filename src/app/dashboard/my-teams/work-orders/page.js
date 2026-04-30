@@ -58,12 +58,13 @@ function getActionNeeded(wo, userRole, canSendEstimates, canSendInvoice) {
 }
 
 const FILTER_OPTIONS = [
-  { value: 'action',      label: 'Action needed'   },
-  { value: 'all',         label: 'All active'      },
-  { value: 'internal_review',   label: 'Estimate review' },
+  { value: 'action',            label: 'Action needed'     },
+  { value: 'all',               label: 'All active'        },
+  { value: 'in_progress',       label: 'In progress'       },
+  { value: 'internal_review',   label: 'Estimate review'   },
   { value: 'awaiting_approval', label: 'Awaiting approval' },
-  { value: 'completed',   label: 'Completed'       },
-  { value: 'in_progress', label: 'In progress'     },
+  { value: 'completed',         label: 'Completed'         },
+  { value: 'history',           label: 'Closed / History'  },
 ]
 
 export default function MemberWorkOrdersPage() {
@@ -71,6 +72,7 @@ export default function MemberWorkOrdersPage() {
   const supabase = createClient()
 
   const [workOrders,      setWorkOrders]      = useState([])
+  const [closedOrders,    setClosedOrders]    = useState([])  // terminal WOs (completed/closed)
   const [userPerms,       setUserPerms]       = useState({}) // map providerId → { role, can_send_estimates, can_send_invoice }
   const [loading,         setLoading]         = useState(true)
   const [refreshing,      setRefreshing]      = useState(false)
@@ -107,10 +109,40 @@ export default function MemberWorkOrdersPage() {
       const merged  = [...mechWOs, ...spuWOs.filter(w => !seen.has(w.id))]
       setWorkOrders(merged)
 
-      // ── 4. Build perms map per provider ──────────────────────────────────
+      // ── 4. Fetch terminal (completed/closed) WOs for same providers ─────
+      // The RPCs exclude terminal WOs (wos.is_terminal = false), so we query directly.
+      const providerIds = [...new Set(merged.map(w => w.service_provider_id).filter(Boolean))]
+      let closed = []
+      if (providerIds.length > 0) {
+        // Get terminal status ids
+        const { data: termStatuses } = await supabase
+          .from('work_order_statuses')
+          .select('id, code, display_name')
+          .eq('is_terminal', true)
+        const termIds = termStatuses?.map(s => s.id) || []
+
+        if (termIds.length > 0) {
+          const { data: closedWOs } = await supabase
+            .from('work_orders')
+            .select(`
+              id, work_order_number, opened_at, completed_at, closed_at, total_amount,
+              service_provider_id,
+              status:work_order_statuses(code, display_name),
+              vehicle:vehicles(plate_number, make, model)
+            `)
+            .in('service_provider_id', providerIds)
+            .in('status_id', termIds)
+            .order('opened_at', { ascending: false })
+            .limit(50)
+          closed = closedWOs || []
+        }
+      }
+      setClosedOrders(closed)
+
+      // ── 5. Build perms map per provider ──────────────────────────────────
       const permsMap = {}
       for (const wo of merged) {
-        const pid = wo.provider?.id
+        const pid = wo.provider?.id || wo.service_provider_id
         if (!pid || permsMap[pid]) continue
         permsMap[pid] = {
           role:               wo.role || null,
@@ -169,14 +201,32 @@ export default function MemberWorkOrdersPage() {
     return getActionNeeded(wo, p.role, p.can_send_estimates, p.can_send_invoice) !== null
   })
 
+  const allForFilter = filter === 'history'
+    ? closedOrders
+    : filter === 'completed'
+    ? [...workOrders.filter(w => w.status?.code === 'completed'), ...closedOrders.filter(w => w.status?.code === 'completed')]
+    : workOrders
+
   const filtered = filter === 'action'
     ? withAction
     : filter === 'all'
     ? workOrders
-    : workOrders.filter(w => w.status?.code === filter)
+    : filter === 'history'
+    ? closedOrders
+    : allForFilter.filter(w => w.status?.code === filter)
 
   // ── Grouped by provider ───────────────────────────────────────────────────
-  const grouped = filtered.reduce((acc, wo) => {
+  // Enrich closed WOs with provider name from permsMap if provider obj is missing
+  const enriched = filtered.map(wo => {
+    if (wo.provider?.name) return wo
+    // closedOrders have service_provider_id but no joined provider obj
+    const pid = wo.service_provider_id
+    // find provider name from active WOs
+    const activeMatch = workOrders.find(w => (w.provider?.id || w.service_provider_id) === pid)
+    return { ...wo, provider: activeMatch?.provider || { name: 'Provider' } }
+  })
+
+  const grouped = enriched.reduce((acc, wo) => {
     const key = wo.provider?.name || 'Unknown Garage'
     if (!acc[key]) acc[key] = []
     acc[key].push(wo)
@@ -232,7 +282,7 @@ export default function MemberWorkOrdersPage() {
             </button>
           )}
 
-          <span className="text-sm text-gray-400">{workOrders.length} total</span>
+          <span className="text-sm text-gray-400">{workOrders.length} active · {closedOrders.length} closed</span>
 
           {/* Filter dropdown */}
           <div className="relative ml-auto">
