@@ -367,14 +367,13 @@ export default function MechanicWorkOrderPage() {
   const isPending     = assignStatus === 'pending'
   const isAcknowledged= assignStatus === 'acknowledged'
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
+  const isAdmin         = ['admin', 'accountant'].includes(memberPerms?.role)
   const canApprove      = !!perms?.can_approve_work
   const canSendEst      = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
   const canSendInvoice  = !!(perms?.can_send_invoice   || memberPerms?.can_send_invoice)
-  const isAdmin         = ['admin', 'accountant'].includes(memberPerms?.role)
   const canCheckout     = isAdmin || !!(perms?.can_approve_work || memberPerms?.can_approve_work)
   const isMechanic      = !!perms?.mechanic_id || !memberPerms   // has mechanic record
   const memberRole      = memberPerms?.role || (isMechanic ? 'mechanic' : null)
-  
   const isAssigned      = !!perms?.is_assigned
 
   // Invoice permissions — admins get full access; can_send_invoice gives full invoice access including generate
