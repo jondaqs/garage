@@ -23,15 +23,15 @@ const METHOD_ICONS = {
   bank_transfer: Building2, cheque: FileText,
 }
 
-function fmt(n)  { return `KES ${Number(n || 0).toLocaleString('en-KE')}` }
-function fmtD(d) {
+function receiptFmt(n)  { return `KES ${Number(n || 0).toLocaleString('en-KE')}` }
+function receiptFmtD(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
 }
-function fmtDs(d) {
+function receiptFmtDs(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -287,7 +287,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
     <div className="text-center py-12 text-gray-400">
       <Clock size={40} className="mx-auto mb-3 opacity-40" />
       <p className="text-sm font-medium">Awaiting Payment</p>
-      <p className="text-xs mt-1">Invoice {invoice.invoice_number} · {fmt(invoice.total_amount)}</p>
+      <p className="text-xs mt-1">Invoice {invoice.invoice_number} · {receiptFmt(invoice.total_amount)}</p>
       <p className="text-xs mt-1 text-gray-400">A receipt will appear here once payment is submitted.</p>
     </div>
   )
@@ -329,7 +329,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
           receipt={receipt} invoice={invoice} items={items}
           vehicle={vehicle} provider={provider} customer={customer}
           custName={custName} services={services} parts={parts}
-          tax={tax} fmt={fmt} fmtD={fmtD} fmtDs={fmtDs}
+          tax={tax} fmt={receiptFmt} fmtD={receiptFmtD} fmtDs={receiptFmtDs}
           MethodIcon={MethodIcon} isConfirmed={isConfirmed}
         />
       </div>

@@ -42,7 +42,7 @@ const CHECKOUT_HANDOVER_ITEMS = [
   { id: 'payment_confirmed',    label: 'Payment confirmed / invoice settled'      },
 ]
 
-function fmtD(d) {
+function checkoutFmtD(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'short', year: 'numeric',

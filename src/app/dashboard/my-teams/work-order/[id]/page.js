@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -37,6 +37,27 @@ const STATUS_COLORS = {
 
 // Tabs available and their minimum permission requirement
 // 'any' = all mechanics can see, 'can_approve_work' = gated
+class WOErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) {
+    console.error('[MyTeams WO] Render error:', error?.message, info?.componentStack?.split('\n')[1])
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-6 bg-red-50 border border-red-200 rounded-xl m-4">
+          <p className="text-red-800 font-semibold text-sm mb-1">Failed to render work order</p>
+          <p className="text-red-600 text-xs font-mono break-all">{this.state.error.message}</p>
+          <button onClick={() => this.setState({ error: null })}
+            className="mt-3 px-3 py-1.5 bg-red-600 text-white rounded text-xs">Retry</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 const ALL_TABS = [
   { id: 'overview',        label: 'Overview',          icon: ClipboardList, perm: 'any'              },
   { id: 'issues',          label: 'Issues/Diagnostics',icon: AlertCircle,   perm: 'can_approve_work' },
@@ -365,6 +386,7 @@ export default function MechanicWorkOrderPage() {
   })
 
   return (
+    <WOErrorBoundary>
     <div className="max-w-4xl mx-auto space-y-5">
       {/* Back */}
       <button onClick={() => router.push('/dashboard/my-teams')}
@@ -776,5 +798,6 @@ export default function MechanicWorkOrderPage() {
         </div>
       )}
     </div>
+    </WOErrorBoundary>
   )
 }
