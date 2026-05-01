@@ -15,8 +15,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Car, CheckCircle, AlertCircle, Loader2, ClipboardCheck,
-  Gauge, ChevronRight, BadgeCheck, X, Wrench
+  Car, CheckCircle, XCircle, AlertCircle, Loader2, ClipboardCheck,
+  Gauge, ChevronRight, BadgeCheck, X, Wrench, Clock
 } from 'lucide-react'
 
 const CHECKOUT_ROAD_TEST_ITEMS = [
@@ -341,27 +341,27 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         </div>
       )}
 
-      {/* ── Road Test checklist — always visible after completion ── */}
-      <ChecklistPanel
-        title="Road Test Checklist"
-        icon={Car}
-        color="text-blue-600"
-        items={CHECKOUT_ROAD_TEST_ITEMS}
-        values={roadTest}
-        onChange={(!isLocked && !isCheckedOut) ? handleRoadTestToggle : undefined}
-        readonly={isLocked || isCheckedOut}
-      />
-
-      {/* ── Handover checklist — always visible after completion ── */}
-      <ChecklistPanel
-        title="Vehicle Handover"
-        icon={ClipboardCheck}
-        color="text-emerald-600"
-        items={CHECKOUT_HANDOVER_ITEMS}
-        values={handover}
-        onChange={(!isLocked && !isCheckedOut) ? handleHandoverToggle : undefined}
-        readonly={isLocked || isCheckedOut}
-      />
+      {/* ── Road Test + Handover checklists — side by side ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ChecklistPanel
+          title="Road Test Checklist"
+          icon={Car}
+          color="text-blue-600"
+          items={CHECKOUT_ROAD_TEST_ITEMS}
+          values={roadTest}
+          onChange={(!isLocked && !isCheckedOut) ? handleRoadTestToggle : undefined}
+          readonly={isLocked || isCheckedOut}
+        />
+        <ChecklistPanel
+          title="Vehicle Handover"
+          icon={ClipboardCheck}
+          color="text-emerald-600"
+          items={CHECKOUT_HANDOVER_ITEMS}
+          values={handover}
+          onChange={(!isLocked && !isCheckedOut) ? handleHandoverToggle : undefined}
+          readonly={isLocked || isCheckedOut}
+        />
+      </div>
 
       {/* ── Locked notice when submitted and awaiting customer ── */}
       {isSubmitted && !isDeclined && !isCheckedOut && (
