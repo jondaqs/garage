@@ -118,8 +118,11 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
   const [success,        setSuccess]        = useState('')
 
   const statusCode  = workOrder.status?.code
-  const isCheckedOut = !!(workOrder.vehicle_checked_out_at)
-  const isCompleted  = ['completed', 'closed'].includes(statusCode)
+  const isCheckedOut = statusCode === 'closed' || !!(workOrder.vehicle_checked_out_at && checkoutRecord?.customer_acceptance_status === 'accepted')
+  const isSubmitted  = !!(checkoutRecord?.confirmed_at)  // provider submitted, awaiting customer
+  const isDeclined   = checkoutRecord?.customer_acceptance_status === 'declined'
+  const isLocked     = isSubmitted && !isDeclined  // lock checklists unless customer declined
+  const isCompleted  = ['completed', 'closed', 'awaiting_customer_checkout'].includes(statusCode)
 
   // ── Load existing checkout record ─────────────────────────────────────────
   const loadCheckout = useCallback(async () => {
@@ -233,9 +236,13 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
       if (rpcErr) throw rpcErr
       if (!result.success) throw new Error(result.error)
 
-      setSuccess('Vehicle checked out successfully. Work order closed.')
+      // Fire email + SMS notification to car owner (non-blocking)
+      fetch(`/api/work-orders/${workOrder.id}/checkout-notify`, { method: 'POST' })
+        .catch(e => console.warn('[checkout-notify]', e.message))
+
+      setSuccess('Checkout submitted. The customer will be notified to confirm.')
       await loadCheckout()
-      onStatusChange?.('closed')
+      onStatusChange?.('awaiting_customer_checkout')
     } catch (e) {
       setError(e.message)
     } finally {
@@ -341,8 +348,8 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         color="text-blue-600"
         items={CHECKOUT_ROAD_TEST_ITEMS}
         values={roadTest}
-        onChange={!isCheckedOut ? handleRoadTestToggle : undefined}
-        readonly={isCheckedOut}
+        onChange={(!isLocked && !isCheckedOut) ? handleRoadTestToggle : undefined}
+        readonly={isLocked || isCheckedOut}
       />
 
       {/* ── Handover checklist — always visible after completion ── */}
@@ -352,12 +359,43 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         color="text-emerald-600"
         items={CHECKOUT_HANDOVER_ITEMS}
         values={handover}
-        onChange={!isCheckedOut ? handleHandoverToggle : undefined}
-        readonly={isCheckedOut}
+        onChange={(!isLocked && !isCheckedOut) ? handleHandoverToggle : undefined}
+        readonly={isLocked || isCheckedOut}
       />
 
-      {/* ── Interactive flow (only when not yet checked out) ── */}
-      {!isCheckedOut && canCheckout && (
+      {/* ── Locked notice when submitted and awaiting customer ── */}
+      {isSubmitted && !isDeclined && !isCheckedOut && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-start gap-3">
+          <Clock size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Awaiting Customer Confirmation</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Checkout submitted on {checkoutFmtD(checkoutRecord?.confirmed_at)}.
+              The checklists are locked until the customer accepts or declines.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Declined notice ── */}
+      {isDeclined && !isCheckedOut && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+          <p className="text-sm font-semibold text-red-900 flex items-center gap-2">
+            <XCircle size={16} className="text-red-600" /> Customer Declined Checkout
+          </p>
+          {checkoutRecord?.customer_acceptance_notes && (
+            <p className="text-xs text-red-700 mt-1">
+              Reason: {checkoutRecord.customer_acceptance_notes}
+            </p>
+          )}
+          <p className="text-xs text-red-600 mt-2">
+            Please review the checklist items and resubmit.
+          </p>
+        </div>
+      )}
+
+      {/* ── Interactive flow (only when not locked and not yet accepted) ── */}
+      {!isLocked && !isCheckedOut && canCheckout && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
 
           {/* Step indicator */}
