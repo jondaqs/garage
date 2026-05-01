@@ -47,6 +47,8 @@ export default function MemberTeamPage() {
         .from('company_users')
         .select(`
           id, staff_role, is_admin, is_active, created_at,
+          can_approve_work, can_manage_team, can_manage_fleet,
+          can_approve_estimates, can_approve_checkout, can_approve_payment,
           user:user_profiles!company_users_user_id_fkey(
             id, first_name, last_name, email, phone
           )
@@ -135,12 +137,32 @@ export default function MemberTeamPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
                       <span className="text-sm text-gray-700 capitalize">{roleLabel(m.staff_role)}</span>
                       {m.is_admin && (
                         <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                           <Shield size={10} /> Admin
                         </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {m.can_approve_work && (
+                        <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium" title="Can approve work orders">WO</span>
+                      )}
+                      {m.can_approve_estimates && (
+                        <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium" title="Can approve estimates">EST</span>
+                      )}
+                      {m.can_approve_payment && (
+                        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium" title="Can approve payments">PAY</span>
+                      )}
+                      {m.can_manage_fleet && (
+                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium" title="Can manage fleet">FLEET</span>
+                      )}
+                      {m.can_manage_team && (
+                        <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>
+                      )}
+                      {m.can_approve_checkout && (
+                        <span className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded font-medium" title="Can approve checkout">CHKOUT</span>
                       )}
                     </div>
                   </td>
