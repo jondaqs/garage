@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import ReceiptCard from '@/components/ReceiptCard'
-import CheckoutAcceptanceCard from '@/components/CheckoutAcceptanceCard'
 
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
@@ -360,12 +359,6 @@ export default function CompanyWorkOrderInvoicePage() {
           <p className="text-sm text-amber-900">{inv.notes}</p>
         </div>
       )}
-
-      {/* ── Checkout Acceptance ─────────────────────────────────────────── */}
-      <CheckoutAcceptanceCard
-        workOrderId={params.id}
-        onDecided={loadInvoice}
-      />
 
       {/* ── Receipt ─────────────────────────────────────────────────────── */}
       {receipt && (

@@ -8,7 +8,7 @@ import {
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
   Loader2, DollarSign, ThumbsUp, ThumbsDown, Edit3,
   ChevronDown, ChevronUp, Building2, Star, FileText,
-  ChevronRight, Receipt
+  ChevronRight, Receipt, ClipboardCheck
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -529,6 +529,31 @@ export default function CompanyMemberWorkOrderDetailPage() {
       )}
 
       {/* ── Receipt banner (paid only) ── */}
+
+      {/* ── Checkout banner ── */}
+      {['awaiting_customer_checkout', 'closed'].includes(statusCode) && (
+        <div className="rounded-xl shadow-sm overflow-hidden border border-purple-200 bg-purple-50">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-purple-100">
+                <ClipboardCheck size={16} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Vehicle Checkout</p>
+                <p className="text-xs font-medium text-purple-700">
+                  {statusCode === 'closed' ? '✓ Checkout Accepted' : 'Awaiting Your Confirmation'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/dashboard/company/${companyId}/work-orders/${workOrderId}/checkout`)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-purple-600 text-white hover:bg-purple-700">
+              View Checkout <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {invoiceStatus === 'paid' && (
         <div className="rounded-xl shadow-sm overflow-hidden border border-emerald-200 bg-emerald-50">
           <div className="px-5 py-4 flex items-center justify-between">
