@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { UserPlus, Mail, Pencil, Check, X, Shield, Loader2, AlertCircle, Clock, Ban } from 'lucide-react'
+import { UserPlus, Mail, Pencil, Check, X, Shield, Loader2, AlertCircle, Clock, Ban, Settings } from 'lucide-react'
 
 const ROLE_OPTIONS = [
   { value: 'driver',        label: 'Driver'        },
