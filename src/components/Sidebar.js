@@ -74,6 +74,8 @@ export default function Sidebar({ user }) {
           is_admin,
           staff_role,
           is_active,
+          can_approve_work, can_manage_team, can_manage_fleet,
+          can_approve_estimates, can_approve_checkout, can_approve_payment,
           company:company_profiles(id, name, status)
         `)
         .eq('user_id', profile.id)
@@ -82,11 +84,17 @@ export default function Sidebar({ user }) {
 
       if (membership?.company) {
         setCompanyMembership({
-          id:        membership.company.id,
-          name:      membership.company.name,
-          status:    membership.company.status,
-          is_admin:  membership.is_admin,
-          staff_role: membership.staff_role,
+          id:                   membership.company.id,
+          name:                 membership.company.name,
+          status:               membership.company.status,
+          is_admin:             membership.is_admin,
+          staff_role:           membership.staff_role,
+          can_approve_work:     !!membership.can_approve_work,
+          can_manage_team:      !!membership.can_manage_team,
+          can_manage_fleet:     !!membership.can_manage_fleet,
+          can_approve_estimates:!!membership.can_approve_estimates,
+          can_approve_checkout: !!membership.can_approve_checkout,
+          can_approve_payment:  !!membership.can_approve_payment,
         })
         // Auto-open company section if we're already on a company page
         if (pathname.includes('/dashboard/company/')) {
@@ -303,6 +311,27 @@ export default function Sidebar({ user }) {
                         {companyMembership.staff_role}
                         {companyMembership.is_admin ? ' · Admin' : ''}
                       </p>
+                      {/* Permission badges */}
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {companyMembership.can_approve_work && (
+                          <span className="text-[10px] px-1 py-0.5 bg-purple-100 text-purple-700 rounded font-semibold" title="Can approve work orders">WO</span>
+                        )}
+                        {companyMembership.can_approve_estimates && (
+                          <span className="text-[10px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded font-semibold" title="Can approve estimates">EST</span>
+                        )}
+                        {companyMembership.can_approve_payment && (
+                          <span className="text-[10px] px-1 py-0.5 bg-green-100 text-green-700 rounded font-semibold" title="Can approve payments">PAY</span>
+                        )}
+                        {companyMembership.can_manage_fleet && (
+                          <span className="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold" title="Can manage fleet">FLEET</span>
+                        )}
+                        {companyMembership.can_manage_team && (
+                          <span className="text-[10px] px-1 py-0.5 bg-orange-100 text-orange-700 rounded font-semibold" title="Can manage team">TEAM</span>
+                        )}
+                        {companyMembership.can_approve_checkout && (
+                          <span className="text-[10px] px-1 py-0.5 bg-teal-100 text-teal-700 rounded font-semibold" title="Can approve checkout">CHKOUT</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
