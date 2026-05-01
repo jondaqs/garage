@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { UserPlus, Mail, Pencil, Check, X, Shield, Loader2, AlertCircle, Clock, Ban, Settings } from 'lucide-react'
 
 const ROLE_OPTIONS = [
@@ -23,6 +24,10 @@ export default function TeamPage() {
   const [success,        setSuccess]        = useState(null)
   const [cancellingId,   setCancellingId]   = useState(null)  // invite id being cancelled
   const [confirmCancel,  setConfirmCancel]  = useState(null)  // invite id awaiting confirm
+  const [rolesModal,     setRolesModal]     = useState(null)
+  const [rolesForm,      setRolesForm]      = useState({})
+  const [savingRoles,    setSavingRoles]    = useState(false)
+  const [rolesError,     setRolesError]     = useState('')
 
   const [inviteForm, setInviteForm] = useState({
     email: '', firstName: '', lastName: '', staffRole: 'driver', isAdmin: false,
@@ -130,8 +135,58 @@ export default function TeamPage() {
     }
   }
 
+  const supabase = createClient()
+
+  const PERM_DEFS = [
+    { key: 'can_approve_work',      label: 'Approve Work Orders',   desc: 'Can approve work to proceed on fleet vehicles'   },
+    { key: 'can_manage_team',       label: 'Manage Team',           desc: 'Can add, edit, and suspend team members'         },
+    { key: 'can_manage_fleet',      label: 'Manage Fleet',          desc: 'Can add/edit/assign fleet vehicles'              },
+    { key: 'can_approve_estimates', label: 'Approve Estimates',     desc: 'Can approve service estimates from providers'    },
+    { key: 'can_approve_checkout',  label: 'Approve Checkout',      desc: 'Can accept or decline vehicle checkout'          },
+    { key: 'can_approve_payment',   label: 'Approve Payments',      desc: 'Can confirm and approve invoice payments'        },
+  ]
+
   const roleLabel = (role) =>
     ROLE_OPTIONS.find(r => r.value === role)?.label ?? (role || 'Member')
+
+  const openRolesModal = (member) => {
+    setRolesForm({
+      can_approve_work:      !!member.can_approve_work,
+      can_manage_team:       !!member.can_manage_team,
+      can_manage_fleet:      !!member.can_manage_fleet,
+      can_approve_estimates: !!member.can_approve_estimates,
+      can_approve_checkout:  !!member.can_approve_checkout,
+      can_approve_payment:   !!member.can_approve_payment,
+    })
+    setRolesError('')
+    setRolesModal(member)
+  }
+
+  const handleSaveRoles = async () => {
+    if (!rolesModal) return
+    setSavingRoles(true); setRolesError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: result, error: rpcErr } = await supabase.rpc('update_company_member_roles', {
+        p_member_id:              rolesModal.id,
+        p_caller_auth_uid:        user.id,
+        p_can_approve_work:       rolesForm.can_approve_work,
+        p_can_manage_team:        rolesForm.can_manage_team,
+        p_can_manage_fleet:       rolesForm.can_manage_fleet,
+        p_can_approve_estimates:  rolesForm.can_approve_estimates,
+        p_can_approve_checkout:   rolesForm.can_approve_checkout,
+        p_can_approve_payment:    rolesForm.can_approve_payment,
+      })
+      if (rpcErr) throw rpcErr
+      if (!result.success) throw new Error(result.error)
+      setRolesModal(null)
+      fetchTeam()
+    } catch (e) {
+      setRolesError(e.message)
+    } finally {
+      setSavingRoles(false)
+    }
+  }
 
   const inp = 'w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
@@ -381,6 +436,71 @@ export default function TeamPage() {
           </div>
         )}
       </div>
+
+
+      {/* ── Manage Roles Modal ─────────────────────────────────────────── */}
+      {rolesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-indigo-600" /> Manage Roles
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {rolesModal.user?.first_name} {rolesModal.user?.last_name}
+                  {rolesModal.staff_role && (
+                    <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">
+                      {roleLabel(rolesModal.staff_role)}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button onClick={() => setRolesModal(null)}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2 mb-5">
+              {PERM_DEFS.map(p => (
+                <label key={p.key}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    rolesForm[p.key] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                  }`}>
+                  <div className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
+                    rolesForm[p.key] ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'
+                  }`}>
+                    {rolesForm[p.key] && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <input type="checkbox" className="sr-only"
+                    checked={!!rolesForm[p.key]}
+                    onChange={e => setRolesForm(f => ({ ...f, [p.key]: e.target.checked }))} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${rolesForm[p.key] ? 'text-indigo-900' : 'text-gray-700'}`}>{p.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{p.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            {rolesError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-4">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />{rolesError}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={handleSaveRoles} disabled={savingRoles}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {savingRoles ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {savingRoles ? 'Saving…' : 'Save Roles'}
+              </button>
+              <button onClick={() => setRolesModal(null)}
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 text-gray-600">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Invite Modal ─────────────────────────────────────────────────── */}
       {showInviteForm && (
