@@ -414,6 +414,27 @@ export default function TeamPage() {
                           </div>
                           <p className="text-xs text-gray-500 truncate">{email}</p>
                           <p className="text-xs text-gray-400 capitalize mt-0.5">{roleLabel(member.staff_role)}</p>
+                          {/* Permission badges */}
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {member.can_approve_work && (
+                              <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium" title="Can approve work orders">WO</span>
+                            )}
+                            {member.can_approve_estimates && (
+                              <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium" title="Can approve estimates">EST</span>
+                            )}
+                            {member.can_approve_payment && (
+                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium" title="Can approve payments">PAY</span>
+                            )}
+                            {member.can_manage_fleet && (
+                              <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium" title="Can manage fleet">FLEET</span>
+                            )}
+                            {member.can_manage_team && (
+                              <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>
+                            )}
+                            {member.can_approve_checkout && (
+                              <span className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded font-medium" title="Can approve checkout">CHKOUT</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {member.staff_role !== 'owner' && (
