@@ -42,10 +42,11 @@ function fmtD(d) {
   })
 }
 
-function ChecklistSection({ title, icon: Icon, color, labels, data }) {
+function ChecklistSection({ title, icon: Icon, color, labels, data, autoValues = {} }) {
   const [open, setOpen] = useState(true)
   const keys   = Object.keys(labels)
-  const passed = keys.filter(k => data?.[k]).length
+  const merged = { ...data, ...autoValues }    // autoValues override DB values
+  const passed = keys.filter(k => merged?.[k]).length
   const total  = keys.length
 
   return (
@@ -63,19 +64,36 @@ function ChecklistSection({ title, icon: Icon, color, labels, data }) {
       </button>
       {open && (
         <div className="px-5 py-4 space-y-2">
-          {keys.map(k => (
-            <div key={k} className={`flex items-center gap-2.5 p-3 rounded-xl text-sm ${
-              data?.[k] ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'
-            }`}>
-              {data?.[k]
-                ? <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
-                : <XCircle    size={14} className="text-red-500 flex-shrink-0" />
-              }
-              <span className={data?.[k] ? 'text-emerald-800 font-medium' : 'text-red-700'}>
-                {labels[k]}
-              </span>
-            </div>
-          ))}
+          {keys.map(k => {
+            const isAuto = k in autoValues
+            const val    = merged?.[k]
+            return (
+              <div key={k} className={`flex items-center gap-2.5 p-3 rounded-xl text-sm ${
+                val
+                  ? isAuto ? 'bg-blue-50 border border-blue-100' : 'bg-emerald-50 border border-emerald-100'
+                  : 'bg-red-50 border border-red-100'
+              }`}>
+                {val
+                  ? isAuto
+                    ? <CheckCircle size={14} className="text-blue-500 flex-shrink-0" />
+                    : <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
+                  : <XCircle size={14} className="text-red-500 flex-shrink-0" />
+                }
+                <div className="flex-1 min-w-0">
+                  <span className={
+                    val
+                      ? isAuto ? 'text-blue-800 font-medium' : 'text-emerald-800 font-medium'
+                      : 'text-red-700'
+                  }>{labels[k]}</span>
+                  {isAuto && (
+                    <span className={`block text-xs mt-0.5 ${val ? 'text-blue-500' : 'text-gray-400'}`}>
+                      {val ? 'Auto-verified: payment confirmed by service provider' : 'Not yet confirmed by service provider'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -90,10 +108,11 @@ export function CheckoutPageInner({ backPath, canAcceptDecline = false }) {
   const workOrderId = params.id
   const companyId   = params.companyId  // only set for company member route
 
-  const [checkout,  setCheckout]  = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState('')
-  const [woStatus,  setWoStatus]  = useState(null)
+  const [checkout,         setCheckout]         = useState(null)
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
+  const [loading,          setLoading]          = useState(true)
+  const [error,            setError]            = useState('')
+  const [woStatus,         setWoStatus]         = useState(null)
 
   // Resolve back path (replace dynamic segments)
   const backTo = backPath
@@ -118,6 +137,20 @@ export function CheckoutPageInner({ backPath, canAcceptDecline = false }) {
         .eq('id', workOrderId)
         .maybeSingle()
       setWoStatus(wo?.status || null)
+
+      // Auto-check payment: invoice paid + receipt confirmed by SP
+      const { data: inv } = await supabase
+        .from('invoices').select('id, status').eq('work_order_id', workOrderId).maybeSingle()
+
+      if (inv?.status === 'paid' && inv?.id) {
+        const { data: rct } = await supabase
+          .from('receipts').select('confirmed')
+          .eq('invoice_id', inv.id)
+          .order('paid_at', { ascending: false }).limit(1).maybeSingle()
+        setPaymentConfirmed(!!(rct?.confirmed))
+      } else {
+        setPaymentConfirmed(false)
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -284,6 +317,7 @@ export function CheckoutPageInner({ backPath, canAcceptDecline = false }) {
         color="text-emerald-600"
         labels={HANDOVER_LABELS}
         data={checkout}
+        autoValues={{ co_payment_confirmed: paymentConfirmed }}
       />
 
       {/* Accept / Decline — only for car owner, only when pending */}
