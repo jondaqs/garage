@@ -45,10 +45,11 @@ function fmtD(d) {
   })
 }
 
-function ChecklistSection({ title, icon: Icon, color, labels, data }) {
+function ChecklistSection({ title, icon: Icon, color, labels, data, autoValues = {} }) {
   const [open, setOpen] = useState(false)
   const keys   = Object.keys(labels)
-  const passed = keys.filter(k => data?.[k]).length
+  const merged = { ...data, ...autoValues }
+  const passed = keys.filter(k => merged?.[k]).length
   const total  = keys.length
 
   return (
@@ -66,17 +67,32 @@ function ChecklistSection({ title, icon: Icon, color, labels, data }) {
       </button>
       {open && (
         <div className="px-4 py-3 space-y-2 bg-white">
-          {keys.map(k => (
-            <div key={k} className={`flex items-center gap-2.5 p-2 rounded-lg text-sm ${
-              data?.[k] ? 'text-emerald-800 bg-emerald-50' : 'text-red-700 bg-red-50'
-            }`}>
-              {data?.[k]
-                ? <CheckCircle size={13} className="text-emerald-600 flex-shrink-0" />
-                : <XCircle size={13} className="text-red-500 flex-shrink-0" />
-              }
-              {labels[k]}
-            </div>
-          ))}
+          {keys.map(k => {
+            const isAuto = k in autoValues
+            const val    = merged?.[k]
+            return (
+              <div key={k} className={`flex items-start gap-2.5 p-2 rounded-lg text-sm ${
+                val
+                  ? isAuto ? 'text-blue-800 bg-blue-50' : 'text-emerald-800 bg-emerald-50'
+                  : 'text-red-700 bg-red-50'
+              }`}>
+                {val
+                  ? isAuto
+                    ? <CheckCircle size={13} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                    : <CheckCircle size={13} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                  : <XCircle size={13} className="text-red-500 flex-shrink-0 mt-0.5" />
+                }
+                <div>
+                  <span>{labels[k]}</span>
+                  {isAuto && (
+                    <span className={`block text-xs mt-0.5 ${val ? 'text-blue-500' : 'text-gray-400'}`}>
+                      {val ? 'Confirmed by service provider' : 'Not yet confirmed by service provider'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -258,6 +274,7 @@ export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
             color="text-emerald-600"
             labels={HANDOVER_LABELS}
             data={checkout}
+            autoValues={{ co_payment_confirmed: isPaid }}
           />
         </div>
 
