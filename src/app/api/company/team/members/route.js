@@ -60,7 +60,7 @@ export async function GET(request) {
     // Fetch company_users rows (no profile join — avoids RLS cross-user read issue)
     const { data: members, error: membersError } = await supabase
       .from('company_users')
-      .select('id, user_id, staff_role, is_admin, is_active, created_at, updated_at')
+      .select('id, user_id, staff_role, is_admin, is_active, created_at, updated_at, can_approve_work, can_manage_team, can_manage_fleet, can_approve_estimates, can_approve_checkout, can_approve_payment')
       .eq('company_id', companyId)
       .order('created_at', { ascending: true })
 

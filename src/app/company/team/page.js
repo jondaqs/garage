@@ -362,10 +362,16 @@ export default function TeamPage() {
                         </div>
                       </div>
                       {member.staff_role !== 'owner' && (
-                        <button onClick={() => startEdit(member)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 flex-shrink-0">
-                          <Pencil className="w-3 h-3" /> Edit
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button onClick={() => startEdit(member)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50">
+                            <Pencil className="w-3 h-3" /> Edit
+                          </button>
+                          <button onClick={() => openRolesModal(member)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-indigo-200 text-indigo-600 bg-indigo-50 rounded-lg text-xs font-medium hover:bg-indigo-100">
+                            <Settings className="w-3 h-3" /> Manage Roles
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
