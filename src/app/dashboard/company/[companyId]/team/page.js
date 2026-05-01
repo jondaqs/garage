@@ -177,7 +177,7 @@ export default function MemberTeamPage() {
     </div>
   )
 
-  const showActions = isAdmin   // only admins see Edit + Manage Roles
+  const showActions = isAdmin   // Actions column visible to admins
 
   return (
     <div>
@@ -288,7 +288,7 @@ export default function MemberTeamPage() {
                     {/* Actions — admin only, not for owners */}
                     {showActions && (
                       <td className="px-6 py-4">
-                        {isOwner ? (
+                        {(isOwner || m.is_admin) ? (
                           <span className="text-xs text-gray-400">—</span>
                         ) : isEditing ? (
                           <div className="flex items-center gap-2">
