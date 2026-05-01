@@ -48,7 +48,7 @@ function checkoutFmtD(d) {
 }
 
 // ── Shared checklist panel (interactive or read-only) ─────────────────────────
-function ChecklistPanel({ title, icon: Icon, color, items, values, onChange, readonly }) {
+function ChecklistPanel({ title, icon: Icon, color, items, values, onChange, readonly, autoItems = {} }) {
   const done  = items.filter(i => values[i.id]).length
   const total = items.length
   const pct   = Math.round((done / total) * 100)
@@ -62,25 +62,40 @@ function ChecklistPanel({ title, icon: Icon, color, items, values, onChange, rea
       </div>
       <div className="px-5 py-4 space-y-2">
         {items.map(item => {
-          const checked = !!values[item.id]
+          const checked   = !!values[item.id]
+          const isAuto    = item.id in autoItems
+          const isReadonly = readonly || isAuto
           return (
             <label key={item.id}
               className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                checked ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'
-              } ${readonly ? 'cursor-default' : 'cursor-pointer hover:border-gray-300'}`}>
+                checked
+                  ? isAuto ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200'
+                  : 'bg-gray-50 border-gray-200'
+              } ${isReadonly ? 'cursor-default' : 'cursor-pointer hover:border-gray-300'}`}>
               <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
-                checked ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'
+                checked
+                  ? isAuto ? 'bg-blue-500 border-blue-500' : 'bg-emerald-600 border-emerald-600'
+                  : 'border-gray-300 bg-white'
               }`}>
                 {checked && <CheckCircle size={12} className="text-white" />}
               </div>
-              {!readonly && (
+              {!isReadonly && (
                 <input type="checkbox" className="sr-only"
                   checked={checked}
                   onChange={() => onChange?.(item.id)} />
               )}
-              <span className={`text-sm ${checked ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                {item.label}
-              </span>
+              <div className="flex-1 min-w-0">
+                <span className={`text-sm ${
+                  checked
+                    ? isAuto ? 'text-blue-800 font-medium' : 'text-emerald-800 font-medium'
+                    : 'text-gray-700'
+                }`}>{item.label}</span>
+                {isAuto && (
+                  <span className={`block text-xs mt-0.5 ${checked ? 'text-blue-600' : 'text-gray-400'}`}>
+                    {autoItems[item.id]}
+                  </span>
+                )}
+              </div>
             </label>
           )
         })}
@@ -111,8 +126,9 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
   const [testNotes,      setTestNotes]      = useState('')
   const [checkoutNotes,  setCheckoutNotes]  = useState('')
   const [activeSection,  setActiveSection]  = useState('road_test')
-  const [checkoutRecord, setCheckoutRecord] = useState(null)  // row from work_order_checkouts
-  const [loading,        setLoading]        = useState(true)
+  const [checkoutRecord,    setCheckoutRecord]    = useState(null)
+  const [paymentConfirmed,  setPaymentConfirmed]  = useState(false)
+  const [loading,           setLoading]           = useState(true)
   const [saving,         setSaving]         = useState(false)
   const [error,          setError]          = useState('')
   const [success,        setSuccess]        = useState('')
@@ -149,6 +165,22 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         if (data.road_test_notes) setTestNotes(data.road_test_notes)
         if (data.checkout_notes)  setCheckoutNotes(data.checkout_notes)
       }
+      // Auto-check payment: invoice paid + receipt confirmed by SP
+      const { data: inv } = await supabase
+        .from('invoices').select('id, status').eq('work_order_id', workOrder.id).maybeSingle()
+
+      if (inv?.status === 'paid' && inv?.id) {
+        const { data: rct } = await supabase
+          .from('receipts').select('confirmed')
+          .eq('invoice_id', inv.id)
+          .order('paid_at', { ascending: false }).limit(1).maybeSingle()
+        const paid = !!(rct?.confirmed)
+        setPaymentConfirmed(paid)
+        setHandover(prev => ({ ...prev, co_payment_confirmed: paid }))
+      } else {
+        setPaymentConfirmed(false)
+        setHandover(prev => ({ ...prev, co_payment_confirmed: false }))
+      }
     } catch (e) {
       console.error('CheckoutTab loadCheckout:', e.message)
     } finally {
@@ -159,7 +191,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
   useEffect(() => { loadCheckout() }, [loadCheckout])
 
   const roadTestAll  = CHECKOUT_ROAD_TEST_ITEMS.every(i => roadTest[i.id])
-  const handoverAll  = CHECKOUT_HANDOVER_ITEMS.every(i => handover[i.id])
+  const handoverAll  = CHECKOUT_HANDOVER_ITEMS.filter(i => i.id !== 'co_payment_confirmed').every(i => handover[i.id])
   const roadTestDone = CHECKOUT_ROAD_TEST_ITEMS.filter(i => roadTest[i.id]).length
   const handoverDone = CHECKOUT_HANDOVER_ITEMS.filter(i => handover[i.id]).length
 
@@ -200,6 +232,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
   }
 
   const handleHandoverToggle = (id) => {
+    if (id === 'co_payment_confirmed') return
     const updated = { ...handover, [id]: !handover[id] }
     setHandover(updated)
     saveProgress(roadTest, updated)
@@ -360,6 +393,11 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
           values={handover}
           onChange={(!isLocked && !isCheckedOut) ? handleHandoverToggle : undefined}
           readonly={isLocked || isCheckedOut}
+          autoItems={{
+            co_payment_confirmed: paymentConfirmed
+              ? 'Auto-verified: invoice paid & confirmed'
+              : 'Auto-managed: updates when payment is confirmed',
+          }}
         />
       </div>
 
@@ -502,7 +540,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
                     ? <Loader2 size={16} className="animate-spin" />
                     : <BadgeCheck size={16} />
                   }
-                  {saving ? 'Processing…' : 'Confirm Checkout & Close Work Order'}
+                  {saving ? 'Processing…' : 'Confirm Checkout & Notify Owner to Accept'}
                 </button>
               </div>
             </>
