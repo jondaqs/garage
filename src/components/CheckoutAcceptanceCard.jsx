@@ -86,21 +86,38 @@ function ChecklistSection({ title, icon: Icon, color, labels, data }) {
 export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
   const supabase = createClient()
 
-  const [checkout,   setCheckout]   = useState(null)
-  const [loading,    setLoading]    = useState(true)
-  const [acting,     setActing]     = useState(false)
-  const [error,      setError]      = useState('')
-  const [showDecline,setShowDecline]= useState(false)
-  const [reason,     setReason]     = useState('')
+  const [checkout,    setCheckout]   = useState(null)
+  const [isPaid,      setIsPaid]     = useState(false)  // invoice paid + receipt confirmed by SP
+  const [loading,     setLoading]    = useState(true)
+  const [acting,      setActing]     = useState(false)
+  const [error,       setError]      = useState('')
+  const [toast,       setToast]      = useState('')     // brief dismissible notice
+  const [showDecline, setShowDecline]= useState(false)
+  const [reason,      setReason]     = useState('')
 
   const load = useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from('work_order_checkouts')
-        .select('*')
-        .eq('work_order_id', workOrderId)
-        .maybeSingle()
-      setCheckout(data || null)
+      const [{ data: co }, { data: inv }] = await Promise.all([
+        supabase.from('work_order_checkouts').select('*')
+          .eq('work_order_id', workOrderId).maybeSingle(),
+        supabase.from('invoices')
+          .select('status, id')
+          .eq('work_order_id', workOrderId).maybeSingle(),
+      ])
+      setCheckout(co || null)
+
+      // Accept is allowed only when invoice is paid AND receipt is confirmed by SP
+      if (inv?.status === 'paid' && inv?.id) {
+        const { data: receipt } = await supabase
+          .from('receipts')
+          .select('confirmed')
+          .eq('invoice_id', inv.id)
+          .order('paid_at', { ascending: false })
+          .limit(1).maybeSingle()
+        setIsPaid(!!(receipt?.confirmed))
+      } else {
+        setIsPaid(false)
+      }
     } catch (e) {
       console.error('CheckoutAcceptanceCard load:', e.message)
     } finally {
@@ -111,6 +128,11 @@ export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
   useEffect(() => { load() }, [load])
 
   const handleAccept = async () => {
+    if (!isPaid) {
+      setToast('Payment must be made and confirmed by the service provider before you can accept the checkout.')
+      setTimeout(() => setToast(''), 5000)
+      return
+    }
     setActing(true); setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -268,17 +290,45 @@ export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
         {/* Action buttons — only when pending */}
         {isPending && (
           <div className="space-y-3">
+
+            {/* Toast notification */}
+            {toast && (
+              <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-300 rounded-xl animate-pulse">
+                <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 font-medium">{toast}</p>
+              </div>
+            )}
+
+            {/* Payment gate notice */}
+            {!isPaid && (
+              <div className="flex items-start gap-2.5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+                <AlertCircle size={15} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">Payment required before acceptance</p>
+                  <p className="text-xs text-blue-600 mt-0.5">
+                    You can only accept the checkout once the invoice is paid and the payment has been confirmed by the service provider.
+                    You may still decline if there are issues with the vehicle.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {!showDecline ? (
               <div className="flex gap-2">
                 <button
                   onClick={handleAccept}
-                  disabled={acting}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                  disabled={acting || !isPaid}
+                  title={!isPaid ? 'Payment must be confirmed by the service provider before accepting' : ''}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-colors ${
+                    isPaid
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}>
                   {acting
                     ? <Loader2 size={14} className="animate-spin" />
                     : <CheckCircle size={14} />
                   }
-                  Accept Checkout
+                  {isPaid ? 'Accept Checkout' : 'Accept (Awaiting Payment)'}
                 </button>
                 <button
                   onClick={() => setShowDecline(true)}
