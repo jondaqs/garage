@@ -15,7 +15,7 @@ export async function POST(request) {
     // Get user profile
     const { data: userProfile } = await supabase
       .from('user_profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -95,12 +95,12 @@ export async function POST(request) {
     // Send invitation email
     try {
       await sendCompanyInviteEmail({
-        inviteeEmail: body.email,
-        inviteeName: `${body.firstName} ${body.lastName}`,
-        companyName: company.name,
-        inviterName: `${userProfile.first_name} ${userProfile.last_name}`,
-        role: body.role,
-        inviteToken: inviteToken
+        inviteeEmail:    body.email,
+        inviteeName:     `${body.firstName || ''} ${body.lastName || ''}`.trim() || body.email,
+        companyName:     company.name,
+        inviterName:     `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'A team admin',
+        staffRole:       body.role || body.staffRole || 'Member',
+        invitationToken: inviteToken,
       })
     } catch (emailError) {
       console.error('Email error:', emailError)

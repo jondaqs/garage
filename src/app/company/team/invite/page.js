@@ -89,15 +89,17 @@ export default function InviteTeamMemberPage() {
       
       if (inviteError) throw inviteError;
       
-      // Send invitation email/SMS
-      await fetch('/api/company/send-invitation', {
+      // Send invitation email
+      await fetch('/api/company/team/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: singleInvite.email,
-          phone: singleInvite.phone,
+          email:     singleInvite.email,
+          phone:     singleInvite.phone,
           firstName: singleInvite.firstName,
-          lastName: singleInvite.lastName,
+          lastName:  singleInvite.lastName,
+          role:      singleInvite.role,
+          isAdmin:   singleInvite.isAdmin,
         }),
       });
       
