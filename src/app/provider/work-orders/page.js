@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Plus,
   ClipboardList, Search, Filter, ChevronRight,
-  Car, Calendar, AlertCircle, Clock
+  Car, Calendar, AlertCircle, Clock, BellRing
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -41,6 +41,7 @@ export default function ProviderWorkOrdersPage() {
   const [error, setError]             = useState('')
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [checkoutRequestedIds, setCheckoutRequestedIds] = useState(new Set())
 
   useEffect(() => { loadWorkOrders() }, [])
 
@@ -74,6 +75,19 @@ export default function ProviderWorkOrdersPage() {
 
       if (fetchErr) throw fetchErr
       setWorkOrders(data || [])
+
+      // Fetch work order IDs that have a pending checkout_requested notification
+      if (data && data.length > 0) {
+        const woIds = data.map(w => w.id)
+        const { data: reqNotes } = await supabase
+          .from('notifications')
+          .select('reference_id')
+          .eq('type', 'checkout_requested')
+          .in('reference_id', woIds)
+        if (reqNotes) {
+          setCheckoutRequestedIds(new Set(reqNotes.map(n => n.reference_id)))
+        }
+      }
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
     } finally {
@@ -204,6 +218,12 @@ export default function ProviderWorkOrdersPage() {
                     {wo.priority === 'urgent' && (
                       <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
                         URGENT
+                      </span>
+                    )}
+                    {checkoutRequestedIds.has(wo.id) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                        <BellRing size={10} />
+                        Checkout Requested
                       </span>
                     )}
                   </div>

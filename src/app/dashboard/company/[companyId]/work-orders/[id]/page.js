@@ -41,6 +41,10 @@ export default function CompanyMemberWorkOrderDetailPage() {
   const [success,         setSuccess]         = useState('')
   const [canApprove,      setCanApprove]      = useState(false)
   const [invoiceStatus,   setInvoiceStatus]   = useState(null)
+  const [checkoutSubmitted,   setCheckoutSubmitted]   = useState(false)
+  const [checkoutRequested,   setCheckoutRequested]   = useState(false)
+  const [requestingCheckout,  setRequestingCheckout]  = useState(false)
+  const [checkoutReqSuccess,  setCheckoutReqSuccess]  = useState(false)
   const [review,          setReview]          = useState({ rating: 0, title: '', body: '' })
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [reviewSubmitting,setReviewSubmitting]= useState(false)
@@ -86,6 +90,23 @@ export default function CompanyMemberWorkOrderDetailPage() {
       const { data: invRow } = await supabase
         .from('invoices').select('status').eq('work_order_id', workOrderId).maybeSingle()
       setInvoiceStatus(invRow?.status || null)
+
+      // Check if provider has submitted checkout
+      const { data: checkoutRow } = await supabase
+        .from('work_order_checkouts')
+        .select('id')
+        .eq('work_order_id', workOrderId)
+        .maybeSingle()
+      setCheckoutSubmitted(!!checkoutRow)
+
+      // Check if a checkout request notification was already sent for this WO
+      const { data: reqNote } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('reference_id', workOrderId)
+        .eq('type', 'checkout_requested')
+        .maybeSingle()
+      setCheckoutRequested(!!reqNote)
 
       // Existing review
       const { data: revData } = await supabase
@@ -524,6 +545,53 @@ export default function CompanyMemberWorkOrderDetailPage() {
               }`}>
               View Invoice <ChevronRight size={14} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Request Checkout banner ── */}
+      {invoiceStatus && invoiceStatus !== 'paid' && !checkoutSubmitted
+        && !['awaiting_customer_checkout', 'closed', 'cancelled'].includes(statusCode) && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-100 flex-shrink-0 mt-0.5">
+              <ClipboardCheck size={16} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900">Checkout not yet submitted</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                The provider has sent an invoice but hasn't submitted the checkout form yet.
+                You can notify them to complete the checkout before your company makes payment.
+              </p>
+              {checkoutReqSuccess ? (
+                <p className="mt-2 text-xs font-medium text-green-700 flex items-center gap-1">
+                  <CheckCircle size={13} /> Provider notified — they will submit the checkout shortly.
+                </p>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setRequestingCheckout(true)
+                    try {
+                      const resp = await fetch(`/api/work-orders/${workOrderId}/request-checkout`, { method: 'POST' })
+                      const data = await resp.json()
+                      if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to send request')
+                      setCheckoutRequested(true)
+                      setCheckoutReqSuccess(true)
+                    } catch (err) { setError(err.message) }
+                    finally { setRequestingCheckout(false) }
+                  }}
+                  disabled={requestingCheckout || checkoutRequested}
+                  className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {requestingCheckout
+                    ? <><Loader2 size={13} className="animate-spin" /> Sending…</>
+                    : checkoutRequested
+                      ? <><CheckCircle size={13} /> Request Sent</>
+                      : <><MessageSquare size={13} /> Notify Provider to Submit Checkout</>
+                  }
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
