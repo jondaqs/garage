@@ -60,10 +60,10 @@ export default function CompanyWorkOrderDetailPage() {
       const { data: owned } = await supabase
         .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
       const { data: mem } = await supabase
-        .from('company_users').select('is_admin')
+        .from('company_users').select('is_admin, can_approve_estimates')
         .eq('user_id', profile.id).eq('is_active', true).maybeSingle()
 
-      setCanApprove(!!(owned || mem?.is_admin))
+      setCanApprove(!!(owned || mem?.is_admin || mem?.can_approve_estimates))
 
       const { data: result, error: rpcErr } = await supabase.rpc('get_customer_work_order', {
         p_work_order_id:    params.id,
@@ -277,7 +277,7 @@ export default function CompanyWorkOrderDetailPage() {
         {isAwaiting && !canApprove && (
           <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg p-3">
             <Building2 size={14} className="flex-shrink-0" />
-            Only company owners and admins can approve estimates. Contact your company admin.
+            Estimate approval requires owner, admin, or Approve Estimates permission. Contact your company admin.
           </div>
         )}
       </div>
