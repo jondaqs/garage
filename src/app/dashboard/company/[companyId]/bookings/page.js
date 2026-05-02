@@ -130,7 +130,7 @@ export default function MemberBookingsPage() {
         </div>
         {(membership?.can_manage_fleet || membership?.is_admin) && (
           <button
-            onClick={() => router.push(`/dashboard/company/${companyId}/bookings/new`)}
+            onClick={() => router.push(`/dashboard/company/${companyId}/bookings/book`)}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Book Service
           </button>
