@@ -5,7 +5,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
-import { CalendarDays, Car, Wrench, Loader2, Filter, Building2 } from 'lucide-react'
+import { CalendarDays, Car, Wrench, Loader2, Filter, Building2, Plus } from 'lucide-react'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 
 const localizer = momentLocalizer(moment)
@@ -31,6 +31,7 @@ export default function CompanyCalendarPage() {
   const [date,        setDate]        = useState(new Date())
   const [filter,      setFilter]      = useState('all')  // all | bookings | work_orders
   const [companyName, setCompanyName] = useState('')
+  const [canBook,     setCanBook]     = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -40,9 +41,10 @@ export default function CompanyCalendarPage() {
 
       // Verify membership
       const { data: mem } = await supabase
-        .from('company_users').select('id, is_admin, staff_role')
+        .from('company_users').select('id, is_admin, staff_role, can_manage_fleet')
         .eq('user_id', profile.id).eq('company_id', companyId).eq('is_active', true).maybeSingle()
       if (!mem) { setError('Access denied.'); setLoading(false); return }
+      setCanBook(!!(mem.can_manage_fleet || mem.is_admin))
 
       // Company name
       const { data: co } = await supabase
@@ -143,10 +145,17 @@ export default function CompanyCalendarPage() {
     }
   })
 
+  const handleSelectSlot = ({ start }) => {
+    if (!canBook) return
+    const dateStr = start.toISOString().split('T')[0]
+    sessionStorage.setItem('selectedBookingDate', dateStr)
+    router.push(`/dashboard/company/${companyId}/bookings/book`)
+  }
+
   const handleSelectEvent = (event) => {
     const { type, booking, wo } = event.resource
-    if (type === 'booking')    router.push(`/company/bookings/${booking.id}`)
-    if (type === 'work_order') router.push(`/company/work-orders/${wo.id}`)
+    if (type === 'booking')    router.push(`/dashboard/company/${companyId}/bookings/${booking.id}`)
+    if (type === 'work_order') router.push(`/dashboard/company/${companyId}/work-orders/${wo.id}`)
   }
 
   if (loading) return (
@@ -174,25 +183,33 @@ export default function CompanyCalendarPage() {
           )}
         </div>
 
-        {/* Filter */}
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-gray-400" />
-          {[
-            { value: 'all',         label: 'All'         },
-            { value: 'bookings',    label: 'Bookings'    },
-            { value: 'work_orders', label: 'Work Orders' },
-          ].map(f => (
-            <button key={f.value} onClick={() => setFilter(f.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                filter === f.value
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}>
-              {f.label}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Filter */}
+          <div className="flex items-center gap-2">
+            <Filter size={14} className="text-gray-400" />
+            {[
+              { value: 'all',         label: 'All'         },
+              { value: 'bookings',    label: 'Bookings'    },
+              { value: 'work_orders', label: 'Work Orders' },
+            ].map(f => (
+              <button key={f.value} onClick={() => setFilter(f.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  filter === f.value
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {canBook && (
+            <button
+              onClick={() => router.push(`/dashboard/company/${companyId}/bookings/book`)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
+              <Plus size={15} /> Book Service
             </button>
-          ))}
+          )}
         </div>
-      </div>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3">
@@ -230,12 +247,20 @@ export default function CompanyCalendarPage() {
           onNavigate={setDate}
           eventPropGetter={eventStyleGetter}
           onSelectEvent={handleSelectEvent}
+          onSelectSlot={handleSelectSlot}
+          selectable={canBook}
           popup
           style={{ height: '100%' }}
           views={['month', 'week', 'day', 'agenda']}
           tooltipAccessor={e => e.title}
         />
+        {canBook && (
+          <p className="text-xs text-gray-400 mt-3 text-center">
+            💡 Click on a booking to view details. Click an empty date to book a service for that day.
+          </p>
+        )}
       </div>
     </div>
+  </div>
   )
 }

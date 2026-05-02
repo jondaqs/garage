@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Calendar, AlertCircle, Truck } from 'lucide-react'
+import { Calendar, AlertCircle, Truck, Plus, ChevronRight, Loader2 } from 'lucide-react'
 
 const STATUS_COLORS = {
   pending:     'bg-yellow-100 text-yellow-800',
@@ -19,6 +19,7 @@ export default function MemberBookingsPage() {
   const supabase = createClient()
 
   const [bookings,   setBookings]   = useState([])
+  const [membership, setMembership] = useState(null)
   const [filter,     setFilter]     = useState('all')
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
@@ -42,13 +43,14 @@ export default function MemberBookingsPage() {
       // Verify membership
       const { data: mem } = await supabase
         .from('company_users')
-        .select('is_admin')
+        .select('is_admin, can_manage_fleet')
         .eq('user_id', profile.id)
         .eq('company_id', companyId)
         .eq('is_active', true)
         .maybeSingle()
 
       if (!mem) { setError('You are not a member of this company.'); setLoading(false); return }
+      setMembership(mem)
 
       // Get fleet vehicle IDs
       const { data: fleet } = await supabase
@@ -112,6 +114,13 @@ export default function MemberBookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Company Bookings</h1>
           <p className="text-sm text-gray-500 mt-1">Fleet service bookings</p>
         </div>
+        {(membership?.can_manage_fleet || membership?.is_admin) && (
+          <button
+            onClick={() => router.push(`/dashboard/company/${companyId}/bookings/new`)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
+            <Plus size={16} /> Book Service
+          </button>
+        )}
       </div>
 
       {/* Filter tabs */}
@@ -142,14 +151,15 @@ export default function MemberBookingsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Reference', 'Vehicle', 'Provider', 'Date', 'Status'].map(h => (
+                {['Reference', 'Vehicle', 'Provider', 'Date', 'Status', ''].map(h => (
                   <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {bookings.map(b => (
-                <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={b.id} onClick={() => router.push(`/dashboard/company/${companyId}/bookings/${b.id}`)}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-sm font-mono text-gray-600">
                     {b.booking_number || b.id.slice(0, 8)}
                   </td>
@@ -173,6 +183,9 @@ export default function MemberBookingsPage() {
                     <span className={`px-2.5 py-1 text-xs font-medium rounded-full capitalize ${STATUS_COLORS[b.status?.code] ?? 'bg-gray-100 text-gray-700'}`}>
                       {b.status?.display_name || b.status?.code || '—'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <ChevronRight size={16} className="text-gray-400" />
                   </td>
                 </tr>
               ))}
