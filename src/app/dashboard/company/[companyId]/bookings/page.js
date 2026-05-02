@@ -23,8 +23,12 @@ export default function MemberBookingsPage() {
   const [filter,     setFilter]     = useState('all')
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
+  const [page,       setPage]       = useState(1)
+  const [perPage,    setPerPage]    = useState(10)
+  const [total,      setTotal]      = useState(0)
 
-  useEffect(() => { fetchData() }, [companyId, filter])
+  useEffect(() => { setPage(1) }, [filter])
+  useEffect(() => { fetchData() }, [companyId, filter, page, perPage])
 
   const fetchData = async () => {
     setLoading(true)
@@ -66,6 +70,24 @@ export default function MemberBookingsPage() {
 
       const vehicleIds = fleet.map(f => f.vehicle_id)
 
+      // Status filter
+      let statusId = null
+      if (filter !== 'all') {
+        const { data: statusRow } = await supabase
+          .from('booking_statuses').select('id').eq('code', filter).maybeSingle()
+        statusId = statusRow?.id || null
+      }
+
+      // Count total matching rows
+      let countQ = supabase.from('bookings').select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+      if (statusId) countQ = countQ.eq('status_id', statusId)
+      const { count } = await countQ
+      setTotal(count || 0)
+
+      // Fetch page
+      const from = (page - 1) * perPage
+      const to   = from + perPage - 1
       let query = supabase
         .from('bookings')
         .select(`
@@ -78,17 +100,8 @@ export default function MemberBookingsPage() {
         `)
         .in('vehicle_id', vehicleIds)
         .order('booking_date', { ascending: false })
-        .limit(50)
-
-      if (filter !== 'all') {
-        // Filter by status code via join
-        const { data: statusRow } = await supabase
-          .from('booking_statuses')
-          .select('id')
-          .eq('code', filter)
-          .maybeSingle()
-        if (statusRow) query = query.eq('status_id', statusRow.id)
-      }
+        .range(from, to)
+      if (statusId) query = query.eq('status_id', statusId)
 
       const { data, error: bErr } = await query
       if (bErr) throw bErr
@@ -201,6 +214,76 @@ export default function MemberBookingsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Pagination ── */}
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+          {/* Per-page selector */}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Show</span>
+            <select value={perPage}
+              onChange={e => { setPerPage(Number(e.target.value)); setPage(1) }}
+              className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+              {[10, 20, 50, 100].map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <span>
+              per page · showing {Math.min((page - 1) * perPage + 1, total)}–{Math.min(page * perPage, total)} of {total}
+            </span>
+          </div>
+
+          {/* Page buttons */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+              «
+            </button>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+              Prev
+            </button>
+
+            {/* Page number pills */}
+            {Array.from({ length: Math.ceil(total / perPage) }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === Math.ceil(total / perPage) || Math.abs(p - page) <= 1)
+              .reduce((acc, p, i, arr) => {
+                if (i > 0 && p - arr[i - 1] > 1) acc.push('…')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) => p === '…'
+                ? <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-sm">…</span>
+                : <button key={p} onClick={() => setPage(p)}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      p === page
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}>
+                    {p}
+                  </button>
+              )
+            }
+
+            <button
+              onClick={() => setPage(p => Math.min(Math.ceil(total / perPage), p + 1))}
+              disabled={page >= Math.ceil(total / perPage)}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+              Next
+            </button>
+            <button
+              onClick={() => setPage(Math.ceil(total / perPage))}
+              disabled={page >= Math.ceil(total / perPage)}
+              className="px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+              »
+            </button>
+          </div>
         </div>
       )}
     </div>
