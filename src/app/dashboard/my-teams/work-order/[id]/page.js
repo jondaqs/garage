@@ -5,10 +5,10 @@ import dynamic from 'next/dynamic'
 const CheckoutTab = dynamic(() => import('@/components/CheckoutTab'), { ssr: false })
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import {
-  ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle,
+import {ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
-  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText, Receipt, LogOut
+  Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText, Receipt, LogOut,
+  BellRing, ClipboardCheck
 } from 'lucide-react'
 import ServicesTab        from '@/app/provider/work-orders/[id]/components/ServicesTab'
 import PartsTab           from '@/app/provider/work-orders/[id]/components/PartsTab'
@@ -703,6 +703,22 @@ export default function MechanicWorkOrderPage() {
           estimate={estimate}
           onSent={() => { load(); setSuccess('Estimate sent to customer for approval.') }}
         />
+      )}
+
+      {/* ── Checkout request action banner ── */}
+      {wo.checkout_requested && !wo.checkout_request_satisfied && (
+        <div className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <BellRing size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Action needed — Checkout form requested</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer has received the invoice and is requesting the checkout form before making payment.
+              Go to the <span className="font-semibold text-blue-700">Checkout tab</span> below, complete the road-test checklist and submit.
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Tabs — only shown after acknowledged */}

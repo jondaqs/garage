@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Wrench, CheckCircle, XCircle, AlertCircle, Loader2,
   RefreshCw, ClipboardList, Car, Send, FileText,
-  Clock, Filter, ChevronDown, Bell, Receipt, AlertTriangle
+  Clock, Filter, ChevronDown, Bell, Receipt, AlertTriangle, BellRing, ClipboardCheck
 } from 'lucide-react'
 
 // ── Status colours ────────────────────────────────────────────────────────────
@@ -51,6 +51,9 @@ function getActionNeeded(wo, userRole, canSendEstimates, canSendInvoice) {
   if (code === 'quality_check' && canSendInvoice) {
     return { label: 'Invoice ready to generate', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: FileText, urgent: false }
   }
+  if (wo.checkout_requested && !wo.checkout_request_satisfied) {
+    return { label: 'Submit checkout form — customer is waiting', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: ClipboardCheck, urgent: true }
+  }
   if (wo.mechanic_assignment_status === 'pending') {
     return { label: 'Acknowledge assignment', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Bell, urgent: true }
   }
@@ -81,6 +84,7 @@ export default function MemberWorkOrdersPage() {
   const [acknowledging,   setAcknowledging]   = useState(null)
   const [declineReason,   setDeclineReason]   = useState('')
   const [showDeclineForm, setShowDeclineForm] = useState(null)
+  const [checkoutRequestCount, setCheckoutRequestCount] = useState(0)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -107,6 +111,9 @@ export default function MemberWorkOrdersPage() {
       const seen    = new Set(mechWOs.map(w => w.id))
       const merged  = [...mechWOs, ...spuWOs.filter(w => !seen.has(w.id))]
       setWorkOrders(merged)
+      setCheckoutRequestCount(
+        merged.filter(w => w.checkout_requested && !w.checkout_request_satisfied).length
+      )
 
       // ── 4. Build perms map per provider ──────────────────────────────────
       const permsMap = {}
@@ -218,6 +225,24 @@ export default function MemberWorkOrdersPage() {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
           <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* ── Checkout request action banner ── */}
+      {checkoutRequestCount > 0 && (
+        <div className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <BellRing size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {checkoutRequestCount} work order{checkoutRequestCount > 1 ? 's' : ''} awaiting checkout submission
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              Customer{checkoutRequestCount > 1 ? 's have' : ' has'} received the invoice and requested the checkout form before making payment.
+              Open the work order and complete the <span className="font-semibold text-blue-700">Checkout tab</span>.
+            </p>
+          </div>
         </div>
       )}
 
@@ -345,6 +370,11 @@ export default function MemberWorkOrdersPage() {
                             {assignBadge && (
                               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${assignBadge.cls}`}>
                                 {assignBadge.label}
+                              </span>
+                            )}
+                            {wo.checkout_requested && !wo.checkout_request_satisfied && (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                                <BellRing size={10} /> Checkout Requested
                               </span>
                             )}
                           </div>

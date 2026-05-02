@@ -167,6 +167,12 @@ export async function POST(request, { params }) {
       }))
     )
 
+    // Flag the work order so provider list/detail can surface it without extra queries
+    await sc
+      .from('work_orders')
+      .update({ checkout_requested: true, updated_at: new Date().toISOString() })
+      .eq('id', workOrderId)
+
     // Email + SMS
     const subject  = `Action Needed: ${callerName} is requesting checkout for ${plate} — ${wo.work_order_number}`
     const smsText  = `${BRAND}: ${callerName} has received the invoice for ${plate} (${wo.work_order_number}) and is waiting for the checkout form before payment. Open: ${woUrl}`

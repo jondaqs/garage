@@ -7,7 +7,7 @@ import {
   ArrowLeft, Car, MapPin, User, Calendar, Clock,
   ClipboardList, AlertCircle, CheckCircle, ChevronRight,
   Wrench, Package, MessageSquare, Hash, ExternalLink,
-  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell, LogOut
+  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell, LogOut, BellRing
 } from 'lucide-react'
 import ServicesTab      from './components/ServicesTab'
 import PartsTab         from './components/PartsTab'
@@ -771,6 +771,22 @@ export default function WorkOrderDetailPage() {
                 </button>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Checkout request action banner ── */}
+      {wo.checkout_requested && !wo.checkout_request_satisfied && (
+        <div className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <BellRing size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Action needed — Checkout form requested</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer has received the invoice and is requesting the checkout form before making payment.
+              Go to the <span className="font-semibold text-blue-700">Checkout tab</span> below, complete the road-test checklist and submit — this will clear the action and notify the customer.
+            </p>
           </div>
         </div>
       )}

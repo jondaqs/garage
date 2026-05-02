@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Plus,
   ClipboardList, Search, Filter, ChevronRight,
-  Car, Calendar, AlertCircle, Clock, BellRing
+  Car, Calendar, AlertCircle, Clock, BellRing, ClipboardCheck
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -41,7 +41,7 @@ export default function ProviderWorkOrdersPage() {
   const [error, setError]             = useState('')
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [checkoutRequestedIds, setCheckoutRequestedIds] = useState(new Set())
+  const [checkoutRequestCount, setCheckoutRequestCount] = useState(0)
 
   useEffect(() => { loadWorkOrders() }, [])
 
@@ -64,6 +64,8 @@ export default function ProviderWorkOrdersPage() {
           priority,
           opened_at,
           scheduled_start,
+          checkout_requested,
+          checkout_request_satisfied,
           vehicle:vehicles(plate_number, make, model),
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops(name, town),
@@ -75,19 +77,9 @@ export default function ProviderWorkOrdersPage() {
 
       if (fetchErr) throw fetchErr
       setWorkOrders(data || [])
-
-      // Fetch work order IDs that have a pending checkout_requested notification
-      if (data && data.length > 0) {
-        const woIds = data.map(w => w.id)
-        const { data: reqNotes } = await supabase
-          .from('notifications')
-          .select('reference_id')
-          .eq('type', 'checkout_requested')
-          .in('reference_id', woIds)
-        if (reqNotes) {
-          setCheckoutRequestedIds(new Set(reqNotes.map(n => n.reference_id)))
-        }
-      }
+      setCheckoutRequestCount(
+        (data || []).filter(w => w.checkout_requested && !w.checkout_request_satisfied).length
+      )
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
     } finally {
@@ -142,6 +134,24 @@ export default function ProviderWorkOrdersPage() {
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
           <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
           <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* ── Checkout request action banner ── */}
+      {checkoutRequestCount > 0 && (
+        <div className="mb-4 rounded-xl border border-blue-300 bg-blue-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <BellRing size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {checkoutRequestCount} work order{checkoutRequestCount > 1 ? 's' : ''} awaiting checkout submission
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              Customer{checkoutRequestCount > 1 ? 's have' : ' has'} received the invoice and requested the checkout form before making payment.
+              Look for the <span className="font-semibold text-blue-700">Checkout Requested</span> badge below and open the work order to complete the checkout tab.
+            </p>
+          </div>
         </div>
       )}
 
@@ -220,10 +230,9 @@ export default function ProviderWorkOrdersPage() {
                         URGENT
                       </span>
                     )}
-                    {checkoutRequestedIds.has(wo.id) && (
+                    {wo.checkout_requested && !wo.checkout_request_satisfied && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                        <BellRing size={10} />
-                        Checkout Requested
+                        <BellRing size={10} /> Checkout Requested
                       </span>
                     )}
                   </div>
