@@ -70,11 +70,11 @@ export default function MemberBookingsPage() {
         .from('bookings')
         .select(`
           id, booking_number, booking_date, booking_time_start,
-          created_at, created_by, updated_by,
+          created_at,
           status:booking_statuses(code, display_name, color_code),
           vehicle:vehicles(plate_number, make, model),
           provider:service_providers(name),
-          creator:user_profiles!bookings_created_by_fkey(first_name, last_name)
+          bookedBy:user_profiles!bookings_customer_user_id_fkey(first_name, last_name)
         `)
         .in('vehicle_id', vehicleIds)
         .order('booking_date', { ascending: false })
@@ -186,9 +186,9 @@ export default function MemberBookingsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {b.creator ? (
+                    {b.bookedBy ? (
                       <span className="text-xs text-gray-600 font-medium">
-                        {b.creator.first_name} {b.creator.last_name}
+                        {b.bookedBy.first_name} {b.bookedBy.last_name}
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400">—</span>
