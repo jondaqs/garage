@@ -51,9 +51,9 @@ export default function CompanyWorkOrderInvoicePage() {
         const { data: owned } = await supabase
           .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
         const { data: mem } = await supabase
-          .from('company_users').select('is_admin')
+          .from('company_users').select('is_admin, can_approve_payment')
           .eq('user_id', profile.id).eq('is_active', true).maybeSingle()
-        setCanPay(!!(owned || mem?.is_admin))
+        setCanPay(!!(owned || mem?.is_admin || mem?.can_approve_payment))
       }
 
       // Use the API route (service-role backed) to bypass RLS
