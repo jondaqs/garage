@@ -30,6 +30,8 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const [error,        setError]        = useState('')
   const [success,      setSuccess]      = useState('')
   const [showItems,    setShowItems]    = useState(true)
+  const [vatPct,       setVatPct]       = useState('16')
+  const [discountPct,  setDiscountPct]  = useState('0')
   const [showPayForm,  setShowPayForm]  = useState(false)
   const [payMethod,    setPayMethod]    = useState('cash')
   const [amountPaid,   setAmountPaid]   = useState('')
@@ -50,7 +52,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     try {
       const { data: inv, error: invErr } = await supabase
         .from('invoices')
-        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
+        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, discount_pct, discount_amount, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
@@ -84,8 +86,14 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     setGenerating(true); setError(''); setSuccess('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      const taxRate     = Math.max(0, Math.min(100, parseFloat(vatPct)     || 0)) / 100
+      const discountRate = Math.max(0, Math.min(100, parseFloat(discountPct) || 0)) / 100
       const { data: result, error: rpcErr } = await supabase.rpc('generate_invoice_for_provider', {
-        p_work_order_id: workOrder.id, p_caller_auth_uid: user.id, p_tax_rate: 0.16, p_notes: null,
+        p_work_order_id:   workOrder.id,
+        p_caller_auth_uid: user.id,
+        p_tax_rate:        taxRate,
+        p_discount_pct:    discountRate,
+        p_notes:           null,
       })
       if (rpcErr) throw rpcErr
       if (!result.success && result.invoice_id) {
@@ -169,10 +177,83 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
           </p>
         </div>
         {canGenerate ? (
-          <button onClick={handleGenerate} disabled={generating}
-            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 text-sm font-semibold transition-colors shadow-sm">
-            {generating ? <><Loader2 size={15} className="animate-spin" /> Generating…</> : <><FileText size={15} /> Generate Invoice</>}
-          </button>
+          <div className="w-full space-y-4">
+            {/* VAT & Discount inline form */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Invoice Settings</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    VAT Rate (%)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number" min="0" max="100" step="0.1"
+                      value={vatPct}
+                      onChange={e => setVatPct(e.target.value)}
+                      className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">%</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Default: 16% (Kenya VAT)</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Discount (%)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number" min="0" max="100" step="0.1"
+                      value={discountPct}
+                      onChange={e => setDiscountPct(e.target.value)}
+                      className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">%</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">0 = no discount shown on invoice</p>
+                </div>
+              </div>
+              {/* Live preview */}
+              {(() => {
+                const sub  = workOrder.total_amount || workOrder.subtotal || 0
+                const disc = Math.max(0, Math.min(100, parseFloat(discountPct) || 0))
+                const vat  = Math.max(0, Math.min(100, parseFloat(vatPct)     || 0))
+                const discAmt  = sub * disc / 100
+                const taxable  = sub - discAmt
+                const taxAmt   = taxable * vat / 100
+                const total    = taxable + taxAmt
+                return (
+                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-1 text-sm">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Subtotal</span>
+                      <span>KES {Number(sub).toLocaleString('en-KE')}</span>
+                    </div>
+                    {disc > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount ({disc}%)</span>
+                        <span>− KES {Number(discAmt).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    {vat > 0 && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>VAT ({vat}%)</span>
+                        <span>KES {Number(taxAmt).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-gray-900 pt-1 border-t border-gray-200">
+                      <span>Total</span>
+                      <span>KES {Number(total).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
+            <button onClick={handleGenerate} disabled={generating}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 text-sm font-semibold transition-colors shadow-sm">
+              {generating ? <><Loader2 size={15} className="animate-spin" /> Generating…</> : <><FileText size={15} /> Generate Invoice</>}
+            </button>
+          </div>
         ) : (
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <Lock size={12} /> Requires owner, admin, or accountant access to generate.
@@ -298,10 +379,16 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
         {/* Totals */}
         <div className="border-t border-gray-100 px-6 py-4 bg-gray-50">
           <div className="space-y-2 max-w-xs ml-auto">
-            <div className="flex justify-between text-sm text-gray-600">
+                        <div className="flex justify-between text-sm text-gray-600">
               <span>Subtotal</span>
               <span className="font-medium text-gray-900">{fmt(inv.subtotal)}</span>
             </div>
+            {inv.discount_amount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Discount ({Math.round((inv.discount_pct || 0) * 100)}%)</span>
+                <span>− {fmt(inv.discount_amount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm text-gray-500">
               <span>VAT ({Math.round((inv.tax_rate || 0.16) * 100)}%)</span>
               <span>{fmt(inv.tax_amount)}</span>
