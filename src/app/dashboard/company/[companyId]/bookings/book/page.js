@@ -13,7 +13,8 @@ import Link from 'next/link'
 const supabase = createClient()
 
 export default function MemberBookServicePage() {
-  const router = useRouter()
+  const router    = useRouter()
+  const { companyId } = useParams()
   const searchParams = useSearchParams()
 
   const [providers, setProviders]           = useState([])
