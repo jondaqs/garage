@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Users, AlertCircle, Shield, UserCheck, Pencil,
-  Check, X, Settings, Loader2
+  Check, X, Settings, Loader2, UserPlus, Mail
 } from 'lucide-react'
 
 const ROLE_OPTIONS = [
@@ -43,6 +43,11 @@ export default function MemberTeamPage() {
 
   // Roles modal state
   const [rolesModal,  setRolesModal]  = useState(null)
+  const [showInvite,  setShowInvite]  = useState(false)
+  const [inviteForm,  setInviteForm]  = useState({ email: '', firstName: '', lastName: '', phone: '', role: 'driver', isAdmin: false })
+  const [inviting,    setInviting]    = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSuccess,setInviteSuccess] = useState('')
   const [rolesForm,   setRolesForm]   = useState({})
   const [savingRoles, setSavingRoles] = useState(false)
   const [rolesError,  setRolesError]  = useState('')
@@ -90,7 +95,8 @@ export default function MemberTeamPage() {
     }
   }
 
-  const isAdmin = membership?.is_admin || membership?.staff_role === 'owner' || membership?.can_manage_team
+  const isAdmin   = membership?.is_admin || membership?.staff_role === 'owner' || membership?.can_manage_team
+  const canInvite = !!(membership?.can_manage_team || membership?.is_admin)
 
   const roleLabel = (role) =>
     ROLE_OPTIONS.find(r => r.value === role)?.label ?? (role === 'owner' ? 'Owner' : role ?? 'Member')
@@ -189,6 +195,12 @@ export default function MemberTeamPage() {
             {isAdmin && <span className="ml-2 text-xs text-blue-600 font-medium">· Admin view</span>}
           </p>
         </div>
+        {canInvite && (
+          <button onClick={() => { setShowInvite(true); setInviteError(''); setInviteSuccess('') }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
+            <UserPlus className="w-4 h-4" /> Invite Member
+          </button>
+        )}
       </div>
 
       {members.length === 0 ? (
@@ -324,7 +336,80 @@ export default function MemberTeamPage() {
         </div>
       )}
 
-      {/* ── Manage Roles Modal ─────────────────────────────────────────────── */}
+      {showInvite && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-start justify-between mb-5">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-blue-600" /> Invite Member
+              </h2>
+              <button onClick={() => setShowInvite(false)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {inviteSuccess ? (
+              <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm">
+                <Check className="w-5 h-5 text-green-600 flex-shrink-0" /> {inviteSuccess}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">First Name</label>
+                    <input type="text" value={inviteForm.firstName} onChange={e => setInviteForm(f => ({ ...f, firstName: e.target.value }))}
+                      placeholder="First name" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Last Name</label>
+                    <input type="text" value={inviteForm.lastName} onChange={e => setInviteForm(f => ({ ...f, lastName: e.target.value }))}
+                      placeholder="Last name" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Email <span className="text-red-500">*</span></label>
+                  <input type="email" value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="member@company.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Phone</label>
+                  <input type="tel" value={inviteForm.phone} onChange={e => setInviteForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="+254..." className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Role</label>
+                  <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+                    {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={inviteForm.isAdmin} onChange={e => setInviteForm(f => ({ ...f, isAdmin: e.target.checked }))}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+                  <span className="text-sm text-gray-700">Grant admin privileges</span>
+                </label>
+                {inviteError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" /> {inviteError}
+                  </div>
+                )}
+                <div className="flex gap-3 pt-1">
+                  <button onClick={handleInvite} disabled={inviting}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                    {inviting ? 'Sending…' : 'Send Invitation'}
+                  </button>
+                  <button onClick={() => setShowInvite(false)}
+                    className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 text-gray-600">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+            {/* ── Manage Roles Modal ─────────────────────────────────────────────── */}
       {rolesModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
