@@ -94,7 +94,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       // 5. Provider
       if (inv.service_provider_id) {
         const { data: sp } = await supabase
-          .from('service_providers').select('name, phone, email, address').eq('id', inv.service_provider_id).maybeSingle()
+          .from('service_providers').select('name, phone, email').eq('id', inv.service_provider_id).maybeSingle()
         setProvider(sp)
       }
 
@@ -438,7 +438,7 @@ export function ReceiptContent({
               {provider.phone && <p style={{ margin: '0 0 2px', fontSize: 12, color: '#64748b' }}>{provider.phone}</p>}
               {provider.email && <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{provider.email}</p>}
             </>
-          ) : <p style={{ fontSize: 13, color: '#94a3b8' }}>Service Provider</p>}
+          ) : <p style={{ fontSize: 13, color: '#0f172a', fontWeight: 700 }}>{workOrder?.service_provider?.name || workOrder?.provider?.name || 'Service Provider'}</p>}
         </div>
         <div style={{ padding: '16px 24px' }}>
           <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>BILLED TO</p>
