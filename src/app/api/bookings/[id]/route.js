@@ -238,7 +238,7 @@ export async function PATCH(request, { params }) {
     const custPhone = booking.customer_phone || custProfile?.phone || null
     console.log(`${t} [11] final: customerName="${customerName}" email=${custEmail||'NONE'} phone=${custPhone||'NONE'}`)
 
-    // ── 9. Determine URL routing (individual vs company) ──────────────────────
+    // ── 9. Determine URL routing + resolve company fleet managers ────────────
     const { data: companyMem, error: coErr } = await sc
       .from('company_users')
       .select('company_id')
@@ -250,6 +250,70 @@ export async function PATCH(request, { params }) {
     const isCompany  = !!companyMem?.company_id
     const bookingUrl = `${APP_URL()}/${isCompany ? 'company' : 'dashboard'}/bookings/${id}`
     console.log(`${t} [12] isCompany=${isCompany} bookingUrl=${bookingUrl}`)
+
+    // For company bookings: notify all fleet managers + company owner
+    let fleetRecipients = []  // [{ user_id, name, email, phone, url }]
+    if (isCompany && companyMem?.company_id && sendComms) {
+      try {
+        const companyId = companyMem.company_id
+
+        // Get company owner profile
+        const { data: company } = await sc
+          .from('company_profiles')
+          .select('owner_user_id, name')
+          .eq('id', companyId)
+          .maybeSingle()
+
+        // Get all active members with can_manage_fleet or is_admin (excluding the booking creator)
+        const { data: fleetMembers } = await sc
+          .from('company_users')
+          .select('user_id, can_manage_fleet, is_admin')
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+          .neq('user_id', booking.customer_user_id)  // already notified above
+
+        const notifyUserIds = new Set()
+
+        // Add owner
+        if (company?.owner_user_id && company.owner_user_id !== booking.customer_user_id) {
+          notifyUserIds.add(company.owner_user_id)
+        }
+
+        // Add fleet managers and admins
+        for (const m of (fleetMembers || [])) {
+          if (m.can_manage_fleet || m.is_admin) {
+            notifyUserIds.add(m.user_id)
+          }
+        }
+
+        if (notifyUserIds.size > 0) {
+          // Fetch their profiles
+          const { data: profiles } = await sc
+            .from('user_profiles')
+            .select('id, first_name, last_name, email, phone, auth_user_id')
+            .in('id', [...notifyUserIds])
+
+          for (const p of (profiles || [])) {
+            let email = p.email
+            if (!email && p.auth_user_id) {
+              const { data: au } = await sc.auth.admin.getUserById(p.auth_user_id)
+              email = au?.user?.email || null
+            }
+            const memberBookingUrl = `${APP_URL()}dashboard/bookings/${id}`
+            fleetRecipients.push({
+              user_id: p.id,
+              name:    `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Team Member',
+              email,
+              phone:   p.phone || null,
+              url:     memberBookingUrl,
+            })
+          }
+          console.log(`${t} [12b] fleet recipients: ${fleetRecipients.length}`)
+        }
+      } catch (e) {
+        console.warn(`${t} [12b] fleet recipients error (non-fatal):`, e.message)
+      }
+    }
 
     // ── 10. Send comms ────────────────────────────────────────────────────────
     const comms = []
@@ -299,6 +363,55 @@ export async function PATCH(request, { params }) {
       }
     })
     console.log(`${t} [15] all comms done`)
+
+    // ── 10b. Notify fleet managers / company owner ───────────────────────────
+    if (fleetRecipients.length > 0) {
+      const fleetComms = []
+      for (const r of fleetRecipients) {
+        // In-app notification
+        supabase.from('notifications').insert({
+          user_id:           r.user_id,
+          recipient_user_id: r.user_id,
+          notification_type: `booking_${statusCode}`,
+          type:              `booking_${statusCode}`,
+          title:             `Fleet Booking ${statusCode === 'confirmed' ? 'Confirmed' : 'Cancelled'}`,
+          message:           `Booking #${booking.booking_number} (${booking.vehicle?.plate_number}) at ${booking.service_provider?.name || '—'} has been ${statusCode.replace(/_/g, ' ')}.`,
+          reference_id:      id,
+          reference_type:    'booking',
+          reference_table:   'bookings',
+          is_read:           false,
+        }).then(() => {}).catch(e => console.warn(`${t} fleet notif error:`, e.message))
+
+        // Email
+        if (r.email) {
+          const { html, text } = buildEmail({ statusCode, booking, customerName: r.name, bookingUrl: r.url })
+          fleetComms.push(
+            sendAndQueueEmail(sc, {
+              to:      [{ Email: r.email, Name: r.name }],
+              subject: `Fleet Booking ${statusCode === 'confirmed' ? 'Confirmed' : 'Cancelled'} — ${booking.booking_number}`,
+              html, text,
+            }).catch(e => console.warn(`${t} fleet email error:`, e.message))
+          )
+        }
+
+        // SMS
+        if (r.phone) {
+          const phone = normalisePhone(r.phone)
+          if (phone) {
+            const dateShort = new Date(booking.booking_date)
+              .toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })
+            const state   = statusCode === 'confirmed' ? 'confirmed ✓' : 'cancelled'
+            const message = `${BRAND}: Fleet booking (${booking.booking_number}) for ${booking.vehicle?.plate_number} at ${booking.service_provider?.name || '—'} on ${dateShort} has been ${state}. View: ${r.url}`
+            fleetComms.push(
+              sendAndQueueSms(sc, { to: phone, message })
+                .catch(e => console.warn(`${t} fleet SMS error:`, e.message))
+            )
+          }
+        }
+      }
+      await Promise.allSettled(fleetComms)
+      console.log(`${t} [15b] fleet notifications done (${fleetRecipients.length} recipients)`)
+    }
 
     // ── Also notify provider when customer cancels ────────────────────────────
     if (statusCode.startsWith('cancelled')) {
