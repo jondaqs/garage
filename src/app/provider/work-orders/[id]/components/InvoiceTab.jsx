@@ -52,7 +52,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     try {
       const { data: inv, error: invErr } = await supabase
         .from('invoices')
-        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, discount_pct, discount_amount, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
+        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, discount, discount_pct, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
@@ -383,10 +383,10 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
               <span>Subtotal</span>
               <span className="font-medium text-gray-900">{fmt(inv.subtotal)}</span>
             </div>
-            {inv.discount_amount > 0 && (
+            {inv.discount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Discount ({Math.round((inv.discount_pct || 0) * 100)}%)</span>
-                <span>− {fmt(inv.discount_amount)}</span>
+                <span>− {fmt(inv.discount)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-500">
