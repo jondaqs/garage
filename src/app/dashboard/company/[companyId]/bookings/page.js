@@ -70,10 +70,11 @@ export default function MemberBookingsPage() {
         .from('bookings')
         .select(`
           id, booking_number, booking_date, booking_time_start,
-          created_at,
+          created_at, created_by, updated_by,
           status:booking_statuses(code, display_name, color_code),
           vehicle:vehicles(plate_number, make, model),
-          provider:service_providers(name)
+          provider:service_providers(name),
+          creator:user_profiles!bookings_created_by_fkey(first_name, last_name)
         `)
         .in('vehicle_id', vehicleIds)
         .order('booking_date', { ascending: false })
@@ -151,7 +152,7 @@ export default function MemberBookingsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Reference', 'Vehicle', 'Provider', 'Date', 'Status', ''].map(h => (
+                {['Reference', 'Vehicle', 'Provider', 'Date', 'Status', 'Booked by', ''].map(h => (
                   <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -183,6 +184,15 @@ export default function MemberBookingsPage() {
                     <span className={`px-2.5 py-1 text-xs font-medium rounded-full capitalize ${STATUS_COLORS[b.status?.code] ?? 'bg-gray-100 text-gray-700'}`}>
                       {b.status?.display_name || b.status?.code || '—'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {b.creator ? (
+                      <span className="text-xs text-gray-600 font-medium">
+                        {b.creator.first_name} {b.creator.last_name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <ChevronRight size={16} className="text-gray-400" />
