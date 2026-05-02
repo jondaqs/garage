@@ -195,6 +195,7 @@ export default function Sidebar({ user }) {
       { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
       { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
+      { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },
       { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
       { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // admin only
       { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
