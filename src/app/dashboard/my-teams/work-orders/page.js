@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Wrench, CheckCircle, XCircle, AlertCircle, Loader2,
   RefreshCw, ClipboardList, Car, Send, FileText,
-  Clock, Filter, ChevronDown, Bell, Receipt, AlertTriangle, BellRing, ClipboardCheck
+  Clock, Filter, ChevronDown, Bell, Receipt, AlertTriangle, BellRing, ClipboardCheck, Search
 } from 'lucide-react'
 
 // ── Status colours ────────────────────────────────────────────────────────────
@@ -87,6 +87,7 @@ export default function MemberWorkOrdersPage() {
   const [error,           setError]           = useState('')
   const [filter,          setFilter]          = useState('action')
   const [showFilter,      setShowFilter]      = useState(false)
+  const [search,          setSearch]          = useState('')
   const [acknowledging,   setAcknowledging]   = useState(null)
   const [declineReason,   setDeclineReason]   = useState('')
   const [showDeclineForm, setShowDeclineForm] = useState(null)
@@ -194,15 +195,27 @@ export default function MemberWorkOrdersPage() {
   const activeOrders   = workOrders.filter(w => !w.status?.is_terminal)
   const terminalOrders = workOrders.filter(w =>  w.status?.is_terminal)
 
-  const filtered = filter === 'action'
-    ? withAction
-    : filter === 'all'
-    ? workOrders
-    : filter === 'active'
-    ? activeOrders
-    : filter === 'history'
-    ? terminalOrders
-    : workOrders.filter(w => w.status?.code === filter)
+  const filtered = (() => {
+    const byStatus = filter === 'action'
+      ? withAction
+      : filter === 'all'
+      ? workOrders
+      : filter === 'active'
+      ? activeOrders
+      : filter === 'history'
+      ? terminalOrders
+      : workOrders.filter(w => w.status?.code === filter)
+
+    if (!search.trim()) return byStatus
+    const q = search.toLowerCase()
+    return byStatus.filter(w =>
+      w.work_order_number?.toLowerCase().includes(q)
+      || w.vehicle?.plate_number?.toLowerCase().includes(q)
+      || w.vehicle?.make?.toLowerCase().includes(q)
+      || w.vehicle?.model?.toLowerCase().includes(q)
+      || w.provider?.name?.toLowerCase().includes(q)
+    )
+  })()
 
   // ── Grouped by provider ───────────────────────────────────────────────────
   const grouped = filtered.reduce((acc, wo) => {
@@ -300,43 +313,58 @@ export default function MemberWorkOrdersPage() {
 
       {/* Summary + filter bar */}
       {workOrders.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Action-needed pill */}
-          {actionCount > 0 && (
-            <button
-              onClick={() => setFilter('action')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                filter === 'action'
-                  ? 'bg-red-600 text-white border-red-600'
-                  : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-              }`}>
-              <AlertTriangle size={13} />
-              {actionCount} need{actionCount === 1 ? 's' : ''} action
-            </button>
-          )}
+        <div className="space-y-2">
+          {/* Search */}
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by WO number, plate, make or garage…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
 
-          <span className="text-sm text-gray-400">{activeOrders.length} active · {terminalOrders.length} closed</span>
-
-          {/* Filter dropdown */}
-          <div className="relative ml-auto">
-            <button
-              onClick={() => setShowFilter(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-              <Filter size={13} />
-              {FILTER_OPTIONS.find(f => f.value === filter)?.label || 'Filter'}
-              <ChevronDown size={13} />
-            </button>
-            {showFilter && (
-              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
-                {FILTER_OPTIONS.map(opt => (
-                  <button key={opt.value}
-                    onClick={() => { setFilter(opt.value); setShowFilter(false) }}
-                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${filter === opt.value ? 'font-semibold text-blue-700 bg-blue-50' : 'text-gray-700'}`}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          {/* Action pill + counts + filter dropdown */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Action-needed pill */}
+            {actionCount > 0 && (
+              <button
+                onClick={() => setFilter('action')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  filter === 'action'
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                }`}>
+                <AlertTriangle size={13} />
+                {actionCount} need{actionCount === 1 ? 's' : ''} action
+              </button>
             )}
+
+            <span className="text-sm text-gray-400">{activeOrders.length} active · {terminalOrders.length} closed</span>
+
+            {/* Filter dropdown */}
+            <div className="relative ml-auto">
+              <button
+                onClick={() => setShowFilter(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                <Filter size={13} />
+                {FILTER_OPTIONS.find(f => f.value === filter)?.label || 'Filter'}
+                <ChevronDown size={13} />
+              </button>
+              {showFilter && (
+                <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
+                  {FILTER_OPTIONS.map(opt => (
+                    <button key={opt.value}
+                      onClick={() => { setFilter(opt.value); setShowFilter(false) }}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${filter === opt.value ? 'font-semibold text-blue-700 bg-blue-50' : 'text-gray-700'}`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -355,10 +383,12 @@ export default function MemberWorkOrdersPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
           <CheckCircle className="mx-auto text-gray-300 mb-3" size={36} />
           <p className="font-semibold text-gray-600">
-            {filter === 'action' ? 'No pending actions — all caught up!' : 'No work orders match this filter'}
+            {filter === 'action' ? 'No pending actions — all caught up!'
+              : search ? 'No work orders match your search or filter.'
+              : 'No work orders match this filter.'}
           </p>
-          <button onClick={() => setFilter('all')} className="mt-3 text-sm text-blue-600 hover:underline">
-            View all work orders
+          <button onClick={() => { setSearch(''); setFilter('all') }} className="mt-3 text-sm text-blue-600 hover:underline">
+            Clear search &amp; filter
           </button>
         </div>
       )}
