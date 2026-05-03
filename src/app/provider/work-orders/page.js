@@ -22,14 +22,19 @@ const STATUS_COLORS = {
   closed:            'bg-gray-100 text-gray-500',
 }
 
+const ACTIVE_STATUSES = new Set([
+  'intake', 'awaiting_approval', 'approved', 'diagnosing',
+  'in_progress', 'rework', 'quality_check', 'completed', 'awaiting_customer_checkout',
+])
+
 const FILTER_OPTIONS = [
-  { label: 'All',             value: 'all' },
-  { label: 'Intake',          value: 'intake' },
-  { label: 'In Progress',     value: 'in_progress' },
+  { label: 'All',               value: 'all' },
+  { label: 'Intake',            value: 'intake' },
+  { label: 'In Progress',       value: 'active' },
   { label: 'Awaiting Approval', value: 'awaiting_approval' },
-  { label: 'Quality Check',   value: 'quality_check' },
-  { label: 'Completed',       value: 'completed' },
-  { label: 'Closed',          value: 'closed' },
+  { label: 'Quality Check',     value: 'quality_check' },
+  { label: 'Completed',         value: 'completed' },
+  { label: 'Closed',            value: 'closed' },
 ]
 
 export default function ProviderWorkOrdersPage() {
@@ -98,7 +103,9 @@ export default function ProviderWorkOrdersPage() {
   }
 
   const filtered = workOrders.filter((wo) => {
-    const matchStatus = statusFilter === 'all' || wo.status?.code === statusFilter
+    const code = wo.status?.code
+    const matchStatus = statusFilter === 'all'
+      || (statusFilter === 'active' ? ACTIVE_STATUSES.has(code) : code === statusFilter)
     const q = search.toLowerCase()
     const matchSearch = !q
       || wo.work_order_number?.toLowerCase().includes(q)

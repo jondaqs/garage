@@ -69,7 +69,7 @@ function getActionNeeded(wo, userRole, canSendEstimates, canSendInvoice) {
 const FILTER_OPTIONS = [
   { value: 'action',            label: 'Action needed'     },
   { value: 'all',               label: 'All'               },
-  { value: 'in_progress',       label: 'In progress'       },
+  { value: 'active',            label: 'In progress'       },
   { value: 'internal_review',   label: 'Estimate review'   },
   { value: 'awaiting_approval', label: 'Awaiting approval' },
   { value: 'completed',         label: 'Completed'         },
@@ -198,6 +198,8 @@ export default function MemberWorkOrdersPage() {
     ? withAction
     : filter === 'all'
     ? workOrders
+    : filter === 'active'
+    ? activeOrders
     : filter === 'history'
     ? terminalOrders
     : workOrders.filter(w => w.status?.code === filter)
