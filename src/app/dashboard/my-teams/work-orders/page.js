@@ -45,6 +45,9 @@ function getActionNeeded(wo, userRole, canSendEstimates, canSendInvoice) {
   if (code === 'internal_review' && canSendEstimates) {
     return { label: 'Review & send estimate', color: 'bg-violet-100 text-violet-800 border-violet-300', icon: Send, urgent: true }
   }
+  if (wo.estimate_approved && code === 'approved') {
+    return { label: 'Estimate approved — start service work', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle, urgent: true }
+  }
   if (code === 'completed' && canSendInvoice) {
     return { label: 'Generate invoice', color: 'bg-green-100 text-green-800 border-green-300', icon: FileText, urgent: true }
   }
@@ -87,8 +90,9 @@ export default function MemberWorkOrdersPage() {
   const [acknowledging,   setAcknowledging]   = useState(null)
   const [declineReason,   setDeclineReason]   = useState('')
   const [showDeclineForm, setShowDeclineForm] = useState(null)
-  const [checkoutRequestCount, setCheckoutRequestCount] = useState(0)
+  const [checkoutRequestCount,  setCheckoutRequestCount]  = useState(0)
   const [checkoutDeclinedCount, setCheckoutDeclinedCount] = useState(0)
+  const [estimateApprovedCount, setEstimateApprovedCount] = useState(0)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -120,6 +124,9 @@ export default function MemberWorkOrdersPage() {
       )
       setCheckoutDeclinedCount(
         merged.filter(w => w.checkout_declined).length
+      )
+      setEstimateApprovedCount(
+        merged.filter(w => w.estimate_approved && w.status?.code === 'approved').length
       )
 
       // ── 4. Build perms map per provider ──────────────────────────────────
@@ -232,6 +239,24 @@ export default function MemberWorkOrdersPage() {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
           <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* ── Estimate approved banner ── */}
+      {estimateApprovedCount > 0 && (
+        <div className="rounded-xl border border-green-300 bg-green-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <CheckCircle size={18} className="text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {estimateApprovedCount} estimate{estimateApprovedCount > 1 ? 's' : ''} approved — ready to start work
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              Customer{estimateApprovedCount > 1 ? 's have' : ' has'} approved the estimate.
+              Look for the <span className="font-semibold text-green-700">Estimate Approved</span> badge and begin the service work.
+            </p>
+          </div>
         </div>
       )}
 
@@ -395,6 +420,11 @@ export default function MemberWorkOrdersPage() {
                             {assignBadge && (
                               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${assignBadge.cls}`}>
                                 {assignBadge.label}
+                              </span>
+                            )}
+                            {wo.estimate_approved && wo.status?.code === 'approved' && (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
+                                <CheckCircle size={10} /> Estimate Approved
                               </span>
                             )}
                             {wo.checkout_requested && !wo.checkout_request_satisfied && (

@@ -775,6 +775,22 @@ export default function WorkOrderDetailPage() {
         </div>
       )}
 
+      {/* ── Estimate approved banner ── */}
+      {wo.estimate_approved && wo.status?.code === 'approved' && (
+        <div className="rounded-xl border border-green-300 bg-green-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <CheckCircle size={18} className="text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Estimate approved — ready to start work</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer has approved the estimate. You can now begin service work on the vehicle.
+              Update service statuses in the <span className="font-semibold text-green-700">Services tab</span>.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Checkout request action banner ── */}
       {wo.checkout_requested && !wo.checkout_request_satisfied && (
         <div className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-4 flex items-start gap-3">

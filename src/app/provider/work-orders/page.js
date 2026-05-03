@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Plus,
   ClipboardList, Search, Filter, ChevronRight,
-  Car, Calendar, AlertCircle, Clock, BellRing, ClipboardCheck
+  Car, Calendar, AlertCircle, Clock, BellRing, ClipboardCheck, CheckCircle
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -41,8 +41,9 @@ export default function ProviderWorkOrdersPage() {
   const [error, setError]             = useState('')
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [checkoutRequestCount, setCheckoutRequestCount] = useState(0)
+  const [checkoutRequestCount,  setCheckoutRequestCount]  = useState(0)
   const [checkoutDeclinedCount, setCheckoutDeclinedCount] = useState(0)
+  const [estimateApprovedCount, setEstimateApprovedCount] = useState(0)
 
   useEffect(() => { loadWorkOrders() }, [])
 
@@ -68,6 +69,7 @@ export default function ProviderWorkOrdersPage() {
           checkout_requested,
           checkout_request_satisfied,
           checkout_declined,
+          estimate_approved,
           vehicle:vehicles(plate_number, make, model),
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops(name, town),
@@ -84,6 +86,9 @@ export default function ProviderWorkOrdersPage() {
       )
       setCheckoutDeclinedCount(
         (data || []).filter(w => w.checkout_declined).length
+      )
+      setEstimateApprovedCount(
+        (data || []).filter(w => w.estimate_approved && w.status?.code === 'approved').length
       )
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
@@ -139,6 +144,24 @@ export default function ProviderWorkOrdersPage() {
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
           <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
           <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* ── Estimate approved banner ── */}
+      {estimateApprovedCount > 0 && (
+        <div className="mb-4 rounded-xl border border-green-300 bg-green-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <CheckCircle size={18} className="text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {estimateApprovedCount} estimate{estimateApprovedCount > 1 ? 's' : ''} approved — ready to start work
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              Customer{estimateApprovedCount > 1 ? 's have' : ' has'} approved the estimate.
+              Look for the <span className="font-semibold text-green-700">Estimate Approved</span> badge and begin the service work.
+            </p>
+          </div>
         </div>
       )}
 
@@ -251,6 +274,11 @@ export default function ProviderWorkOrdersPage() {
                     {wo.priority === 'urgent' && (
                       <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
                         URGENT
+                      </span>
+                    )}
+                    {wo.estimate_approved && wo.status?.code === 'approved' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                        <CheckCircle size={10} /> Estimate Approved
                       </span>
                     )}
                     {wo.checkout_requested && !wo.checkout_request_satisfied && (

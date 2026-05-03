@@ -44,91 +44,101 @@ export async function POST(request, { params }) {
       ? `${customerProfile.first_name} ${customerProfile.last_name}`.trim()
       : 'Customer'
 
-    // ── 3. Fetch provider owner contact ───────────────────────────────────
-    const { data: providerOwner } = await supabase
-      .from('service_providers')
-      .select('owner_user_id, owner:user_profiles!owner_user_id(phone, auth_user_id)')
-      .eq('id', provider_id)
-      .single()
+    // ── 3. Fetch all provider staff to notify ─────────────────────────────
+    const sc = (() => {
+      const { createClient: svcClient } = require('@supabase/supabase-js')
+      return svcClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+    })()
 
     // Get work order details for vehicle plate + total
     const { data: wo } = await supabase
       .from('work_orders')
       .select('total_amount, vehicle:vehicles(plate_number)')
       .eq('id', workOrderId)
-      .single()
+      .maybeSingle()
 
-    // Get provider owner's email via auth
-    let providerEmail = null
-    let providerPhone = providerOwner?.owner?.phone || null
-
-    if (providerOwner?.owner?.auth_user_id) {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-        .catch(() => ({ data: { user: null } }))
-      // Use a direct query since admin API may not be available
-      const { data: emailData } = await supabase
-        .from('user_profiles')
-        .select('auth_user_id')
-        .eq('id', providerOwner.owner_user_id)
-        .single()
-      // We'll rely on the notification system for email; SMS is primary for provider
-    }
-
-    // Fetch email from provider_documents or service_providers table
-    const { data: spEmail } = await supabase
-      .from('service_providers')
-      .select('email')
-      .eq('id', provider_id)
-      .single()
-    providerEmail = spEmail?.email || null
-
-    const vehiclePlate = wo?.vehicle?.plate_number || ''
+    const vehiclePlate  = wo?.vehicle?.plate_number || ''
     const estimateTotal = wo?.total_amount || 0
 
-    // ── 4. Send email to provider (non-fatal) ─────────────────────────────
-    let emailSent = false
-    if (providerEmail) {
-      try {
-        await sendEstimateApprovedEmail(supabase, {
-          to:             providerEmail,
-          providerName:   provider_name,
-          workOrderNumber: work_order_number,
-          customerName,
-          vehiclePlate,
-          estimateTotal,
-          workOrderId,
-        })
-        emailSent = true
-      } catch (e) {
-        console.error('Approved email failed (non-fatal):', e.message)
-      }
+    // Collect all recipients: owner + SPU admins/managers/accountants + mechanics with can_approve_work
+    const recipients = []
+    const seenIds    = new Set()
+    const addR = (r) => { if (r?.user_id && !seenIds.has(r.user_id)) { seenIds.add(r.user_id); recipients.push(r) } }
+
+    const { data: spOwner } = await sc
+      .from('service_providers')
+      .select('owner_user_id, email, user_profiles!owner_user_id(first_name, last_name, email, phone)')
+      .eq('id', provider_id).maybeSingle()
+    if (spOwner?.owner_user_id) {
+      addR({
+        user_id:    spOwner.owner_user_id,
+        first_name: spOwner.user_profiles?.first_name,
+        last_name:  spOwner.user_profiles?.last_name,
+        email:      spOwner.user_profiles?.email || spOwner.email,
+        phone:      spOwner.user_profiles?.phone,
+      })
     }
 
-    // ── 5. Send SMS to provider (non-fatal) ───────────────────────────────
-    let smsSent = false
-    if (providerPhone) {
-      try {
-        const smsResult = await sendEstimateApprovedSms(supabase, {
-          phone:           providerPhone,
-          providerName:    provider_name,
-          workOrderNumber: work_order_number,
-          vehiclePlate,
-          estimateTotal,
-          workOrderId,
-        })
-        smsSent = smsResult.sent
-      } catch (e) {
-        console.error('Approved SMS failed (non-fatal):', e.message)
+    const { data: spuList } = await sc
+      .from('service_provider_users')
+      .select('user_id, user_profiles!user_id(first_name, last_name, email, phone)')
+      .eq('service_provider_id', provider_id).eq('is_active', true)
+      .in('role', ['admin', 'manager', 'accountant'])
+    for (const s of spuList || []) {
+      addR({ user_id: s.user_id, first_name: s.user_profiles?.first_name, last_name: s.user_profiles?.last_name, email: s.user_profiles?.email, phone: s.user_profiles?.phone })
+    }
+
+    const { data: mechList } = await sc
+      .from('mechanics')
+      .select('user_id, user_profiles!user_id(first_name, last_name, email, phone)')
+      .eq('service_provider_id', provider_id).eq('is_active', true).eq('can_approve_work', true)
+    for (const m of mechList || []) {
+      addR({ user_id: m.user_id, first_name: m.user_profiles?.first_name, last_name: m.user_profiles?.last_name, email: m.user_profiles?.email, phone: m.user_profiles?.phone })
+    }
+
+    // ── 4. Send email + SMS to all recipients ────────────────────────────
+    let emailsSent = 0, smsSent = 0
+    for (const r of recipients) {
+      if (r.email) {
+        try {
+          await sendEstimateApprovedEmail(supabase, {
+            to:              r.email,
+            providerName:    provider_name,
+            workOrderNumber: work_order_number,
+            customerName,
+            vehiclePlate,
+            estimateTotal,
+            workOrderId,
+          })
+          emailsSent++
+        } catch (e) { console.error('Approved email failed (non-fatal):', e.message) }
+      }
+      if (r.phone) {
+        try {
+          const smsResult = await sendEstimateApprovedSms(supabase, {
+            phone:           r.phone,
+            providerName:    provider_name,
+            workOrderNumber: work_order_number,
+            vehiclePlate,
+            estimateTotal,
+            workOrderId,
+          })
+          if (smsResult?.sent) smsSent++
+        } catch (e) { console.error('Approved SMS failed (non-fatal):', e.message) }
       }
     }
 
     return NextResponse.json({
       success:          true,
       work_order_number,
-      email_sent:       emailSent,
+      email_sent:       emailsSent > 0,
+      emails_sent:      emailsSent,
       sms_sent:         smsSent,
     })
-
   } catch (err) {
     console.error('POST /api/work-orders/[id]/approve error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
