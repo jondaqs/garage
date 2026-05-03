@@ -721,6 +721,22 @@ export default function MechanicWorkOrderPage() {
         </div>
       )}
 
+      {/* ── Checkout declined banner ── */}
+      {wo.checkout_declined && (
+        <div className="rounded-xl border border-red-300 bg-red-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <ClipboardCheck size={18} className="text-red-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Action needed — Checkout declined by customer</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer was not satisfied with the checkout submission. Go to the <span className="font-semibold text-red-700">Checkout tab</span> to
+              review their reason, address any concerns and resubmit the checkout form.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Tabs — only shown after acknowledged */}
       {(isAcknowledged || !isPending) && tabs.length > 1 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">

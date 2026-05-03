@@ -175,6 +175,12 @@ export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
       })
       if (rpcErr) throw rpcErr
       if (!data.success) throw new Error(data.error)
+      // Non-blocking: notify provider staff via email + SMS
+      fetch(`/api/work-orders/${workOrderId}/decline-checkout-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      }).catch(e => console.warn('[decline-checkout-notify]', e.message))
       onDecided?.()
     } catch (e) { setError(e.message) }
     finally { setActing(false) }

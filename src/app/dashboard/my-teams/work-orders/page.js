@@ -54,6 +54,9 @@ function getActionNeeded(wo, userRole, canSendEstimates, canSendInvoice) {
   if (wo.checkout_requested && !wo.checkout_request_satisfied) {
     return { label: 'Submit checkout form — customer is waiting', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: ClipboardCheck, urgent: true }
   }
+  if (wo.checkout_declined) {
+    return { label: 'Checkout declined — review and resubmit', color: 'bg-red-100 text-red-800 border-red-300', icon: ClipboardCheck, urgent: true }
+  }
   if (wo.mechanic_assignment_status === 'pending') {
     return { label: 'Acknowledge assignment', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Bell, urgent: true }
   }
@@ -85,6 +88,7 @@ export default function MemberWorkOrdersPage() {
   const [declineReason,   setDeclineReason]   = useState('')
   const [showDeclineForm, setShowDeclineForm] = useState(null)
   const [checkoutRequestCount, setCheckoutRequestCount] = useState(0)
+  const [checkoutDeclinedCount, setCheckoutDeclinedCount] = useState(0)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -113,6 +117,9 @@ export default function MemberWorkOrdersPage() {
       setWorkOrders(merged)
       setCheckoutRequestCount(
         merged.filter(w => w.checkout_requested && !w.checkout_request_satisfied).length
+      )
+      setCheckoutDeclinedCount(
+        merged.filter(w => w.checkout_declined).length
       )
 
       // ── 4. Build perms map per provider ──────────────────────────────────
@@ -241,6 +248,24 @@ export default function MemberWorkOrdersPage() {
             <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
               Customer{checkoutRequestCount > 1 ? 's have' : ' has'} received the invoice and requested the checkout form before making payment.
               Open the work order and complete the <span className="font-semibold text-blue-700">Checkout tab</span>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Checkout declined banner ── */}
+      {checkoutDeclinedCount > 0 && (
+        <div className="rounded-xl border border-red-300 bg-red-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <ClipboardCheck size={18} className="text-red-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {checkoutDeclinedCount} checkout{checkoutDeclinedCount > 1 ? 's' : ''} declined by customer
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer was not satisfied with the checkout. Look for the <span className="font-semibold text-red-700">Checkout Declined</span> badge,
+              open the work order, review the reason and resubmit the <span className="font-semibold text-red-700">Checkout tab</span>.
             </p>
           </div>
         </div>
@@ -375,6 +400,11 @@ export default function MemberWorkOrdersPage() {
                             {wo.checkout_requested && !wo.checkout_request_satisfied && (
                               <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
                                 <BellRing size={10} /> Checkout Requested
+                              </span>
+                            )}
+                            {wo.checkout_declined && (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                                <ClipboardCheck size={10} /> Checkout Declined
                               </span>
                             )}
                           </div>

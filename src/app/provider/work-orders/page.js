@@ -42,6 +42,7 @@ export default function ProviderWorkOrdersPage() {
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [checkoutRequestCount, setCheckoutRequestCount] = useState(0)
+  const [checkoutDeclinedCount, setCheckoutDeclinedCount] = useState(0)
 
   useEffect(() => { loadWorkOrders() }, [])
 
@@ -66,6 +67,7 @@ export default function ProviderWorkOrdersPage() {
           scheduled_start,
           checkout_requested,
           checkout_request_satisfied,
+          checkout_declined,
           vehicle:vehicles(plate_number, make, model),
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops(name, town),
@@ -79,6 +81,9 @@ export default function ProviderWorkOrdersPage() {
       setWorkOrders(data || [])
       setCheckoutRequestCount(
         (data || []).filter(w => w.checkout_requested && !w.checkout_request_satisfied).length
+      )
+      setCheckoutDeclinedCount(
+        (data || []).filter(w => w.checkout_declined).length
       )
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
@@ -150,6 +155,24 @@ export default function ProviderWorkOrdersPage() {
             <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
               Customer{checkoutRequestCount > 1 ? 's have' : ' has'} received the invoice and requested the checkout form before making payment.
               Look for the <span className="font-semibold text-blue-700">Checkout Requested</span> badge below and open the work order to complete the checkout tab.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Checkout declined banner ── */}
+      {checkoutDeclinedCount > 0 && (
+        <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <ClipboardCheck size={18} className="text-red-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {checkoutDeclinedCount} checkout{checkoutDeclinedCount > 1 ? 's' : ''} declined by customer
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer was not satisfied with the checkout. Look for the <span className="font-semibold text-red-700">Checkout Declined</span> badge,
+              open the work order, review the reason and resubmit the checkout form.
             </p>
           </div>
         </div>
@@ -233,6 +256,11 @@ export default function ProviderWorkOrdersPage() {
                     {wo.checkout_requested && !wo.checkout_request_satisfied && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
                         <BellRing size={10} /> Checkout Requested
+                      </span>
+                    )}
+                    {wo.checkout_declined && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                        <ClipboardCheck size={10} /> Checkout Declined
                       </span>
                     )}
                   </div>
