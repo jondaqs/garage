@@ -5,8 +5,22 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Car, ChevronRight, AlertCircle,
-  Loader2, Bell
+  Loader2, Bell, Search, Filter
 } from 'lucide-react'
+
+const ACTIVE_STATUSES = new Set([
+  'intake', 'awaiting_approval', 'approved', 'diagnosing',
+  'in_progress', 'rework', 'quality_check', 'completed', 'awaiting_customer_checkout',
+])
+
+const FILTER_OPTIONS = [
+  { label: 'All',               value: 'all' },
+  { label: 'In Progress',       value: 'active' },
+  { label: 'Awaiting Approval', value: 'awaiting_approval' },
+  { label: 'Quality Check',     value: 'quality_check' },
+  { label: 'Completed',         value: 'completed' },
+  { label: 'Closed',            value: 'closed' },
+]
 
 const STATUS_STYLES = {
   intake:            'bg-gray-100 text-gray-600',
@@ -26,9 +40,11 @@ export default function CustomerWorkOrdersPage() {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [workOrders, setWorkOrders] = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState('')
+  const [workOrders,    setWorkOrders]    = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState('')
+  const [search,        setSearch]        = useState('')
+  const [statusFilter,  setStatusFilter]  = useState('all')
 
   useEffect(() => { loadWorkOrders() }, [])
 
@@ -87,6 +103,20 @@ export default function CustomerWorkOrdersPage() {
   const active          = workOrders.filter(wo => !['completed','cancelled','closed'].includes(wo.status?.code))
   const fmt = (n) => n ? `KES ${Number(n).toLocaleString()}` : null
 
+  const filtered = workOrders.filter(wo => {
+    const code = wo.status?.code
+    const matchStatus = statusFilter === 'all'
+      || (statusFilter === 'active' ? ACTIVE_STATUSES.has(code) : code === statusFilter)
+    const q = search.toLowerCase()
+    const matchSearch = !q
+      || wo.work_order_number?.toLowerCase().includes(q)
+      || wo.vehicle?.plate_number?.toLowerCase().includes(q)
+      || wo.vehicle?.make?.toLowerCase().includes(q)
+      || wo.vehicle?.model?.toLowerCase().includes(q)
+      || wo.provider?.name?.toLowerCase().includes(q)
+    return matchStatus && matchSearch
+  })
+
   if (loading) return (
     <div className="flex justify-center items-center h-64">
       <Loader2 className="animate-spin text-green-600" size={32} />
@@ -137,6 +167,34 @@ export default function CustomerWorkOrdersPage() {
         </div>
       )}
 
+      {/* Search + filter bar */}
+      {workOrders.length > 0 && (
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by WO number, plate, make or garage…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+          <div className="relative">
+            <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none cursor-pointer"
+            >
+              {FILTER_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {workOrders.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <ClipboardList className="mx-auto text-gray-300 mb-4" size={48} />
@@ -149,9 +207,18 @@ export default function CustomerWorkOrdersPage() {
             My Bookings
           </button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-10 text-center">
+          <ClipboardList className="mx-auto text-gray-300 mb-3" size={36} />
+          <p className="text-gray-500 text-sm">No work orders match your search or filter.</p>
+          <button onClick={() => { setSearch(''); setStatusFilter('all') }}
+            className="mt-3 text-sm text-green-600 hover:underline">
+            Clear filters
+          </button>
+        </div>
       ) : (
         <div className="space-y-3">
-          {workOrders.map(wo => (
+          {filtered.map(wo => (
             <button key={wo.id}
               onClick={() => router.push(`/dashboard/work-orders/${wo.id}`)}
               className="w-full bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition-shadow border border-transparent hover:border-green-200">
