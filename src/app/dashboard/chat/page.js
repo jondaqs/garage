@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Send, MessageSquare, Search, Loader2,
-  Building2, CheckCheck, Check, X
+  Building2, CheckCheck, Check, X, XCircle, AlertCircle, CheckCircle
 } from 'lucide-react'
 
 export default function ChatPage() {
@@ -23,6 +23,7 @@ export default function ChatPage() {
   const [loadingMsgs,   setLoadingMsgs]   = useState(false)
   const [convSearch,    setConvSearch]    = useState('')
   const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [closingConv,   setClosingConv]   = useState(false)
 
   const messagesEndRef = useRef(null)
   const channelRef     = useRef(null)
@@ -45,7 +46,7 @@ export default function ChatPage() {
     const { data } = await supabase
       .from('conversations')
       .select(`
-        id, updated_at, last_message_at, last_message_preview, user_unread_count,
+        id, updated_at, last_message_at, last_message_preview, user_unread_count, status,
         provider:service_providers(id, name, is_verified)
       `)
       .eq('user_id', profile.id)
@@ -219,6 +220,20 @@ export default function ChatPage() {
     inputRef.current?.focus()
   }
 
+  const toggleClosed = async () => {
+    if (!activeConv || !profile) return
+    setClosingConv(true)
+    const isOpen = activeConv.status !== 'closed'
+    const update = isOpen
+      ? { status: 'closed', closed_at: new Date().toISOString(), closed_by_id: profile.id }
+      : { status: 'open',   closed_at: null,                     closed_by_id: null }
+    await supabase.from('conversations').update(update).eq('id', activeConv.id)
+    const updated = { ...activeConv, ...update }
+    setActiveConv(updated)
+    setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, ...update } : c))
+    setClosingConv(false)
+  }
+
   const handleKey = e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
@@ -295,11 +310,16 @@ export default function ChatPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800 truncate">{conv.provider?.name}</p>
-                    {conv.last_message_at && (
-                      <span className="text-[11px] text-gray-400 flex-shrink-0 ml-2">
-                        {formatTime(conv.last_message_at)}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      {conv.status === 'closed' && (
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">closed</span>
+                      )}
+                      {conv.last_message_at && (
+                        <span className="text-[11px] text-gray-400">
+                          {formatTime(conv.last_message_at)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-gray-400 truncate mt-0.5">
                     {conv.last_message_preview || 'Start a conversation'}
@@ -343,8 +363,26 @@ export default function ChatPage() {
                 <p className="text-sm font-semibold text-gray-800 truncate">
                   {activeConv.provider?.name || 'Service Provider'}
                 </p>
-                <p className="text-xs text-gray-400">Service Provider</p>
+                <p className={`text-xs ${activeConv.status === 'closed' ? 'text-red-500' : 'text-green-500'}`}>
+                  {activeConv.status === 'closed' ? '● Closed' : '● Open'}
+                </p>
               </div>
+              <button
+                onClick={toggleClosed}
+                disabled={closingConv}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 ${
+                  activeConv.status === 'closed'
+                    ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100'
+                }`}
+              >
+                {closingConv
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : activeConv.status === 'closed'
+                    ? <><CheckCircle size={12} /> Reopen</>
+                    : <><XCircle size={12} /> Close chat</>
+                }
+              </button>
               <button
                 onClick={() => router.push(`/dashboard/providers/${activeConv.provider?.id}`)}
                 className="text-xs text-blue-600 hover:underline px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
@@ -352,6 +390,16 @@ export default function ChatPage() {
                 View profile
               </button>
             </div>
+
+            {/* Closed banner */}
+            {activeConv.status === 'closed' && (
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2">
+                <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
+                <p className="text-xs text-amber-700 font-medium">
+                  This conversation is closed. Reopen it to send new messages.
+                </p>
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
@@ -410,29 +458,38 @@ export default function ChatPage() {
 
             {/* Input */}
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex-shrink-0">
-              <div className="flex items-end gap-2">
-                <textarea
-                  ref={inputRef}
-                  value={body}
-                  onChange={e => setBody(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Type a message…"
-                  rows={1}
-                  className="flex-1 resize-none px-4 py-2.5 text-sm bg-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all max-h-32"
-                  style={{ minHeight: '42px' }}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!body.trim() || sending}
-                  className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                >
-                  {sending
-                    ? <Loader2 size={16} className="animate-spin" />
-                    : <Send size={16} />
-                  }
-                </button>
-              </div>
-              <p className="text-[11px] text-gray-400 mt-1.5 text-center">Enter to send · Shift+Enter for new line</p>
+              {activeConv.status === 'closed' ? (
+                <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-400">
+                  <XCircle size={15} />
+                  Conversation closed — reopen to send messages
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      ref={inputRef}
+                      value={body}
+                      onChange={e => setBody(e.target.value)}
+                      onKeyDown={handleKey}
+                      placeholder="Type a message…"
+                      rows={1}
+                      className="flex-1 resize-none px-4 py-2.5 text-sm bg-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all max-h-32"
+                      style={{ minHeight: '42px' }}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={!body.trim() || sending}
+                      className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                    >
+                      {sending
+                        ? <Loader2 size={16} className="animate-spin" />
+                        : <Send size={16} />
+                      }
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1.5 text-center">Enter to send · Shift+Enter for new line</p>
+                </>
+              )}
             </div>
           </>
         )}

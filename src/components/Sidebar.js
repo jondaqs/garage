@@ -33,6 +33,7 @@ export default function Sidebar({ user }) {
         .from('conversations')
         .select('user_unread_count')
         .eq('user_id', profile.id)
+        .eq('status', 'open')
       const total = (convs || []).reduce((s, c) => s + (c.user_unread_count || 0), 0)
       setUnreadMessages(total)
     } catch {}

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Calendar, Users, Package, FileText,
-  BarChart3, Settings, Store, LogOut, Menu, X
+  BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -13,15 +13,31 @@ export default function ProviderSidebar({ provider }) {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [mobileOpen,   setMobileOpen]   = useState(false)
+  const [mobileOpen,    setMobileOpen]    = useState(false)
   const [activeWoCount, setActiveWoCount] = useState(0)
+  const [unreadChats,   setUnreadChats]   = useState(0)
 
   // Close on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   useEffect(() => {
-    if (provider?.id) loadActiveWoCount(provider.id)
+    if (provider?.id) {
+      loadActiveWoCount(provider.id)
+      loadUnreadChats(provider.id)
+    }
   }, [provider?.id])
+
+  const loadUnreadChats = async (providerId) => {
+    try {
+      const { data } = await supabase
+        .from('conversations')
+        .select('provider_unread_count')
+        .eq('service_provider_id', providerId)
+        .eq('status', 'open')
+      const total = (data || []).reduce((s, c) => s + (c.provider_unread_count || 0), 0)
+      setUnreadChats(total)
+    } catch {}
+  }
 
   const loadActiveWoCount = async (providerId) => {
     try {
@@ -44,6 +60,8 @@ export default function ProviderSidebar({ provider }) {
     { name: 'Bookings',     href: '/provider/bookings',    icon: Calendar        },
     { name: 'Work Orders',  href: '/provider/work-orders', icon: FileText,
       badge: activeWoCount > 0 ? activeWoCount : null },
+    { name: 'Chat',         href: '/provider/chat',        icon: MessageSquare,
+      badge: unreadChats > 0 ? unreadChats : null },
     { name: 'My Shops',     href: '/provider/shops',       icon: Store           },
     { name: 'Team Members', href: '/provider/team',        icon: Users           },
     { name: 'Inventory',    href: '/provider/inventory',   icon: Package         },
