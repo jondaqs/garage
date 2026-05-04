@@ -144,6 +144,7 @@ export default function TeamPage() {
     { key: 'can_approve_estimates', label: 'Approve Estimates',     desc: 'Can approve service estimates from providers'    },
     { key: 'can_approve_checkout',  label: 'Approve Checkout',      desc: 'Can accept or decline vehicle checkout'          },
     { key: 'can_approve_payment',   label: 'Approve Payments',      desc: 'Can confirm and approve invoice payments'        },
+    { key: 'can_chat',              label: 'Chat with Providers',   desc: 'Can message service providers via the chat'      },
   ]
 
   const roleLabel = (role) =>
@@ -157,6 +158,7 @@ export default function TeamPage() {
       can_approve_estimates: !!member.can_approve_estimates,
       can_approve_checkout:  !!member.can_approve_checkout,
       can_approve_payment:   !!member.can_approve_payment,
+      can_chat:              !!member.can_chat,
     })
     setRolesError('')
     setRolesModal(member)
@@ -176,6 +178,7 @@ export default function TeamPage() {
         p_can_approve_estimates:  rolesForm.can_approve_estimates,
         p_can_approve_checkout:   rolesForm.can_approve_checkout,
         p_can_approve_payment:    rolesForm.can_approve_payment,
+        p_can_chat:               rolesForm.can_chat,
       })
       if (rpcErr) throw rpcErr
       if (!result.success) throw new Error(result.error)
@@ -433,6 +436,9 @@ export default function TeamPage() {
                             )}
                             {member.can_approve_checkout && (
                               <span className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded font-medium" title="Can approve checkout">CHKOUT</span>
+                            )}
+                            {member.can_chat && (
+                              <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium" title="Can chat with providers">CHAT</span>
                             )}
                           </div>
                         </div>

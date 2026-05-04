@@ -97,6 +97,7 @@ export default function ProviderTeamPage() {
           id, user_id, role, specialization, experience_years,
           is_active, is_verified,
           can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates,
+          can_send_invoice, can_chat,
           user:user_profiles!user_id(first_name, last_name, email, phone)
         `)
         .eq('service_provider_id', pId)
@@ -120,6 +121,7 @@ export default function ProviderTeamPage() {
         spu_can_manage_team:      m.spu_can_manage_team,
         spu_can_send_estimates:   m.spu_can_send_estimates,
         spu_can_send_invoice:     m.spu_can_send_invoice,
+        spu_can_chat:             m.spu_can_chat,
         // Mechanic-level permissions
         mech_can_approve_work:     m.mech_can_approve_work,
         mech_can_manage_inventory: m.mech_can_manage_inventory,
@@ -276,6 +278,7 @@ export default function ProviderTeamPage() {
       spu_can_manage_team:      !!member.spu_can_manage_team,
       spu_can_send_estimates:   !!member.spu_can_send_estimates,
       spu_can_send_invoice:     !!member.spu_can_send_invoice,
+      spu_can_chat:             !!member.spu_can_chat,
       // Mechanic permissions (Mechanic tab)
       mech_can_approve_work:     !!member.mech_can_approve_work,
       mech_can_manage_inventory: !!member.mech_can_manage_inventory,
@@ -303,6 +306,7 @@ export default function ProviderTeamPage() {
             can_manage_inventory: editMemberForm.spu_can_manage_inventory,
             can_send_estimates:   editMemberForm.spu_can_send_estimates,
             can_send_invoice:     editMemberForm.spu_can_send_invoice,
+            can_chat:             editMemberForm.spu_can_chat,
             updated_at:           new Date().toISOString(),
           })
           .eq('id', editingMemberData.spu_id)
@@ -817,6 +821,7 @@ export default function ProviderTeamPage() {
                       { key: 'spu_can_send_invoice',     mech: 'mech_can_send_invoice',     label: 'Can send invoices'               },
                       { key: 'spu_can_manage_inventory', mech: 'mech_can_manage_inventory', label: 'Can manage inventory'            },
                       { key: 'spu_can_manage_team',      mech: 'mech_can_manage_team',      label: 'Can manage team'                 },
+                      { key: 'spu_can_chat',             mech: 'spu_can_chat',              label: 'Can chat with customers'         },
                     ].map(p => (
                       <label key={p.key} className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={editMemberForm[p.key] || false}
