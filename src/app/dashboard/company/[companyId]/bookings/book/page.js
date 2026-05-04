@@ -9,6 +9,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, Star, MapPin, Truck, ArrowLeft, Calendar, CalendarDays, X, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import ProviderDetailModal from '@/components/ProviderDetailModal'
 
 const supabase = createClient()
 
@@ -26,6 +27,7 @@ export default function MemberBookServicePage() {
   const [selectedType, setSelectedType]     = useState('all')
   const [selectedDate, setSelectedDate]     = useState(null)
   const [error, setError]                   = useState(null)
+  const [previewProvider, setPreviewProvider] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -275,7 +277,8 @@ export default function MemberBookServicePage() {
             {filtered.map(provider => (
               <div
                 key={provider.id}
-                className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all"
+                onClick={() => setPreviewProvider(provider)}
+                className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
               >
                 <div className="p-2.5 bg-blue-50 rounded-lg shrink-0">
                   <Calendar className="w-5 h-5 text-blue-600" />
@@ -320,7 +323,7 @@ export default function MemberBookServicePage() {
                 </div>
 
                 <button
-                  onClick={() => handleBook(provider)}
+                  onClick={e => { e.stopPropagation(); handleBook(provider) }}
                   disabled={!selectedVehicle}
                   className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${
                     selectedVehicle
@@ -328,7 +331,7 @@ export default function MemberBookServicePage() {
                       : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  {selectedVehicle ? 'Book Service' : 'Select Vehicle First'}
+                  {selectedVehicle ? 'Book' : '—'}
                 </button>
               </div>
             ))}
@@ -340,6 +343,15 @@ export default function MemberBookServicePage() {
         <p className="text-center text-sm text-gray-400">
           Select a vehicle above to enable booking
         </p>
+      )}
+
+      {previewProvider && (
+        <ProviderDetailModal
+          provider={previewProvider}
+          onClose={() => setPreviewProvider(null)}
+          onBook={p => { setPreviewProvider(null); handleBook(p) }}
+          canBook={!!selectedVehicle}
+        />
       )}
     </div>
   )

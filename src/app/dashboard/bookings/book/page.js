@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, MapPin, Search, Star, Filter, X, CalendarDays } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import ProviderDetailModal from '@/components/ProviderDetailModal'
 
 export default function BookServicePage() {
   const router = useRouter()
@@ -13,6 +14,7 @@ export default function BookServicePage() {
   const [vehicles, setVehicles] = useState([])
   const [selectedVehicle, setSelectedVehicle] = useState(searchParams.get('vehicle') || null)
   const [selectedProvider, setSelectedProvider] = useState(null)
+  const [previewProvider,  setPreviewProvider]  = useState(null)
   const [selectedDate, setSelectedDate] = useState(null) // ← ADD THIS
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -239,7 +241,10 @@ export default function BookServicePage() {
           </div>
         ) : (
           filteredProviders.map((provider) => (
-            <div key={provider.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition">
+            <div key={provider.id}
+              onClick={() => setPreviewProvider(provider)}
+              className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition cursor-pointer group ring-0 hover:ring-2 hover:ring-blue-300"
+            >
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -279,7 +284,7 @@ export default function BookServicePage() {
 
                 {/* Book Button */}
                 <button
-                  onClick={() => handleBookProvider(provider)}
+                  onClick={e => { e.stopPropagation(); handleBookProvider(provider) }}
                   disabled={!selectedVehicle}
                   className={`w-full py-2 rounded-lg font-medium transition ${
                     selectedVehicle
@@ -289,11 +294,22 @@ export default function BookServicePage() {
                 >
                   {selectedVehicle ? 'Book Service' : 'Select Vehicle First'}
                 </button>
+                <p className="text-center text-xs text-gray-400 mt-2">Tap card for more details</p>
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Provider detail modal */}
+      {previewProvider && (
+        <ProviderDetailModal
+          provider={previewProvider}
+          onClose={() => setPreviewProvider(null)}
+          onBook={p => { setPreviewProvider(null); handleBookProvider(p) }}
+          canBook={!!selectedVehicle}
+        />
+      )}
     </div>
   )
 }
