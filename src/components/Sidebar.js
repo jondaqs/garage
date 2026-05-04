@@ -4,8 +4,8 @@ import {
   Car, User, Plus, Calendar, CalendarDays, History, Bell,
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
-  AlertCircle, Wrench,
-  ClipboardList} from 'lucide-react'
+  AlertCircle, Wrench, ClipboardList, Search, MessageSquare
+} from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect } from 'react'
@@ -15,10 +15,28 @@ export default function Sidebar({ user }) {
   const pathname = usePathname()
   const supabase = createClient()
   const [remindersCount, setRemindersCount] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
 
   useEffect(() => {
     loadRemindersCount()
+    loadUnreadMessages()
   }, [])
+
+  const loadUnreadMessages = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+      const { data: profile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
+      if (!profile) return
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('user_unread_count')
+        .eq('user_id', profile.id)
+      const total = (convs || []).reduce((s, c) => s + (c.user_unread_count || 0), 0)
+      setUnreadMessages(total)
+    } catch {}
+  }
 
   const loadRemindersCount = async () => {
     try {
@@ -175,15 +193,18 @@ export default function Sidebar({ user }) {
 
   // ── Personal nav items ────────────────────────────────────────────────────
   const personalItems = [
-    { icon: User,        label: 'Dashboard',   path: '/dashboard' },
-    { icon: Plus,        label: 'Add Vehicle', path: '/dashboard/vehicles/add' },
-    { icon: Calendar,    label: 'Bookings',    path: '/dashboard/bookings' },
-    { icon: ClipboardList, label: 'My Work Orders',path: '/dashboard/work-orders' },
-    { icon: Bell,          label: 'Reminders',    path: '/dashboard/reminders',
+    { icon: User,          label: 'Dashboard',              path: '/dashboard' },
+    { icon: Plus,          label: 'Add Vehicle',            path: '/dashboard/vehicles/add' },
+    { icon: Search,        label: 'Search Providers',       path: '/dashboard/providers' },
+    { icon: Calendar,      label: 'Bookings',               path: '/dashboard/bookings' },
+    { icon: ClipboardList, label: 'My Work Orders',         path: '/dashboard/work-orders' },
+    { icon: MessageSquare, label: 'Chat',                   path: '/dashboard/chat',
+      badge: unreadMessages > 0 ? unreadMessages : null },
+    { icon: Bell,          label: 'Reminders',              path: '/dashboard/reminders',
       badge: remindersCount > 0 ? remindersCount : null },
-    { icon: CalendarDays,label: 'Calendar',    path: '/dashboard/calendar' },
-    { icon: History,     label: 'History',     path: '/dashboard/history' },
-    { icon: Settings,    label: 'Profile',     path: '/dashboard/profile' },
+    { icon: CalendarDays,  label: 'Calendar',               path: '/dashboard/calendar' },
+    { icon: History,       label: 'History',                path: '/dashboard/history' },
+    { icon: Settings,      label: 'Profile',                path: '/dashboard/profile' },
   ]
 
   // ── Company nav items (gated by role) ─────────────────────────────────────
