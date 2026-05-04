@@ -24,10 +24,17 @@ export default function BookServicePage() {
   useEffect(() => {
     loadData()
     
-    // Check for pre-selected date from calendar
+    // Check for pre-selected date from calendar — consume and clear immediately
+    // so stale values from previous sessions never show up on fresh visits
     const storedDate = sessionStorage.getItem('selectedBookingDate')
     if (storedDate) {
-      setSelectedDate(storedDate)
+      sessionStorage.removeItem('selectedBookingDate')
+      // Only use it if it's today or in the future
+      const picked = new Date(storedDate)
+      const today  = new Date(); today.setHours(0,0,0,0)
+      if (!isNaN(picked) && picked >= today) {
+        setSelectedDate(storedDate)
+      }
     }
   }, [])
 
@@ -209,7 +216,7 @@ export default function BookServicePage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Search providers..."
+              placeholder="Search by name or description…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"

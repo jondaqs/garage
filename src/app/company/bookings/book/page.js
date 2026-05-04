@@ -30,8 +30,14 @@ export default function CompanyBookServicePage() {
 
   useEffect(() => {
     loadData()
+    // Consume and clear immediately — prevents stale cached date from showing
     const storedDate = sessionStorage.getItem('selectedBookingDate')
-    if (storedDate) setSelectedDate(storedDate)
+    if (storedDate) {
+      sessionStorage.removeItem('selectedBookingDate')
+      const picked = new Date(storedDate)
+      const today  = new Date(); today.setHours(0,0,0,0)
+      if (!isNaN(picked) && picked >= today) setSelectedDate(storedDate)
+    }
   }, [])
 
   const clearSelectedDate = () => {
@@ -249,7 +255,7 @@ export default function CompanyBookServicePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search providers..."
+              placeholder="Search by name or description…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"

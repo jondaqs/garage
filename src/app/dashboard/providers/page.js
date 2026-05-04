@@ -187,81 +187,79 @@ export default function ProvidersPage() {
             </div>
           </div>
 
-          {/* Search bars */}
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          {/* Search bars — always visible */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by provider name…"
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              />
+            </div>
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                value={descSearch}
+                onChange={e => setDescSearch(e.target.value)}
+                placeholder="Search by description…"
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              />
+            </div>
+            <button
+              onClick={() => setFiltersOpen(o => !o)}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors flex-shrink-0 ${filtersOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            >
+              <SlidersHorizontal size={15} />
+              Filters
+              {(typeFilter || locationFilter || verifiedOnly) && (
+                <span className="w-2 h-2 rounded-full bg-orange-400" />
+              )}
+            </button>
+          </div>
+
+          {/* Expanded filters — location, type, verified */}
+          {filtersOpen && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              <div className="relative">
+                <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search by provider name…"
-                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                  value={locationFilter}
+                  onChange={e => setLocationFilter(e.target.value)}
+                  placeholder="Town or county…"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
-              <button
-                onClick={() => setFiltersOpen(o => !o)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${filtersOpen ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              <select
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
-                <SlidersHorizontal size={15} />
-                Filters
-                {(typeFilter || locationFilter || verifiedOnly || descSearch) && (
-                  <span className="w-2 h-2 rounded-full bg-orange-400" />
-                )}
-              </button>
-            </div>
-
-            {/* Expanded filters */}
-            {filtersOpen && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                <div className="relative">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    value={descSearch}
-                    onChange={e => setDescSearch(e.target.value)}
-                    placeholder="Search description…"
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div className="relative">
-                  <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    value={locationFilter}
-                    onChange={e => setLocationFilter(e.target.value)}
-                    placeholder="Town or county…"
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-                <select
-                  value={typeFilter}
-                  onChange={e => setTypeFilter(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <option value="">All types</option>
+                {types.map(t => (
+                  <option key={t.id} value={t.id}>{t.display_name}</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-2 px-3 py-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={verifiedOnly}
+                  onChange={e => setVerifiedOnly(e.target.checked)}
+                  className="w-4 h-4 rounded accent-blue-600"
+                />
+                <span className="text-sm text-gray-700 font-medium">Verified only</span>
+              </label>
+              {(typeFilter || locationFilter || verifiedOnly || descSearch || search) && (
+                <button
+                  onClick={() => { setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setVerifiedOnly(false) }}
+                  className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 px-3 py-2"
                 >
-                  <option value="">All types</option>
-                  {types.map(t => (
-                    <option key={t.id} value={t.id}>{t.display_name}</option>
-                  ))}
-                </select>
-                <label className="flex items-center gap-2 px-3 py-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={verifiedOnly}
-                    onChange={e => setVerifiedOnly(e.target.checked)}
-                    className="w-4 h-4 rounded accent-blue-600"
-                  />
-                  <span className="text-sm text-gray-700 font-medium">Verified only</span>
-                </label>
-                {(typeFilter || locationFilter || verifiedOnly || descSearch || search) && (
-                  <button
-                    onClick={() => { setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setVerifiedOnly(false) }}
-                    className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 px-3 py-2"
-                  >
-                    <X size={13} /> Clear all
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                  <X size={13} /> Clear all
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
