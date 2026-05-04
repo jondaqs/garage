@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   Home, Truck, Users, Calendar, CalendarDays, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle,
-  Bell, Menu, X
+  Bell, Menu, X, Search, MessageSquare
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -17,6 +17,7 @@ export default function CompanySidebar({ company, userRole }) {
   const [mobileOpen,           setMobileOpen]           = useState(false)
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const [recommendationsCount, setRecommendationsCount] = useState(0)
+  const [unreadMessages,       setUnreadMessages]       = useState(0)
 
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
@@ -25,8 +26,26 @@ export default function CompanySidebar({ company, userRole }) {
     if (company?.id) {
       loadPendingCount(company.id)
       loadRecommendationsCount(company.id)
+      loadUnreadMessages()
     }
   }, [company?.id])
+
+  const loadUnreadMessages = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+      const { data: profile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
+      if (!profile) return
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('user_unread_count')
+        .eq('user_id', profile.id)
+        .eq('status', 'open')
+      const total = (convs || []).reduce((s, c) => s + (c.user_unread_count || 0), 0)
+      setUnreadMessages(total)
+    } catch {}
+  }
 
   const loadPendingCount = async (companyId) => {
     try {
@@ -62,17 +81,20 @@ export default function CompanySidebar({ company, userRole }) {
   }
 
   const navigation = [
-    { name: 'Dashboard',   href: '/company/dashboard',   icon: Home         },
-    { name: 'Fleet',       href: '/company/fleet',        icon: Truck        },
-    { name: 'Team',        href: '/company/team',         icon: Users        },
-    { name: 'Bookings',    href: '/company/bookings',     icon: Calendar     },
-    { name: 'Calendar',    href: '/company/calendar',     icon: CalendarDays },
-    { name: 'Work Orders', href: '/company/work-orders',  icon: ClipboardList,
+    { name: 'Dashboard',         href: '/company/dashboard',   icon: Home         },
+    { name: 'Fleet',             href: '/company/fleet',        icon: Truck        },
+    { name: 'Team',              href: '/company/team',         icon: Users        },
+    { name: 'Bookings',          href: '/company/bookings',     icon: Calendar     },
+    { name: 'Calendar',          href: '/company/calendar',     icon: CalendarDays },
+    { name: 'Work Orders',       href: '/company/work-orders',  icon: ClipboardList,
       badge: pendingApprovalCount > 0 ? pendingApprovalCount : null },
-    { name: 'Reminders',   href: '/company/reminders',   icon: Bell,
+    { name: 'Search Providers',  href: '/company/providers',    icon: Search       },
+    { name: 'Chat',              href: '/company/chat',         icon: MessageSquare,
+      badge: unreadMessages > 0 ? unreadMessages : null },
+    { name: 'Reminders',         href: '/company/reminders',   icon: Bell,
       badge: recommendationsCount > 0 ? recommendationsCount : null },
-    { name: 'Budget',      href: '/company/budget',       icon: DollarSign   },
-    { name: 'Reports',     href: '/company/reports',      icon: BarChart3    },
+    { name: 'Budget',            href: '/company/budget',       icon: DollarSign   },
+    { name: 'Reports',           href: '/company/reports',      icon: BarChart3    },
   ]
 
   const showInfoAlert = company?.status === 'pending_info'
