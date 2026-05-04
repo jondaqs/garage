@@ -23,6 +23,7 @@ const PERM_DEFS = [
   { key: 'can_approve_estimates', label: 'Approve Estimates',    desc: 'Can approve service estimates'             },
   { key: 'can_approve_checkout',  label: 'Approve Checkout',     desc: 'Can accept or decline vehicle checkout'   },
   { key: 'can_approve_payment',   label: 'Approve Payments',     desc: 'Can confirm and approve invoice payments' },
+  { key: 'can_chat',              label: 'Chat with Providers',  desc: 'Can message service providers via chat'   },
 ]
 
 export default function MemberTeamPage() {
@@ -78,7 +79,7 @@ export default function MemberTeamPage() {
         .select(`
           id, staff_role, is_admin, is_active, created_at,
           can_approve_work, can_manage_team, can_manage_fleet,
-          can_approve_estimates, can_approve_checkout, can_approve_payment,
+          can_approve_estimates, can_approve_checkout, can_approve_payment, can_chat,
           user:user_profiles!company_users_user_id_fkey(
             id, first_name, last_name, email, phone
           )
@@ -140,6 +141,7 @@ export default function MemberTeamPage() {
       can_approve_estimates: !!m.can_approve_estimates,
       can_approve_checkout:  !!m.can_approve_checkout,
       can_approve_payment:   !!m.can_approve_payment,
+      can_chat:              !!m.can_chat,
     })
     setRolesError('')
     setRolesModal(m)
@@ -159,6 +161,7 @@ export default function MemberTeamPage() {
         p_can_approve_estimates:  rolesForm.can_approve_estimates,
         p_can_approve_checkout:   rolesForm.can_approve_checkout,
         p_can_approve_payment:    rolesForm.can_approve_payment,
+        p_can_chat:               rolesForm.can_chat,
       })
       if (rpcErr) throw rpcErr
       if (!result.success) throw new Error(result.error)
@@ -310,6 +313,7 @@ export default function MemberTeamPage() {
                             {m.can_manage_fleet      && <span className="text-xs px-1.5 py-0.5 bg-blue-100   text-blue-700   rounded font-medium" title="Can manage fleet">FLEET</span>}
                             {m.can_manage_team       && <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>}
                             {m.can_approve_checkout  && <span className="text-xs px-1.5 py-0.5 bg-teal-100   text-teal-700   rounded font-medium" title="Can approve checkout">CHKOUT</span>}
+                            {m.can_chat              && <span className="text-xs px-1.5 py-0.5 bg-pink-100   text-pink-700   rounded font-medium" title="Can chat with providers">CHAT</span>}
                           </div>
                         </>
                       )}
