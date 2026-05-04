@@ -151,6 +151,16 @@ export default function ChatPage() {
             .eq('id', msg.id)
         }
       })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversations',
+        filter: `id=eq.${activeConv.id}`,
+      }, payload => {
+        const updated = payload.new
+        setActiveConv(prev => ({ ...prev, ...updated }))
+        setConversations(prev =>
+          prev.map(c => c.id === activeConv.id ? { ...c, ...updated } : c)
+        )
+      })
       .subscribe()
 
     return () => {
