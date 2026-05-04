@@ -128,6 +128,7 @@ export default function ProviderTeamPage() {
         mech_can_manage_team:      m.mech_can_manage_team,
         mech_can_send_estimates:   m.mech_can_send_estimates,
         mech_can_send_invoice:     m.mech_can_send_invoice,
+        mech_can_chat:             m.mech_can_chat,
         source:              'spu',
         user: {
           first_name: m.first_name,
@@ -152,11 +153,13 @@ export default function ProviderTeamPage() {
         spu_can_manage_team:      false,
         spu_can_send_estimates:   false,
         spu_can_send_invoice:     false,
+        spu_can_chat:             false,
         mech_can_approve_work:     !!m.can_approve_work,
         mech_can_manage_inventory: !!m.can_manage_inventory,
         mech_can_manage_team:      !!m.can_manage_team,
         mech_can_send_estimates:   !!m.can_send_estimates,
         mech_can_send_invoice:     !!m.can_send_invoice,
+        mech_can_chat:             !!m.can_chat,
         source:              'mechanic_only',
         user: {
           first_name: m.user?.first_name,
@@ -285,6 +288,7 @@ export default function ProviderTeamPage() {
       mech_can_manage_team:      !!member.mech_can_manage_team,
       mech_can_send_estimates:   !!member.mech_can_send_estimates,
       mech_can_send_invoice:     !!member.mech_can_send_invoice,
+      mech_can_chat:             !!member.mech_can_chat,
     })
   }
 
@@ -327,6 +331,7 @@ export default function ProviderTeamPage() {
               can_manage_team:      editMemberForm.mech_can_manage_team,
               can_send_estimates:   editMemberForm.mech_can_send_estimates,
               can_send_invoice:     editMemberForm.mech_can_send_invoice,
+              can_chat:             editMemberForm.mech_can_chat,
               is_active:            true,
               updated_at:           new Date().toISOString(),
             })
@@ -347,6 +352,7 @@ export default function ProviderTeamPage() {
               can_manage_team:     editMemberForm.mech_can_manage_team,
               can_send_estimates:  editMemberForm.mech_can_send_estimates,
               can_send_invoice:    editMemberForm.mech_can_send_invoice,
+              can_chat:            editMemberForm.mech_can_chat,
               is_active:           true,
               is_verified:         false,
             })
@@ -821,7 +827,7 @@ export default function ProviderTeamPage() {
                       { key: 'spu_can_send_invoice',     mech: 'mech_can_send_invoice',     label: 'Can send invoices'               },
                       { key: 'spu_can_manage_inventory', mech: 'mech_can_manage_inventory', label: 'Can manage inventory'            },
                       { key: 'spu_can_manage_team',      mech: 'mech_can_manage_team',      label: 'Can manage team'                 },
-                      { key: 'spu_can_chat',             mech: 'spu_can_chat',              label: 'Can chat with customers'         },
+                      { key: 'spu_can_chat',             mech: 'mech_can_chat',             label: 'Can chat with customers'         },
                     ].map(p => (
                       <label key={p.key} className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={editMemberForm[p.key] || false}
@@ -915,6 +921,7 @@ export default function ProviderTeamPage() {
                       { key: 'mech_can_send_invoice',     spu: 'spu_can_send_invoice',     label: 'Can send invoices to customer',  desc: 'Send invoices and accept payment directly' },
                       { key: 'mech_can_manage_inventory', spu: 'spu_can_manage_inventory', label: 'Can manage inventory',           desc: 'Add, edit, and adjust stock levels' },
                       { key: 'mech_can_manage_team',      spu: 'spu_can_manage_team',      label: 'Can manage team',                desc: 'View and manage other team members' },
+                      { key: 'mech_can_chat',             spu: 'spu_can_chat',             label: 'Can chat with customers',        desc: 'Reply to customer chat messages' },
                     ].map(p => (
                       <label key={p.key} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-white bg-white/60">
                         <input type="checkbox" checked={editMemberForm[p.key] || false}
