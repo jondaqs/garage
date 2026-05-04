@@ -656,7 +656,7 @@ export default function ProviderTeamPage() {
                     {(member.spu_can_send_estimates || member.mech_can_send_estimates) && (
                       <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium" title="Can send estimates">EST</span>
                     )}
-                    {member.can_send_invoice && (
+                    {(member.spu_can_send_invoice || member.mech_can_send_invoice) && (
                       <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium" title="Can send invoices">INV$</span>
                     )}
                     {(member.spu_can_manage_inventory || member.mech_can_manage_inventory) && (
@@ -664,6 +664,9 @@ export default function ProviderTeamPage() {
                     )}
                     {(member.spu_can_manage_team || member.mech_can_manage_team) && (
                       <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium" title="Can manage team">TEAM</span>
+                    )}
+                    {(member.spu_can_chat || member.mech_can_chat) && (
+                      <span className="text-xs px-1.5 py-0.5 bg-pink-100 text-pink-700 rounded font-medium" title="Can chat with customers">CHAT</span>
                     )}
                   </div>
                   {member.role !== 'service_provider_owner' && (<>

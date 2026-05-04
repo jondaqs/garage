@@ -8,7 +8,7 @@ import {
   Phone, Mail, MapPin, Shield, CheckCircle, AlertCircle,
   Loader2, Award, Calendar, ChevronRight, FileText,
   Send, Receipt, AlertTriangle, RefreshCw, Car, Filter,
-  Clock, ChevronDown
+  Clock, ChevronDown, MessageSquare
 } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ export default function ProviderOverviewPage() {
       // ── 2. SPU membership ─────────────────────────────────────────────────
       const { data: spuRow, error: spuErr } = await supabase
         .from('service_provider_users')
-        .select('id, role, is_verified, is_active, joined_at, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice')
+        .select('id, role, is_verified, is_active, joined_at, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat')
         .eq('user_id', profile.id)
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
@@ -305,7 +305,7 @@ export default function ProviderOverviewPage() {
       // ── 3. Mechanic record ────────────────────────────────────────────────
       const { data: mechanic } = await supabase
         .from('mechanics')
-        .select('id, role, specialization, experience_years, is_verified, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice')
+        .select('id, role, specialization, experience_years, is_verified, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat')
         .eq('user_id', profile.id)
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
@@ -322,6 +322,7 @@ export default function ProviderOverviewPage() {
         can_manage_team:      !!(spuRow.can_manage_team      || mechanic?.can_manage_team),
         can_send_estimates:   !!(spuRow.can_send_estimates   || mechanic?.can_send_estimates),
         can_send_invoice:     !!(spuRow.can_send_invoice     || mechanic?.can_send_invoice),
+        can_chat:             !!(spuRow.can_chat             || mechanic?.can_chat),
         is_verified:          !!(spuRow.is_verified          || mechanic?.is_verified),
       }
 
@@ -702,8 +703,13 @@ export default function ProviderOverviewPage() {
                     <Users size={11} /> Manage team
                   </span>
                 )}
+                {mechanic.can_chat && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 border border-pink-200 rounded-lg text-xs font-medium text-pink-700">
+                    <MessageSquare size={11} /> Chat with customers
+                  </span>
+                )}
                 {!isAdminRole && !mechanic.can_approve_work && !mechanic.can_send_estimates
-                  && !mechanic.can_send_invoice && !mechanic.can_manage_inventory && !mechanic.can_manage_team && (
+                  && !mechanic.can_send_invoice && !mechanic.can_manage_inventory && !mechanic.can_manage_team && !mechanic.can_chat && (
                   <span className="text-xs text-gray-400 italic">Acknowledge / decline assignments only</span>
                 )}
               </div>
