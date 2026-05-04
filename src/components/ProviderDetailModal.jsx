@@ -286,7 +286,7 @@ export default function ProviderDetailModal({ provider, onClose, onBook, canBook
                       style={{ border: 0, display: 'block' }}
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
-                      src={`https://www.google.com/maps?q=${primaryShop.latitude},${primaryShop.longitude}&z=15&output=embed`}
+                      src={`https://maps.google.com/maps?q=${primaryShop.latitude},${primaryShop.longitude}&z=15&output=embed&hl=en`}
                     />
                     <div className="px-4 py-2.5 flex items-center gap-2 text-sm text-gray-600">
                       <MapPin size={13} className="text-gray-400 flex-shrink-0" />
@@ -460,7 +460,7 @@ export default function ProviderDetailModal({ provider, onClose, onBook, canBook
                         style={{ border: 0, display: 'block' }}
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.google.com/maps?q=${shop.latitude},${shop.longitude}&z=15&output=embed`}
+                        src={`https://maps.google.com/maps?q=${shop.latitude},${shop.longitude}&z=15&output=embed&hl=en`}
                       />
                     )}
                     <div className="px-4 py-3 bg-gray-50">

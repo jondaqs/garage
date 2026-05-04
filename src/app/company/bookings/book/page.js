@@ -90,9 +90,9 @@ export default function CompanyBookServicePage() {
       const { data: providerData } = await supabase
         .from('service_providers')
         .select(`
-          id, name, description, status, is_verified,
+          *,
           provider_type:service_provider_types(display_name, code),
-          shops(id, name, town, county),
+          shops(id, name, town, county, latitude, longitude),
           provider_reviews(rating)
         `)
         .eq('status', 'active')
