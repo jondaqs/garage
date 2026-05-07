@@ -94,7 +94,7 @@ export default function Sidebar({ user }) {
           staff_role,
           is_active,
           can_approve_work, can_manage_team, can_manage_fleet,
-          can_approve_estimates, can_approve_checkout, can_approve_payment,
+          can_approve_estimates, can_approve_checkout, can_approve_payment, can_chat,
           company:company_profiles(id, name, status)
         `)
         .eq('user_id', profile.id)
@@ -114,6 +114,7 @@ export default function Sidebar({ user }) {
           can_approve_estimates:!!membership.can_approve_estimates,
           can_approve_checkout: !!membership.can_approve_checkout,
           can_approve_payment:  !!membership.can_approve_payment,
+          can_chat:             !!membership.can_chat,
         })
         // Auto-open company section if we're already on a company page
         if (pathname.includes('/dashboard/company/')) {
@@ -362,31 +363,82 @@ export default function Sidebar({ user }) {
                           {statusBadge(companyMembership.status).label}
                         </span>
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-0.5 capitalize">
-                        {companyMembership.staff_role}
-                        {companyMembership.is_admin ? ' · Admin' : ''}
-                      </p>
-                      {/* Permission badges */}
-                      <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {companyMembership.can_approve_work && (
-                          <span className="text-[10px] px-1 py-0.5 bg-purple-100 text-purple-700 rounded font-semibold" title="Can approve work orders">WO</span>
+
+                      {/* Roles row — Admin + staff_role (free text from company_users.staff_role) */}
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">Roles</p>
+                      <div className="flex flex-wrap gap-1">
+                        {companyMembership.is_admin && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-rose-100 text-rose-700 border border-rose-200"
+                            title="Company administrator"
+                          >
+                            Admin
+                          </span>
                         )}
-                        {companyMembership.can_approve_estimates && (
-                          <span className="text-[10px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded font-semibold" title="Can approve estimates">EST</span>
+                        {companyMembership.staff_role && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-sky-100 text-sky-700 border border-sky-200 capitalize"
+                            title={`Staff role: ${companyMembership.staff_role}`}
+                          >
+                            {companyMembership.staff_role.replace(/_/g, ' ')}
+                          </span>
                         )}
-                        {companyMembership.can_approve_payment && (
-                          <span className="text-[10px] px-1 py-0.5 bg-green-100 text-green-700 rounded font-semibold" title="Can approve payments">PAY</span>
-                        )}
-                        {companyMembership.can_manage_fleet && (
-                          <span className="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold" title="Can manage fleet">FLEET</span>
-                        )}
-                        {companyMembership.can_manage_team && (
-                          <span className="text-[10px] px-1 py-0.5 bg-orange-100 text-orange-700 rounded font-semibold" title="Can manage team">TEAM</span>
-                        )}
-                        {companyMembership.can_approve_checkout && (
-                          <span className="text-[10px] px-1 py-0.5 bg-teal-100 text-teal-700 rounded font-semibold" title="Can approve checkout">CHKOUT</span>
+                        {!companyMembership.is_admin && !companyMembership.staff_role && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+                            title="Member"
+                          >
+                            Member
+                          </span>
                         )}
                       </div>
+
+                      {/* Permissions row — every truthy can_* flag from company_users */}
+                      {(companyMembership.can_approve_work || companyMembership.can_approve_estimates ||
+                        companyMembership.can_approve_payment || companyMembership.can_approve_checkout ||
+                        companyMembership.can_manage_fleet || companyMembership.can_manage_team ||
+                        companyMembership.can_chat) && (
+                        <>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">Permissions</p>
+                          <div className="flex gap-1 flex-wrap">
+                            {companyMembership.can_approve_work && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded" title="Can approve work orders">
+                                WO access
+                              </span>
+                            )}
+                            {companyMembership.can_approve_estimates && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded" title="Can approve estimates">
+                                Estimates
+                              </span>
+                            )}
+                            {companyMembership.can_approve_payment && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded" title="Can approve payments">
+                                Payments
+                              </span>
+                            )}
+                            {companyMembership.can_approve_checkout && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded" title="Can approve checkout">
+                                Checkout
+                              </span>
+                            )}
+                            {companyMembership.can_manage_fleet && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can manage fleet">
+                                Fleet
+                              </span>
+                            )}
+                            {companyMembership.can_manage_team && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" title="Can manage team">
+                                Team
+                              </span>
+                            )}
+                            {companyMembership.can_chat && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded" title="Can chat with providers">
+                                Chat
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
