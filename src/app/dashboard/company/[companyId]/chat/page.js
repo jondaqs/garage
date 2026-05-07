@@ -175,7 +175,10 @@ export default function CompanyMemberChatPage() {
 
     const { data: msgs } = await supabase
       .from('messages')
-      .select('id, body, sender_id, sender_role, created_at, is_read')
+      .select(`
+        id, body, sender_id, sender_role, created_at, is_read,
+        sender:user_profiles!sender_id(id, first_name, last_name)
+      `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
@@ -209,9 +212,19 @@ export default function CompanyMemberChatPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${activeConv.id}`,
-      }, payload => {
+      }, async payload => {
         const msg = payload.new
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+        let sender = null
+        if (msg.sender_id) {
+          const { data: s } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name')
+            .eq('id', msg.sender_id)
+            .maybeSingle()
+          sender = s
+        }
+        const enriched = { ...msg, sender }
+        setMessages(prev => prev.some(m => m.id === enriched.id) ? prev : [...prev, enriched])
         if (msg.sender_role === 'provider') {
           supabase.from('messages')
             .update({ is_read: true, read_at: new Date().toISOString() })
@@ -252,6 +265,7 @@ export default function CompanyMemberChatPage() {
       id: `opt-${Date.now()}`, body: text,
       sender_id: profile.id, sender_role: 'company',
       created_at: new Date().toISOString(), is_read: false,
+      sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
     }
     setMessages(prev => [...prev, optimistic])
 
@@ -265,7 +279,11 @@ export default function CompanyMemberChatPage() {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setBody(text)
     } else {
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? msg : m))
+      const enriched = {
+        ...msg,
+        sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
+      }
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? enriched : m))
       const preview = text.length > 60 ? text.slice(0, 60) + '…' : text
 
       setConversations(prev =>
@@ -480,9 +498,33 @@ export default function CompanyMemberChatPage() {
                 </div>
               ) : (
                 messages.map((msg, i) => {
-                  const isOurs   = msg.sender_role === 'company'
-                  const prev     = messages[i - 1]
-                  const showDate = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString()
+                  const isMine    = msg.sender_id === profile.id           // sent by me personally
+                  const isCompany = msg.sender_role === 'company'          // any company-side message
+                  const isOurs    = isCompany                              // align bubble: company side = right
+                  const prev      = messages[i - 1]
+                  const showDate  = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString()
+                  // Show a sender label whenever the previous bubble was from
+                  // a different sender (or after a date divider). Skip on my own
+                  // outgoing messages — no need to label myself to myself.
+                  const showSenderLabel =
+                    !isMine &&
+                    (showDate || !prev || prev.sender_id !== msg.sender_id || prev.sender_role !== msg.sender_role)
+                  // Compose the sender label.
+                  // - 'provider'  → provider staff member's name (and provider name)
+                  // - 'company'   → coworker's name (we already know it's our company)
+                  // - 'user'      → personal user (only happens for legacy/migrated chats)
+                  const senderName = (() => {
+                    const personName = `${msg.sender?.first_name || ''} ${msg.sender?.last_name || ''}`.trim()
+                    if (msg.sender_role === 'provider') {
+                      const provider = activeConv.provider?.name
+                      if (provider && personName) return `${personName} · ${provider}`
+                      return provider || personName || 'Provider'
+                    }
+                    if (msg.sender_role === 'company') {
+                      return personName || 'Coworker'
+                    }
+                    return personName || 'Customer'
+                  })()
                   return (
                     <div key={msg.id}>
                       {showDate && (
@@ -494,9 +536,16 @@ export default function CompanyMemberChatPage() {
                       )}
                       <div className={`flex ${isOurs ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[75%] flex flex-col ${isOurs ? 'items-end' : 'items-start'}`}>
+                          {showSenderLabel && (
+                            <span className="text-[11px] font-semibold text-gray-500 mb-0.5 mx-1">
+                              {senderName}
+                            </span>
+                          )}
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isOurs
-                              ? 'bg-blue-600 text-white rounded-br-sm'
+                              ? (isMine
+                                  ? 'bg-blue-600 text-white rounded-br-sm'
+                                  : 'bg-blue-100 text-blue-900 rounded-br-sm')   // coworker reply
                               : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm'
                           }`}>
                             {msg.body}
@@ -505,7 +554,7 @@ export default function CompanyMemberChatPage() {
                             <span className="text-[10px] text-gray-400">
                               {new Date(msg.created_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {isOurs && (
+                            {isMine && (
                               msg.is_read
                                 ? <CheckCheck size={12} className="text-blue-300" />
                                 : <Check size={12} className="text-gray-300" />

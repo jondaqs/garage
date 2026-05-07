@@ -160,7 +160,10 @@ export default function ProviderMemberChatPage() {
 
     const { data: msgs } = await supabase
       .from('messages')
-      .select('id, body, sender_id, sender_role, created_at, is_read')
+      .select(`
+        id, body, sender_id, sender_role, created_at, is_read,
+        sender:user_profiles!sender_id(id, first_name, last_name)
+      `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
@@ -194,9 +197,21 @@ export default function ProviderMemberChatPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${activeConv.id}`,
-      }, payload => {
+      }, async payload => {
         const msg = payload.new
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+        // Hydrate sender for display. Postgres_changes payloads don't include
+        // joins, so we fetch the sender's profile separately.
+        let sender = null
+        if (msg.sender_id) {
+          const { data: s } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name')
+            .eq('id', msg.sender_id)
+            .maybeSingle()
+          sender = s
+        }
+        const enriched = { ...msg, sender }
+        setMessages(prev => prev.some(m => m.id === enriched.id) ? prev : [...prev, enriched])
         if (msg.sender_role === 'user' || msg.sender_role === 'company') {
           supabase.from('messages')
             .update({ is_read: true, read_at: new Date().toISOString() })
@@ -238,6 +253,7 @@ export default function ProviderMemberChatPage() {
       id: `opt-${Date.now()}`, body: text,
       sender_id: profile.id, sender_role: 'provider',
       created_at: new Date().toISOString(), is_read: false,
+      sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
     }
     setMessages(prev => [...prev, optimistic])
 
@@ -250,7 +266,12 @@ export default function ProviderMemberChatPage() {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setBody(text)
     } else {
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? msg : m))
+      // RPC returns a bare messages row; attach sender for consistent rendering.
+      const enriched = {
+        ...msg,
+        sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
+      }
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? enriched : m))
       const preview = text.length > 60 ? text.slice(0, 60) + '…' : text
 
       // Optimistically reflect the conversation update in the local list;
@@ -543,6 +564,23 @@ export default function ProviderMemberChatPage() {
                   const isProvider = msg.sender_role === 'provider'
                   const prev       = messages[i - 1]
                   const showDate   = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString()
+                  // Only show the sender label on the first message of a run from
+                  // the same sender (and right after a date divider). Outgoing
+                  // (provider) messages don't get a sender label.
+                  const showSenderLabel =
+                    !isProvider &&
+                    (showDate || !prev || prev.sender_id !== msg.sender_id || prev.sender_role !== msg.sender_role)
+                  // Compose the sender label. For company-side messages, prefix
+                  // the company name so the provider knows which client it's from.
+                  const senderName = (() => {
+                    const personName = `${msg.sender?.first_name || ''} ${msg.sender?.last_name || ''}`.trim()
+                    if (msg.sender_role === 'company') {
+                      const company = activeConv.company?.name
+                      if (company && personName) return `${personName} · ${company}`
+                      return company || personName || 'Company'
+                    }
+                    return personName || 'Customer'
+                  })()
                   return (
                     <div key={msg.id}>
                       {showDate && (
@@ -554,6 +592,11 @@ export default function ProviderMemberChatPage() {
                       )}
                       <div className={`flex ${isProvider ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[75%] flex flex-col ${isProvider ? 'items-end' : 'items-start'}`}>
+                          {showSenderLabel && (
+                            <span className="text-[11px] font-semibold text-gray-500 mb-0.5 ml-1">
+                              {senderName}
+                            </span>
+                          )}
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isProvider
                               ? 'bg-green-600 text-white rounded-br-sm'
