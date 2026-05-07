@@ -218,12 +218,19 @@ export default function Sidebar({ user }) {
   const companyNavItems = (membership) => {
     if (!membership) return []
     const base = `/dashboard/company/${membership.id}`
+    // can_chat is the gate, but admins always see it as well.
+    const canChat = membership.is_admin || membership.can_chat
     const items = [
       { icon: Building2,    label: 'Overview',    path: base,                       everyone: true  },
       { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
       { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
       { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },
+      // Chat — visible only to members with can_chat (or admins).
+      // The page guards permission again server-side.
+      ...(canChat ? [
+        { icon: MessageSquare, label: 'Chat',     path: `${base}/chat`,             everyone: true  }
+      ] : []),
       { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
       { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // admin only
       { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
@@ -565,6 +572,15 @@ export default function Sidebar({ user }) {
                         label: 'Overview',
                         path:  `/dashboard/my-teams/provider/${m.providerId}`,
                       }} />
+
+                      {/* Chat — only when this member has can_chat for this provider */}
+                      {m.can_chat && (
+                        <NavItem key={`${m.providerId}-chat`} compact item={{
+                          icon:  MessageSquare,
+                          label: 'Chat',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
+                        }} />
+                      )}
                     </>
                   )}
                 </div>
