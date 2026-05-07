@@ -50,6 +50,7 @@ export default function ChatPage() {
         provider:service_providers(id, name, is_verified)
       `)
       .eq('user_id', profile.id)
+      .is('company_id', null)
       .order('last_message_at', { ascending: false, nullsFirst: false })
     setConversations(data || [])
     setLoadingConvs(false)
@@ -65,12 +66,15 @@ export default function ChatPage() {
   }, [searchParams, profile])
 
   const openOrCreateConversation = async (providerId) => {
-    // Check existing
+    // Check existing — strictly the personal (non-company) chat with this
+    // provider. If the user has only a company chat with this provider, this
+    // returns nothing and we create a new personal chat below.
     const { data: existing } = await supabase
       .from('conversations')
       .select('id')
       .eq('user_id', profile.id)
       .eq('service_provider_id', providerId)
+      .is('company_id', null)
       .maybeSingle()
 
     if (existing) {
