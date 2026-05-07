@@ -135,7 +135,7 @@ export default function Sidebar({ user }) {
       // 1. Fetch service_provider_users (all roles)
       const { data: spuRows, error: spuErr } = await supabase
         .from('service_provider_users')
-        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, service_provider:service_providers(id, name)')
+        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat, service_provider:service_providers(id, name)')
         .eq('user_id', profile.id)
         .eq('is_active', true)
 
@@ -148,7 +148,7 @@ export default function Sidebar({ user }) {
         const providerIds = spuRows.map(r => r.service_provider_id)
         const { data: mechRows } = await supabase
           .from('mechanics')
-          .select('id, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates')
+          .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat')
           .eq('user_id', profile.id)
           .eq('is_active', true)
           .in('service_provider_id', providerIds)
@@ -165,12 +165,17 @@ export default function Sidebar({ user }) {
             providerId:          m.service_provider?.id || m.service_provider_id,
             providerName:        m.service_provider?.name || 'Unknown Garage',
             role:                m.role || 'mechanic',
+            // If a mechanic record exists, the user is also on the floor as a mechanic.
+            // Surface its role separately when it differs from the SPU role (e.g. SPU=manager, mech=senior_mechanic).
+            mechanicRole:        mech?.role || null,
+            hasMechanicRecord:   !!mech,
             // Merge SPU + mechanic permissions — either source grants the badge
-            can_approve_work:    !!(m.can_approve_work    || mech?.can_approve_work),
+            can_approve_work:    !!(m.can_approve_work     || mech?.can_approve_work),
             can_manage_inventory:!!(m.can_manage_inventory || mech?.can_manage_inventory),
-            can_manage_team:     !!(m.can_manage_team     || mech?.can_manage_team),
-            can_send_estimates:  !!(m.can_send_estimates  || mech?.can_send_estimates),
-            can_send_invoice:    !!(m.can_send_invoice),
+            can_manage_team:     !!(m.can_manage_team      || mech?.can_manage_team),
+            can_send_estimates:  !!(m.can_send_estimates   || mech?.can_send_estimates),
+            can_send_invoice:    !!(m.can_send_invoice     || mech?.can_send_invoice),
+            can_chat:            !!(m.can_chat             || mech?.can_chat),
           }
         }))
 
@@ -275,6 +280,33 @@ export default function Sidebar({ user }) {
   }
 
   // ── Sidebar inner content (shared between desktop + mobile) ────────────────
+  // Pretty label for a role string from service_provider_users.role / mechanics.role
+  const roleLabel = (role) => {
+    const map = {
+      service_provider_owner: 'Owner',
+      admin:                  'Admin',
+      accountant:             'Accountant',
+      manager:                'Manager',
+      senior_mechanic:        'Senior Mechanic',
+      mechanic:               'Mechanic',
+    }
+    if (!role) return ''
+    return map[role] || role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  }
+
+  // Color theme per role badge
+  const roleBadgeClass = (role) => {
+    const map = {
+      service_provider_owner: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
+      admin:                  'bg-rose-100   text-rose-700   border border-rose-200',
+      accountant:             'bg-emerald-100 text-emerald-700 border border-emerald-200',
+      manager:                'bg-sky-100    text-sky-700    border border-sky-200',
+      senior_mechanic:        'bg-amber-100  text-amber-700  border border-amber-200',
+      mechanic:               'bg-slate-100  text-slate-700  border border-slate-200',
+    }
+    return map[role] || 'bg-gray-100 text-gray-700 border border-gray-200'
+  }
+
   const SidebarContent = () => (
     <>
       {/* Logo */}
@@ -411,15 +443,68 @@ export default function Sidebar({ user }) {
 
                   {isOpen && (
                     <>
-                      {/* Role + permissions chip */}
+                      {/* Roles + permissions */}
                       <div className="mx-1 mb-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
-                        <p className="text-[10px] text-gray-500 capitalize">{m.role?.replace(/_/g,' ')}</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {m.can_approve_work     && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">WO access</span>}
-                          {m.can_send_estimates   && <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded">Estimates</span>}
-                          {m.can_manage_inventory && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Inventory</span>}
-                          {m.can_manage_team      && <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">Team</span>}
+                        {/* Roles row — primary SPU role + (optional) on-the-floor mechanic role */}
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Roles</p>
+                        <div className="flex flex-wrap gap-1">
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${roleBadgeClass(m.role)}`}
+                            title={`Service provider role: ${roleLabel(m.role)}`}
+                          >
+                            {roleLabel(m.role)}
+                          </span>
+                          {/* Show the mechanic-table role as a separate badge when it adds info
+                              (e.g. SPU role is admin/manager, but the user is also a senior_mechanic on the floor) */}
+                          {m.hasMechanicRecord && m.mechanicRole && m.mechanicRole !== m.role && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${roleBadgeClass(m.mechanicRole)}`}
+                              title={`Also assigned as ${roleLabel(m.mechanicRole)} in the mechanics roster`}
+                            >
+                              {roleLabel(m.mechanicRole)}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Permissions row — every truthy can_* flag from SPU + mechanics */}
+                        {(m.can_approve_work || m.can_send_estimates || m.can_send_invoice ||
+                          m.can_manage_inventory || m.can_manage_team || m.can_chat) && (
+                          <>
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">Permissions</p>
+                            <div className="flex flex-wrap gap-1">
+                              {m.can_approve_work && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded" title="Can approve work orders">
+                                  WO access
+                                </span>
+                              )}
+                              {m.can_send_estimates && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded" title="Can send estimates">
+                                  Estimates
+                                </span>
+                              )}
+                              {m.can_send_invoice && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded" title="Can send invoices">
+                                  Invoices
+                                </span>
+                              )}
+                              {m.can_manage_inventory && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can manage inventory">
+                                  Inventory
+                                </span>
+                              )}
+                              {m.can_manage_team && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" title="Can manage team">
+                                  Team
+                                </span>
+                              )}
+                              {m.can_chat && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded" title="Can chat with customers">
+                                  Chat
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Overview is provider-specific */}
