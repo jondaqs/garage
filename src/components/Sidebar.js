@@ -91,12 +91,87 @@ export default function Sidebar({ user }) {
     }
   }, [profileId, loadUnreadMessages, loadRemindersCount])
 
+  // ── Per-provider unread chat counts (Service Provider Membership) ───────
+  // For each provider this user has can_chat on, sum provider_unread_count
+  // across that provider's open conversations and stash by providerId. The
+  // sidebar Chat row for each provider then renders its own badge.
+  useEffect(() => {
+    const chattableProviders = mechanicMemberships.filter(m => m.can_chat)
+    if (chattableProviders.length === 0) {
+      setProviderUnreadByProviderId({})
+      return
+    }
+
+    const loadOne = async (providerId) => {
+      const { data } = await supabase
+        .from('conversations')
+        .select('provider_unread_count')
+        .eq('service_provider_id', providerId)
+        .eq('status', 'open')
+      const total = (data || []).reduce((s, c) => s + (c.provider_unread_count || 0), 0)
+      setProviderUnreadByProviderId(prev => ({ ...prev, [providerId]: total }))
+    }
+
+    // Initial loads
+    chattableProviders.forEach(m => loadOne(m.providerId))
+
+    // One realtime channel per provider — postgres-changes filters don't
+    // support IN(), so we subscribe per id. The channel triggers the loader
+    // for just that provider on any conversation change.
+    const channels = chattableProviders.map(m => {
+      return supabase
+        .channel(`sidebar-spu-convs-${m.providerId}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'conversations',
+          filter: `service_provider_id=eq.${m.providerId}`,
+        }, () => loadOne(m.providerId))
+        .subscribe()
+    })
+
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
+  // We intentionally only depend on the list of chattable provider IDs (as a
+  // stable string), not the entire mechanicMemberships array, so unrelated
+  // re-renders don't tear the channels down.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mechanicMemberships.filter(m => m.can_chat).map(m => m.providerId).sort().join(',')])
+
+  // ── Company unread chat count (My Company section) ──────────────────────
+  // Same pattern as the per-provider counts above, but there's only ever one
+  // company per user so we keep it as a scalar.
+  useEffect(() => {
+    const id = companyMembership?.id
+    if (!id) { setCompanyUnread(0); return }
+
+    const load = async () => {
+      const { data } = await supabase
+        .from('conversations')
+        .select('company_unread_count')
+        .eq('company_id', id)
+        .eq('status', 'open')
+      const total = (data || []).reduce((s, c) => s + (c.company_unread_count || 0), 0)
+      setCompanyUnread(total)
+    }
+    load()
+
+    const channel = supabase
+      .channel(`sidebar-company-convs-${id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${id}`,
+      }, () => load())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [companyMembership?.id])
+
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }
   const [companyNavOpen,  setCompanyNavOpen]  = useState(true)       // expanded by default
   const [membershipLoading, setMembershipLoading] = useState(true)
-  const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory }]
+  const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory, can_chat }]
   const [providerNavOpen, setProviderNavOpen] = useState({})         // { [providerId]: bool }
+  const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number }
+  const [companyUnread, setCompanyUnread] = useState(0)
 
   // ── Fetch company membership once on mount ────────────────────────────────
   useEffect(() => {
@@ -266,7 +341,8 @@ export default function Sidebar({ user }) {
       // Visually grouped: discover → message.
       ...(canChat ? [
         { icon: Search,        label: 'Find Providers', path: `${base}/providers`, everyone: true },
-        { icon: MessageSquare, label: 'Chat',           path: `${base}/chat`,      everyone: true },
+        { icon: MessageSquare, label: 'Chat',           path: `${base}/chat`,      everyone: true,
+          badge: companyUnread > 0 ? companyUnread : null },
       ] : []),
       { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
       { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // admin only
@@ -636,18 +712,25 @@ export default function Sidebar({ user }) {
               {/* Chat — one row per provider where this member has can_chat.
                   When the user belongs to a single provider, the row label is
                   just "Chat"; when they belong to several, each row is labelled
-                  with the provider name so they can pick the right inbox. */}
+                  with the provider name so they can pick the right inbox.
+                  Each row carries its own unread badge sourced from
+                  providerUnreadByProviderId — bumped live by the realtime
+                  subscription a few hooks above. */}
               {mechanicMemberships
                 .filter(m => m.can_chat)
-                .map(m => (
-                  <NavItem key={`${m.providerId}-chat`} compact item={{
-                    icon:  MessageSquare,
-                    label: mechanicMemberships.filter(x => x.can_chat).length > 1
-                      ? `Chat \u00b7 ${m.providerName || 'Provider'}`
-                      : 'Chat',
-                    path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
-                  }} />
-                ))
+                .map(m => {
+                  const unread = providerUnreadByProviderId[m.providerId] || 0
+                  return (
+                    <NavItem key={`${m.providerId}-chat`} compact item={{
+                      icon:  MessageSquare,
+                      label: mechanicMemberships.filter(x => x.can_chat).length > 1
+                        ? `Chat \u00b7 ${m.providerName || 'Provider'}`
+                        : 'Chat',
+                      path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
+                      badge: unread > 0 ? unread : null,
+                    }} />
+                  )
+                })
               }
             </div>
           </div>
