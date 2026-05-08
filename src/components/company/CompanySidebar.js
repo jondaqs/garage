@@ -2,7 +2,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Home, Truck, Users, Calendar, CalendarDays, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle,
@@ -23,15 +23,7 @@ export default function CompanySidebar({ company, userRole }) {
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  useEffect(() => {
-    if (company?.id) {
-      loadPendingCount(company.id)
-      loadRecommendationsCount(company.id)
-      loadUnreadMessages()
-    }
-  }, [company?.id])
-
-  const loadUnreadMessages = async () => {
+  const loadUnreadMessages = useCallback(async () => {
     try {
       if (!company?.id) return
       // /company/chat is the company-scoped chat surface for the owner —
@@ -45,7 +37,28 @@ export default function CompanySidebar({ company, userRole }) {
       const total = (convs || []).reduce((s, c) => s + (c.company_unread_count || 0), 0)
       setUnreadMessages(total)
     } catch {}
-  }
+  }, [company?.id])
+
+  // ── Initial load + realtime ──────────────────────────────────────────────
+  // Without realtime here, the badge stayed stale until the page was reloaded;
+  // a new message would arrive, the page state would update, but the sidebar
+  // counter would still show the old number from mount time.
+  useEffect(() => {
+    if (!company?.id) return
+    loadPendingCount(company.id)
+    loadRecommendationsCount(company.id)
+    loadUnreadMessages()
+
+    const convChannel = supabase
+      .channel(`co-sidebar-convs-${company.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${company.id}`,
+      }, () => loadUnreadMessages())
+      .subscribe()
+
+    return () => { supabase.removeChannel(convChannel) }
+  }, [company?.id, loadUnreadMessages])
 
   const loadPendingCount = async (companyId) => {
     try {

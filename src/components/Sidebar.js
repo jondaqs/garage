@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export default function Sidebar({ user }) {
   const router   = useRouter()
@@ -17,44 +17,79 @@ export default function Sidebar({ user }) {
   const supabase = createClient()
   const [remindersCount, setRemindersCount] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [profileId,      setProfileId]      = useState(null)
 
+  // ── Resolve profile once on mount; share across loaders ─────────────────
   useEffect(() => {
-    loadRemindersCount()
-    loadUnreadMessages()
-  }, [])
-
-  const loadUnreadMessages = async () => {
-    try {
+    const resolve = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
       const { data: profile } = await supabase
         .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
-      if (!profile) return
+      if (profile) setProfileId(profile.id)
+    }
+    resolve()
+  }, [])
+
+  // ── Loaders (now keyed off profileId) ───────────────────────────────────
+  const loadUnreadMessages = useCallback(async () => {
+    if (!profileId) return
+    try {
       const { data: convs } = await supabase
         .from('conversations')
         .select('user_unread_count')
-        .eq('user_id', profile.id)
+        .eq('user_id', profileId)
+        .is('company_id', null)
         .eq('status', 'open')
       const total = (convs || []).reduce((s, c) => s + (c.user_unread_count || 0), 0)
       setUnreadMessages(total)
     } catch {}
-  }
+  }, [profileId])
 
-  const loadRemindersCount = async () => {
+  const loadRemindersCount = useCallback(async () => {
+    if (!profileId) return
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
-      const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
-      if (!profile) return
       const { count } = await supabase
         .from('reminders')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', profile.id)
+        .eq('user_id', profileId)
         .eq('is_active', true)
       setRemindersCount(count || 0)
     } catch {}
-  }
+  }, [profileId])
+
+  // ── Reload + realtime: fire when profile id becomes known ───────────────
+  useEffect(() => {
+    if (!profileId) return
+    loadUnreadMessages()
+    loadRemindersCount()
+
+    // Subscribe to conversation changes so the message badge updates live.
+    // Filter is on user_id (personal chats only — matches loadUnreadMessages
+    // scope, which excludes company chats).
+    const convChannel = supabase
+      .channel(`sidebar-convs-${profileId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `user_id=eq.${profileId}`,
+      }, () => loadUnreadMessages())
+      .subscribe()
+
+    // Reminders change less often, but we still want them fresh — listen on
+    // INSERT/UPDATE/DELETE keyed on the user.
+    const remindChannel = supabase
+      .channel(`sidebar-reminders-${profileId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'reminders',
+        filter: `user_id=eq.${profileId}`,
+      }, () => loadRemindersCount())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(convChannel)
+      supabase.removeChannel(remindChannel)
+    }
+  }, [profileId, loadUnreadMessages, loadRemindersCount])
 
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }

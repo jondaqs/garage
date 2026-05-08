@@ -1,7 +1,8 @@
+// → Drop this file at: src/components/provider/ProviderSidebar.js
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, Calendar, Users, Package, FileText,
   BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare
@@ -20,24 +21,38 @@ export default function ProviderSidebar({ provider }) {
   // Close on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  useEffect(() => {
-    if (provider?.id) {
-      loadActiveWoCount(provider.id)
-      loadUnreadChats(provider.id)
-    }
-  }, [provider?.id])
-
-  const loadUnreadChats = async (providerId) => {
+  const loadUnreadChats = useCallback(async () => {
     try {
+      if (!provider?.id) return
       const { data } = await supabase
         .from('conversations')
         .select('provider_unread_count')
-        .eq('service_provider_id', providerId)
+        .eq('service_provider_id', provider.id)
         .eq('status', 'open')
       const total = (data || []).reduce((s, c) => s + (c.provider_unread_count || 0), 0)
       setUnreadChats(total)
     } catch {}
-  }
+  }, [provider?.id])
+
+  // ── Initial load + realtime ──────────────────────────────────────────────
+  // Realtime keeps the sidebar chat badge in sync without page reloads. Any
+  // INSERT/UPDATE on a conversation belonging to this provider triggers a
+  // refetch of the unread total.
+  useEffect(() => {
+    if (!provider?.id) return
+    loadActiveWoCount(provider.id)
+    loadUnreadChats()
+
+    const convChannel = supabase
+      .channel(`prov-sidebar-convs-${provider.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `service_provider_id=eq.${provider.id}`,
+      }, () => loadUnreadChats())
+      .subscribe()
+
+    return () => { supabase.removeChannel(convChannel) }
+  }, [provider?.id, loadUnreadChats])
 
   const loadActiveWoCount = async (providerId) => {
     try {

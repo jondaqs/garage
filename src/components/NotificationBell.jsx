@@ -1,3 +1,4 @@
+// → Drop this file at: src/components/NotificationBell.jsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -6,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Bell, X, Check, CheckCheck, Building2, Store, Users,
   ClipboardList, DollarSign, CheckCircle, XCircle,
-  MessageSquare, Wrench, Car, FileText, Star
+  MessageSquare, Wrench, Car, FileText, Star, RefreshCw
 } from 'lucide-react'
 
 // ─── Notification type → icon + colour + deep-link ──────────────────────────
@@ -125,6 +126,7 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
   const [unreadCount, setUnreadCount]     = useState(0)
   const [isOpen, setIsOpen]               = useState(false)
   const [loading, setLoading]             = useState(true)
+  const [refreshing, setRefreshing]       = useState(false)
   const [profileId, setProfileId]         = useState(null)
 
   // ── FIX: useCallback so the realtime closure always calls the latest version ──
@@ -193,13 +195,17 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
   useEffect(() => {
     if (!profileId) return
 
-    // ── FIX: filter at the channel level so only relevant inserts fire ───────
+    // ── Listen for any notification change (INSERT/UPDATE/DELETE) so the
+    // bell reflects external mutations too — e.g. if a user marks a
+    // notification read on another device, this device updates as well.
+    // The two filters cover both columns the schema uses to address a
+    // recipient (recipient_user_id and user_id).
     const channel = supabase
       .channel(`notifications-${profileId}`)
       .on(
         'postgres_changes',
         {
-          event:  'INSERT',
+          event:  '*',
           schema: 'public',
           table:  'notifications',
           filter: `recipient_user_id=eq.${profileId}`,
@@ -209,7 +215,7 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
       .on(
         'postgres_changes',
         {
-          event:  'INSERT',
+          event:  '*',
           schema: 'public',
           table:  'notifications',
           filter: `user_id=eq.${profileId}`,
@@ -220,6 +226,15 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
 
     return () => supabase.removeChannel(channel)
   }, [profileId, loadNotifications])
+
+  const handleManualRefresh = async () => {
+    if (!profileId || refreshing) return
+    setRefreshing(true)
+    await loadNotifications(profileId)
+    // Keep the spinner visible briefly so the user sees the action register,
+    // even when the response is near-instant.
+    setTimeout(() => setRefreshing(false), 350)
+  }
 
   const markAsRead = async (id) => {
     await supabase.from('notifications')
@@ -303,14 +318,29 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
                   </span>
                 )}
               </div>
-              {unreadCount > 0 && (
+              <div className="flex items-center gap-3">
+                {/* Manual refresh — realtime keeps the list fresh on its own,
+                    but this button is a "force pull" escape hatch for cases
+                    where the realtime subscription drops (e.g. flaky mobile
+                    networks). The icon spins briefly on click. */}
                 <button
-                  onClick={markAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium"
+                  onClick={handleManualRefresh}
+                  disabled={refreshing || !profileId}
+                  className="text-gray-400 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Refresh notifications"
+                  aria-label="Refresh notifications"
                 >
-                  <CheckCheck size={14} /> Mark all read
+                  <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
                 </button>
-              )}
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium"
+                  >
+                    <CheckCheck size={14} /> Mark all read
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* List */}
