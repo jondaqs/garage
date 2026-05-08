@@ -577,18 +577,27 @@ export default function ProviderMemberChatPage() {
               ) : (
                 messages.map((msg, i) => {
                   const isProvider = msg.sender_role === 'provider'
+                  const isMine     = msg.sender_id === profile?.id
                   const prev       = messages[i - 1]
                   const showDate   = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString()
-                  // Only show the sender label on the first message of a run from
-                  // the same sender (and right after a date divider). Outgoing
-                  // (provider) messages don't get a sender label.
+                  // Show a label above messages from anyone OTHER than me, on the
+                  // first of a same-sender run. That covers two cases:
+                  //   • Customer-side replies (user / company) — what we always showed.
+                  //   • Coworker provider replies (owner, SPU staff, mechanic) —
+                  //     so the viewer knows which staff member said what.
+                  // My own outgoing messages are skipped — no need to label myself.
                   const showSenderLabel =
-                    !isProvider &&
+                    !isMine &&
                     (showDate || !prev || prev.sender_id !== msg.sender_id || prev.sender_role !== msg.sender_role)
                   // Compose the sender label. For company-side messages, prefix
                   // the company name so the provider knows which client it's from.
                   const senderName = (() => {
                     const personName = `${msg.sender?.first_name || ''} ${msg.sender?.last_name || ''}`.trim()
+                    if (msg.sender_role === 'provider') {
+                      // Coworker — keep the label compact since the viewer already
+                      // knows the provider context (it's their own inbox).
+                      return personName || 'Coworker'
+                    }
                     if (msg.sender_role === 'company') {
                       const company = activeConv.company?.name
                       if (company && personName) return `${personName} · ${company}`
@@ -614,7 +623,9 @@ export default function ProviderMemberChatPage() {
                           )}
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isProvider
-                              ? 'bg-green-600 text-white rounded-br-sm'
+                              ? (isMine
+                                  ? 'bg-green-600 text-white rounded-br-sm'
+                                  : 'bg-green-100 text-green-900 rounded-br-sm')   // coworker reply
                               : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm'
                           }`}>
                             {msg.body}
@@ -623,7 +634,7 @@ export default function ProviderMemberChatPage() {
                             <span className="text-[10px] text-gray-400">
                               {new Date(msg.created_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {isProvider && (
+                            {isMine && (
                               msg.is_read
                                 ? <CheckCheck size={12} className="text-green-400" />
                                 : <Check size={12} className="text-gray-300" />
