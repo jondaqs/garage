@@ -403,8 +403,16 @@ export default function CompanyMemberChatPage() {
           ) : filteredConvs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
               <MessageSquare size={36} className="text-gray-200 mb-3" />
-              <p className="text-gray-400 text-sm">No conversations</p>
-              <p className="text-gray-400 text-xs mt-1">Start one from a provider's page.</p>
+              <p className="text-gray-500 text-sm font-medium">No conversations yet</p>
+              <p className="text-gray-400 text-xs mt-1 max-w-[220px]">
+                Find a service provider and tap <span className="font-medium text-gray-500">Chat</span> to start.
+              </p>
+              <button
+                onClick={() => router.push(`/dashboard/company/${companyId}/providers`)}
+                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Search size={12} /> Find Providers
+              </button>
             </div>
           ) : (
             filteredConvs.map(conv => {

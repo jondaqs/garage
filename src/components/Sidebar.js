@@ -1,3 +1,4 @@
+// → Drop this file at: src/components/Sidebar.js
 'use client'
 
 import {
@@ -226,10 +227,11 @@ export default function Sidebar({ user }) {
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
       { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
       { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },
-      // Chat — visible only to members with can_chat (or admins).
-      // The page guards permission again server-side.
+      // Find Providers + Chat — both gated on can_chat (admins see them too).
+      // Visually grouped: discover → message.
       ...(canChat ? [
-        { icon: MessageSquare, label: 'Chat',     path: `${base}/chat`,             everyone: true  }
+        { icon: Search,        label: 'Find Providers', path: `${base}/providers`, everyone: true },
+        { icon: MessageSquare, label: 'Chat',           path: `${base}/chat`,      everyone: true },
       ] : []),
       { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
       { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // admin only
