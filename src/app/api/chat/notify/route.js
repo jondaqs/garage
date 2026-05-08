@@ -1,3 +1,4 @@
+// → Drop this file at: src/app/api/chat/notify/route.js
 /**
  * POST /api/chat/notify
  * Called after a user sends a message.
@@ -14,11 +15,14 @@ const BRAND   = 'Motiifix'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
 
 function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Supabase service-role credentials not configured')
+  }
+  return createServiceClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
 }
 
 export async function POST(request) {
@@ -90,33 +94,31 @@ export async function POST(request) {
     const title   = `New message from ${senderName}`
     const message = `${senderName} sent a message to ${providerName}: "${preview}"`
 
-    // In-app notifications
-    await sc.from('notifications').insert(
-      recipients.map(r => ({
-        user_id:           r.user_id,
-        recipient_user_id: r.user_id,
-        type:              'new_message',
-        notification_type: 'new_message',
-        title,
-        message,
-        reference_table:   'conversations',
-        reference_id:      conversationId,
-        reference_type:    'conversation',
-        is_read:           false,
-      }))
-    )
+    // In-app notifications — wrapped: a single failed insert here must not 500
+    // the whole route (which manifests as a red POST in the browser console).
+    try {
+      const { error: notifErr } = await sc.from('notifications').insert(
+        recipients.map(r => ({
+          user_id:           r.user_id,
+          recipient_user_id: r.user_id,
+          type:              'new_message',
+          notification_type: 'new_message',
+          title,
+          message,
+          reference_table:   'conversations',
+          reference_id:      conversationId,
+          reference_type:    'conversation',
+          is_read:           false,
+        }))
+      )
+      if (notifErr) console.error('[chat/notify] notifications insert:', notifErr.message)
+    } catch (e) {
+      console.error('[chat/notify] notifications insert threw:', e.message)
+    }
 
-    // Update provider unread count
-    await sc.from('conversations')
-      .update({ provider_unread_count: sc.rpc ? undefined : undefined })
-      .eq('id', conversationId)
-    await sc.rpc('increment_provider_unread', { p_conversation_id: conversationId }).catch(() => {
-      // Fallback: increment manually
-      sc.from('conversations').select('provider_unread_count').eq('id', conversationId).single()
-        .then(({ data }) => {
-          sc.from('conversations').update({ provider_unread_count: (data?.provider_unread_count || 0) + 1 }).eq('id', conversationId)
-        })
-    })
+    // NB: provider_unread_count is already incremented atomically by the
+    // send_message_to_provider RPC on the client side. This route used to
+    // increment it again here; we removed that to prevent double-counting.
 
     const subject  = `New message from ${senderName} — ${providerName}`
     const smsText  = `${BRAND}: ${senderName} sent you a message: "${preview.slice(0, 100)}". Reply at: ${chatUrl}`
@@ -189,6 +191,9 @@ export async function POST(request) {
     return NextResponse.json({ success: true, notified: recipients.length, emailsSent, smsSent })
   } catch (err) {
     console.error('POST /api/chat/notify error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Notifications are a side effect — never surface a 500 here, because the
+    // user has already successfully sent their message. Returning 200 with a
+    // delivered:false flag keeps the browser console clean.
+    return NextResponse.json({ success: false, delivered: false, error: err.message }, { status: 200 })
   }
 }

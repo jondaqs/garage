@@ -1,3 +1,4 @@
+// → Drop this file at: src/app/dashboard/chat/page.js
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -47,6 +48,7 @@ export default function ChatPage() {
       .from('conversations')
       .select(`
         id, updated_at, last_message_at, last_message_preview, user_unread_count, status,
+        closed_at, closed_by:user_profiles!closed_by_id(id, first_name, last_name),
         provider:service_providers(id, name, is_verified)
       `)
       .eq('user_id', profile.id)
@@ -106,7 +108,10 @@ export default function ChatPage() {
 
     const { data: msgs } = await supabase
       .from('messages')
-      .select('id, body, sender_id, sender_role, created_at, is_read')
+      .select(`
+        id, body, sender_id, sender_role, created_at, is_read,
+        sender:user_profiles!sender_id(id, first_name, last_name)
+      `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
@@ -142,14 +147,26 @@ export default function ChatPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${activeConv.id}`,
-      }, payload => {
+      }, async payload => {
         const msg = payload.new
+        // Realtime payloads don't include joins; hydrate sender separately so
+        // the name label has data to render.
+        let sender = null
+        if (msg.sender_id) {
+          const { data: s } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name')
+            .eq('id', msg.sender_id)
+            .maybeSingle()
+          sender = s
+        }
+        const enriched = { ...msg, sender }
         setMessages(prev => {
-          if (prev.some(m => m.id === msg.id)) return prev
-          return [...prev, msg]
+          if (prev.some(m => m.id === enriched.id)) return prev
+          return [...prev, enriched]
         })
         // Mark as read if from provider
-        if (msg.sender_role === 'provider') {
+        if (msg.sender_role === 'provider' || msg.sender_role === 'company') {
           supabase.from('messages')
             .update({ is_read: true, read_at: new Date().toISOString() })
             .eq('id', msg.id)
@@ -189,30 +206,33 @@ export default function ChatPage() {
       id: `opt-${Date.now()}`, body: text,
       sender_id: profile.id, sender_role: 'user',
       created_at: new Date().toISOString(), is_read: false,
+      sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
     }
     setMessages(prev => [...prev, optimistic])
 
-    const { data: msg, error } = await supabase.from('messages').insert({
-      conversation_id: activeConv.id,
-      sender_id:       profile.id,
-      sender_role:     'user',
-      body:            text,
-    }).select().single()
+    // Atomic RPC: inserts message with sender_role='user', updates conversation
+    // preview/timestamp, and bumps provider_unread_count — all server-side.
+    const { data: msg, error } = await supabase.rpc('send_message_to_provider', {
+      p_conversation_id: activeConv.id,
+      p_body:            text,
+      p_as_company:      false,
+    })
 
-    if (error) {
+    if (error || !msg) {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setBody(text)
     } else {
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? msg : m))
-      // Update conversation preview
-      await supabase.from('conversations').update({
-        last_message_at:      msg.created_at,
-        last_message_preview: text.length > 60 ? text.slice(0, 60) + '…' : text,
-        provider_unread_count: supabase.rpc ? undefined : undefined,
-      }).eq('id', activeConv.id)
+      // Hydrate sender on the returned row so renderers that show name labels
+      // have it without a follow-up query.
+      const enriched = {
+        ...msg,
+        sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
+      }
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? enriched : m))
+      const preview = text.length > 60 ? text.slice(0, 60) + '…' : text
       setConversations(prev => prev.map(c =>
         c.id === activeConv.id
-          ? { ...c, last_message_at: msg.created_at, last_message_preview: text.slice(0, 60) }
+          ? { ...c, last_message_at: msg.created_at, last_message_preview: preview }
           : c
       ).sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at)))
 
@@ -407,11 +427,24 @@ export default function ChatPage() {
 
             {/* Closed banner */}
             {activeConv.status === 'closed' && (
-              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2">
-                <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
-                <p className="text-xs text-amber-700 font-medium">
-                  This conversation is closed. Reopen it to send new messages.
-                </p>
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-start gap-2">
+                <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-700 leading-snug">
+                  <p className="font-medium">This conversation is closed. Reopen it to send new messages.</p>
+                  {(activeConv.closed_at || activeConv.closed_by) && (
+                    <p className="text-[11px] text-amber-600/80 mt-0.5">
+                      Closed
+                      {activeConv.closed_by && (
+                        <> by <span className="font-medium">
+                          {`${activeConv.closed_by.first_name || ''} ${activeConv.closed_by.last_name || ''}`.trim() || 'someone'}
+                        </span></>
+                      )}
+                      {activeConv.closed_at && (
+                        <> on {new Date(activeConv.closed_at).toLocaleString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -432,6 +465,17 @@ export default function ChatPage() {
                   const isUser = msg.sender_role === 'user'
                   const prevMsg = messages[i - 1]
                   const showDate = !prevMsg || new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString()
+                  // Label above incoming messages on the first of a same-sender run.
+                  // Outgoing (own) messages don't get a label.
+                  const showSenderLabel =
+                    !isUser &&
+                    (showDate || !prevMsg || prevMsg.sender_id !== msg.sender_id || prevMsg.sender_role !== msg.sender_role)
+                  const senderName = (() => {
+                    const personName = `${msg.sender?.first_name || ''} ${msg.sender?.last_name || ''}`.trim()
+                    const providerName = activeConv.provider?.name
+                    if (personName && providerName) return `${personName} · ${providerName}`
+                    return personName || providerName || 'Service Provider'
+                  })()
 
                   return (
                     <div key={msg.id}>
@@ -444,6 +488,11 @@ export default function ChatPage() {
                       )}
                       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[75%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                          {showSenderLabel && (
+                            <span className="text-[11px] font-semibold text-gray-500 mb-0.5 ml-1">
+                              {senderName}
+                            </span>
+                          )}
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isUser
                               ? 'bg-blue-600 text-white rounded-br-sm'

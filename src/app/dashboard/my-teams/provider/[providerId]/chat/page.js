@@ -1,3 +1,4 @@
+// → Drop this file at: src/app/dashboard/my-teams/provider/[providerId]/chat/page.js
 'use client'
 
 /* ============================================================================
@@ -126,6 +127,7 @@ export default function ProviderMemberChatPage() {
       .select(`
         id, updated_at, last_message_at, last_message_preview,
         provider_unread_count, status, closed_at, company_id,
+        closed_by:user_profiles!closed_by_id(id, first_name, last_name),
         user:user_profiles!user_id(id, first_name, last_name),
         company:company_profiles!company_id(id, name)
       `)
@@ -540,11 +542,24 @@ export default function ProviderMemberChatPage() {
 
             {/* Closed banner */}
             {activeConv.status === 'closed' && (
-              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2">
-                <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
-                <p className="text-xs text-amber-700 font-medium">
-                  This conversation is closed. Reopen it to send messages.
-                </p>
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-start gap-2">
+                <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-700 leading-snug">
+                  <p className="font-medium">This conversation is closed. Reopen it to send messages.</p>
+                  {(activeConv.closed_at || activeConv.closed_by) && (
+                    <p className="text-[11px] text-amber-600/80 mt-0.5">
+                      Closed
+                      {activeConv.closed_by && (
+                        <> by <span className="font-medium">
+                          {`${activeConv.closed_by.first_name || ''} ${activeConv.closed_by.last_name || ''}`.trim() || 'someone'}
+                        </span></>
+                      )}
+                      {activeConv.closed_at && (
+                        <> on {new Date(activeConv.closed_at).toLocaleString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 

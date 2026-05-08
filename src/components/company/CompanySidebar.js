@@ -1,3 +1,4 @@
+// → Drop this file at: src/components/company/CompanySidebar.js
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
@@ -32,17 +33,16 @@ export default function CompanySidebar({ company, userRole }) {
 
   const loadUnreadMessages = async () => {
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
-      const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
-      if (!profile) return
+      if (!company?.id) return
+      // /company/chat is the company-scoped chat surface for the owner —
+      // it filters conversations by company_id and tracks company_unread_count.
+      // The sidebar badge must mirror that, otherwise the counts diverge.
       const { data: convs } = await supabase
         .from('conversations')
-        .select('user_unread_count')
-        .eq('user_id', profile.id)
+        .select('company_unread_count')
+        .eq('company_id', company.id)
         .eq('status', 'open')
-      const total = (convs || []).reduce((s, c) => s + (c.user_unread_count || 0), 0)
+      const total = (convs || []).reduce((s, c) => s + (c.company_unread_count || 0), 0)
       setUnreadMessages(total)
     } catch {}
   }

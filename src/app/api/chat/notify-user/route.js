@@ -1,7 +1,10 @@
+// → Drop this file at: src/app/api/chat/notify-user/route.js
 /**
  * POST /api/chat/notify-user
- * Called after provider sends a message.
- * Sends in-app notification + email + SMS to the user who initiated the chat.
+ * Called after a provider sends a message.
+ * Sends in-app notification + email + SMS to the customer side of the chat:
+ *   • Personal conversation  → the user who opened it
+ *   • Company conversation   → every active company_users member with can_chat = true
  */
 
 import { createClient }                        from '@/lib/supabase/server'
@@ -15,11 +18,12 @@ const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.
 
 function sc() {
   const { createClient: svc } = require('@supabase/supabase-js')
-  return svc(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Supabase service-role credentials not configured')
+  }
+  return svc(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
 export async function POST(request) {
@@ -33,52 +37,80 @@ export async function POST(request) {
     const { conversationId, messageId, senderName, providerName, preview } = await request.json()
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 })
 
-    // Load conversation + user
+    // Load conversation — note we now read company_id too, since the recipient
+    // set differs for company-scoped conversations.
     const { data: conv } = await db
       .from('conversations')
-      .select('id, user_id, service_provider_id')
+      .select('id, user_id, company_id, service_provider_id')
       .eq('id', conversationId)
       .maybeSingle()
     if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
 
-    // Load user contact details
-    const { data: userProfile } = await db
-      .from('user_profiles')
-      .select('id, first_name, last_name, email, phone')
-      .eq('id', conv.user_id)
-      .maybeSingle()
+    // Build the recipient list. Two paths:
+    //  • Personal conversation (company_id IS NULL): single recipient = conv.user_id
+    //  • Company conversation (company_id IS NOT NULL): every active company_users
+    //    row with can_chat = true. (The conv.user_id is the member who *opened*
+    //    the chat — they may or may not still have can_chat, so we don't rely
+    //    on it here.)
+    const recipients = []
+    const seenIds    = new Set()
+    const addR = r => { if (r?.id && !seenIds.has(r.id)) { seenIds.add(r.id); recipients.push(r) } }
 
-    if (!userProfile) return NextResponse.json({ success: true, notified: 0 })
+    if (conv.company_id) {
+      const { data: members } = await db
+        .from('company_users')
+        .select('user_id, user_profiles!user_id(id, first_name, last_name, email, phone)')
+        .eq('company_id', conv.company_id)
+        .eq('is_active', true)
+        .eq('can_chat', true)
+      for (const m of members || []) {
+        const p = m.user_profiles
+        if (p) addR({ id: p.id, first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone })
+      }
+    } else {
+      const { data: userProfile } = await db
+        .from('user_profiles')
+        .select('id, first_name, last_name, email, phone')
+        .eq('id', conv.user_id)
+        .maybeSingle()
+      if (userProfile) addR(userProfile)
+    }
 
-    const chatUrl   = `${APP_URL()}/dashboard/chat?conversation=${conversationId}`
-    const userName  = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'there'
+    if (recipients.length === 0) return NextResponse.json({ success: true, notified: 0 })
 
-    // In-app notification
-    await db.from('notifications').insert({
-      user_id:           userProfile.id,
-      recipient_user_id: userProfile.id,
-      type:              'new_message',
-      notification_type: 'new_message',
-      title:             `New message from ${providerName || senderName}`,
-      message:           `${senderName} replied: "${preview}"`,
-      reference_table:   'conversations',
-      reference_id:      conversationId,
-      reference_type:    'conversation',
-      is_read:           false,
-    })
+    // The chat URL differs by surface — personal recipients land at /dashboard/chat,
+    // company recipients land at /dashboard/company/[id]/chat.
+    const chatUrl = conv.company_id
+      ? `${APP_URL()}/dashboard/company/${conv.company_id}/chat?conversation=${conversationId}`
+      : `${APP_URL()}/dashboard/chat?conversation=${conversationId}`
 
-    // Update user unread count
-    await db.from('conversations')
-      .update({ user_unread_count: db.rpc ? undefined : undefined })
-      .eq('id', conversationId)
-    await db.rpc('increment_user_unread', { p_conversation_id: conversationId })
-      .catch(async () => {
-        const { data } = await db.from('conversations').select('user_unread_count').eq('id', conversationId).single()
-        await db.from('conversations').update({ user_unread_count: (data?.user_unread_count || 0) + 1 }).eq('id', conversationId)
-      })
+    // In-app notifications — wrapped: a failed insert here must not 500
+    // the whole route (which manifests as a red POST in the browser console).
+    try {
+      const { error: notifErr } = await db.from('notifications').insert(
+        recipients.map(r => ({
+          user_id:           r.id,
+          recipient_user_id: r.id,
+          type:              'new_message',
+          notification_type: 'new_message',
+          title:             `New message from ${providerName || senderName}`,
+          message:           `${senderName} replied: "${preview}"`,
+          reference_table:   'conversations',
+          reference_id:      conversationId,
+          reference_type:    'conversation',
+          is_read:           false,
+        }))
+      )
+      if (notifErr) console.error('[notify-user] notifications insert:', notifErr.message)
+    } catch (e) {
+      console.error('[notify-user] notifications insert threw:', e.message)
+    }
+
+    // NB: user_unread_count / company_unread_count are already incremented
+    // atomically by the send_message_to_user RPC on the provider side. This
+    // route used to increment again here; removed to prevent double-counting.
 
     const subject = `New reply from ${providerName} — ${BRAND}`
-    const smsText = `${BRAND}: ${senderName} from ${providerName} replied: "${preview.slice(0, 100)}". View: ${chatUrl}`
 
     const html = (name) => `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>New Reply</title></head>
@@ -114,39 +146,43 @@ export async function POST(request) {
 </table>
 </body></html>`
 
-    let emailSent = false, smsSent = false
+    let emailsSent = 0, smsSent = 0
+    for (const r of recipients) {
+      const rName   = `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'there'
+      const smsText = `${BRAND}: ${senderName} from ${providerName} replied: "${preview.slice(0, 100)}". View: ${chatUrl}`
 
-    if (userProfile.email) {
-      try {
-        await sendAndQueueEmail(db, {
-          to:             [{ Email: userProfile.email, Name: userName }],
-          subject,
-          html:           html(userName),
-          text:           smsText,
-          referenceTable: 'conversations',
-          referenceId:    conversationId,
-        })
-        emailSent = true
-      } catch (e) { console.error('[notify-user] email:', e.message) }
+      if (r.email) {
+        try {
+          await sendAndQueueEmail(db, {
+            to:             [{ Email: r.email, Name: rName }],
+            subject,
+            html:           html(rName),
+            text:           smsText,
+            referenceTable: 'conversations',
+            referenceId:    conversationId,
+          })
+          emailsSent++
+        } catch (e) { console.error('[notify-user] email:', e.message) }
+      }
+
+      const phone = normalisePhone(r.phone)
+      if (phone) {
+        try {
+          const res = await sendAndQueueSms(db, {
+            to:             phone,
+            recipientName:  rName,
+            message:        smsText,
+            referenceTable: 'conversations',
+            referenceId:    conversationId,
+          })
+          if (res?.sent) smsSent++
+        } catch (e) { console.error('[notify-user] sms:', e.message) }
+      }
     }
 
-    const phone = normalisePhone(userProfile.phone)
-    if (phone) {
-      try {
-        const res = await sendAndQueueSms(db, {
-          to:             phone,
-          recipientName:  userName,
-          message:        smsText,
-          referenceTable: 'conversations',
-          referenceId:    conversationId,
-        })
-        smsSent = !!res?.sent
-      } catch (e) { console.error('[notify-user] sms:', e.message) }
-    }
-
-    return NextResponse.json({ success: true, emailSent, smsSent })
+    return NextResponse.json({ success: true, notified: recipients.length, emailsSent, smsSent })
   } catch (err) {
     console.error('POST /api/chat/notify-user error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ success: false, delivered: false, error: err.message }, { status: 200 })
   }
 }

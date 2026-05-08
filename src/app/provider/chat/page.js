@@ -1,3 +1,4 @@
+// → Drop this file at: src/app/provider/chat/page.js
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -83,7 +84,9 @@ export default function ProviderChatPage() {
       .select(`
         id, updated_at, last_message_at, last_message_preview,
         provider_unread_count, status, closed_at,
-        user:user_profiles!user_id(id, first_name, last_name)
+        closed_by:user_profiles!closed_by_id(id, first_name, last_name),
+        user:user_profiles!user_id(id, first_name, last_name),
+        company:company_profiles!company_id(id, name)
       `)
       .eq('service_provider_id', provider.id)
       .order('last_message_at', { ascending: false, nullsFirst: false })
@@ -116,17 +119,20 @@ export default function ProviderChatPage() {
 
     const { data: msgs } = await supabase
       .from('messages')
-      .select('id, body, sender_id, sender_role, created_at, is_read')
+      .select(`
+        id, body, sender_id, sender_role, created_at, is_read,
+        sender:user_profiles!sender_id(id, first_name, last_name)
+      `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
     setLoadingMsgs(false)
 
-    // Mark user messages as read
+    // Mark customer-side messages (user OR company) as read
     await supabase.from('messages')
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('conversation_id', convId)
-      .eq('sender_role', 'user')
+      .in('sender_role', ['user', 'company'])
       .eq('is_read', false)
 
     // Reset provider unread count
@@ -150,10 +156,20 @@ export default function ProviderChatPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${activeConv.id}`,
-      }, payload => {
+      }, async payload => {
         const msg = payload.new
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
-        if (msg.sender_role === 'user') {
+        let sender = null
+        if (msg.sender_id) {
+          const { data: s } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name')
+            .eq('id', msg.sender_id)
+            .maybeSingle()
+          sender = s
+        }
+        const enriched = { ...msg, sender }
+        setMessages(prev => prev.some(m => m.id === enriched.id) ? prev : [...prev, enriched])
+        if (msg.sender_role === 'user' || msg.sender_role === 'company') {
           supabase.from('messages')
             .update({ is_read: true, read_at: new Date().toISOString() })
             .eq('id', msg.id)
@@ -190,27 +206,27 @@ export default function ProviderChatPage() {
       id: `opt-${Date.now()}`, body: text,
       sender_id: profile.id, sender_role: 'provider',
       created_at: new Date().toISOString(), is_read: false,
+      sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
     }
     setMessages(prev => [...prev, optimistic])
 
-    const { data: msg, error } = await supabase.from('messages').insert({
-      conversation_id: activeConv.id,
-      sender_id:       profile.id,
-      sender_role:     'provider',
-      body:            text,
-    }).select().single()
+    // Atomic RPC: inserts message with sender_role='provider', updates conversation
+    // preview/timestamp, and bumps user_unread_count (or company_unread_count) — all server-side.
+    const { data: msg, error } = await supabase.rpc('send_message_to_user', {
+      p_conversation_id: activeConv.id,
+      p_body:            text,
+    })
 
-    if (error) {
+    if (error || !msg) {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setBody(text)
     } else {
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? msg : m))
+      const enriched = {
+        ...msg,
+        sender: { id: profile.id, first_name: profile.first_name, last_name: profile.last_name },
+      }
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? enriched : m))
       const preview = text.length > 60 ? text.slice(0, 60) + '…' : text
-      await supabase.from('conversations').update({
-        last_message_at:      msg.created_at,
-        last_message_preview: preview,
-        user_unread_count:    supabase.rpc ? undefined : undefined,
-      }).eq('id', activeConv.id)
       setConversations(prev =>
         prev.map(c => c.id === activeConv.id
           ? { ...c, last_message_at: msg.created_at, last_message_preview: preview }
@@ -431,11 +447,24 @@ export default function ProviderChatPage() {
 
             {/* Closed banner */}
             {activeConv.status === 'closed' && (
-              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2">
-                <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
-                <p className="text-xs text-amber-700 font-medium">
-                  This conversation is closed. Reopen it to send messages.
-                </p>
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-start gap-2">
+                <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-700 leading-snug">
+                  <p className="font-medium">This conversation is closed. Reopen it to send messages.</p>
+                  {(activeConv.closed_at || activeConv.closed_by) && (
+                    <p className="text-[11px] text-amber-600/80 mt-0.5">
+                      Closed
+                      {activeConv.closed_by && (
+                        <> by <span className="font-medium">
+                          {`${activeConv.closed_by.first_name || ''} ${activeConv.closed_by.last_name || ''}`.trim() || 'someone'}
+                        </span></>
+                      )}
+                      {activeConv.closed_at && (
+                        <> on {new Date(activeConv.closed_at).toLocaleString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -455,6 +484,21 @@ export default function ProviderChatPage() {
                   const isProvider = msg.sender_role === 'provider'
                   const prev = messages[i - 1]
                   const showDate = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString()
+                  // Label above incoming (customer-side) messages on the first
+                  // of a same-sender run. Prefix with company name when the
+                  // sender is replying as a company.
+                  const showSenderLabel =
+                    !isProvider &&
+                    (showDate || !prev || prev.sender_id !== msg.sender_id || prev.sender_role !== msg.sender_role)
+                  const senderName = (() => {
+                    const personName = `${msg.sender?.first_name || ''} ${msg.sender?.last_name || ''}`.trim()
+                    if (msg.sender_role === 'company') {
+                      const company = activeConv.company?.name
+                      if (company && personName) return `${personName} · ${company}`
+                      return company || personName || 'Company'
+                    }
+                    return personName || 'Customer'
+                  })()
                   return (
                     <div key={msg.id}>
                       {showDate && (
@@ -466,6 +510,11 @@ export default function ProviderChatPage() {
                       )}
                       <div className={`flex ${isProvider ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[75%] flex flex-col ${isProvider ? 'items-end' : 'items-start'}`}>
+                          {showSenderLabel && (
+                            <span className="text-[11px] font-semibold text-gray-500 mb-0.5 ml-1">
+                              {senderName}
+                            </span>
+                          )}
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isProvider
                               ? 'bg-green-600 text-white rounded-br-sm'
