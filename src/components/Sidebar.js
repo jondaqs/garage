@@ -574,15 +574,11 @@ export default function Sidebar({ user }) {
                         label: 'Overview',
                         path:  `/dashboard/my-teams/provider/${m.providerId}`,
                       }} />
-
-                      {/* Chat — only when this member has can_chat for this provider */}
-                      {m.can_chat && (
-                        <NavItem key={`${m.providerId}-chat`} compact item={{
-                          icon:  MessageSquare,
-                          label: 'Chat',
-                          path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
-                        }} />
-                      )}
+                      {/* Chat for this provider lives below Assigned Work Orders
+                          in the shared block — keeps the provider-membership
+                          quick-look (Overview only) tight, and groups all chat
+                          entry points together when a member belongs to multiple
+                          providers. */}
                     </>
                   )}
                 </div>
@@ -601,6 +597,23 @@ export default function Sidebar({ user }) {
                 label: 'Assigned Work Orders',
                 path:  '/dashboard/my-teams/work-orders',
               }} />
+
+              {/* Chat — one row per provider where this member has can_chat.
+                  When the user belongs to a single provider, the row label is
+                  just "Chat"; when they belong to several, each row is labelled
+                  with the provider name so they can pick the right inbox. */}
+              {mechanicMemberships
+                .filter(m => m.can_chat)
+                .map(m => (
+                  <NavItem key={`${m.providerId}-chat`} compact item={{
+                    icon:  MessageSquare,
+                    label: mechanicMemberships.filter(x => x.can_chat).length > 1
+                      ? `Chat \u00b7 ${m.providerName || 'Provider'}`
+                      : 'Chat',
+                    path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
+                  }} />
+                ))
+              }
             </div>
           </div>
         )}
