@@ -27,7 +27,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Send, MessageSquare, Search, Loader2, CheckCheck, Check,
-  ArrowLeft, XCircle, CheckCircle, AlertCircle, Building2,
+  ArrowLeft, XCircle, CheckCircle, AlertCircle, Building2, RefreshCw,
 } from 'lucide-react'
 
 export default function CompanyOwnerChatPage() {
@@ -49,9 +49,11 @@ export default function CompanyOwnerChatPage() {
   const [convSearch,     setConvSearch]     = useState('')
   const [closingConv,    setClosingConv]    = useState(false)
   const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [refreshing,     setRefreshing]     = useState(false)
 
   const messagesEndRef = useRef(null)
   const channelRef     = useRef(null)
+  const listChannelRef = useRef(null)
   const inputRef       = useRef(null)
 
   // ── Resolve profile + the company this user owns ─────────────────────────
@@ -91,9 +93,8 @@ export default function CompanyOwnerChatPage() {
   }, [])
 
   // ── Load conversations for THIS company ─────────────────────────────────
-  const loadConversations = useCallback(async () => {
-    if (authState !== 'ok' || !company?.id) return
-    setLoadingConvs(true)
+  const fetchConversations = useCallback(async () => {
+    if (authState !== 'ok' || !company?.id) return null
     const { data } = await supabase
       .from('conversations')
       .select(`
@@ -105,12 +106,65 @@ export default function CompanyOwnerChatPage() {
       `)
       .eq('company_id', company.id)
       .order('last_message_at', { ascending: false, nullsFirst: false })
-
-    setConversations(data || [])
-    setLoadingConvs(false)
+    return data || []
   }, [authState, company?.id])
 
+  const loadConversations = useCallback(async () => {
+    setLoadingConvs(true)
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+    setLoadingConvs(false)
+  }, [fetchConversations])
+
+  const reloadConversationsSilent = useCallback(async () => {
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+  }, [fetchConversations])
+
+  const handleManualRefresh = async () => {
+    if (!company?.id || refreshing) return
+    setRefreshing(true)
+    await reloadConversationsSilent()
+    setTimeout(() => setRefreshing(false), 350)
+  }
+
   useEffect(() => { loadConversations() }, [loadConversations])
+
+  // ── Realtime: list-wide subscription on this company's conversations ────
+  useEffect(() => {
+    if (!company?.id) return
+    if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+
+    listChannelRef.current = supabase
+      .channel(`company-chat-list-${company.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${company.id}`,
+      }, payload => {
+        const updated = payload.new
+        setConversations(prev => {
+          if (!prev.some(c => c.id === updated.id)) return prev
+          return prev.map(c => c.id === updated.id ? { ...c, ...updated } : c)
+            .sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0))
+        })
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${company.id}`,
+      }, () => reloadConversationsSilent())
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${company.id}`,
+      }, payload => {
+        const deletedId = payload.old?.id
+        if (deletedId) setConversations(prev => prev.filter(c => c.id !== deletedId))
+      })
+      .subscribe()
+
+    return () => {
+      if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+    }
+  }, [company?.id, reloadConversationsSilent])
 
   // ── Auto-open or create a conversation with a specific provider ─────────
   // Pattern: /company/chat?provider={providerId}
@@ -383,11 +437,22 @@ export default function CompanyOwnerChatPage() {
         <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-start justify-between mb-1">
             <h2 className="text-lg font-bold text-gray-900 leading-tight">Provider Chats</h2>
-            {unreadTotal > 0 && (
-              <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
-                {unreadTotal} new
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadTotal > 0 && (
+                <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
+                  {unreadTotal} new
+                </span>
+              )}
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing || !company?.id}
+                className="text-gray-400 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Refresh conversations"
+                aria-label="Refresh conversations"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
           <p className="text-xs text-gray-500 mt-0.5 truncate">{company?.name}</p>
 

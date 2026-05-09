@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Send, MessageSquare, Search, Loader2, CheckCheck, Check,
-  ArrowLeft, User, XCircle, CheckCircle, AlertCircle, ChevronDown
+  ArrowLeft, User, XCircle, CheckCircle, AlertCircle, ChevronDown, RefreshCw
 } from 'lucide-react'
 
 export default function ProviderChatPage() {
@@ -28,9 +28,11 @@ export default function ProviderChatPage() {
   const [statusFilter,  setStatusFilter]  = useState('open')
   const [closingConv,   setClosingConv]   = useState(false)
   const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [refreshing,    setRefreshing]    = useState(false)
 
   const messagesEndRef = useRef(null)
   const channelRef     = useRef(null)
+  const listChannelRef = useRef(null)
   const inputRef       = useRef(null)
 
   // ── Load profile + provider + permissions ────────────────────────────────
@@ -76,9 +78,13 @@ export default function ProviderChatPage() {
   }, [])
 
   // ── Load conversations ────────────────────────────────────────────────────
-  const loadConversations = useCallback(async () => {
-    if (!provider?.id) return
-    setLoadingConvs(true)
+  // Two flavours:
+  //   • loadConversations(): used on mount; toggles loadingConvs.
+  //   • reloadConversationsSilent(): same query, no spinner. Used by realtime
+  //     callbacks and the manual refresh button so the list doesn't flash a
+  //     spinner every time a customer sends a message.
+  const fetchConversations = useCallback(async () => {
+    if (!provider?.id) return null
     let q = supabase
       .from('conversations')
       .select(`
@@ -90,14 +96,75 @@ export default function ProviderChatPage() {
       `)
       .eq('service_provider_id', provider.id)
       .order('last_message_at', { ascending: false, nullsFirst: false })
-
     if (statusFilter !== 'all') q = q.eq('status', statusFilter)
     const { data } = await q
-    setConversations(data || [])
-    setLoadingConvs(false)
+    return data || []
   }, [provider?.id, statusFilter])
 
+  const loadConversations = useCallback(async () => {
+    setLoadingConvs(true)
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+    setLoadingConvs(false)
+  }, [fetchConversations])
+
+  const reloadConversationsSilent = useCallback(async () => {
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+  }, [fetchConversations])
+
+  const handleManualRefresh = async () => {
+    if (!provider?.id || refreshing) return
+    setRefreshing(true)
+    await reloadConversationsSilent()
+    setTimeout(() => setRefreshing(false), 350)
+  }
+
   useEffect(() => { loadConversations() }, [loadConversations])
+
+  // ── Realtime: keep the conversation list in sync without page refresh ────
+  // Watch every conversation for this provider. UPDATE → patch the row in
+  // place; INSERT/DELETE → silent refetch (we need the joined user/company
+  // rows that postgres_changes payloads don't include).
+  useEffect(() => {
+    if (!provider?.id) return
+    if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+
+    listChannelRef.current = supabase
+      .channel(`provider-chat-list-${provider.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversations',
+        filter: `service_provider_id=eq.${provider.id}`,
+      }, payload => {
+        const updated = payload.new
+        setConversations(prev => {
+          // Respect the active status filter — drop the row if it no longer
+          // matches (e.g. status changed from open to closed while filter='open').
+          if (statusFilter !== 'all' && updated.status !== statusFilter) {
+            return prev.filter(c => c.id !== updated.id)
+          }
+          if (!prev.some(c => c.id === updated.id)) return prev
+          return prev.map(c => c.id === updated.id ? { ...c, ...updated } : c)
+            .sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0))
+        })
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'conversations',
+        filter: `service_provider_id=eq.${provider.id}`,
+      }, () => reloadConversationsSilent())
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'conversations',
+        filter: `service_provider_id=eq.${provider.id}`,
+      }, payload => {
+        const deletedId = payload.old?.id
+        if (deletedId) setConversations(prev => prev.filter(c => c.id !== deletedId))
+      })
+      .subscribe()
+
+    return () => {
+      if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+    }
+  }, [provider?.id, statusFilter, reloadConversationsSilent])
 
   // ── Auto-open from ?conversation= param ─────────────────────────────────
   useEffect(() => {
@@ -323,11 +390,22 @@ export default function ProviderChatPage() {
         <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-gray-900">Customer Chats</h2>
-            {unreadTotal > 0 && (
-              <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
-                {unreadTotal} new
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadTotal > 0 && (
+                <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
+                  {unreadTotal} new
+                </span>
+              )}
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing || !provider?.id}
+                className="text-gray-400 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Refresh conversations"
+                aria-label="Refresh conversations"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
           {/* Status filter */}
           <div className="flex gap-1 mb-3">

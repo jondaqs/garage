@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Send, MessageSquare, Search, Loader2,
-  Building2, CheckCheck, Check, X, XCircle, AlertCircle, CheckCircle
+  Building2, CheckCheck, Check, X, XCircle, AlertCircle, CheckCircle, RefreshCw
 } from 'lucide-react'
 
 export default function ChatPage() {
@@ -25,9 +25,11 @@ export default function ChatPage() {
   const [convSearch,    setConvSearch]    = useState('')
   const [mobileShowChat, setMobileShowChat] = useState(false)
   const [closingConv,   setClosingConv]   = useState(false)
+  const [refreshing,    setRefreshing]    = useState(false)
 
   const messagesEndRef = useRef(null)
   const channelRef     = useRef(null)
+  const listChannelRef = useRef(null)
   const inputRef       = useRef(null)
 
   // ── Load profile ──────────────────────────────────────────────────────────
@@ -41,9 +43,14 @@ export default function ChatPage() {
   }, [])
 
   // ── Load conversations ────────────────────────────────────────────────────
-  const loadConversations = useCallback(async () => {
-    if (!profile) return
-    setLoadingConvs(true)
+  // Two flavours:
+  //   • loadConversations(): used on mount; toggles loadingConvs so the list
+  //     shows a spinner while the first fetch is in flight.
+  //   • reloadConversationsSilent(): same query, but leaves loadingConvs alone.
+  //     Used by realtime callbacks and the manual refresh button so the list
+  //     doesn't flash a spinner every time a message arrives.
+  const fetchConversations = useCallback(async () => {
+    if (!profile) return null
     const { data } = await supabase
       .from('conversations')
       .select(`
@@ -54,11 +61,73 @@ export default function ChatPage() {
       .eq('user_id', profile.id)
       .is('company_id', null)
       .order('last_message_at', { ascending: false, nullsFirst: false })
-    setConversations(data || [])
-    setLoadingConvs(false)
+    return data || []
   }, [profile])
 
+  const loadConversations = useCallback(async () => {
+    setLoadingConvs(true)
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+    setLoadingConvs(false)
+  }, [fetchConversations])
+
+  const reloadConversationsSilent = useCallback(async () => {
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+  }, [fetchConversations])
+
+  const handleManualRefresh = async () => {
+    if (!profile || refreshing) return
+    setRefreshing(true)
+    await reloadConversationsSilent()
+    setTimeout(() => setRefreshing(false), 350)
+  }
+
   useEffect(() => { loadConversations() }, [loadConversations])
+
+  // ── Realtime: keep the conversation list in sync without a page reload ───
+  // Listen to ALL changes on conversations the current user owns. UPDATE
+  // events deliver the new row, so we patch in place to avoid a refetch.
+  // INSERT/DELETE are rare and need joined data we can't get from the
+  // payload — fall back to a silent refetch.
+  useEffect(() => {
+    if (!profile?.id) return
+    if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+
+    listChannelRef.current = supabase
+      .channel(`dashboard-chat-list-${profile.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversations',
+        filter: `user_id=eq.${profile.id}`,
+      }, payload => {
+        const updated = payload.new
+        setConversations(prev => {
+          // Personal-chat surface only — ignore company conversations even if
+          // they share a user_id with the caller.
+          if (updated.company_id) return prev
+          if (!prev.some(c => c.id === updated.id)) return prev
+          return prev.map(c => c.id === updated.id ? { ...c, ...updated } : c)
+            .sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0))
+        })
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'conversations',
+        filter: `user_id=eq.${profile.id}`,
+      }, () => reloadConversationsSilent())
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'conversations',
+        filter: `user_id=eq.${profile.id}`,
+      }, payload => {
+        const deletedId = payload.old?.id
+        if (!deletedId) return
+        setConversations(prev => prev.filter(c => c.id !== deletedId))
+      })
+      .subscribe()
+
+    return () => {
+      if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+    }
+  }, [profile?.id, reloadConversationsSilent])
 
   // ── Auto-open or create conversation from ?provider= param ───────────────
   useEffect(() => {
@@ -296,9 +365,23 @@ export default function ChatPage() {
         <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-gray-900">Messages</h2>
-            {conversations.length > 0 && (
-              <span className="text-xs text-gray-400">{conversations.length} chat{conversations.length !== 1 ? 's' : ''}</span>
-            )}
+            <div className="flex items-center gap-3">
+              {conversations.length > 0 && (
+                <span className="text-xs text-gray-400">{conversations.length} chat{conversations.length !== 1 ? 's' : ''}</span>
+              )}
+              {/* Manual refresh — realtime keeps the list updated on its own,
+                  but this is a "force pull" escape hatch for cases where the
+                  realtime subscription drops (flaky mobile networks, etc). */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing || !profile}
+                className="text-gray-400 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Refresh conversations"
+                aria-label="Refresh conversations"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />

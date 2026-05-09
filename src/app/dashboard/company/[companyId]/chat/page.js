@@ -24,7 +24,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import {
   Send, MessageSquare, Search, Loader2, CheckCheck, Check,
-  ArrowLeft, XCircle, AlertCircle, Building2,
+  ArrowLeft, XCircle, AlertCircle, Building2, RefreshCw,
 } from 'lucide-react'
 
 export default function CompanyMemberChatPage() {
@@ -48,9 +48,11 @@ export default function CompanyMemberChatPage() {
   const [loadingMsgs,    setLoadingMsgs]    = useState(false)
   const [convSearch,     setConvSearch]     = useState('')
   const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [refreshing,     setRefreshing]     = useState(false)
 
   const messagesEndRef = useRef(null)
   const channelRef     = useRef(null)
+  const listChannelRef = useRef(null)
   const inputRef       = useRef(null)
 
   // ── Resolve profile + verify company membership ─────────────────────────
@@ -101,9 +103,13 @@ export default function CompanyMemberChatPage() {
   }, [companyId])
 
   // ── Load conversations for THIS company ─────────────────────────────────
-  const loadConversations = useCallback(async () => {
-    if (authState !== 'ok' || !companyId) return
-    setLoadingConvs(true)
+  // Two flavours:
+  //   • loadConversations(): used on mount; toggles loadingConvs.
+  //   • reloadConversationsSilent(): same query, no spinner. Used by realtime
+  //     callbacks and the manual refresh button so the list doesn't flash a
+  //     spinner every time a message arrives.
+  const fetchConversations = useCallback(async () => {
+    if (authState !== 'ok' || !companyId) return null
     const { data } = await supabase
       .from('conversations')
       .select(`
@@ -115,12 +121,68 @@ export default function CompanyMemberChatPage() {
       `)
       .eq('company_id', companyId)
       .order('last_message_at', { ascending: false, nullsFirst: false })
-
-    setConversations(data || [])
-    setLoadingConvs(false)
+    return data || []
   }, [authState, companyId])
 
+  const loadConversations = useCallback(async () => {
+    setLoadingConvs(true)
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+    setLoadingConvs(false)
+  }, [fetchConversations])
+
+  const reloadConversationsSilent = useCallback(async () => {
+    const data = await fetchConversations()
+    if (data) setConversations(data)
+  }, [fetchConversations])
+
+  const handleManualRefresh = async () => {
+    if (!companyId || refreshing) return
+    setRefreshing(true)
+    await reloadConversationsSilent()
+    setTimeout(() => setRefreshing(false), 350)
+  }
+
   useEffect(() => { loadConversations() }, [loadConversations])
+
+  // ── Realtime: list-wide subscription on this company's conversations ────
+  // UPDATE → patch row in place; INSERT/DELETE → silent refetch (we need the
+  // joined provider/opened_by/closed_by rows that postgres_changes payloads
+  // don't include).
+  useEffect(() => {
+    if (!companyId) return
+    if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+
+    listChannelRef.current = supabase
+      .channel(`team-company-chat-list-${companyId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${companyId}`,
+      }, payload => {
+        const updated = payload.new
+        setConversations(prev => {
+          if (!prev.some(c => c.id === updated.id)) return prev
+          return prev.map(c => c.id === updated.id ? { ...c, ...updated } : c)
+            .sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0))
+        })
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${companyId}`,
+      }, () => reloadConversationsSilent())
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${companyId}`,
+      }, payload => {
+        const deletedId = payload.old?.id
+        if (deletedId) setConversations(prev => prev.filter(c => c.id !== deletedId))
+      })
+      .subscribe()
+
+    return () => {
+      if (listChannelRef.current) supabase.removeChannel(listChannelRef.current)
+    }
+  }, [companyId, reloadConversationsSilent])
 
   // ── Auto-open or create a conversation with a specific provider ─────────
   // Pattern: /dashboard/company/{companyId}/chat?provider={providerId}
@@ -378,11 +440,22 @@ export default function CompanyMemberChatPage() {
             >
               <ArrowLeft size={18} />
             </button>
-            {unreadTotal > 0 && (
-              <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
-                {unreadTotal} new
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadTotal > 0 && (
+                <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
+                  {unreadTotal} new
+                </span>
+              )}
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing || !companyId}
+                className="text-gray-400 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Refresh conversations"
+                aria-label="Refresh conversations"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
           <h2 className="text-lg font-bold text-gray-900 leading-tight">Provider Chats</h2>
           <p className="text-xs text-gray-500 mt-0.5 truncate">{company?.name}</p>
