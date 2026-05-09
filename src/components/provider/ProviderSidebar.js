@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, Calendar, Users, Package, FileText,
-  BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare
+  BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare,
+  Search, Building2
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -17,10 +18,13 @@ export default function ProviderSidebar({ provider }) {
   const [mobileOpen,    setMobileOpen]    = useState(false)
   const [activeWoCount, setActiveWoCount] = useState(0)
   const [unreadChats,   setUnreadChats]   = useState(0)
+  const [unreadPeer,    setUnreadPeer]    = useState(0)
 
   // Close on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
+  // ── Customer-chat unread (existing behaviour) ──
+  // Sum provider_unread_count across this provider's open customer conversations.
   const loadUnreadChats = useCallback(async () => {
     try {
       if (!provider?.id) return
@@ -34,14 +38,37 @@ export default function ProviderSidebar({ provider }) {
     } catch {}
   }, [provider?.id])
 
+  // ── Peer-chat unread ──
+  // Two queries — one for conversations where we are the initiator (use
+  // initiator_unread_count), one where we are the recipient (use
+  // recipient_unread_count). Sum both.
+  const loadUnreadPeer = useCallback(async () => {
+    try {
+      if (!provider?.id) return
+      const [{ data: asInit }, { data: asRecip }] = await Promise.all([
+        supabase
+          .from('peer_conversations')
+          .select('initiator_unread_count')
+          .eq('initiator_provider_id', provider.id)
+          .eq('status', 'open'),
+        supabase
+          .from('peer_conversations')
+          .select('recipient_unread_count')
+          .eq('recipient_provider_id', provider.id)
+          .eq('status', 'open'),
+      ])
+      const t1 = (asInit  || []).reduce((s, c) => s + (c.initiator_unread_count || 0), 0)
+      const t2 = (asRecip || []).reduce((s, c) => s + (c.recipient_unread_count || 0), 0)
+      setUnreadPeer(t1 + t2)
+    } catch {}
+  }, [provider?.id])
+
   // ── Initial load + realtime ──────────────────────────────────────────────
-  // Realtime keeps the sidebar chat badge in sync without page reloads. Any
-  // INSERT/UPDATE on a conversation belonging to this provider triggers a
-  // refetch of the unread total.
   useEffect(() => {
     if (!provider?.id) return
     loadActiveWoCount(provider.id)
     loadUnreadChats()
+    loadUnreadPeer()
 
     const convChannel = supabase
       .channel(`prov-sidebar-convs-${provider.id}`)
@@ -51,8 +78,28 @@ export default function ProviderSidebar({ provider }) {
       }, () => loadUnreadChats())
       .subscribe()
 
-    return () => { supabase.removeChannel(convChannel) }
-  }, [provider?.id, loadUnreadChats])
+    const peerInitChannel = supabase
+      .channel(`prov-sidebar-peer-init-${provider.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'peer_conversations',
+        filter: `initiator_provider_id=eq.${provider.id}`,
+      }, () => loadUnreadPeer())
+      .subscribe()
+
+    const peerRecipChannel = supabase
+      .channel(`prov-sidebar-peer-recip-${provider.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'peer_conversations',
+        filter: `recipient_provider_id=eq.${provider.id}`,
+      }, () => loadUnreadPeer())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(convChannel)
+      supabase.removeChannel(peerInitChannel)
+      supabase.removeChannel(peerRecipChannel)
+    }
+  }, [provider?.id, loadUnreadChats, loadUnreadPeer])
 
   const loadActiveWoCount = async (providerId) => {
     try {
@@ -71,17 +118,20 @@ export default function ProviderSidebar({ provider }) {
   }
 
   const navigation = [
-    { name: 'Dashboard',    href: '/provider/dashboard',   icon: LayoutDashboard },
-    { name: 'Bookings',     href: '/provider/bookings',    icon: Calendar        },
-    { name: 'Work Orders',  href: '/provider/work-orders', icon: FileText,
+    { name: 'Dashboard',        href: '/provider/dashboard',   icon: LayoutDashboard },
+    { name: 'Bookings',         href: '/provider/bookings',    icon: Calendar        },
+    { name: 'Work Orders',      href: '/provider/work-orders', icon: FileText,
       badge: activeWoCount > 0 ? activeWoCount : null },
-    { name: 'Chat',         href: '/provider/chat',        icon: MessageSquare,
+    { name: 'Chat',             href: '/provider/chat',        icon: MessageSquare,
       badge: unreadChats > 0 ? unreadChats : null },
-    { name: 'My Shops',     href: '/provider/shops',       icon: Store           },
-    { name: 'Team Members', href: '/provider/team',        icon: Users           },
-    { name: 'Inventory',    href: '/provider/inventory',   icon: Package         },
-    { name: 'Analytics',    href: '/provider/analytics',   icon: BarChart3       },
-    { name: 'Settings',     href: '/provider/settings',    icon: Settings        },
+    { name: 'Search Providers', href: '/provider/providers',   icon: Search          },
+    { name: 'Provider Chats',   href: '/provider/peer-chat',   icon: Building2,
+      badge: unreadPeer > 0 ? unreadPeer : null },
+    { name: 'My Shops',         href: '/provider/shops',       icon: Store           },
+    { name: 'Team Members',     href: '/provider/team',        icon: Users           },
+    { name: 'Inventory',        href: '/provider/inventory',   icon: Package         },
+    { name: 'Analytics',        href: '/provider/analytics',   icon: BarChart3       },
+    { name: 'Settings',         href: '/provider/settings',    icon: Settings        },
   ]
 
   const handleSignOut = async () => {
@@ -106,7 +156,6 @@ export default function ProviderSidebar({ provider }) {
           </h2>
           <p className="text-xs text-gray-500 capitalize">{provider?.status || 'Active'}</p>
         </div>
-        {/* Close button (mobile only) */}
         <button onClick={() => setMobileOpen(false)}
           className="ml-auto lg:hidden p-1 text-gray-400 hover:text-gray-600">
           <X size={18} />
