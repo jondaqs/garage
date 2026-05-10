@@ -29,7 +29,8 @@ export default function Sidebar({ user }) {
   const [membershipLoading, setMembershipLoading] = useState(true)
   const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory, can_chat }]
   const [providerNavOpen, setProviderNavOpen] = useState({})         // { [providerId]: bool }
-  const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number }
+  const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number } — customer chat unread
+  const [providerPeerUnreadByProviderId, setProviderPeerUnreadByProviderId] = useState({}) // { [providerId]: number } — peer chat unread (provider-to-provider)
   const [companyUnread, setCompanyUnread] = useState(0)
 
   // ── Resolve profile once on mount; share across loaders ─────────────────
@@ -145,6 +146,64 @@ export default function Sidebar({ user }) {
   // We intentionally only depend on the list of chattable provider IDs (as a
   // stable string), not the entire mechanicMemberships array, so unrelated
   // re-renders don't tear the channels down.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mechanicMemberships.filter(m => m.can_chat).map(m => m.providerId).sort().join(',')])
+
+  // ── Per-provider PEER unread (Provider Chats — provider-to-provider) ────
+  // Each chat-able membership gets its own peer-chat inbox at
+  //   /dashboard/my-teams/provider/<providerId>/peer-chat
+  // and a matching badge in the sidebar. Two filtered queries per provider —
+  // one where we're the initiator, one where we're the recipient — summed
+  // into a single counter. Realtime: two channels per provider matching the
+  // filtered queries.
+  useEffect(() => {
+    const chattableProviders = mechanicMemberships.filter(m => m.can_chat)
+    if (chattableProviders.length === 0) {
+      setProviderPeerUnreadByProviderId({})
+      return
+    }
+
+    const loadOne = async (providerId) => {
+      const [{ data: asInit }, { data: asRecip }] = await Promise.all([
+        supabase
+          .from('peer_conversations')
+          .select('initiator_unread_count')
+          .eq('initiator_provider_id', providerId)
+          .eq('status', 'open'),
+        supabase
+          .from('peer_conversations')
+          .select('recipient_unread_count')
+          .eq('recipient_provider_id', providerId)
+          .eq('status', 'open'),
+      ])
+      const t1 = (asInit  || []).reduce((s, c) => s + (c.initiator_unread_count || 0), 0)
+      const t2 = (asRecip || []).reduce((s, c) => s + (c.recipient_unread_count || 0), 0)
+      setProviderPeerUnreadByProviderId(prev => ({ ...prev, [providerId]: t1 + t2 }))
+    }
+
+    chattableProviders.forEach(m => loadOne(m.providerId))
+
+    const channels = []
+    chattableProviders.forEach(m => {
+      channels.push(
+        supabase
+          .channel(`sidebar-peer-init-${m.providerId}`)
+          .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'peer_conversations',
+            filter: `initiator_provider_id=eq.${m.providerId}`,
+          }, () => loadOne(m.providerId))
+          .subscribe(),
+        supabase
+          .channel(`sidebar-peer-recip-${m.providerId}`)
+          .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'peer_conversations',
+            filter: `recipient_provider_id=eq.${m.providerId}`,
+          }, () => loadOne(m.providerId))
+          .subscribe()
+      )
+    })
+
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mechanicMemberships.filter(m => m.can_chat).map(m => m.providerId).sort().join(',')])
 
@@ -723,16 +782,33 @@ export default function Sidebar({ user }) {
               {mechanicMemberships
                 .filter(m => m.can_chat)
                 .map(m => {
-                  const unread = providerUnreadByProviderId[m.providerId] || 0
+                  const unread     = providerUnreadByProviderId[m.providerId] || 0
+                  const peerUnread = providerPeerUnreadByProviderId[m.providerId] || 0
+                  const showProviderSuffix = mechanicMemberships.filter(x => x.can_chat).length > 1
+                  const suffix = showProviderSuffix ? ` \u00b7 ${m.providerName || 'Provider'}` : ''
                   return (
-                    <NavItem key={`${m.providerId}-chat`} compact item={{
-                      icon:  MessageSquare,
-                      label: mechanicMemberships.filter(x => x.can_chat).length > 1
-                        ? `Chat \u00b7 ${m.providerName || 'Provider'}`
-                        : 'Chat',
-                      path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
-                      badge: unread > 0 ? unread : null,
-                    }} />
+                    <div key={`${m.providerId}-chat-group`}>
+                      {/* Customer chat — existing flow */}
+                      <NavItem key={`${m.providerId}-chat`} compact item={{
+                        icon:  MessageSquare,
+                        label: `Chat${suffix}`,
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
+                        badge: unread > 0 ? unread : null,
+                      }} />
+                      {/* Search Providers — provider marketplace, scoped to this membership */}
+                      <NavItem key={`${m.providerId}-search-providers`} compact item={{
+                        icon:  Search,
+                        label: `Search Providers${suffix}`,
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/providers`,
+                      }} />
+                      {/* Peer chat — provider-to-provider conversations */}
+                      <NavItem key={`${m.providerId}-peer-chat`} compact item={{
+                        icon:  Building2,
+                        label: `Provider Chats${suffix}`,
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/peer-chat`,
+                        badge: peerUnread > 0 ? peerUnread : null,
+                      }} />
+                    </div>
                   )
                 })
               }
