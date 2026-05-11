@@ -51,6 +51,10 @@ export default function MemberPeerChatPage() {
   const listChannelInitRef  = useRef(null)
   const listChannelRecipRef = useRef(null)
   const inputRef       = useRef(null)
+  // Mirror of activeConv?.id used by decorate() so a list refetch triggered
+  // by a customer-side counter bump doesn't briefly re-light the badge on
+  // the conversation the member is currently reading.
+  const activeConvIdRef = useRef(null)
 
   // ── Auth: caller must be a chat-able member of ownProviderId ──
   useEffect(() => {
@@ -96,13 +100,18 @@ export default function MemberPeerChatPage() {
   }, [ownProviderId])
 
   // ── Decoration ──
+  // If the row IS the conversation currently open, force unreadCount to 0 —
+  // the member is looking at it, so any inbound bumps from the customer side
+  // shouldn't surface even if a list refetch races ahead of our reset RPC.
   const decorate = useCallback((row) => {
     if (!ownProviderId) return row
     const isInitiator = row.initiator_provider_id === ownProviderId
+    const rawUnread = isInitiator ? (row.initiator_unread_count || 0) : (row.recipient_unread_count || 0)
+    const isActive  = activeConvIdRef.current === row.id
     return {
       ...row,
       role:        isInitiator ? 'initiator' : 'recipient',
-      unreadCount: isInitiator ? (row.initiator_unread_count || 0) : (row.recipient_unread_count || 0),
+      unreadCount: isActive ? 0 : rawUnread,
       otherProvider: isInitiator ? row.recipient : row.initiator,
     }
   }, [ownProviderId])
@@ -259,12 +268,40 @@ export default function MemberPeerChatPage() {
           sender = s
         }
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, { ...msg, sender }])
+
+        // If this message came from the OTHER side and the chat is open,
+        // mark the conversation read immediately — otherwise the counter
+        // would grow while the member is staring at the chat. We pass our
+        // explicit own-provider id (2-arg overload) so the right counter is
+        // zeroed even when the caller is a member of both providers.
+        if (msg.sender_provider_id !== ownProviderId) {
+          supabase.rpc('mark_peer_conversation_read', {
+            p_conversation_id: activeConv.id,
+            p_own_provider_id: ownProviderId,
+          })
+          // Optimistic local zero so the badge clears immediately, before
+          // the realtime UPDATE on peer_conversations arrives.
+          setConversations(prev => prev.map(c => c.id === activeConv.id
+            ? {
+                ...c,
+                unreadCount: 0,
+                initiator_unread_count: c.role === 'initiator' ? 0 : c.initiator_unread_count,
+                recipient_unread_count: c.role === 'recipient' ? 0 : c.recipient_unread_count,
+              }
+            : c))
+        }
       })
       .subscribe()
 
     return () => {
       if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current)
     }
+  }, [activeConv?.id])
+
+  // Keep activeConvIdRef in sync so decorate() always sees the current
+  // selection without needing to be re-bound on every conversation switch.
+  useEffect(() => {
+    activeConvIdRef.current = activeConv?.id || null
   }, [activeConv?.id])
 
   useEffect(() => {

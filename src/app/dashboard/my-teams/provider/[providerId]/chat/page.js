@@ -272,10 +272,24 @@ export default function ProviderMemberChatPage() {
         }
         const enriched = { ...msg, sender }
         setMessages(prev => prev.some(m => m.id === enriched.id) ? prev : [...prev, enriched])
+        // ── Mark inbound message as read AND clear the provider unread counter ──
+        // The customer's send_message_to_provider RPC bumps provider_unread_count
+        // immediately after inserting the message. If the conversation is open
+        // we don't want that bump to surface — the member is looking at it.
+        // Both DB updates are fire-and-forget; we also optimistically zero the
+        // counter in local state so the badge doesn't flicker between the
+        // customer's bump arriving and our zero landing.
         if (msg.sender_role === 'user' || msg.sender_role === 'company') {
           supabase.from('messages')
             .update({ is_read: true, read_at: new Date().toISOString() })
             .eq('id', msg.id)
+          supabase.from('conversations')
+            .update({ provider_unread_count: 0 })
+            .eq('id', activeConv.id)
+          setConversations(prev => prev.map(c =>
+            c.id === activeConv.id ? { ...c, provider_unread_count: 0 } : c
+          ))
+          setActiveConv(prev => prev ? { ...prev, provider_unread_count: 0 } : prev)
         }
       })
       .on('postgres_changes', {
@@ -283,9 +297,17 @@ export default function ProviderMemberChatPage() {
         filter: `id=eq.${activeConv.id}`,
       }, payload => {
         const updated = payload.new
-        setActiveConv(prev => ({ ...prev, ...updated }))
+        // Force provider_unread_count to 0 for the active conversation. The
+        // customer's send_message_to_provider RPC bumps this counter as part
+        // of the same write that inserts a message; that bump's UPDATE event
+        // can race ahead of our own reset and would otherwise re-light the
+        // badge for a conversation that's open and being read. Our INSERT
+        // handler above is what does the authoritative DB reset; this local
+        // override just keeps the rendered state truthful in between.
+        const sanitised = { ...updated, provider_unread_count: 0 }
+        setActiveConv(prev => ({ ...prev, ...sanitised }))
         setConversations(prev =>
-          prev.map(c => c.id === activeConv.id ? { ...c, ...updated } : c)
+          prev.map(c => c.id === activeConv.id ? { ...c, ...sanitised } : c)
         )
       })
       .subscribe()

@@ -9,17 +9,17 @@ import {
   ArrowLeft, XCircle, CheckCircle, AlertCircle, RefreshCw, Building2, BadgeCheck
 } from 'lucide-react'
 
-// Provider-to-provider chat. This page reads/writes only the dedicated
-// `peer_conversations` / `peer_messages` tables — completely separate from
-// the customer-chat surface at /provider/chat.
+// Provider-to-provider chat (owner / single-provider context).
+// Reads/writes only peer_conversations / peer_messages — completely separate
+// from the customer-chat surface at /provider/chat.
 
 export default function ProviderPeerChatPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
-  const [profile,       setProfile]       = useState(null)   // user_profiles row
-  const [provider,      setProvider]      = useState(null)   // service_providers row
+  const [profile,       setProfile]       = useState(null)
+  const [provider,      setProvider]      = useState(null)
   const [canChat,       setCanChat]       = useState(false)
   const [conversations, setConversations] = useState([])
   const [activeConv,    setActiveConv]    = useState(null)
@@ -39,6 +39,9 @@ export default function ProviderPeerChatPage() {
   const listChannelInitRef  = useRef(null)
   const listChannelRecipRef = useRef(null)
   const inputRef       = useRef(null)
+  // Mirror of activeConv?.id so decorate() and realtime handlers can know
+  // the current selection without being re-bound on every selection.
+  const activeConvIdRef = useRef(null)
 
   // ── Load profile + provider + permissions ────────────────────────────────
   useEffect(() => {
@@ -54,13 +57,11 @@ export default function ProviderPeerChatPage() {
       setProfile(prof)
       if (!prof) return
 
-      // Resolve "my provider" the same way the rest of the app does.
       const { data: owned } = await supabase
         .from('service_providers')
         .select('id, name')
         .eq('owner_user_id', prof.id)
         .maybeSingle()
-
       if (owned) {
         setProvider(owned)
         setCanChat(true)
@@ -79,7 +80,6 @@ export default function ProviderPeerChatPage() {
         return
       }
 
-      // Mechanic fallback
       const { data: mech } = await supabase
         .from('mechanics')
         .select('service_provider_id, can_chat, service_providers(id, name)')
@@ -95,22 +95,24 @@ export default function ProviderPeerChatPage() {
   }, [])
 
   // ── Decoration ──
-  // For each row, figure out which side the current provider is on so the
-  // UI can show the right "other party" name and the right unread counter.
+  // For each row, figure out which side this provider is on so the UI can
+  // show the right "other party" name and the right unread counter. If the
+  // row IS the conversation the user is currently looking at, force the
+  // counter to 0 — they're seeing the messages in real time.
   const decorate = useCallback((row) => {
     if (!provider?.id) return row
     const isInitiator = row.initiator_provider_id === provider.id
+    const rawUnread = isInitiator ? (row.initiator_unread_count || 0) : (row.recipient_unread_count || 0)
+    const isActive  = activeConvIdRef.current === row.id
     return {
       ...row,
       role:        isInitiator ? 'initiator' : 'recipient',
-      unreadCount: isInitiator ? (row.initiator_unread_count || 0) : (row.recipient_unread_count || 0),
+      unreadCount: isActive ? 0 : rawUnread,
       otherProvider: isInitiator ? row.recipient : row.initiator,
     }
   }, [provider?.id])
 
   // ── Load conversations ────────────────────────────────────────────────────
-  // Two queries — one where we're the initiator, one where we're the
-  // recipient — then merge and sort by last_message_at desc.
   const fetchConversations = useCallback(async () => {
     if (!provider?.id) return null
 
@@ -165,13 +167,9 @@ export default function ProviderPeerChatPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
-  // ── Realtime: keep the conversation list in sync ──
-  // Two channels matching the two filtered queries above. Each just triggers
-  // a silent refetch on any change — much simpler than patching individual
-  // rows for two streams, and the cost is one round-trip per change.
+  // ── Realtime: list ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!provider?.id) return
-
     if (listChannelInitRef.current)  supabase.removeChannel(listChannelInitRef.current)
     if (listChannelRecipRef.current) supabase.removeChannel(listChannelRecipRef.current)
 
@@ -205,7 +203,7 @@ export default function ProviderPeerChatPage() {
     if (conv) selectConversation(conv.id, conv)
   }, [searchParams, conversations])
 
-  // ── Select conversation ───────────────────────────────────────────────────
+  // ── Select conversation ──
   const selectConversation = useCallback(async (convId, convObj = null) => {
     if (activeConv?.id === convId) return
     setLoadingMsgs(true)
@@ -226,7 +224,6 @@ export default function ProviderPeerChatPage() {
     setMessages(msgs || [])
     setLoadingMsgs(false)
 
-    // Mark read via RPC — handles "which side am I" and resets the right counter.
     await supabase.rpc('mark_peer_conversation_read', { p_conversation_id: convId })
 
     setConversations(prev => prev.map(c =>
@@ -239,7 +236,7 @@ export default function ProviderPeerChatPage() {
     inputRef.current?.focus()
   }, [activeConv, conversations])
 
-  // ── Realtime: messages in the active conversation ─────────────────────────
+  // ── Realtime: messages in active conv ──
   useEffect(() => {
     if (!activeConv?.id) return
     if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current)
@@ -261,12 +258,35 @@ export default function ProviderPeerChatPage() {
           sender = s
         }
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, { ...msg, sender }])
+
+        // If this message came from the OTHER side and the chat is open,
+        // mark the conversation read immediately — otherwise the counter
+        // would grow while the user is staring at the chat. The RPC is a
+        // no-op for own messages, but we still skip those here to avoid
+        // the round-trip.
+        if (msg.sender_provider_id !== provider?.id) {
+          supabase.rpc('mark_peer_conversation_read', { p_conversation_id: activeConv.id })
+          // Optimistic local zero so the badge clears immediately, before
+          // the realtime UPDATE on peer_conversations arrives.
+          setConversations(prev => prev.map(c => c.id === activeConv.id
+            ? {
+                ...c,
+                unreadCount: 0,
+                initiator_unread_count: c.role === 'initiator' ? 0 : c.initiator_unread_count,
+                recipient_unread_count: c.role === 'recipient' ? 0 : c.recipient_unread_count,
+              }
+            : c))
+        }
       })
       .subscribe()
 
     return () => {
       if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current)
     }
+  }, [activeConv?.id, provider?.id])
+
+  useEffect(() => {
+    activeConvIdRef.current = activeConv?.id || null
   }, [activeConv?.id])
 
   useEffect(() => {
@@ -316,7 +336,7 @@ export default function ProviderPeerChatPage() {
     inputRef.current?.focus()
   }
 
-  // ── Close / reopen via RPC (sets closed_by_id authoritatively) ──
+  // ── Close / reopen ──
   const toggleClosed = async () => {
     if (!activeConv || !canChat) return
     setClosingConv(true)
@@ -369,7 +389,7 @@ export default function ProviderPeerChatPage() {
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
-      {/* ── Conversation list ───────────────────────────────────────────── */}
+      {/* List */}
       <div className={`w-full sm:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col
         ${mobileShowChat ? 'hidden sm:flex' : 'flex'}`}>
 
@@ -385,19 +405,14 @@ export default function ProviderPeerChatPage() {
                   {unreadTotal} new
                 </span>
               )}
-              <button
-                onClick={handleManualRefresh}
-                disabled={refreshing || !provider?.id}
-                className="text-gray-400 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title="Refresh conversations"
-                aria-label="Refresh conversations"
-              >
+              <button onClick={handleManualRefresh} disabled={refreshing || !provider?.id}
+                className="text-gray-400 hover:text-gray-700 disabled:opacity-40 transition-colors"
+                title="Refresh" aria-label="Refresh conversations">
                 <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
 
-          {/* Status filter */}
           <div className="flex gap-1 mb-3">
             {['open','closed','all'].map(s => (
               <button key={s} onClick={() => setStatusFilter(s)}
@@ -428,8 +443,7 @@ export default function ProviderPeerChatPage() {
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
               <Building2 size={36} className="text-gray-200 mb-3" />
               <p className="text-gray-400 text-sm">No conversations yet</p>
-              <button
-                onClick={() => router.push('/provider/providers')}
+              <button onClick={() => router.push('/provider/providers')}
                 className="mt-4 text-xs text-green-700 hover:underline font-medium">
                 Find a provider →
               </button>
@@ -477,22 +491,20 @@ export default function ProviderPeerChatPage() {
         </div>
       </div>
 
-      {/* ── Chat area ────────────────────────────────────────────────────── */}
+      {/* Chat area */}
       <div className={`flex-1 flex flex-col min-w-0 ${!mobileShowChat ? 'hidden sm:flex' : 'flex'}`}>
 
         {!activeConv ? (
           <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
             <Building2 size={56} className="text-gray-200 mb-4" />
             <p className="text-gray-400 font-medium">Select a conversation</p>
-            <button
-              onClick={() => router.push('/provider/providers')}
+            <button onClick={() => router.push('/provider/providers')}
               className="mt-3 text-sm text-green-700 hover:underline font-medium">
               or find a new provider to chat with →
             </button>
           </div>
         ) : (
           <>
-            {/* Chat header */}
             <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
               <button onClick={() => setMobileShowChat(false)}
                 className="sm:hidden p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
@@ -515,15 +527,12 @@ export default function ProviderPeerChatPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={toggleClosed}
-                disabled={closingConv || !canChat}
+              <button onClick={toggleClosed} disabled={closingConv || !canChat}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 ${
                   activeConv.status === 'closed'
                     ? 'bg-green-50 text-green-700 hover:bg-green-100'
                     : 'bg-red-50 text-red-600 hover:bg-red-100'
-                }`}
-              >
+                }`}>
                 {closingConv
                   ? <Loader2 size={12} className="animate-spin" />
                   : activeConv.status === 'closed'
@@ -533,7 +542,6 @@ export default function ProviderPeerChatPage() {
               </button>
             </div>
 
-            {/* Closed banner */}
             {activeConv.status === 'closed' && (
               <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-start gap-2">
                 <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -556,7 +564,6 @@ export default function ProviderPeerChatPage() {
               </div>
             )}
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
               {loadingMsgs ? (
                 <div className="flex justify-center py-12">
@@ -570,11 +577,6 @@ export default function ProviderPeerChatPage() {
                 </div>
               ) : (
                 messages.map((msg, i) => {
-                  // Both sides are providers in this surface, so we determine
-                  // alignment by sender_provider_id matching our own provider.
-                  // "Mine" is further narrowed to messages I personally sent
-                  // (so coworker messages from my own provider show in green
-                  // but not as "me").
                   const isMyProvider = msg.sender_provider_id === provider?.id
                   const isMine       = msg.sender_id === profile?.id
                   const prev = messages[i - 1]
@@ -582,12 +584,9 @@ export default function ProviderPeerChatPage() {
                   const showSenderLabel =
                     !isMine &&
                     (showDate || !prev || prev.sender_id !== msg.sender_id)
-                  // Sender label tells the viewer who from where
                   const personName = `${msg.sender?.first_name || ''} ${msg.sender?.last_name || ''}`.trim()
                   const senderLabel = isMyProvider
-                    // Coworker on my own provider — show name (or fallback)
                     ? (personName || 'Coworker')
-                    // Other provider — name + the other provider's name for context
                     : (personName ? `${personName} · ${otherName}` : otherName)
 
                   return (
@@ -610,7 +609,7 @@ export default function ProviderPeerChatPage() {
                             isMyProvider
                               ? (isMine
                                   ? 'bg-green-600 text-white rounded-br-sm'
-                                  : 'bg-green-100 text-green-900 rounded-br-sm')   // coworker
+                                  : 'bg-green-100 text-green-900 rounded-br-sm')
                               : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm'
                           }`}>
                             {msg.body}
@@ -634,7 +633,6 @@ export default function ProviderPeerChatPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex-shrink-0">
               {activeConv.status === 'closed' ? (
                 <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-400">
