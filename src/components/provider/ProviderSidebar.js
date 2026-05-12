@@ -4,7 +4,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import {
-  LayoutDashboard, Calendar, Users, Package, FileText,
+  LayoutDashboard, Calendar, CalendarDays, Users, Package, FileText,
   BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare,
   Search, Building2
 } from 'lucide-react'
@@ -15,16 +15,16 @@ export default function ProviderSidebar({ provider }) {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [mobileOpen,    setMobileOpen]    = useState(false)
-  const [activeWoCount, setActiveWoCount] = useState(0)
-  const [unreadChats,   setUnreadChats]   = useState(0)
-  const [unreadPeer,    setUnreadPeer]    = useState(0)
+  const [mobileOpen,        setMobileOpen]        = useState(false)
+  const [activeWoCount,     setActiveWoCount]     = useState(0)
+  const [unreadChats,       setUnreadChats]       = useState(0)
+  const [unreadPeer,        setUnreadPeer]        = useState(0)
+  const [upcomingCount,     setUpcomingCount]     = useState(0)
 
   // Close on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   // ── Customer-chat unread (existing behaviour) ──
-  // Sum provider_unread_count across this provider's open customer conversations.
   const loadUnreadChats = useCallback(async () => {
     try {
       if (!provider?.id) return
@@ -39,9 +39,6 @@ export default function ProviderSidebar({ provider }) {
   }, [provider?.id])
 
   // ── Peer-chat unread ──
-  // Two queries — one for conversations where we are the initiator (use
-  // initiator_unread_count), one where we are the recipient (use
-  // recipient_unread_count). Sum both.
   const loadUnreadPeer = useCallback(async () => {
     try {
       if (!provider?.id) return
@@ -63,12 +60,41 @@ export default function ProviderSidebar({ provider }) {
     } catch {}
   }, [provider?.id])
 
+  // ── Upcoming bookings in next 7 days (non-terminal statuses only) ──
+  const loadUpcomingCount = useCallback(async () => {
+    try {
+      if (!provider?.id) return
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const in7 = new Date(today)
+      in7.setDate(in7.getDate() + 7)
+
+      // Resolve non-terminal status ids
+      const { data: statuses } = await supabase
+        .from('booking_statuses').select('id, code')
+        .in('code', ['pending', 'confirmed', 'in_progress'])
+      const ids = (statuses || []).map(s => s.id)
+      if (ids.length === 0) { setUpcomingCount(0); return }
+
+      const { count } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_provider_id', provider.id)
+        .in('status_id', ids)
+        .gte('booking_date', today.toISOString().slice(0, 10))
+        .lte('booking_date', in7.toISOString().slice(0, 10))
+
+      setUpcomingCount(count || 0)
+    } catch {}
+  }, [provider?.id])
+
   // ── Initial load + realtime ──────────────────────────────────────────────
   useEffect(() => {
     if (!provider?.id) return
     loadActiveWoCount(provider.id)
     loadUnreadChats()
     loadUnreadPeer()
+    loadUpcomingCount()
 
     const convChannel = supabase
       .channel(`prov-sidebar-convs-${provider.id}`)
@@ -94,12 +120,21 @@ export default function ProviderSidebar({ provider }) {
       }, () => loadUnreadPeer())
       .subscribe()
 
+    const bookingsChannel = supabase
+      .channel(`prov-sidebar-bookings-${provider.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'bookings',
+        filter: `service_provider_id=eq.${provider.id}`,
+      }, () => loadUpcomingCount())
+      .subscribe()
+
     return () => {
       supabase.removeChannel(convChannel)
       supabase.removeChannel(peerInitChannel)
       supabase.removeChannel(peerRecipChannel)
+      supabase.removeChannel(bookingsChannel)
     }
-  }, [provider?.id, loadUnreadChats, loadUnreadPeer])
+  }, [provider?.id, loadUnreadChats, loadUnreadPeer, loadUpcomingCount])
 
   const loadActiveWoCount = async (providerId) => {
     try {
@@ -120,6 +155,8 @@ export default function ProviderSidebar({ provider }) {
   const navigation = [
     { name: 'Dashboard',        href: '/provider/dashboard',   icon: LayoutDashboard },
     { name: 'Bookings',         href: '/provider/bookings',    icon: Calendar        },
+    { name: 'Calendar',         href: '/provider/calendar',    icon: CalendarDays,
+      badge: upcomingCount > 0 ? upcomingCount : null },
     { name: 'Work Orders',      href: '/provider/work-orders', icon: FileText,
       badge: activeWoCount > 0 ? activeWoCount : null },
     { name: 'Chat',             href: '/provider/chat',        icon: MessageSquare,
