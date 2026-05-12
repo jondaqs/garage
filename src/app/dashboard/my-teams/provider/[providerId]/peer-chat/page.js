@@ -279,6 +279,7 @@ export default function MemberPeerChatPage() {
             p_conversation_id: activeConv.id,
             p_own_provider_id: ownProviderId,
           })
+            .then(({ error }) => { if (error) console.error('mark_peer_conversation_read failed:', error) })
           // Optimistic local zero so the badge clears immediately, before
           // the realtime UPDATE on peer_conversations arrives.
           setConversations(prev => prev.map(c => c.id === activeConv.id

@@ -248,9 +248,11 @@ export default function ProviderChatPage() {
           supabase.from('messages')
             .update({ is_read: true, read_at: new Date().toISOString() })
             .eq('id', msg.id)
+            .then(({ error }) => { if (error) console.error('mark message read failed:', error) })
           supabase.from('conversations')
             .update({ provider_unread_count: 0 })
             .eq('id', activeConv.id)
+            .then(({ error }) => { if (error) console.error('reset provider_unread_count failed:', error) })
           setConversations(prev => prev.map(c =>
             c.id === activeConv.id ? { ...c, provider_unread_count: 0 } : c
           ))
