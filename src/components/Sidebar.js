@@ -35,6 +35,8 @@ export default function Sidebar({ user }) {
   // Phase: per-provider upcoming-bookings count for the Calendar badge.
   // Keyed by providerId: { '<uuid>': <count>, ... }
   const [providerUpcomingByProvider, setProviderUpcomingByProvider] = useState({})
+  // Pending bookings (status='pending') per provider — drives the Bookings badge.
+  const [providerPendingByProvider, setProviderPendingByProvider] = useState({})
 
   // ── Resolve profile once on mount; share across loaders ─────────────────
   useEffect(() => {
@@ -357,8 +359,9 @@ export default function Sidebar({ user }) {
           }
         }))
 
-        // ── Per-provider upcoming-bookings counts (next 7 days, non-terminal) ──
-        // Drives the badge next to each per-provider "Calendar" entry.
+        // ── Per-provider upcoming-bookings counts (next 7 days, live) AND
+        //    pending-bookings counts (status='pending') 
+        // Drives the badges next to the per-provider Calendar + Bookings entries.
         try {
           const today = new Date()
           today.setHours(0, 0, 0, 0)
@@ -366,30 +369,39 @@ export default function Sidebar({ user }) {
           in7.setDate(in7.getDate() + 7)
           const todayStr = today.toISOString().slice(0, 10)
           const in7Str   = in7.toISOString().slice(0, 10)
-          const { data: liveStatuses } = await supabase
+          const { data: allStatuses } = await supabase
             .from('booking_statuses').select('id, code')
             .in('code', ['pending', 'confirmed', 'in_progress'])
-          const liveIds = (liveStatuses || []).map(s => s.id)
+          const statusByCode = {}
+          ;(allStatuses || []).forEach(s => { statusByCode[s.code] = s.id })
+          const liveIds = Object.values(statusByCode)
+          const pendingId = statusByCode['pending']
 
           if (liveIds.length > 0 && providerIds.length > 0) {
-            // Bookings RLS already permits service_provider_users to read their
-            // provider's bookings, so this single query is enough.
-            const { data: upBookings } = await supabase
+            // Single query covers both badges — we'll partition the rows in JS.
+            const { data: liveBookings } = await supabase
               .from('bookings')
-              .select('id, service_provider_id')
+              .select('id, service_provider_id, status_id, booking_date')
               .in('service_provider_id', providerIds)
               .in('status_id', liveIds)
-              .gte('booking_date', todayStr)
-              .lte('booking_date', in7Str)
 
-            const counts = {}
-            ;(upBookings || []).forEach(b => {
-              counts[b.service_provider_id] = (counts[b.service_provider_id] || 0) + 1
+            const upCounts  = {}
+            const penCounts = {}
+            ;(liveBookings || []).forEach(b => {
+              // Upcoming-7-days: any live status, date within window
+              if (b.booking_date >= todayStr && b.booking_date <= in7Str) {
+                upCounts[b.service_provider_id] = (upCounts[b.service_provider_id] || 0) + 1
+              }
+              // Pending: only the 'pending' status (no date filter — pending is pending)
+              if (pendingId && b.status_id === pendingId) {
+                penCounts[b.service_provider_id] = (penCounts[b.service_provider_id] || 0) + 1
+              }
             })
-            setProviderUpcomingByProvider(counts)
+            setProviderUpcomingByProvider(upCounts)
+            setProviderPendingByProvider(penCounts)
           }
         } catch (e) {
-          console.error('Sidebar member upcoming-count fetch error:', e)
+          console.error('Sidebar member booking-counts fetch error:', e)
         }
 
         // Auto-open if already on my-teams path
@@ -785,6 +797,16 @@ export default function Sidebar({ user }) {
                         icon:  Building2,
                         label: 'Overview',
                         path:  `/dashboard/my-teams/provider/${m.providerId}`,
+                      }} />
+                      {/* Bookings — provider-specific. Open to all members (read); the
+                          badge surfaces bookings still in 'pending' status (need attention). */}
+                      <NavItem key={`${m.providerId}-bookings`} compact item={{
+                        icon:  Calendar,
+                        label: 'Bookings',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/bookings`,
+                        badge: providerPendingByProvider[m.providerId] > 0
+                          ? providerPendingByProvider[m.providerId]
+                          : null,
                       }} />
                       {/* Calendar — provider-specific. Open to all members (read), badge
                           shows upcoming bookings in the next 7 days for THIS provider. */}
