@@ -32,6 +32,9 @@ export default function Sidebar({ user }) {
   const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number } — customer chat unread
   const [providerPeerUnreadByProviderId, setProviderPeerUnreadByProviderId] = useState({}) // { [providerId]: number } — peer chat unread (provider-to-provider)
   const [companyUnread, setCompanyUnread] = useState(0)
+  // Phase: per-provider upcoming-bookings count for the Calendar badge.
+  // Keyed by providerId: { '<uuid>': <count>, ... }
+  const [providerUpcomingByProvider, setProviderUpcomingByProvider] = useState({})
 
   // ── Resolve profile once on mount; share across loaders ─────────────────
   useEffect(() => {
@@ -353,6 +356,41 @@ export default function Sidebar({ user }) {
             can_chat:            !!(m.can_chat             || mech?.can_chat),
           }
         }))
+
+        // ── Per-provider upcoming-bookings counts (next 7 days, non-terminal) ──
+        // Drives the badge next to each per-provider "Calendar" entry.
+        try {
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const in7 = new Date(today)
+          in7.setDate(in7.getDate() + 7)
+          const todayStr = today.toISOString().slice(0, 10)
+          const in7Str   = in7.toISOString().slice(0, 10)
+          const { data: liveStatuses } = await supabase
+            .from('booking_statuses').select('id, code')
+            .in('code', ['pending', 'confirmed', 'in_progress'])
+          const liveIds = (liveStatuses || []).map(s => s.id)
+
+          if (liveIds.length > 0 && providerIds.length > 0) {
+            // Bookings RLS already permits service_provider_users to read their
+            // provider's bookings, so this single query is enough.
+            const { data: upBookings } = await supabase
+              .from('bookings')
+              .select('id, service_provider_id')
+              .in('service_provider_id', providerIds)
+              .in('status_id', liveIds)
+              .gte('booking_date', todayStr)
+              .lte('booking_date', in7Str)
+
+            const counts = {}
+            ;(upBookings || []).forEach(b => {
+              counts[b.service_provider_id] = (counts[b.service_provider_id] || 0) + 1
+            })
+            setProviderUpcomingByProvider(counts)
+          }
+        } catch (e) {
+          console.error('Sidebar member upcoming-count fetch error:', e)
+        }
 
         // Auto-open if already on my-teams path
         if (pathname.includes('/dashboard/my-teams')) {
@@ -747,6 +785,16 @@ export default function Sidebar({ user }) {
                         icon:  Building2,
                         label: 'Overview',
                         path:  `/dashboard/my-teams/provider/${m.providerId}`,
+                      }} />
+                      {/* Calendar — provider-specific. Open to all members (read), badge
+                          shows upcoming bookings in the next 7 days for THIS provider. */}
+                      <NavItem key={`${m.providerId}-calendar`} compact item={{
+                        icon:  CalendarDays,
+                        label: 'Calendar',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/calendar`,
+                        badge: providerUpcomingByProvider[m.providerId] > 0
+                          ? providerUpcomingByProvider[m.providerId]
+                          : null,
                       }} />
                       {/* Chat for this provider lives below Assigned Work Orders
                           in the shared block — keeps the provider-membership
