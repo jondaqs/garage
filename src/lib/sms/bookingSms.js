@@ -4,8 +4,10 @@
  * SMS notifications related to bookings.
  *
  *  sendBookingConfirmationSms  — to the customer/booker
+ *      • Customer-initiated → "pending confirmation" wording
+ *      • Provider-initiated (isProviderInitiated=true) → "confirmed" wording
  *  sendNewBookingProviderSms   — to the service provider owner
- *  sendBookingReminderSms      — to the customer 24h before the booking (Phase 3)
+ *  sendBookingReminderSms      — to the customer 24h before the booking
  *
  * Server-only — never import in client components.
  */
@@ -37,7 +39,8 @@ export async function sendBookingConfirmationSms(supabase, {
   bookingDate,
   bookingTime,
   providerName,
-  isCompany = false,
+  isCompany           = false,
+  isProviderInitiated = false,
 }) {
   if (!phone) return { sent: false, skipped: true, reason: 'no phone' }
 
@@ -46,7 +49,10 @@ export async function sendBookingConfirmationSms(supabase, {
 
   const url     = `${APP_URL()}/${isCompany ? 'company' : 'dashboard'}/bookings/${bookingId}`
   const name    = customerName ? `${customerName}, ` : ''
-  const message = `${BRAND}: ${name}your booking (${bookingNumber}) at ${providerName} on ${fmtDate(bookingDate)} ${fmtTime(bookingTime)} is pending confirmation. View: ${url}`
+  const tail    = isProviderInitiated
+    ? 'is confirmed.'
+    : 'is pending confirmation.'
+  const message = `${BRAND}: ${name}your booking (${bookingNumber}) at ${providerName} on ${fmtDate(bookingDate)} ${fmtTime(bookingTime)} ${tail} View: ${url}`
 
   return sendAndQueueSms(supabase, {
     to:             normalisedPhone,
@@ -86,17 +92,12 @@ export async function sendNewBookingProviderSms(supabase, {
   })
 }
 
-// ─── 3. Customer 24-hour reminder SMS (Phase 3) ──────────────────────────────
+// ─── 3. Customer 24-hour reminder SMS ────────────────────────────────────────
 
 /**
- * sendBookingReminderSms(supabase, {
- *   phone, customerName,
- *   bookingNumber, bookingId,
- *   bookingDate, bookingTime,
- *   providerName, vehiclePlate,
- *   isCompany, isForProvider,
- * })
+ * Sends a reminder SMS about an upcoming booking. Used for 24h reminder, but can be used for any custom reminder timing.
  *
+ * Message content is similar to the confirmation SMS, but with "Reminder" wording.
  * Kept under 160 chars where possible. Africa's Talking concatenates >160 char
  * messages automatically; we still aim to fit one segment for cost.
  */

@@ -146,6 +146,10 @@ export async function POST(request) {
       shopName:     shop?.name            || null,
       shopTown:     shop?.town            || null,
       services:     (services || []).map(s => s.name),
+      // Provider made this booking on the customer's behalf — it goes straight
+      // into 'confirmed' state (see the RPC). Tell the email/SMS helpers to
+      // use the "already confirmed" copy instead of "pending confirmation".
+      isProviderInitiated: true,
     }
 
     const commTasks = []
