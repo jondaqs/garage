@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, Building2, Users, Wrench, ClipboardList,
   Phone, Mail, MapPin, Shield, CheckCircle, AlertCircle,
-  Loader2, Award, Calendar, ChevronRight, FileText,
+  Loader2, Award, Calendar, CalendarDays, ChevronRight, FileText, Plus,
   Send, Receipt, AlertTriangle, RefreshCw, Car, Filter,
   Clock, ChevronDown, MessageSquare
 } from 'lucide-react'
@@ -383,6 +383,41 @@ export default function ProviderOverviewPage() {
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
         .limit(3)
+      
+      // ── 10. Calendar counters (today / next 7 days, live statuses) ───────
+      // Bookings RLS already permits this member to read their provider's
+      // bookings, so a single client-side query is enough.
+      let calendarTodayCount   = 0
+      let calendarUpcomingCount = 0
+      try {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const in7 = new Date(today)
+        in7.setDate(in7.getDate() + 7)
+        const todayStr = today.toISOString().slice(0, 10)
+        const in7Str   = in7.toISOString().slice(0, 10)
+
+        const { data: liveStatuses } = await supabase
+          .from('booking_statuses').select('id, code')
+          .in('code', ['pending', 'confirmed', 'in_progress'])
+        const liveIds = (liveStatuses || []).map(s => s.id)
+
+        if (liveIds.length > 0) {
+          const { data: liveBookings } = await supabase
+            .from('bookings')
+            .select('id, booking_date')
+            .eq('service_provider_id', params.providerId)
+            .in('status_id', liveIds)
+            .gte('booking_date', todayStr)
+            .lte('booking_date', in7Str)
+
+          calendarUpcomingCount = (liveBookings || []).length
+          calendarTodayCount    = (liveBookings || [])
+            .filter(b => b.booking_date === todayStr).length
+        }
+      } catch (e) {
+        console.warn('Calendar counters load failed (non-fatal):', e.message)
+      }
 
       setData({
         provider,
@@ -400,6 +435,8 @@ export default function ProviderOverviewPage() {
         canSendEst,
         canSendInv,
         shops:         shops || [],
+        calendarTodayCount,          
+        calendarUpcomingCount, 
       })
     } catch (err) {
       setError(err.message)
@@ -439,6 +476,7 @@ export default function ProviderOverviewPage() {
     pendingWOs, activeWOs, assignedWOs, shops,
     reviewWOs, invoiceWOs, actionCount, isAdminRole,
     canSendEst, canSendInv,
+    calendarTodayCount = 0, calendarUpcomingCount = 0,
   } = data
 
   const canSeeWOTab = isAdminRole || mechanic.can_send_estimates || mechanic.can_send_invoice
@@ -564,6 +602,57 @@ export default function ProviderOverviewPage() {
       {/* ── OVERVIEW TAB ─────────────────────────────────────────────────── */}
       {(activeTab === 'overview' || !canSeeWOTab) && (
         <div className="space-y-5">
+
+          {/* Calendar quick-link — opens the per-provider calendar page.
+          "Book Customer" CTA is shown only when the member has
+          can_approve_work; otherwise just the View Calendar button. */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <CalendarDays className="text-white" size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                    Calendar
+                  </h2>
+                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className={`text-2xl font-bold ${calendarTodayCount > 0 ? 'text-blue-700' : 'text-gray-400'}`}>
+                        {calendarTodayCount}
+                      </span>
+                      <span className="text-xs text-gray-600">today</span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className={`text-2xl font-bold ${calendarUpcomingCount > 0 ? 'text-indigo-700' : 'text-gray-400'}`}>
+                        {calendarUpcomingCount}
+                      </span>
+                      <span className="text-xs text-gray-600">next 7 days</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              <button
+                onClick={() => router.push(`/dashboard/my-teams/provider/${params.providerId}/calendar`)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+              >
+                <CalendarDays size={16} /> View Calendar
+                <ChevronRight size={14} />
+              </button>
+              {mechanic.can_approve_work && (
+                <button
+                  onClick={() => router.push(`/dashboard/my-teams/provider/${params.providerId}/calendar`)}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"
+                  title="Open the calendar to book a customer"
+                >
+                  <Plus size={16} /> Book Customer
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Provider info */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
