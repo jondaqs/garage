@@ -276,7 +276,7 @@ export default function MemberProviderCalendarPage() {
     } else {
       const wo = event.resource?.work_order
       if (wo?.id) router.push(`/dashboard/my-teams/work-order/${wo.id}`)
-      else        router.push(`/dashboard/bookings/${event.id}`)
+      else        router.push(`/dashboard/my-teams/provider/${providerId}/bookings/${event.id}`)
     }
   }
 
@@ -606,17 +606,17 @@ export default function MemberProviderCalendarPage() {
       {/* Book Customer Modal — reused from provider side */}
       {canApproveWork && (
         <BookCustomerModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          selectedDate={modalDate}
-          providerId={providerId}
-          onCreated={handleBookingCreated}
-          onOpenBooking={(bookingId) => {
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        selectedDate={modalDate}
+        providerId={providerId}
+        onCreated={handleBookingCreated}
+        onOpenBooking={(bookingId) => {
             setModalOpen(false)
-            router.push(`/dashboard/bookings/${bookingId}`)
-          }}
+            router.push(`/dashboard/my-teams/provider/${providerId}/bookings/${bookingId}`)
+        }}
         />
-      )}
+     )}
     </div>
   )
 }
