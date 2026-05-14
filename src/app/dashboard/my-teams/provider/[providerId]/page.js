@@ -13,33 +13,33 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_COLORS = {
-  intake:             'bg-gray-100 text-gray-600',
-  assigned:           'bg-blue-100 text-blue-700',
-  diagnosing:         'bg-purple-100 text-purple-700',
+  intake: 'bg-gray-100 text-gray-600',
+  assigned: 'bg-blue-100 text-blue-700',
+  diagnosing: 'bg-purple-100 text-purple-700',
   services_estimates: 'bg-blue-100 text-blue-700',
-  internal_review:    'bg-violet-100 text-violet-700',
-  awaiting_approval:  'bg-yellow-100 text-yellow-700',
-  approved:           'bg-cyan-100 text-cyan-700',
-  in_progress:        'bg-orange-100 text-orange-700',
-  quality_check:      'bg-indigo-100 text-indigo-700',
-  rework:             'bg-red-100 text-red-700',
-  completed:          'bg-green-100 text-green-700',
-  cancelled:          'bg-red-100 text-red-500',
-  closed:             'bg-gray-100 text-gray-500',
+  internal_review: 'bg-violet-100 text-violet-700',
+  awaiting_approval: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-cyan-100 text-cyan-700',
+  in_progress: 'bg-orange-100 text-orange-700',
+  quality_check: 'bg-indigo-100 text-indigo-700',
+  rework: 'bg-red-100 text-red-700',
+  completed: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-500',
+  closed: 'bg-gray-100 text-gray-500',
 }
 
 const WO_FILTER_OPTIONS = [
-  { value: 'action',            label: 'Needs action'      },
-  { value: 'all',               label: 'All active'        },
-  { value: 'internal_review',   label: 'Estimate review'   },
+  { value: 'action', label: 'Needs action' },
+  { value: 'all', label: 'All active' },
+  { value: 'internal_review', label: 'Estimate review' },
   { value: 'awaiting_approval', label: 'Awaiting approval' },
-  { value: 'completed',         label: 'Completed'         },
-  { value: 'quality_check',     label: 'Quality check'     },
-  { value: 'in_progress',       label: 'In progress'       },
+  { value: 'completed', label: 'Completed' },
+  { value: 'quality_check', label: 'Quality check' },
+  { value: 'in_progress', label: 'In progress' },
 ]
 
 const TABS = [
-  { id: 'overview',    label: 'Overview'    },
+  { id: 'overview', label: 'Overview' },
   { id: 'work-orders', label: 'Work Orders' },
 ]
 
@@ -63,16 +63,16 @@ function getActionNeeded(wo, canSendEstimates, canSendInvoice) {
 }
 
 // ── WorkOrdersPanel ───────────────────────────────────────────────────────────
-function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
-  const router   = useRouter()
+function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice, canApproveWork }) {
+  const router = useRouter()
   const supabase = createClient()
 
   const [workOrders, setWorkOrders] = useState([])
-  const [loading,    setLoading]    = useState(true)
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter,     setFilter]     = useState('action')
+  const [filter, setFilter] = useState('action')
   const [showFilter, setShowFilter] = useState(false)
-  const [error,      setError]      = useState('')
+  const [error, setError] = useState('')
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -101,7 +101,7 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
   )
   const filtered = filter === 'action' ? actionWOs
     : filter === 'all' ? workOrders
-    : workOrders.filter(w => w.status?.code === filter)
+      : workOrders.filter(w => w.status?.code === filter)
 
   if (loading) return (
     <div className="flex justify-center py-10">
@@ -117,11 +117,10 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
         {actionWOs.length > 0 && (
           <button
             onClick={() => setFilter('action')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-              filter === 'action'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${filter === 'action'
                 ? 'bg-red-600 text-white border-red-600'
                 : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-            }`}
+              }`}
           >
             <AlertTriangle size={13} />
             {actionWOs.length} need{actionWOs.length === 1 ? 's' : ''} action
@@ -153,9 +152,8 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
                   <button
                     key={opt.value}
                     onClick={() => { setFilter(opt.value); setShowFilter(false) }}
-                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${
-                      filter === opt.value ? 'font-semibold text-blue-700 bg-blue-50' : 'text-gray-700'
-                    }`}
+                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${filter === opt.value ? 'font-semibold text-blue-700 bg-blue-50' : 'text-gray-700'
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -163,6 +161,18 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
               </div>
             )}
           </div>
+          {/* New Walk-In Work Order — only visible when member has WO access.
+          Routes to the member-side walk-in flow (Phase 2). */}
+          {canApproveWork && (
+            <button
+              onClick={() => router.push(`/dashboard/my-teams/provider/${providerId}/work-orders/new`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex-shrink-0"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">New Walk-In Work Order</span>
+              <span className="sm:hidden">Walk-In</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,14 +206,13 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
       {/* WO cards */}
       <div className="space-y-3">
         {filtered.map(wo => {
-          const action     = getActionNeeded(wo, canSendEstimates, canSendInvoice)
+          const action = getActionNeeded(wo, canSendEstimates, canSendInvoice)
           const ActionIcon = action?.icon
           return (
             <div
               key={wo.id}
-              className={`bg-white rounded-xl border shadow-sm overflow-hidden ${
-                action?.urgent ? 'border-l-4 border-l-violet-500 border-gray-200' : 'border-gray-200'
-              }`}
+              className={`bg-white rounded-xl border shadow-sm overflow-hidden ${action?.urgent ? 'border-l-4 border-l-violet-500 border-gray-200' : 'border-gray-200'
+                }`}
             >
               {action && (
                 <div className={`px-4 py-2 flex items-center gap-2 text-xs font-semibold border-b ${action.color}`}>
@@ -248,11 +257,10 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
                   </span>
                   <button
                     onClick={() => router.push(`/dashboard/my-teams/work-order/${wo.id}`)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${
-                      action?.urgent
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${action?.urgent
                         ? 'bg-blue-600 text-white hover:bg-blue-700'
                         : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {action ? 'Open & act' : 'View'}
                     <ChevronRight size={13} />
@@ -269,13 +277,13 @@ function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ProviderOverviewPage() {
-  const router   = useRouter()
-  const params   = useParams()
+  const router = useRouter()
+  const params = useParams()
   const supabase = createClient()
 
-  const [data,      setData]      = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState('')
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
 
   const load = useCallback(async () => {
@@ -312,18 +320,18 @@ export default function ProviderOverviewPage() {
         .maybeSingle()
 
       const memberRecord = {
-        created_at:           spuRow.joined_at,
+        created_at: spuRow.joined_at,
         ...spuRow,
-        mechanic_id:          mechanic?.id || null,
-        specialization:       mechanic?.specialization || null,
-        experience_years:     mechanic?.experience_years || null,
-        can_approve_work:     !!(spuRow.can_approve_work     || mechanic?.can_approve_work),
+        mechanic_id: mechanic?.id || null,
+        specialization: mechanic?.specialization || null,
+        experience_years: mechanic?.experience_years || null,
+        can_approve_work: !!(spuRow.can_approve_work || mechanic?.can_approve_work),
         can_manage_inventory: !!(spuRow.can_manage_inventory || mechanic?.can_manage_inventory),
-        can_manage_team:      !!(spuRow.can_manage_team      || mechanic?.can_manage_team),
-        can_send_estimates:   !!(spuRow.can_send_estimates   || mechanic?.can_send_estimates),
-        can_send_invoice:     !!(spuRow.can_send_invoice     || mechanic?.can_send_invoice),
-        can_chat:             !!(spuRow.can_chat             || mechanic?.can_chat),
-        is_verified:          !!(spuRow.is_verified          || mechanic?.is_verified),
+        can_manage_team: !!(spuRow.can_manage_team || mechanic?.can_manage_team),
+        can_send_estimates: !!(spuRow.can_send_estimates || mechanic?.can_send_estimates),
+        can_send_invoice: !!(spuRow.can_send_invoice || mechanic?.can_send_invoice),
+        can_chat: !!(spuRow.can_chat || mechanic?.can_chat),
+        is_verified: !!(spuRow.is_verified || mechanic?.is_verified),
       }
 
       // ── 4. Provider details ───────────────────────────────────────────────
@@ -357,13 +365,13 @@ export default function ProviderOverviewPage() {
         'get_mechanic_assigned_work_orders', { p_mechanic_user_id: user.id }
       )
       const assignedWOs = woResult?.work_orders || []
-      const pendingWOs  = assignedWOs.filter(w => w.mechanic_assignment_status === 'pending')
-      const activeWOs   = assignedWOs.filter(w => w.mechanic_assignment_status === 'acknowledged')
+      const pendingWOs = assignedWOs.filter(w => w.mechanic_assignment_status === 'pending')
+      const activeWOs = assignedWOs.filter(w => w.mechanic_assignment_status === 'acknowledged')
 
       // ── 8. Provider-wide WOs (admin/accountant/can_send) ──────────────────
       const isAdminRole = ['service_provider_owner', 'admin', 'accountant'].includes(spuRow.role)
-      const canSendEst  = memberRecord.can_send_estimates || isAdminRole
-      const canSendInv  = memberRecord.can_send_invoice   || isAdminRole
+      const canSendEst = memberRecord.can_send_estimates || isAdminRole
+      const canSendInv = memberRecord.can_send_invoice || isAdminRole
       let allProviderWOs = []
       if (isAdminRole || canSendEst || canSendInv) {
         const { data: spuWOs } = await supabase.rpc(
@@ -372,8 +380,8 @@ export default function ProviderOverviewPage() {
         allProviderWOs = (spuWOs?.work_orders || []).filter(w => w.provider?.id === params.providerId)
       }
 
-      const reviewWOs   = allProviderWOs.filter(w => w.status?.code === 'internal_review')
-      const invoiceWOs  = allProviderWOs.filter(w => ['completed', 'quality_check'].includes(w.status?.code))
+      const reviewWOs = allProviderWOs.filter(w => w.status?.code === 'internal_review')
+      const invoiceWOs = allProviderWOs.filter(w => ['completed', 'quality_check'].includes(w.status?.code))
       const actionCount = allProviderWOs.filter(w => getActionNeeded(w, canSendEst, canSendInv) !== null).length
 
       // ── 9. Shops ──────────────────────────────────────────────────────────
@@ -383,11 +391,11 @@ export default function ProviderOverviewPage() {
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
         .limit(3)
-      
+
       // ── 10. Calendar counters (today / next 7 days, live statuses) ───────
       // Bookings RLS already permits this member to read their provider's
       // bookings, so a single client-side query is enough.
-      let calendarTodayCount   = 0
+      let calendarTodayCount = 0
       let calendarUpcomingCount = 0
       try {
         const today = new Date()
@@ -395,7 +403,7 @@ export default function ProviderOverviewPage() {
         const in7 = new Date(today)
         in7.setDate(in7.getDate() + 7)
         const todayStr = today.toISOString().slice(0, 10)
-        const in7Str   = in7.toISOString().slice(0, 10)
+        const in7Str = in7.toISOString().slice(0, 10)
 
         const { data: liveStatuses } = await supabase
           .from('booking_statuses').select('id, code')
@@ -412,7 +420,7 @@ export default function ProviderOverviewPage() {
             .lte('booking_date', in7Str)
 
           calendarUpcomingCount = (liveBookings || []).length
-          calendarTodayCount    = (liveBookings || [])
+          calendarTodayCount = (liveBookings || [])
             .filter(b => b.booking_date === todayStr).length
         }
       } catch (e) {
@@ -423,7 +431,7 @@ export default function ProviderOverviewPage() {
         provider,
         mechanic: memberRecord,
         ownerName,
-        teamCount:     teamCount || 0,
+        teamCount: teamCount || 0,
         assignedWOs,
         pendingWOs,
         activeWOs,
@@ -434,9 +442,9 @@ export default function ProviderOverviewPage() {
         isAdminRole,
         canSendEst,
         canSendInv,
-        shops:         shops || [],
-        calendarTodayCount,          
-        calendarUpcomingCount, 
+        shops: shops || [],
+        calendarTodayCount,
+        calendarUpcomingCount,
       })
     } catch (err) {
       setError(err.message)
@@ -505,11 +513,10 @@ export default function ProviderOverviewPage() {
                 <CheckCircle size={11} /> Verified
               </span>
             )}
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
-              mechanic.role === 'accountant' ? 'bg-blue-100 text-blue-700'   :
-              mechanic.role === 'admin'      ? 'bg-purple-100 text-purple-700' :
-              'bg-gray-100 text-gray-600'
-            }`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${mechanic.role === 'accountant' ? 'bg-blue-100 text-blue-700' :
+                mechanic.role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                  'bg-gray-100 text-gray-600'
+              }`}>
               {mechanic.role?.replace(/_/g, ' ')}
             </span>
           </div>
@@ -582,11 +589,10 @@ export default function ProviderOverviewPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
+              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
                   ? 'border-blue-600 text-blue-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               {tab.label}
               {tab.id === 'work-orders' && actionCount > 0 && (
@@ -714,7 +720,7 @@ export default function ProviderOverviewPage() {
                       <MapPin size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
                       <span>
                         {shop.name}
-                        {shop.town   ? `, ${shop.town}`   : ''}
+                        {shop.town ? `, ${shop.town}` : ''}
                         {shop.county ? `, ${shop.county}` : ''}
                       </span>
                     </div>
@@ -799,8 +805,8 @@ export default function ProviderOverviewPage() {
                 )}
                 {!isAdminRole && !mechanic.can_approve_work && !mechanic.can_send_estimates
                   && !mechanic.can_send_invoice && !mechanic.can_manage_inventory && !mechanic.can_manage_team && !mechanic.can_chat && (
-                  <span className="text-xs text-gray-400 italic">Acknowledge / decline assignments only</span>
-                )}
+                    <span className="text-xs text-gray-400 italic">Acknowledge / decline assignments only</span>
+                  )}
               </div>
             </div>
           </div>
@@ -835,6 +841,7 @@ export default function ProviderOverviewPage() {
           providerId={params.providerId}
           canSendEstimates={canSendEst}
           canSendInvoice={canSendInv}
+          canApproveWork={mechanic.can_approve_work}
         />
       )}
     </div>

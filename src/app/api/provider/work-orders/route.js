@@ -1,11 +1,28 @@
 // src/app/api/provider/work-orders/route.js
 // POST /api/provider/work-orders
-// Creates a walk-in work order, then sends invite email if needed.
-// Separating email from the DB function keeps the function pure SQL
-// and allows retries on email failure without rolling back the WO.
+// Creates a walk-in work order, then:
+//   • sends the invite email if needed (original behaviour),
+//   • notifies the provider owner + admins (excluding the initiator)
+//     when notifyOwnerAndAdmins=true is supplied (member-flow new behaviour).
+//
+// Auth + can_approve_work gating happens inside the RPC; this layer is thin.
 
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createClient }                          from '@/lib/supabase/server'
+import { createClient as createServiceClient }   from '@supabase/supabase-js'
+import { NextResponse }                          from 'next/server'
+import { sendWalkInCreatedEmail }                from '@/lib/email/walkInEmails'
+import { sendWalkInCreatedSms }                  from '@/lib/sms/walkInSms'
+
+function getServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
+  return createServiceClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
+const ADMIN_ROLES = ['service_provider_owner', 'admin']
 
 export async function POST(request) {
   try {
@@ -28,19 +45,21 @@ export async function POST(request) {
       priority,
       shop_id,
       initial_mileage,
+      // ── NEW ─────────────────────────────────────────────────────────
+      providerId,               // explicit provider scope (member flow)
+      notifyOwnerAndAdmins,     // fan-out to owner + admins (member flow default true)
     } = body
 
     if (!plate_number?.trim()) {
       return NextResponse.json({ error: 'Plate number is required' }, { status: 400 })
     }
 
-    // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Call the SECURITY DEFINER function
+    // ── Call the SECURITY DEFINER function ────────────────────────────
     const { data: result, error: rpcError } = await supabase.rpc(
       'create_walk_in_work_order',
       {
@@ -60,6 +79,7 @@ export async function POST(request) {
         p_priority:            priority || 'normal',
         p_shop_id:             shop_id  || null,
         p_initial_mileage:     initial_mileage ? parseInt(initial_mileage) : null,
+        p_provider_id:         providerId || null,    // ← NEW
       }
     )
 
@@ -67,15 +87,46 @@ export async function POST(request) {
       console.error('create_walk_in_work_order RPC error:', rpcError)
       return NextResponse.json({ error: rpcError.message }, { status: 500 })
     }
-
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 })
+      const status = (result.error || '').toLowerCase().includes('permission') ? 403 : 400
+      return NextResponse.json({ error: result.error }, { status })
     }
 
-    // If an invitation was created, send the email
+    // ── Fan-out notifications to owner + admins (NEW) ─────────────────
+    // We do this even for the legacy provider flow when the caller is the
+    // owner — the helper itself excludes the initiator, so the owner won't
+    // notify themselves. The new member flow opts in via notifyOwnerAndAdmins.
+    const shouldNotify =
+      notifyOwnerAndAdmins === undefined ? true : !!notifyOwnerAndAdmins
+
+    if (shouldNotify) {
+      // Fire-and-forget — never block the API response on this
+      notifyOwnerAndAdminsBackground({
+        providerId:         result.service_provider_id,
+        workOrderId:        result.work_order_id,
+        workOrderNumber:    result.work_order_number,
+        initiatorProfileId: result.initiator_profile_id,
+        plateNumber:        plate_number.trim().toUpperCase(),
+        problemDescription: problem_description,
+        priority:           priority || 'normal',
+        shopId:             shop_id,
+        walkInOwner: {
+          name:  walk_in_owner_name,
+          phone: walk_in_owner_phone,
+          email: walk_in_owner_email,
+        },
+        registeredOwner: {
+          userId:    owner_user_id,
+          companyId: owner_company_id,
+        },
+      }).catch(e =>
+        console.error('[walk-in] notification fan-out failed (non-fatal):', e.message)
+      )
+    }
+
+    // ── Walk-in invitation email (existing behaviour) ─────────────────
     if (result.invitation_id && walk_in_owner_email) {
       try {
-        console.log('Sending walk-in invite email to:', walk_in_owner_email)
         await sendWalkInInviteEmail({
           toEmail:          walk_in_owner_email,
           ownerName:        walk_in_owner_name,
@@ -86,12 +137,11 @@ export async function POST(request) {
           supabase,
         })
       } catch (emailErr) {
-        // Email failure is non-fatal — WO is created; provider can retry
         console.error('Walk-in invite email failed (non-fatal):', emailErr.message)
         return NextResponse.json({
           ...result,
-          email_sent:     false,
-          email_warning:  'Work order created but invitation email failed to send. You can resend from the work order page.',
+          email_sent:    false,
+          email_warning: 'Work order created but invitation email failed to send. You can resend from the work order page.',
         })
       }
     }
@@ -104,7 +154,193 @@ export async function POST(request) {
   }
 }
 
-// ─── Email helper ─────────────────────────────────────────────────────────────
+// ─── Owner + admin fan-out ──────────────────────────────────────────────────
+async function notifyOwnerAndAdminsBackground({
+  providerId, workOrderId, workOrderNumber, initiatorProfileId,
+  plateNumber, problemDescription, priority, shopId, walkInOwner, registeredOwner,
+}) {
+  const sc = getServiceClient()
+
+  // 1. Resolve provider + initiator + owner + admins + shop + vehicle ───
+  const [
+    { data: provider },
+    { data: initiator },
+    { data: ownerProfile },
+    { data: admins },
+    { data: shop },
+    { data: vehicle },
+  ] = await Promise.all([
+    sc.from('service_providers')
+      .select('id, name, owner_user_id')
+      .eq('id', providerId).maybeSingle(),
+    sc.from('user_profiles')
+      .select('id, first_name, last_name')
+      .eq('id', initiatorProfileId).maybeSingle(),
+    // owner profile — we'll look it up via provider.owner_user_id below
+    Promise.resolve({ data: null }),
+    sc.from('service_provider_users')
+      .select(`
+        role, user_id, is_active,
+        user:user_profiles!service_provider_users_user_id_fkey(
+          id, first_name, last_name, email, phone
+        )
+      `)
+      .eq('service_provider_id', providerId)
+      .eq('is_active', true)
+      .in('role', ADMIN_ROLES),
+    shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle()
+           : Promise.resolve({ data: null }),
+    sc.from('vehicles').select('plate_number, make, model').eq('plate_number', plateNumber).maybeSingle(),
+  ])
+
+  // Look up the owner profile separately
+  const { data: ownerProf } = provider?.owner_user_id
+    ? await sc.from('user_profiles')
+        .select('id, first_name, last_name, email, phone')
+        .eq('id', provider.owner_user_id).maybeSingle()
+    : { data: null }
+
+  // Walk-in initiator's role on this provider (for the email subtext)
+  let initiatorRole = null
+  if (initiatorProfileId) {
+    if (provider?.owner_user_id === initiatorProfileId) {
+      initiatorRole = 'owner'
+    } else {
+      const { data: spu } = await sc.from('service_provider_users')
+        .select('role').eq('service_provider_id', providerId)
+        .eq('user_id', initiatorProfileId).eq('is_active', true).maybeSingle()
+      const { data: mech } = await sc.from('mechanics')
+        .select('role').eq('service_provider_id', providerId)
+        .eq('user_id', initiatorProfileId).eq('is_active', true).maybeSingle()
+      initiatorRole = (spu?.role || mech?.role || 'member').replace(/_/g, ' ')
+    }
+  }
+
+  // Look up registered customer/company name if applicable
+  let ownerInfo = walkInOwner?.name
+    ? `Walk-in: ${walkInOwner.name}${walkInOwner.phone ? ` · ${walkInOwner.phone}` : ''}`
+    : walkInOwner?.phone
+      ? `Walk-in: ${walkInOwner.phone}`
+      : null
+  if (!ownerInfo && registeredOwner?.userId) {
+    const { data: u } = await sc.from('user_profiles')
+      .select('first_name, last_name')
+      .eq('id', registeredOwner.userId).maybeSingle()
+    if (u) ownerInfo = `Registered: ${[u.first_name, u.last_name].filter(Boolean).join(' ')}`
+  }
+  if (!ownerInfo && registeredOwner?.companyId) {
+    const { data: c } = await sc.from('company_profiles')
+      .select('name').eq('id', registeredOwner.companyId).maybeSingle()
+    if (c) ownerInfo = `Fleet: ${c.name}`
+  }
+  if (!ownerInfo) ownerInfo = 'Unknown / unregistered'
+
+  // 2. Build recipient list — owner + admins, dedup, exclude initiator ──
+  const recipientMap = new Map()  // keyed by user_profiles.id
+
+  if (ownerProf && ownerProf.id !== initiatorProfileId) {
+    recipientMap.set(ownerProf.id, {
+      name:  [ownerProf.first_name, ownerProf.last_name].filter(Boolean).join(' ') || 'Owner',
+      email: ownerProf.email,
+      phone: ownerProf.phone,
+      role:  'Owner',
+      isOwner: true,
+    })
+  }
+  for (const a of (admins || [])) {
+    const u = a.user
+    if (!u || u.id === initiatorProfileId) continue
+    if (recipientMap.has(u.id)) continue
+    recipientMap.set(u.id, {
+      name:  [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Admin',
+      email: u.email,
+      phone: u.phone,
+      role:  a.role === 'service_provider_owner' ? 'Owner' : 'Admin',
+      isOwner: a.role === 'service_provider_owner',
+    })
+  }
+
+  if (recipientMap.size === 0) {
+    console.log(`[walk-in ${workOrderNumber}] no recipients — initiator may be the only admin`)
+    return
+  }
+
+  const initiatorName = initiator
+    ? `${initiator.first_name || ''} ${initiator.last_name || ''}`.trim() || 'A team member'
+    : 'A team member'
+
+  const sharedArgs = {
+    workOrderNumber,
+    workOrderId,
+    vehiclePlate: vehicle?.plate_number || plateNumber,
+    vehicleMake:  vehicle?.make         || '',
+    vehicleModel: vehicle?.model        || '',
+    ownerInfo,
+    initiatorName,
+    initiatorRole,
+    priority,
+    problemDescription,
+    shopName: shop?.name || null,
+    shopTown: shop?.town || null,
+    createdAt: new Date().toISOString(),
+  }
+
+  // 3. In-app notifications (single insert) ─────────────────────────────
+  try {
+    const notificationRows = Array.from(recipientMap.entries()).map(([profileId, r]) => ({
+      user_id:            profileId,
+      recipient_user_id:  profileId,
+      type:               'walk_in_wo_created',
+      notification_type:  'walk_in_wo_created',
+      title:              'New Walk-In Work Order',
+      message: `${initiatorName} created walk-in work order ${workOrderNumber} for ${sharedArgs.vehiclePlate}.`,
+      reference_table:    'work_orders',
+      reference_id:       workOrderId,
+      reference_type:     'work_order',
+      is_read:            false,
+    }))
+    if (notificationRows.length > 0) {
+      await sc.from('notifications').insert(notificationRows)
+    }
+  } catch (e) {
+    console.warn(`[walk-in ${workOrderNumber}] in-app notification failed:`, e.message)
+  }
+
+  // 4. Email + SMS fan-out (parallel, best-effort) ──────────────────────
+  const tasks = []
+  for (const [, r] of recipientMap) {
+    if (r.email) {
+      tasks.push(
+        sendWalkInCreatedEmail(sc, {
+          to:              r.email,
+          recipientName:   r.name,
+          recipientRole:   r.role,
+          recipientIsOwner: r.isOwner,
+          ...sharedArgs,
+        })
+          .then(() => console.log(`[walk-in ${workOrderNumber}] ✓ email → ${r.email}`))
+          .catch(e => console.error(`[walk-in ${workOrderNumber}] ✗ email → ${r.email}: ${e.message}`))
+      )
+    }
+    if (r.phone) {
+      tasks.push(
+        sendWalkInCreatedSms(sc, {
+          phone:           r.phone,
+          recipientName:   r.name,
+          workOrderNumber,
+          workOrderId,
+          vehiclePlate:    sharedArgs.vehiclePlate,
+          initiatorName,
+        })
+          .then(() => console.log(`[walk-in ${workOrderNumber}] ✓ SMS → ${r.phone}`))
+          .catch(e => console.error(`[walk-in ${workOrderNumber}] ✗ SMS → ${r.phone}: ${e.message}`))
+      )
+    }
+  }
+  await Promise.allSettled(tasks)
+}
+
+// ─── Walk-in invitation email helper (existing — unchanged) ─────────────────
 async function sendWalkInInviteEmail({
   toEmail, ownerName, workOrderNumber, plateNumber, inviteToken, providerUserId, supabase
 }) {
@@ -115,23 +351,21 @@ async function sendWalkInInviteEmail({
   const fromName       = process.env.MAILJET_FROM_NAME  || 'Motiifix'
 
   if (!mailjetApiKey || !mailjetSecret) {
-    // Queue for later and throw so caller can warn
     await supabase.from('email_queue').insert({
       recipient_email: toEmail,
       subject:         `Your vehicle (${plateNumber}) is being serviced — register to track it`,
-      body_html:       buildEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }),
-      body_text:       buildEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }),
+      body_html:       buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }),
+      body_text:       buildInviteEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }),
       status:          'failed',
       error_message:   'Mailjet credentials not configured',
     })
     throw new Error('Mailjet credentials not configured')
   }
 
-  const html  = buildEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl })
-  const text  = buildEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl })
+  const html  = buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl })
+  const text  = buildInviteEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl })
   const subject = `Your vehicle (${plateNumber}) is at the garage — track it on GariCare`
 
-  // Queue before sending
   let queuedId = null
   try {
     const { data: queued } = await supabase.from('email_queue').insert({
@@ -178,7 +412,7 @@ async function sendWalkInInviteEmail({
   }
 }
 
-function buildEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }) {
+function buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }) {
   const registerUrl = `${appUrl}/auth/signup?invite_token=${inviteToken}&ref=walkin`
   const greeting    = ownerName ? `Hello ${ownerName},` : 'Hello,'
   return `
@@ -207,7 +441,7 @@ function buildEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, 
       <p style="margin:0 0 8px"><strong>Work Order:</strong> <span class="wo-badge">${workOrderNumber}</span></p>
       <p style="margin:0"><strong>Vehicle Plate:</strong> ${plateNumber}</p>
     </div>
-    <p>To <strong>view service progress, approve work estimates, and receive updates</strong>, 
+    <p>To <strong>view service progress, approve work estimates, and receive updates</strong>,
     create your free GariCare account using this link:</p>
     <div style="text-align:center">
       <a href="${registerUrl}" class="btn">Create My Account &amp; Track Service</a>
@@ -217,8 +451,8 @@ function buildEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, 
       After registering, the vehicle and work order will automatically appear in your dashboard.
     </p>
     <p style="font-size:13px;color:#6b7280">
-      Already have a GariCare account? 
-      <a href="${appUrl}/auth/login" style="color:#16a34a">Log in here</a> — 
+      Already have a GariCare account?
+      <a href="${appUrl}/auth/login" style="color:#16a34a">Log in here</a> —
       the work order will be linked to your vehicle.
     </p>
   </div>
@@ -230,7 +464,7 @@ function buildEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, 
 </body></html>`
 }
 
-function buildEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }) {
+function buildInviteEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl }) {
   const registerUrl = `${appUrl}/auth/signup?invite_token=${inviteToken}&ref=walkin`
   return `
 ${ownerName ? `Hello ${ownerName},` : 'Hello,'}
