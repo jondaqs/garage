@@ -773,4 +773,4 @@ Already have an account? Log in at ${appUrl}/auth/login
 ---
 GariCare — Vehicle Service Platform
 `
-}s
+}
