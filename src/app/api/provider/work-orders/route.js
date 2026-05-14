@@ -1,17 +1,21 @@
 // src/app/api/provider/work-orders/route.js
 // POST /api/provider/work-orders
 // Creates a walk-in work order, then:
-//   • sends the invite email if needed (original behaviour),
-//   • notifies the provider owner + admins (excluding the initiator)
-//     when notifyOwnerAndAdmins=true is supplied (member-flow new behaviour).
+//   • sends an invite email + SMS to an UNREGISTERED customer (existing email
+//     path preserved verbatim; SMS added alongside it),
+//   • sends a "your vehicle is at the garage" email + SMS + in-app notification
+//     to a REGISTERED customer (chauffeur-aware: the owner may not be present
+//     at drop-off so all three channels are used),
+//   • notifies the provider owner + admins (excluding the initiator) when
+//     notifyOwnerAndAdmins=true is supplied (member-flow new behaviour).
 //
 // Auth + can_approve_work gating happens inside the RPC; this layer is thin.
 
 import { createClient }                          from '@/lib/supabase/server'
 import { createClient as createServiceClient }   from '@supabase/supabase-js'
 import { NextResponse }                          from 'next/server'
-import { sendWalkInCreatedEmail }                from '@/lib/email/walkInEmails'
-import { sendWalkInCreatedSms }                  from '@/lib/sms/walkInSms'
+import { sendWalkInCreatedEmail, sendWalkInOwnerEmail, sendWalkInFleetEmail } from '@/lib/email/walkInEmails'
+import { sendWalkInCreatedSms, sendWalkInInviteSms, sendWalkInOwnerSms, sendWalkInFleetSms } from '@/lib/sms/walkInSms'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -92,35 +96,43 @@ export async function POST(request) {
       return NextResponse.json({ error: result.error }, { status })
     }
 
-    // ── Fan-out notifications to owner + admins (NEW) ─────────────────
+    // ── Fan-out notifications to owner + admins ───────────────────────
     // We do this even for the legacy provider flow when the caller is the
     // owner — the helper itself excludes the initiator, so the owner won't
     // notify themselves. The new member flow opts in via notifyOwnerAndAdmins.
+    //
+    // Important: we MUST await this. In Vercel / Lambda serverless functions,
+    // any unawaited promise is dropped the moment the response is sent.
+    // Internally each helper uses Promise.allSettled across recipients, so
+    // a single bad email doesn't block the others.
     const shouldNotify =
       notifyOwnerAndAdmins === undefined ? true : !!notifyOwnerAndAdmins
 
+    const backgroundTasks = []
+
     if (shouldNotify) {
-      // Fire-and-forget — never block the API response on this
-      notifyOwnerAndAdminsBackground({
-        providerId:         result.service_provider_id,
-        workOrderId:        result.work_order_id,
-        workOrderNumber:    result.work_order_number,
-        initiatorProfileId: result.initiator_profile_id,
-        plateNumber:        plate_number.trim().toUpperCase(),
-        problemDescription: problem_description,
-        priority:           priority || 'normal',
-        shopId:             shop_id,
-        walkInOwner: {
-          name:  walk_in_owner_name,
-          phone: walk_in_owner_phone,
-          email: walk_in_owner_email,
-        },
-        registeredOwner: {
-          userId:    owner_user_id,
-          companyId: owner_company_id,
-        },
-      }).catch(e =>
-        console.error('[walk-in] notification fan-out failed (non-fatal):', e.message)
+      backgroundTasks.push(
+        notifyOwnerAndAdminsBackground({
+          providerId:         result.service_provider_id,
+          workOrderId:        result.work_order_id,
+          workOrderNumber:    result.work_order_number,
+          initiatorProfileId: result.initiator_profile_id,
+          plateNumber:        plate_number.trim().toUpperCase(),
+          problemDescription: problem_description,
+          priority:           priority || 'normal',
+          shopId:             shop_id,
+          walkInOwner: {
+            name:  walk_in_owner_name,
+            phone: walk_in_owner_phone,
+            email: walk_in_owner_email,
+          },
+          registeredOwner: {
+            userId:    owner_user_id,
+            companyId: owner_company_id,
+          },
+        }).catch(e =>
+          console.error('[walk-in] owner/admin fan-out failed (non-fatal):', e.message)
+        )
       )
     }
 
@@ -138,15 +150,43 @@ export async function POST(request) {
         })
       } catch (emailErr) {
         console.error('Walk-in invite email failed (non-fatal):', emailErr.message)
-        return NextResponse.json({
-          ...result,
-          email_sent:    false,
-          email_warning: 'Work order created but invitation email failed to send. You can resend from the work order page.',
-        })
+        // Don't early-return — we still want to send the SMS path and notify
+        // owner/admins. Just flag the failure in the response.
+        result.email_warning = 'Work order created but invitation email failed to send. You can resend from the work order page.'
       }
     }
 
-    return NextResponse.json({ ...result, email_sent: !!result.invitation_id })
+    // ── Customer comms ────────────────────────────────────────────────
+    // Same awaited pattern as the owner/admin fan-out above.
+    backgroundTasks.push(
+      notifyCustomerBackground({
+        result,
+        walkInOwner: {
+          name:  walk_in_owner_name,
+          phone: walk_in_owner_phone,
+          email: walk_in_owner_email,
+        },
+        registeredOwnerUserId:    owner_user_id,
+        registeredOwnerCompanyId: owner_company_id,
+        plateNumber:              plate_number.trim().toUpperCase(),
+        problemDescription:       problem_description,
+        priority:                 priority || 'normal',
+        shopId:                   shop_id,
+      }).catch(e =>
+        console.error('[walk-in] customer comms failed (non-fatal):', e.message)
+      )
+    )
+
+    // Await all comms together so they actually run in serverless.
+    // Each one already swallows its own errors via .catch() so this
+    // resolves cleanly even on partial failures.
+    await Promise.all(backgroundTasks)
+
+    return NextResponse.json({
+      ...result,
+      email_sent:        !!result.invitation_id && !result.email_warning,
+      customer_notified: !!(walk_in_owner_email || walk_in_owner_phone || owner_user_id || owner_company_id),
+    })
 
   } catch (err) {
     console.error('POST /api/provider/work-orders error:', err)
@@ -338,6 +378,253 @@ async function notifyOwnerAndAdminsBackground({
     }
   }
   await Promise.allSettled(tasks)
+}
+
+// ─── Customer comms fan-out ────────────────────────────────────────────────
+// Three paths:
+//   • REGISTERED individual owner (owner_user_id set) → email + SMS + in-app
+//     notification to the owner. The owner may have sent a chauffeur to the
+//     garage, so all three channels are used — in-app alone may go unseen.
+//   • UNREGISTERED owner with phone (with or without email) → invite SMS
+//     using the same invitation token the email path uses. Email path is
+//     handled separately above (preserves the original Mailjet-based queue).
+//   • REGISTERED company fleet (owner_company_id set) → email + SMS + in-app
+//     to the company owner AND every active fleet manager / admin. Same
+//     "chauffeur scenario" rationale; mirrors the pattern used by the
+//     bookings notify and checkout-notify flows.
+async function notifyCustomerBackground({
+  result,
+  walkInOwner,
+  registeredOwnerUserId,
+  registeredOwnerCompanyId,
+  plateNumber,
+  problemDescription,
+  priority,
+  shopId,
+}) {
+  const sc = getServiceClient()
+  const workOrderNumber = result.work_order_number
+  const workOrderId     = result.work_order_id
+
+  // Common context: provider name + shop + vehicle
+  const [
+    { data: provider },
+    { data: shop },
+    { data: vehicle },
+  ] = await Promise.all([
+    sc.from('service_providers').select('name')
+      .eq('id', result.service_provider_id).maybeSingle(),
+    shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle()
+           : Promise.resolve({ data: null }),
+    sc.from('vehicles').select('plate_number, make, model')
+      .eq('plate_number', plateNumber).maybeSingle(),
+  ])
+
+  const sharedArgs = {
+    workOrderNumber,
+    workOrderId,
+    vehiclePlate: vehicle?.plate_number || plateNumber,
+    vehicleMake:  vehicle?.make         || '',
+    vehicleModel: vehicle?.model        || '',
+    providerName: provider?.name        || '—',
+    shopName:     shop?.name            || null,
+    shopTown:     shop?.town            || null,
+    problemDescription,
+    priority,
+    createdAt:    new Date().toISOString(),
+  }
+
+  // ── Path A: Registered owner (has a user account) ────────────────────
+  if (registeredOwnerUserId) {
+    const { data: customer } = await sc.from('user_profiles')
+      .select('id, first_name, last_name, email, phone')
+      .eq('id', registeredOwnerUserId).maybeSingle()
+
+    if (!customer) {
+      console.warn(`[walk-in ${workOrderNumber}] registered owner ${registeredOwnerUserId} not found`)
+      return
+    }
+
+    const customerName = [customer.first_name, customer.last_name]
+      .filter(Boolean).join(' ') || 'Customer'
+
+    // In-app notification
+    try {
+      await sc.from('notifications').insert({
+        user_id:           customer.id,
+        recipient_user_id: customer.id,
+        type:              'walk_in_wo_opened',
+        notification_type: 'walk_in_wo_opened',
+        title:             'Your vehicle is at the garage',
+        message: `Your vehicle ${sharedArgs.vehiclePlate} has been brought in to ${sharedArgs.providerName}. `
+               + `Work order ${workOrderNumber} is now open.`,
+        reference_table: 'work_orders',
+        reference_id:    workOrderId,
+        reference_type:  'work_order',
+        is_read:         false,
+      })
+    } catch (e) {
+      console.warn(`[walk-in ${workOrderNumber}] customer in-app notification failed:`, e.message)
+    }
+
+    // Email + SMS (parallel, best-effort)
+    const tasks = []
+    if (customer.email) {
+      tasks.push(
+        sendWalkInOwnerEmail(sc, {
+          to: customer.email, customerName, ...sharedArgs,
+        })
+          .then(() => console.log(`[walk-in ${workOrderNumber}] ✓ customer email → ${customer.email}`))
+          .catch(e => console.error(`[walk-in ${workOrderNumber}] ✗ customer email: ${e.message}`))
+      )
+    }
+    if (customer.phone) {
+      tasks.push(
+        sendWalkInOwnerSms(sc, {
+          phone: customer.phone,
+          customerName,
+          workOrderNumber,
+          workOrderId,
+          vehiclePlate: sharedArgs.vehiclePlate,
+          providerName: sharedArgs.providerName,
+        })
+          .then(() => console.log(`[walk-in ${workOrderNumber}] ✓ customer SMS → ${customer.phone}`))
+          .catch(e => console.error(`[walk-in ${workOrderNumber}] ✗ customer SMS: ${e.message}`))
+      )
+    }
+    await Promise.allSettled(tasks)
+    return
+  }
+
+  // ── Path C: Company fleet (owner_company_id set) ─────────────────────
+  // Fan out to: company owner + every active fleet manager / admin. Same
+  // pattern as the bookings notify and checkout-notify flows. Dedup by
+  // user_id since the owner is usually also a company_users row.
+  if (registeredOwnerCompanyId) {
+    const [
+      { data: company },
+      { data: fleetMembers },
+    ] = await Promise.all([
+      sc.from('company_profiles')
+        .select('id, name, owner_user_id')
+        .eq('id', registeredOwnerCompanyId).maybeSingle(),
+      sc.from('company_users')
+        .select('user_id, is_admin, can_manage_fleet')
+        .eq('company_id', registeredOwnerCompanyId)
+        .eq('is_active', true),
+    ])
+
+    if (!company) {
+      console.warn(`[walk-in ${workOrderNumber}] company ${registeredOwnerCompanyId} not found`)
+      return
+    }
+
+    // Build dedup'd recipient id set: owner + qualifying members
+    const recipientIds = new Set()
+    if (company.owner_user_id) recipientIds.add(company.owner_user_id)
+    for (const m of (fleetMembers || [])) {
+      if (m.is_admin || m.can_manage_fleet) recipientIds.add(m.user_id)
+    }
+    if (recipientIds.size === 0) {
+      console.log(`[walk-in ${workOrderNumber}] no fleet recipients for company ${company.name}`)
+      return
+    }
+
+    // Fetch profile rows for the contact channels in one query
+    const { data: profiles } = await sc.from('user_profiles')
+      .select('id, first_name, last_name, email, phone')
+      .in('id', Array.from(recipientIds))
+
+    // In-app notifications (batched)
+    try {
+      const notificationRows = (profiles || []).map(p => ({
+        user_id:           p.id,
+        recipient_user_id: p.id,
+        type:              'walk_in_wo_opened',
+        notification_type: 'walk_in_wo_opened',
+        title:             `Fleet vehicle ${sharedArgs.vehiclePlate} at the garage`,
+        message: `${company.name || 'A fleet'} vehicle ${sharedArgs.vehiclePlate} has been brought in `
+               + `to ${sharedArgs.providerName}. Work order ${workOrderNumber} is now open.`,
+        reference_table: 'work_orders',
+        reference_id:    workOrderId,
+        reference_type:  'work_order',
+        is_read:         false,
+      }))
+      if (notificationRows.length > 0) {
+        await sc.from('notifications').insert(notificationRows)
+      }
+    } catch (e) {
+      console.warn(`[walk-in ${workOrderNumber}] fleet in-app notifications failed:`, e.message)
+    }
+
+    // Email + SMS fan-out (parallel, best-effort)
+    const tasks = []
+    for (const p of (profiles || [])) {
+      const recipientName = [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Fleet Manager'
+      const recipientRole = p.id === company.owner_user_id ? 'Company Owner' : 'Fleet Manager'
+
+      if (p.email) {
+        tasks.push(
+          sendWalkInFleetEmail(sc, {
+            to:            p.email,
+            recipientName,
+            recipientRole,
+            companyName:   company.name,
+            ...sharedArgs,
+          })
+            .then(() => console.log(`[walk-in ${workOrderNumber}] ✓ fleet email → ${p.email}`))
+            .catch(e => console.error(`[walk-in ${workOrderNumber}] ✗ fleet email → ${p.email}: ${e.message}`))
+        )
+      }
+      if (p.phone) {
+        tasks.push(
+          sendWalkInFleetSms(sc, {
+            phone:           p.phone,
+            recipientName,
+            companyName:     company.name,
+            workOrderNumber,
+            workOrderId,
+            vehiclePlate:    sharedArgs.vehiclePlate,
+            providerName:    sharedArgs.providerName,
+          })
+            .then(() => console.log(`[walk-in ${workOrderNumber}] ✓ fleet SMS → ${p.phone}`))
+            .catch(e => console.error(`[walk-in ${workOrderNumber}] ✗ fleet SMS → ${p.phone}: ${e.message}`))
+        )
+      }
+    }
+    await Promise.allSettled(tasks)
+    return
+  }
+
+  // ── Path B: Unregistered owner — invite SMS (companion to invite email) ─
+  // The invite email is handled in the main handler (preserves Mailjet
+  // queue semantics). We only handle the SMS leg here. Requires an invite
+  // token (only created when an email was supplied at intake), AND a phone.
+  if (walkInOwner?.phone && result.invitation_token) {
+    try {
+      await sendWalkInInviteSms(sc, {
+        phone:           walkInOwner.phone,
+        customerName:    walkInOwner.name,
+        workOrderNumber,
+        workOrderId,
+        vehiclePlate:    sharedArgs.vehiclePlate,
+        providerName:    sharedArgs.providerName,
+        inviteToken:     result.invitation_token,
+      })
+      console.log(`[walk-in ${workOrderNumber}] ✓ invite SMS → ${walkInOwner.phone}`)
+    } catch (e) {
+      console.error(`[walk-in ${workOrderNumber}] ✗ invite SMS: ${e.message}`)
+    }
+  } else if (walkInOwner?.phone && !result.invitation_token) {
+    // Edge case: a phone was given but no email → the RPC did NOT create an
+    // invitation (current behaviour). We have no token to send. Log so the
+    // gap is visible; the provider can still hand the customer a physical
+    // contact card or follow up manually.
+    console.log(
+      `[walk-in ${workOrderNumber}] phone-only walk-in: no invite token created, ` +
+      `SMS skipped. (Provider should follow up directly.)`
+    )
+  }
 }
 
 // ─── Walk-in invitation email helper (existing — unchanged) ─────────────────
