@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, Calendar, CalendarDays, Users, Package, FileText,
   BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare,
-  Search, Building2
+  Search, Building2, MessageCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -248,6 +248,12 @@ export default function ProviderSidebar({ provider }) {
 
       {/* Sign out */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4">
+        <button
+          onClick={() => { router.push('/provider/feedback'); setMobileOpen(false) }}
+          className="w-full group flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors mb-1">
+          <MessageCircle className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+          Feedback
+        </button>
         <button onClick={handleSignOut}
           className="w-full group flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
           <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />

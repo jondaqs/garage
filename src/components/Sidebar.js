@@ -5,7 +5,8 @@ import {
   Car, User, Plus, Calendar, CalendarDays, History, Bell,
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
-  AlertCircle, Wrench, ClipboardList, Search, MessageSquare
+  AlertCircle, Wrench, ClipboardList, Search, MessageSquare,
+  MessageCircle
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -889,6 +890,13 @@ export default function Sidebar({ user }) {
 
       {/* Logout */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4">
+        <button
+          onClick={() => { router.push('/dashboard/feedback'); setMobileOpen(false) }}
+          className="w-full flex items-center px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-1"
+        >
+          <MessageCircle className="mr-3" size={20} />
+          <span className="font-medium">Feedback</span>
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition"
