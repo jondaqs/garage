@@ -105,6 +105,11 @@ export default function LandingPage() {
         }
         .gc-btn-primary:hover { transform: translateY(-1px); }
 
+        .gc-nav-link:hover {
+          background: rgba(255,255,255,0.08) !important;
+          color: #fff !important;
+        }
+
         .role-card {
           background: rgba(0,0,0,0.25);
           border: 1px solid rgba(255,255,255,0.14);
@@ -223,13 +228,49 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <button
-            onClick={() => router.push('/auth/login')}
-            className="gc-btn-primary"
-            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-          >
-            Sign In <ArrowRight size={15} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => router.push('/about')}
+              className="gc-nav-link"
+              style={{
+                background: 'transparent',
+                color: 'rgba(255,255,255,0.75)',
+                border: 'none',
+                padding: '10px 16px',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              About Us
+            </button>
+            <button
+              onClick={() => router.push('/contact')}
+              className="gc-nav-link"
+              style={{
+                background: 'transparent',
+                color: 'rgba(255,255,255,0.75)',
+                border: 'none',
+                padding: '10px 16px',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              Contact Us
+            </button>
+            <button
+              onClick={() => router.push('/auth/login')}
+              className="gc-btn-primary"
+              style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', marginLeft: 4 }}
+            >
+              Sign In <ArrowRight size={15} />
+            </button>
+          </div>
         </nav>
 
         {/* ── HERO ── */}
@@ -392,6 +433,24 @@ export default function LandingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Car size={16} color="rgba(255,255,255,0.3)" />
             <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>GariCare</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+            <button
+              onClick={() => router.push('/about')}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+            >
+              About
+            </button>
+            <button
+              onClick={() => router.push('/contact')}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+            >
+              Contact
+            </button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
             © {new Date().getFullYear()} GariCare. Built for Kenyan roads.
