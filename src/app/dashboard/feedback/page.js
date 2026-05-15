@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   MessageCircle, Send, Bug, Lightbulb, Sparkles, AlertCircle,
   Heart, MoreHorizontal, Star, Loader2, CheckCircle2, Trash2,
-  Clock, Eye, XCircle
+  Clock, Eye, XCircle, RefreshCw
 } from 'lucide-react'
 
 // ── Shared constants ────────────────────────────────────────────────────────
@@ -274,7 +274,21 @@ export default function CustomerFeedbackPage() {
 
       {/* History */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Your previous feedback</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">Your previous feedback</h2>
+          <button
+            onClick={loadHistory}
+            disabled={loadingList}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+                       text-blue-700 bg-blue-50 hover:bg-blue-100
+                       disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed
+                       rounded-lg transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw size={14} className={loadingList ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
         {loadingList ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="animate-spin text-blue-600" size={24} />
