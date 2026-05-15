@@ -42,7 +42,7 @@ export async function sendWalkInCreatedSms(supabase, {
   const greet = recipientName ? `${recipientName}, ` : ''
   const who   = initiatorName || 'A team member'
 
-  const message = `${BRAND}: ${greet}${who} created walk-in WO ${workOrderNumber} for ${vehiclePlate}. View: ${url}`
+  const message = `${BRAND}: ${greet}${who} created walk-in work order ${workOrderNumber} for ${vehiclePlate}. View: ${url}`
 
   return sendAndQueueSms(supabase, {
     to:             normalisedPhone,
@@ -85,7 +85,7 @@ export async function sendWalkInInviteSms(supabase, {
 
   // Kept compact: ~155 chars with realistic data.
   const message =
-    `${BRAND}: ${greet}your vehicle ${vehiclePlate} is ${who}(WO ${workOrderNumber}). ` +
+    `${BRAND}: ${greet}your vehicle ${vehiclePlate} is ${who}(${workOrderNumber}). ` +
     `Track service & approve estimates: ${signupUrl} (link expires in 7 days).`
 
   return sendAndQueueSms(supabase, {
@@ -163,7 +163,7 @@ export async function sendWalkInFleetSms(supabase, {
 
   const message =
     `${BRAND}: ${greet}${co}vehicle ${vehiclePlate} is ${where}. ` +
-    `WO ${workOrderNumber} opened. Track: ${url}`
+    `${workOrderNumber} opened. Track: ${url}`
 
   return sendAndQueueSms(supabase, {
     to:             normalisedPhone,

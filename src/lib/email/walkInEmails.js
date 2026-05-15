@@ -185,7 +185,7 @@ Open work order: ${workOrderUrl}
 
   return sendAndQueueEmail(supabase, {
     to:             [{ Email: to, Name: recipientName }],
-    subject:        `Walk-In WO Created — ${workOrderNumber} · ${vehiclePlate}`,
+    subject:        `Walk-In Work Order Created — ${workOrderNumber} · ${vehiclePlate}`,
     html,
     text,
     referenceTable: 'work_orders',
@@ -327,7 +327,7 @@ Track service progress: ${workOrderUrl}
 
   return sendAndQueueEmail(supabase, {
     to:             [{ Email: to, Name: customerName || 'Customer' }],
-    subject:        `Your vehicle ${vehiclePlate} is at the garage — WO ${workOrderNumber}`,
+    subject:        `Your vehicle ${vehiclePlate} is at the garage — ${workOrderNumber}`,
     html,
     text,
     referenceTable: 'work_orders',
@@ -472,7 +472,7 @@ Track service progress: ${workOrderUrl}
 
   return sendAndQueueEmail(supabase, {
     to:             [{ Email: to, Name: recipientName || 'Fleet Manager' }],
-    subject:        `Fleet vehicle ${vehiclePlate} at the garage — WO ${workOrderNumber}`,
+    subject:        `Fleet vehicle ${vehiclePlate} at the garage — ${workOrderNumber}`,
     html,
     text,
     referenceTable: 'work_orders',
