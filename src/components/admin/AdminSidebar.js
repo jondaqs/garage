@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, Shield, Settings,
   FileText, Bell, LogOut, CheckCircle, Clock,
-  MailIcon, Building2
+  MailIcon, Building2, MessageCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -117,7 +117,20 @@ export default function AdminSidebar() {
         </nav>
 
         {/* Sign Out */}
-        <div className="flex-shrink-0 flex border-t border-gray-700 p-4">
+        <div className="flex-shrink-0 flex flex-col border-t border-gray-700 p-4 space-y-1">
+          <button
+            onClick={() => router.push('/admin/feedback')}
+            className="w-full group block"
+          >
+            <div className="flex items-center">
+              <MessageCircle className="inline-block h-5 w-5 text-gray-400 group-hover:text-gray-300" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-300 group-hover:text-white">
+                  Feedback
+                </p>
+              </div>
+            </div>
+          </button>
           <button onClick={handleSignOut} className="flex-shrink-0 w-full group block">
             <div className="flex items-center">
               <LogOut className="inline-block h-5 w-5 text-gray-400 group-hover:text-gray-300" />
