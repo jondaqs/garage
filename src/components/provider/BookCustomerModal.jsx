@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   X, Search, Loader2, AlertCircle, CheckCircle, Calendar as CalendarIcon,
   Car, User, Phone, Mail, ClipboardList, Building2, Info, ChevronRight,
-  ArrowLeft, MapPin
+  ArrowLeft, MapPin, List
 } from 'lucide-react'
 
 const STEPS = [
@@ -58,6 +58,12 @@ export default function BookCustomerModal({
   const [searching,   setSearching]   = useState(false)
   const [lookup,      setLookup]      = useState(null) // RPC response
 
+  // Step 1 — email lookup (separate search path)
+  const [emailValue,     setEmailValue]     = useState('')
+  const [searchingEmail, setSearchingEmail] = useState(false)
+  const [emailMatches,   setEmailMatches]   = useState(null) // null = not searched yet
+  const [emailError,     setEmailError]     = useState('')
+
   // Step 2 — booking details
   const [bookingTime,      setBookingTime]      = useState('09:00')
   const [bookingEndTime,   setBookingEndTime]   = useState('10:00')
@@ -77,6 +83,9 @@ export default function BookCustomerModal({
     setSuccessData(null)
     setSearchValue('')
     setLookup(null)
+    setEmailValue('')
+    setEmailMatches(null)
+    setEmailError('')
     setBookingTime('09:00')
     setBookingEndTime('10:00')
     setShopId('')
@@ -130,6 +139,10 @@ export default function BookCustomerModal({
     setSearching(true)
     setError('')
     setLookup(null)
+    // Clear any prior email-search results so the UI shows only the
+    // active search path.
+    setEmailMatches(null)
+    setEmailError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data, error: rpcErr } = await supabase.rpc('lookup_vehicle_and_owner', {
@@ -143,6 +156,53 @@ export default function BookCustomerModal({
     } finally {
       setSearching(false)
     }
+  }
+
+  // ── Step 1: email lookup (independent search path) ───────────────────────
+  // Calls find_vehicles_by_email and returns a list of vehicles linked to
+  // that email (direct owner OR company owner). The provider then picks one
+  // from the list, which routes through selectFromMatches() into the same
+  // `lookup` state shape the existing flow uses — so Step 2/3 don't need any
+  // changes downstream.
+  const handleEmailLookup = async () => {
+    const e = emailValue.trim()
+    if (!e) {
+      setEmailError('Enter an email address')
+      return
+    }
+    setSearchingEmail(true)
+    setEmailError('')
+    setEmailMatches(null)
+    // Clear any prior plate/VIN result so the UI shows only the active path.
+    setLookup(null)
+    setError('')
+    try {
+      const { data, error: rpcErr } = await supabase.rpc('find_vehicles_by_email', {
+        p_email: e,
+      })
+      if (rpcErr) throw rpcErr
+      if (!data?.success) throw new Error(data?.error || 'Email lookup failed')
+      setEmailMatches(data.matches || [])
+    } catch (err) {
+      setEmailError(err.message || 'Email lookup failed')
+    } finally {
+      setSearchingEmail(false)
+    }
+  }
+
+  // Provider clicks a vehicle from the email-results list. We synthesise the
+  // same `lookup` shape the plate/VIN RPC returns so the rest of the modal
+  // (canProceedFromLookup, Next button, Step 2/3) works unchanged.
+  const selectFromMatches = (match) => {
+    if (!match) return
+    setLookup({
+      found:      true,
+      owner_type: match.owner_type,
+      vehicle:    match.vehicle,
+      owner:      match.owner,
+    })
+    // Collapse the picker once a vehicle has been chosen.
+    setEmailMatches(null)
   }
 
   const canProceedFromLookup =
@@ -287,6 +347,127 @@ export default function BookCustomerModal({
                   Min 3 characters. Searches all vehicles registered in Motiifix.
                 </p>
               </div>
+
+              {/* ── OR divider ─────────────────────────────────────────── */}
+              <div className="flex items-center gap-3 my-1" aria-hidden="true">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+
+              {/* ── Email search ───────────────────────────────────────── */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Customer Email
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                      type="email"
+                      value={emailValue}
+                      onChange={e => setEmailValue(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleEmailLookup()}
+                      placeholder="customer@example.com"
+                      className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg
+                                 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
+                    />
+                  </div>
+                  <button
+                    onClick={handleEmailLookup}
+                    disabled={searchingEmail || !emailValue.trim()}
+                    className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700
+                               disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                  >
+                    {searchingEmail ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                    Find Vehicles
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Returns every vehicle linked to that registered customer.
+                </p>
+
+                {emailError && (
+                  <div className="mt-2 flex items-start gap-2 p-2.5 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                    <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                    <span>{emailError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Email-results picker ───────────────────────────────── */}
+              {emailMatches !== null && emailMatches.length === 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div className="text-sm">
+                      <p className="font-medium text-amber-900">No vehicles found for that email</p>
+                      <p className="text-amber-800 mt-0.5">
+                        The email may not be registered, or the customer hasn't added any vehicles yet.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {emailMatches !== null && emailMatches.length > 0 && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <List className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-900">
+                        {emailMatches.length} vehicle{emailMatches.length !== 1 ? 's' : ''} found
+                      </p>
+                      <p className="text-blue-800 mt-0.5 text-xs">
+                        Pick the vehicle you want to book.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto -mx-1 px-1">
+                    {emailMatches.map((m, i) => {
+                      const v = m.vehicle || {}
+                      const ownerLabel =
+                        m.owner_type === 'user'
+                          ? [m.owner?.first_name, m.owner?.last_name].filter(Boolean).join(' ') || 'Registered customer'
+                          : m.owner_type === 'company'
+                          ? `Fleet · ${m.owner?.name || 'company'}`
+                          : 'No registered owner'
+                      const ownerCls =
+                        m.owner_type === 'user'    ? 'text-green-700'  :
+                        m.owner_type === 'company' ? 'text-amber-700'  :
+                                                     'text-gray-500'
+                      return (
+                        <button
+                          key={v.id || i}
+                          onClick={() => selectFromMatches(m)}
+                          className="w-full text-left bg-white border border-gray-200 hover:border-blue-400
+                                     hover:bg-blue-50/40 rounded-lg p-3 transition flex items-center gap-3"
+                        >
+                          <div className="flex-shrink-0 w-9 h-9 rounded-md bg-gray-100 flex items-center justify-center">
+                            <Car size={16} className="text-gray-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-gray-900">
+                                {v.plate_number || '—'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {[v.make, v.model, v.year_of_manufacture].filter(Boolean).join(' · ')}
+                              </span>
+                            </div>
+                            <div className={`text-xs mt-0.5 ${ownerCls}`}>
+                              {ownerLabel}
+                              {m.owner?.phone && <span className="text-gray-500"> · {m.owner.phone}</span>}
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Lookup result panel */}
               {lookup && (
