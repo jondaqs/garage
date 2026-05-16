@@ -137,9 +137,16 @@ export default function MemberProviderCalendarPage() {
   }, [providerId, router])
 
   // ── Load bookings, work orders, vehicles, shops ─────────────────────────
+  // Note: we intentionally do NOT setLoading(true) here. The initial spinner
+  // is driven by the initial-state value (loading=true) which flips false in
+  // this function's finally block on first run. Subsequent refetches (after
+  // booking creation, after reminder scans, after permission denials) update
+  // the page silently — flipping `loading` back to true would unmount the
+  // main JSX tree (including the booking modal), so a user who just saw the
+  // "Booking Created" success screen would have the modal yanked from under
+  // them and re-mounted in its empty Step-0 state.
   const loadData = useCallback(async () => {
     if (!providerId) return
-    setLoading(true)
     try {
       const { data: shopRows } = await supabase
         .from('shops').select('id, name, town')
