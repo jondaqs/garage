@@ -24,7 +24,10 @@ export async function POST(request) {
   try {
     const supabase = await createClient()
     const body     = await request.json()
-    const { providerId, name, email, phone, description, website, provider_type_id } = body
+    const {
+      providerId, name, email, phone, description, website,
+      provider_type_id, currency_id,
+    } = body
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Business name is required' }, { status: 400 })
@@ -39,13 +42,14 @@ export async function POST(request) {
     const { data: result, error: rpcErr } = await supabase.rpc(
       'owner_update_provider_details',
       {
-        p_provider_id:  providerId,
-        p_name:         name.trim(),
-        p_email:        email        || null,
-        p_phone:        phone        || null,
-        p_description:  description  || null,
-        p_website:      website      || null,
+        p_provider_id:      providerId,
+        p_name:             name.trim(),
+        p_email:            email            || null,
+        p_phone:            phone            || null,
+        p_description:      description      || null,
+        p_website:          website          || null,
         p_provider_type_id: provider_type_id || null,
+        p_currency_id:      currency_id      || null,
       }
     )
     if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 })
@@ -65,12 +69,13 @@ export async function POST(request) {
 
     // ── 3. Detect changed fields for admin email summary ─────────────────────
     const changed = []
-    if (name)         changed.push(`Business name: "${name}"`)
-    if (email)        changed.push(`Email: ${email}`)
-    if (phone)        changed.push(`Phone: ${phone}`)
-    if (description)  changed.push('Description updated')
-    if (website)      changed.push(`Website: ${website}`)
+    if (name)             changed.push(`Business name: "${name}"`)
+    if (email)            changed.push(`Email: ${email}`)
+    if (phone)            changed.push(`Phone: ${phone}`)
+    if (description)      changed.push('Description updated')
+    if (website)          changed.push(`Website: ${website}`)
     if (provider_type_id) changed.push('Provider type updated')
+    if (currency_id)      changed.push('Currency updated')
 
     // ── 4. Send admin email (non-fatal) ──────────────────────────────────────
     try {

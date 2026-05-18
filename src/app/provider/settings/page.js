@@ -30,6 +30,7 @@ export default function ProviderSettingsPage() {
 
   // Reference data
   const [providerTypes,    setProviderTypes]    = useState([])
+  const [currencies,       setCurrencies]       = useState([])
   const [allServices,      setAllServices]      = useState([])
   const [selectedServices, setSelectedServices] = useState(new Set())
   const [servicesSaving,   setServicesSaving]   = useState(false)
@@ -41,7 +42,7 @@ export default function ProviderSettingsPage() {
 
   const [business, setBusiness] = useState({
     name: '', email: '', phone: '', description: '',
-    website: '', provider_type_id: '',
+    website: '', provider_type_id: '', currency_id: '',
   })
 
   const [personal, setPersonal] = useState({
@@ -75,7 +76,7 @@ export default function ProviderSettingsPage() {
       // Load provider
       const { data: sp } = await supabase
         .from('service_providers')
-        .select('id, name, email, phone, description, website, provider_type_id, status')
+        .select('id, name, email, phone, description, website, provider_type_id, currency_id, status')
         .eq('owner_user_id', profile.id).single()
 
       if (sp) {
@@ -88,6 +89,7 @@ export default function ProviderSettingsPage() {
           description:      sp.description      || '',
           website:          sp.website          || '',
           provider_type_id: sp.provider_type_id || '',
+          currency_id:      sp.currency_id      || '',
         })
 
         // Load selected services for this provider
@@ -99,12 +101,18 @@ export default function ProviderSettingsPage() {
       }
 
       // Load reference data
-      const [{ data: types }, { data: services }] = await Promise.all([
+      const [{ data: types }, { data: services }, { data: currs }] = await Promise.all([
         supabase.from('service_provider_types').select('id, code, display_name').order('display_name'),
         supabase.from('services').select('id, name, description').order('name'),
+        supabase.from('currencies')
+          .select('id, code, display_name, symbol, sort_order')
+          .eq('is_active', true)
+          .order('sort_order', { nullsFirst: false })
+          .order('code'),
       ])
       setProviderTypes(types || [])
       setAllServices(services || [])
+      setCurrencies(currs || [])
 
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
@@ -356,6 +364,24 @@ export default function ProviderSettingsPage() {
             </select>
             <p className="text-xs text-gray-400 mt-1">
               The category of automotive services you primarily offer.
+            </p>
+          </div>
+
+          <div>
+            <label className={lbl}>Currency</label>
+            <select value={business.currency_id}
+              onChange={e => setBusiness(b => ({ ...b, currency_id: e.target.value }))}
+              className={inp}>
+              <option value="">Select currency...</option>
+              {currencies.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.display_name}{c.symbol ? ` (${c.symbol})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Default currency for your pricing, invoices and work orders.
+              New shops you add will inherit this currency.
             </p>
           </div>
 
