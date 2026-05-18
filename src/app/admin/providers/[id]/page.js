@@ -62,17 +62,10 @@ export default function ProviderDetailPage({ params }) {
       const providerId     = resolvedParams.id
 
       // ── Provider profile ──
-      // Be explicit about the columns — relying on `select(*)` together with
-      // aliased nested selects has bitten us before (owner_user_id sometimes
-      // gets hidden by the `owner:user_profiles(...)` alias on the same row).
       const { data: providerData, error: pErr } = await supabase
         .from('service_providers')
         .select(`
-          id, owner_user_id, provider_type_id, currency_id,
-          name, email, phone, description, website,
-          registration_number, tax_id, years_in_operation,
-          status, is_active, is_verified,
-          verified_at, verified_by, submitted_at, created_at, updated_at,
+          *,
           owner:user_profiles!service_providers_owner_user_id_fkey(
             id, first_name, last_name, email, phone
           ),
@@ -87,40 +80,23 @@ export default function ProviderDetailPage({ params }) {
       setOwner(providerData.owner || null)
 
       // ── Documents ──
-      // Documents are linked to the OWNER's user_profiles.id via
-      // uploaded_files.uploader_user_id, with reference_type='provider_document'.
-      // (Pattern set in src/components/provider-registration/steps/DocumentsStep.js.)
-      if (!providerData.owner_user_id) {
-        console.warn('[provider detail] no owner_user_id on provider, cannot fetch documents')
-        setDocuments([])
-      } else {
-        const { data: docsData, error: docsErr } = await supabase
-          .from('uploaded_files')
-          .select('id, file_name, file_type, file_size, storage_path, storage_bucket, created_at')
-          .eq('uploader_user_id', providerData.owner_user_id)
-          .eq('reference_type', 'provider_document')
-          .order('created_at', { ascending: false })
+      const { data: docsData } = await supabase
+        .from('uploaded_files')
+        .select('id, file_name, file_type, file_size, storage_path, storage_bucket, created_at')
+        .eq('reference_type', 'provider_document')
+        .eq('uploader_user_id', providerData.owner_user_id)
+        .order('created_at', { ascending: true })
 
-        if (docsErr) {
-          console.error('[provider detail] documents query failed:', docsErr)
-        }
-        console.log(
-          '[provider detail] documents lookup',
-          { owner_user_id: providerData.owner_user_id, count: docsData?.length ?? 0 }
-        )
-
-        const docsWithUrls = await Promise.all(
-          (docsData || []).map(async (file) => {
-            const { data: signed, error: sErr } = await supabase
-              .storage
-              .from(file.storage_bucket || 'documents')
-              .createSignedUrl(file.storage_path, 3600)
-            if (sErr) console.error('[provider detail] signed URL failed for', file.storage_path, sErr)
-            return { ...file, publicUrl: sErr ? null : signed.signedUrl }
-          })
-        )
-        setDocuments(docsWithUrls)
-      }
+      const docsWithUrls = await Promise.all(
+        (docsData || []).map(async (file) => {
+          const { data: signed, error: sErr } = await supabase
+            .storage
+            .from(file.storage_bucket || 'documents')
+            .createSignedUrl(file.storage_path, 3600)
+          return { ...file, publicUrl: sErr ? null : signed.signedUrl }
+        })
+      )
+      setDocuments(docsWithUrls)
 
       // ── Shops ──
       const { data: shopsData } = await supabase
@@ -646,13 +622,7 @@ export default function ProviderDetailPage({ params }) {
           {documents.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="font-medium">No documents found for this provider</p>
-              <p className="text-xs text-gray-400 mt-2 max-w-md mx-auto">
-                Documents are uploaded during registration and stored against the
-                owner's profile. If you expect documents here, verify your account
-                has the <span className="font-mono">admin</span> role and check the
-                browser console for diagnostic output.
-              </p>
+              <p>No documents uploaded for this provider</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
