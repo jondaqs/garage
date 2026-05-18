@@ -4,34 +4,62 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Search, CheckCircle, Clock, XCircle, AlertCircle, Store } from 'lucide-react'
+import {
+  Search, CheckCircle, Clock, XCircle, AlertCircle, Store,
+  History, AlertTriangle,
+} from 'lucide-react'
 import Link from 'next/link'
 
+const FIELD_LABELS = {
+  name:                'Business Name',
+  email:               'Business Email',
+  phone:               'Business Phone',
+  description:         'Description',
+  website:             'Website',
+  registration_number: 'Registration Number',
+  tax_id:              'Tax ID',
+  provider_type_id:    'Provider Type',
+  currency_id:         'Currency',
+  years_in_operation:  'Years in Operation',
+}
+
 export default function AllProvidersPage() {
-  const router = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
 
-  const [providers, setProviders] = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
+  const [providers,    setProviders]    = useState([])
+  const [pendingDiffs, setPendingDiffs] = useState({})   // service_provider_id -> latest change row
+  const [loading,      setLoading]      = useState(true)
+  const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
   useEffect(() => { loadProviders() }, [])
 
   const loadProviders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('service_providers')
-        .select(`
-          id, name, status, is_active, is_verified, created_at, submitted_at,
-          owner:user_profiles(first_name, last_name, email),
-          provider_type:service_provider_types(display_name),
-          shops(id)
-        `)
-        .order('created_at', { ascending: false })
+      const [{ data: provs, error }, { data: pending }] = await Promise.all([
+        supabase
+          .from('service_providers')
+          .select(`
+            id, name, status, is_active, is_verified, created_at, submitted_at,
+            owner:user_profiles(first_name, last_name, email),
+            provider_type:service_provider_types(display_name),
+            shops(id)
+          `)
+          .order('created_at', { ascending: false }),
+
+        // Pending diffs are only relevant for providers in pending_verification.
+        // The view filters that for us.
+        supabase
+          .from('provider_pending_changes')
+          .select('service_provider_id, changed_fields, change_count, is_reverification, verified_at_snapshot'),
+      ])
 
       if (error) throw error
-      setProviders(data || [])
+      setProviders(provs || [])
+      setPendingDiffs(
+        Object.fromEntries((pending || []).map(r => [r.service_provider_id, r]))
+      )
     } catch (err) {
       console.error('Error loading providers:', err)
     } finally {
@@ -120,6 +148,7 @@ export default function AllProvidersPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changes</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
             </tr>
@@ -127,46 +156,72 @@ export default function AllProvidersPage() {
           <tbody className="bg-white divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
+                <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
                   <Store className="w-10 h-10 mx-auto mb-2 text-gray-200" />
                   No providers found
                 </td>
               </tr>
             ) : (
-              filtered.map(p => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-gray-900">{p.name}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm text-gray-900">{p.owner?.first_name} {p.owner?.last_name}</p>
-                    <p className="text-xs text-gray-400">{p.owner?.email}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">{p.provider_type?.display_name || '—'}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">{p.shops?.length ?? 0}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusBadge(p.status)}`}>
-                      {statusIcon(p.status)}
-                      {p.status?.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Link
-                      href={`/admin/providers/${p.id}`}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      View →
-                    </Link>
-                  </td>
-                </tr>
-              ))
+              filtered.map(p => {
+                const diff = pendingDiffs[p.id]
+                const labels = diff?.changed_fields
+                  ? Object.keys(diff.changed_fields).map(f => FIELD_LABELS[f] || f)
+                  : []
+                return (
+                  <tr key={p.id} className="hover:bg-gray-50 align-top">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-900">{p.name}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-900">{p.owner?.first_name} {p.owner?.last_name}</p>
+                      <p className="text-xs text-gray-400">{p.owner?.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-600">{p.provider_type?.display_name || '—'}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-600">{p.shops?.length ?? 0}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusBadge(p.status)}`}>
+                        {statusIcon(p.status)}
+                        {p.status?.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {diff && labels.length > 0 ? (
+                        <div>
+                          <div className="flex items-center gap-1 text-xs font-medium text-gray-900 mb-1">
+                            <AlertTriangle className="w-3 h-3 text-yellow-600" />
+                            {diff.change_count} changed
+                          </div>
+                          {diff.is_reverification && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">
+                              <History className="w-2.5 h-2.5" /> Re-verify
+                            </span>
+                          )}
+                          <p className="text-[10px] text-gray-500 mt-1 line-clamp-1" title={labels.join(', ')}>
+                            {labels.slice(0, 2).join(', ')}{labels.length > 2 ? '…' : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link
+                        href={`/admin/providers/${p.id}`}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        View →
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
