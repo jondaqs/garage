@@ -18,6 +18,7 @@ export default function EditShopPage() {
   const router = useRouter()
   const params = useParams()
   const supabase = createClient()
+  const [currencies, setCurrencies] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -35,7 +36,8 @@ export default function EditShopPage() {
     latitude: '',
     longitude: '',
     opening_time: '',
-    closing_time: ''
+    closing_time: '',
+    currency_id: '',
   })
 
   useEffect(() => {
@@ -46,13 +48,22 @@ export default function EditShopPage() {
 
   const loadShop = async () => {
     try {
-      const { data, error: fetchError } = await supabase
-        .from('shops')
-        .select('*')
-        .eq('id', params.id)
-        .single()
+      const [{ data, error: fetchError }, { data: currs }] = await Promise.all([
+        supabase
+          .from('shops')
+          .select('*')
+          .eq('id', params.id)
+          .single(),
+        supabase
+          .from('currencies')
+          .select('id, code, display_name, symbol, sort_order')
+          .eq('is_active', true)
+          .order('sort_order', { nullsFirst: false })
+          .order('code'),
+      ])
 
       if (fetchError) throw fetchError
+      setCurrencies(currs || [])
 
       setFormData({
         name: data.name || '',
@@ -66,7 +77,8 @@ export default function EditShopPage() {
         latitude: data.latitude?.toString() || '',
         longitude: data.longitude?.toString() || '',
         opening_time: data.opening_time || '',
-        closing_time: data.closing_time || ''
+        closing_time: data.closing_time || '',
+        currency_id: data.currency_id || '',
       })
 
     } catch (err) {
@@ -99,6 +111,7 @@ export default function EditShopPage() {
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         opening_time: formData.opening_time,
         closing_time: formData.closing_time,
+        currency_id: formData.currency_id || null,
         updated_by: user.id
       }
 
@@ -426,6 +439,33 @@ export default function EditShopPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Pricing / Currency */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Currency
+              </label>
+              <select
+                name="currency_id"
+                value={formData.currency_id}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Use default (provider currency)</option>
+                {currencies.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} — {c.display_name}{c.symbol ? ` (${c.symbol})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The currency used for pricing and invoices at this shop.
+                Changes apply to new work orders only — existing records keep their original currency.
+              </p>
             </div>
           </div>
 

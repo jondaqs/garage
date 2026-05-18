@@ -18,6 +18,7 @@ export default function AddShopPage() {
   const router = useRouter()
   const supabase = createClient()
   const [provider, setProvider] = useState(null)
+  const [currencies, setCurrencies] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -34,7 +35,8 @@ export default function AddShopPage() {
     latitude: '',
     longitude: '',
     opening_time: '08:00',
-    closing_time: '17:00'
+    closing_time: '17:00',
+    currency_id: '',
   })
 
   useEffect(() => {
@@ -55,13 +57,29 @@ export default function AddShopPage() {
         .eq('auth_user_id', user.id)
         .single()
 
-      const { data: providerData } = await supabase
-        .from('service_providers')
-        .select('*')
-        .eq('owner_user_id', profile.id)
-        .single()
+      const [{ data: providerData }, { data: currs }] = await Promise.all([
+        supabase
+          .from('service_providers')
+          .select('*')
+          .eq('owner_user_id', profile.id)
+          .single(),
+        supabase
+          .from('currencies')
+          .select('id, code, display_name, symbol, sort_order')
+          .eq('is_active', true)
+          .order('sort_order', { nullsFirst: false })
+          .order('code'),
+      ])
 
       setProvider(providerData)
+      setCurrencies(currs || [])
+
+      // Pre-select the provider's currency so the user can see the default.
+      // The DB trigger would do the same on INSERT if left blank, but showing
+      // it explicitly is clearer.
+      if (providerData?.currency_id) {
+        setFormData(f => ({ ...f, currency_id: providerData.currency_id }))
+      }
     } catch (err) {
       console.error('Error loading provider:', err)
       setError('Failed to load provider information')
@@ -95,6 +113,9 @@ export default function AddShopPage() {
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         opening_time: formData.opening_time,
         closing_time: formData.closing_time,
+        // If left blank, the BEFORE INSERT trigger on shops will copy from
+        // the parent service_providers.currency_id (or fall back to KES).
+        currency_id: formData.currency_id || null,
         is_active: true,
         updated_by: user.id
       }
@@ -426,6 +447,33 @@ export default function AddShopPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Pricing / Currency */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Currency
+              </label>
+              <select
+                name="currency_id"
+                value={formData.currency_id}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Use default (provider currency)</option>
+                {currencies.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} — {c.display_name}{c.symbol ? ` (${c.symbol})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The currency used for pricing and invoices at this shop.
+                If left blank, your provider currency will be used.
+              </p>
             </div>
           </div>
 

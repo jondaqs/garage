@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { MapPin, Phone, Mail, Clock, Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
+import { MapPin, Phone, Mail, Clock, Plus, Edit, Trash2, AlertCircle, DollarSign } from 'lucide-react'
 
 export default function ProviderShopsPage() {
   const router = useRouter()
@@ -45,7 +45,10 @@ export default function ProviderShopsPage() {
       // Load shops
       const { data: shopsData, error: shopsError } = await supabase
         .from('shops')
-        .select('*')
+        .select(`
+          *,
+          currency:currencies(code, symbol, display_name)
+        `)
         .eq('service_provider_id', providerData.id)
         .order('created_at', { ascending: false })
 
@@ -209,6 +212,17 @@ export default function ProviderShopsPage() {
                     <div className="flex items-center text-sm text-gray-600">
                       <Clock size={16} className="mr-2" />
                       <span>{shop.opening_time} - {shop.closing_time}</span>
+                    </div>
+                  )}
+
+                  {/* Currency */}
+                  {shop.currency && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <DollarSign size={16} className="mr-2" />
+                      <span>
+                        {shop.currency.code}
+                        {shop.currency.symbol ? ` (${shop.currency.symbol})` : ''}
+                      </span>
                     </div>
                   )}
                 </div>
