@@ -4,14 +4,16 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Settings, User, Store, Lock, CheckCircle, AlertCircle,
-  Loader2, Save, Eye, EyeOff, Clock, Info, Wrench, Plus, X
+  Loader2, Save, Eye, EyeOff, Clock, Info, Wrench, Plus, X,
+  FileText, Upload, Trash2, ExternalLink, RefreshCw,
 } from 'lucide-react'
 
 const TABS = [
-  { id: 'business', label: 'Business Profile', icon: Store  },
-  { id: 'services', label: 'Services Offered',  icon: Wrench },
-  { id: 'personal', label: 'My Profile',         icon: User  },
-  { id: 'security', label: 'Security',            icon: Lock  },
+  { id: 'business',  label: 'Business Profile', icon: Store    },
+  { id: 'services',  label: 'Services Offered', icon: Wrench   },
+  { id: 'documents', label: 'Documents',        icon: FileText },
+  { id: 'personal',  label: 'My Profile',       icon: User     },
+  { id: 'security',  label: 'Security',          icon: Lock    },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent'
@@ -54,6 +56,13 @@ export default function ProviderSettingsPage() {
   const [pwError, setPwError]   = useState('')
   const [pwSaving, setPwSaving] = useState(false)
 
+  // Documents state
+  const [userProfileId, setUserProfileId] = useState(null)
+  const [documents,     setDocuments]     = useState([])
+  const [docsLoading,   setDocsLoading]   = useState(false)
+  const [uploadingType, setUploadingType] = useState(null)   // doc-type currently uploading
+  const [docError,      setDocError]      = useState('')
+
   useEffect(() => { load() }, [])
 
   const load = async () => {
@@ -65,12 +74,16 @@ export default function ProviderSettingsPage() {
         .eq('auth_user_id', user.id).single()
 
       if (profile) {
+        setUserProfileId(profile.id)
         setPersonal({
           first_name: profile.first_name || '',
           last_name:  profile.last_name  || '',
           phone:      profile.phone      || '',
           bio:        profile.bio        || '',
         })
+
+        // Kick off documents load in parallel (non-blocking).
+        loadDocuments(profile.id)
       }
 
       // Load provider
@@ -215,6 +228,248 @@ export default function ProviderSettingsPage() {
     } catch (err) { setPwError(err.message) }
     finally { setPwSaving(false) }
   }
+
+  // ─── DOCUMENTS ─────────────────────────────────────────────────────────
+  // Document types here mirror provider-registration/steps/DocumentsStep.js
+  // exactly, so re-uploads stay consistent with what the admin reviewer sees.
+  const DOCUMENT_TYPES = [
+    { id: 'business_license', label: 'Business Registration Certificate',
+      description: 'Valid business registration from relevant authority',
+      required: true },
+    { id: 'tax_compliance',   label: 'KRA PIN Certificate / Tax Compliance',
+      description: 'Valid KRA PIN certificate or tax compliance certificate',
+      required: true },
+    { id: 'insurance',        label: 'Insurance Certificate',
+      description: 'Professional indemnity or public liability insurance (if applicable)',
+      required: false },
+    { id: 'id_passport',      label: 'ID / Passport Copy',
+      description: 'Valid identification document for business owner',
+      required: true },
+  ]
+
+  // storage_path layout from registration step:
+  //   {auth_user_id}/{docType}_{timestamp}.{ext}
+  // Extract docType from the basename so we can group by it.
+  const extractDocType = (storage_path) => {
+    if (!storage_path) return 'other'
+    const base = storage_path.split('/').pop() || ''
+    const m    = base.match(/^([a-z_]+)_\d+\./i)
+    return m ? m[1] : 'other'
+  }
+
+  // Calls owner_log_document_change RPC. Each `changes` entry is
+  //   { action: 'uploaded' | 'replaced' | 'deleted', doc_type, file_name }.
+  // The RPC flips provider status to pending_verification and writes one row
+  // into provider_change_history with a 'documents' key.
+  const logDocChange = async (changes) => {
+    if (!providerId || !changes?.length) return
+    try {
+      const { data, error } = await supabase.rpc('owner_log_document_change', {
+        p_provider_id: providerId,
+        p_changes:     changes,
+      })
+      if (error) throw error
+      if (data && !data.success) throw new Error(data.error || 'RPC failed')
+      // Reflect the new status locally so the pending banner appears.
+      setStatus('pending_verification')
+    } catch (e) {
+      console.error('owner_log_document_change failed:', e)
+      // Don't surface to user as a hard error — the doc change itself worked,
+      // and admins can still see status updates from the next profile save.
+      setDocError(
+        'Document change saved, but the re-verification request could not be sent. ' +
+        'Try saving your business profile to re-trigger admin review.'
+      )
+    }
+  }
+
+  const loadDocuments = async (profileId) => {
+    if (!profileId) return
+    setDocsLoading(true)
+    setDocError('')
+    try {
+      const { data, error } = await supabase
+        .from('uploaded_files')
+        .select('id, file_name, file_type, file_size, storage_path, storage_bucket, created_at')
+        .eq('uploader_user_id', profileId)
+        .eq('reference_type', 'provider_document')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+
+      const withType = (data || []).map(d => ({ ...d, docType: extractDocType(d.storage_path) }))
+      setDocuments(withType)
+    } catch (e) {
+      console.error('Documents load failed:', e)
+      setDocError(e.message)
+    } finally {
+      setDocsLoading(false)
+    }
+  }
+
+  const handleDocUpload = async (docType, file) => {
+    setDocError('')
+    setUploadingType(docType)
+    try {
+      // Validate
+      if (file.size > 10 * 1024 * 1024) throw new Error('File too large. Maximum size is 10MB.')
+      const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+      if (!allowed.includes(file.type)) throw new Error('Invalid file type. Only PDF, JPG, PNG allowed.')
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      const ext      = file.name.split('.').pop()
+      const path     = `${user.id}/${docType}_${Date.now()}.${ext}`
+
+      // 1. Upload to storage
+      const { error: upErr } = await supabase.storage
+        .from('documents')
+        .upload(path, file, { cacheControl: '3600', upsert: false })
+      if (upErr) throw upErr
+
+      // 2. Insert metadata row
+      const { error: insErr } = await supabase
+        .from('uploaded_files')
+        .insert({
+          uploader_user_id: userProfileId,
+          file_name:        file.name,
+          file_size:        file.size,
+          file_type:        file.type,
+          storage_path:     path,
+          storage_bucket:   'documents',
+          reference_type:   'provider_document',
+          is_public:        false,
+        })
+      if (insErr) throw insErr
+
+      // Flip provider to pending_verification + log to change history.
+      // We do this after the storage+DB inserts succeeded so a failed RPC
+      // doesn't strand the user with an unverified upload.
+      await logDocChange([
+        { action: 'uploaded', doc_type: docType, file_name: file.name },
+      ])
+
+      await loadDocuments(userProfileId)
+      setSuccess(`${file.name} uploaded. Submitted for re-verification.`)
+      setTimeout(() => setSuccess(''), 3500)
+    } catch (e) {
+      console.error('Upload failed:', e)
+      setDocError(e.message)
+    } finally {
+      setUploadingType(null)
+    }
+  }
+
+  const handleDocDelete = async (doc) => {
+    if (!confirm(`Delete "${doc.file_name}"? This cannot be undone.`)) return
+    setDocError('')
+    try {
+      // 1. Storage first — leaving an orphaned file is worse than an orphaned row
+      const { error: stErr } = await supabase.storage
+        .from(doc.storage_bucket || 'documents')
+        .remove([doc.storage_path])
+      if (stErr) throw stErr
+
+      // 2. DB row
+      const { error: dbErr } = await supabase
+        .from('uploaded_files')
+        .delete()
+        .eq('id', doc.id)
+      if (dbErr) throw dbErr
+
+      await logDocChange([
+        { action: 'deleted', doc_type: doc.docType || 'other', file_name: doc.file_name },
+      ])
+
+      await loadDocuments(userProfileId)
+      setSuccess(`${doc.file_name} deleted. Submitted for re-verification.`)
+      setTimeout(() => setSuccess(''), 3500)
+    } catch (e) {
+      console.error('Delete failed:', e)
+      setDocError(e.message)
+    }
+  }
+
+  // "Edit" in the original ask = replace the file. We do this as
+  // upload-new-then-delete-old so a failure leaves the user with a document,
+  // never with nothing.
+  const handleDocReplace = async (oldDoc, file) => {
+    setDocError('')
+    setUploadingType(oldDoc.docType)
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error('File too large. Maximum size is 10MB.')
+      const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+      if (!allowed.includes(file.type)) throw new Error('Invalid file type. Only PDF, JPG, PNG allowed.')
+
+      const { data: { user } } = await supabase.auth.getUser()
+      const ext  = file.name.split('.').pop()
+      const path = `${user.id}/${oldDoc.docType}_${Date.now()}.${ext}`
+
+      const { error: upErr } = await supabase.storage
+        .from('documents')
+        .upload(path, file, { cacheControl: '3600', upsert: false })
+      if (upErr) throw upErr
+
+      const { error: insErr } = await supabase
+        .from('uploaded_files')
+        .insert({
+          uploader_user_id: userProfileId,
+          file_name:        file.name,
+          file_size:        file.size,
+          file_type:        file.type,
+          storage_path:     path,
+          storage_bucket:   'documents',
+          reference_type:   'provider_document',
+          is_public:        false,
+        })
+      if (insErr) throw insErr
+
+      // New file succeeded — now clean up the old one (best-effort, don't
+      // bubble errors so the user still has a working document).
+      try {
+        await supabase.storage
+          .from(oldDoc.storage_bucket || 'documents')
+          .remove([oldDoc.storage_path])
+        await supabase.from('uploaded_files').delete().eq('id', oldDoc.id)
+      } catch (cleanupErr) {
+        console.warn('Old document cleanup failed (non-fatal):', cleanupErr)
+      }
+
+      await logDocChange([
+        { action: 'replaced', doc_type: oldDoc.docType, file_name: file.name },
+      ])
+
+      await loadDocuments(userProfileId)
+      setSuccess(`${file.name} replaced previous file. Submitted for re-verification.`)
+      setTimeout(() => setSuccess(''), 3500)
+    } catch (e) {
+      console.error('Replace failed:', e)
+      setDocError(e.message)
+    } finally {
+      setUploadingType(null)
+    }
+  }
+
+  const handleDocView = async (doc) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from(doc.storage_bucket || 'documents')
+        .createSignedUrl(doc.storage_path, 300)   // 5-min signed URL
+      if (error) throw error
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      console.error('View failed:', e)
+      setDocError(e.message)
+    }
+  }
+
+  const formatBytes = (b) => {
+    if (!b) return ''
+    if (b < 1024) return `${b} B`
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`
+  }
+  // ─── /DOCUMENTS ────────────────────────────────────────────────────────
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -533,6 +788,194 @@ export default function ProviderSettingsPage() {
               {servicesSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save Services
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Documents ── */}
+      {tab === 'documents' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Business Documents</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Upload, replace, or remove the documents that verify your business.
+                  Max file size 10 MB. Accepted: PDF, JPG, PNG.
+                </p>
+              </div>
+              <button
+                onClick={() => loadDocuments(userProfileId)}
+                disabled={docsLoading}
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={docsLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
+
+            {docError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{docError}</p>
+              </div>
+            )}
+
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+              <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-800">
+                Uploading, replacing, or deleting any document submits your profile
+                for re-verification. You'll be notified once an admin reviews the change.
+              </p>
+            </div>
+
+            {/* Document types — render one card per required/optional type */}
+            <div className="space-y-3">
+              {DOCUMENT_TYPES.map((type) => {
+                // Most recent file of this type
+                const matches = documents.filter(d => d.docType === type.id)
+                const current = matches[0] || null
+                const olderCount = matches.length > 1 ? matches.length - 1 : 0
+                const isUploading = uploadingType === type.id
+
+                return (
+                  <div key={type.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-900">{type.label}</p>
+                          {type.required && (
+                            <span className="text-[10px] uppercase font-medium px-1.5 py-0.5 bg-red-50 text-red-700 rounded">Required</span>
+                          )}
+                          {!type.required && (
+                            <span className="text-[10px] uppercase font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">Optional</span>
+                          )}
+                          {current && (
+                            <span className="inline-flex items-center gap-1 text-[10px] uppercase font-medium px-1.5 py-0.5 bg-green-50 text-green-700 rounded">
+                              <CheckCircle size={10} /> Uploaded
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">{type.description}</p>
+                      </div>
+                    </div>
+
+                    {current ? (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText size={16} className="text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{current.file_name}</p>
+                              <p className="text-[11px] text-gray-400">
+                                {formatBytes(current.file_size)} · uploaded {new Date(current.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => handleDocView(current)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-white"
+                            >
+                              <ExternalLink size={12} /> View
+                            </button>
+
+                            <label className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 cursor-pointer">
+                              <Upload size={12} />
+                              {isUploading ? 'Replacing…' : 'Replace'}
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                disabled={isUploading}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0]
+                                  if (f) handleDocReplace(current, f)
+                                  e.target.value = '' // allow same file re-select
+                                }}
+                              />
+                            </label>
+
+                            <button
+                              onClick={() => handleDocDelete(current)}
+                              disabled={isUploading}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        {olderCount > 0 && (
+                          <p className="text-[11px] text-gray-400 mt-2">
+                            {olderCount} earlier version{olderCount === 1 ? '' : 's'} on file.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <label className="block border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-green-400 hover:bg-green-50 cursor-pointer transition-colors">
+                        <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+                        <p className="text-xs font-medium text-gray-700">
+                          {isUploading ? 'Uploading…' : 'Click to upload'}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">PDF, JPG, or PNG · up to 10 MB</p>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          disabled={isUploading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) handleDocUpload(type.id, f)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Any documents that don't match a known type (e.g. legacy "other"
+                category) so the user can still see and manage them. */}
+            {documents.some(d => !DOCUMENT_TYPES.find(t => t.id === d.docType)) && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Other Documents</h3>
+                <div className="space-y-2">
+                  {documents
+                    .filter(d => !DOCUMENT_TYPES.find(t => t.id === d.docType))
+                    .map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText size={14} className="text-gray-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{doc.file_name}</p>
+                            <p className="text-[11px] text-gray-400">
+                              {formatBytes(doc.file_size)} · {new Date(doc.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => handleDocView(doc)} className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-white">
+                            View
+                          </button>
+                          <button onClick={() => handleDocDelete(doc)} className="px-2 py-1 text-xs text-red-700 border border-red-300 rounded hover:bg-red-50">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {documents.length === 0 && !docsLoading && (
+              <div className="text-xs text-gray-400 text-center mt-4">
+                No documents on file yet.
+              </div>
+            )}
           </div>
         </div>
       )}

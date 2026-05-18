@@ -25,6 +25,22 @@ const FIELD_LABELS = {
   provider_type_id:    'Provider Type',
   currency_id:         'Currency',
   years_in_operation:  'Years in Operation',
+  documents:           'Documents',
+}
+
+// Document types mirror those in provider-registration/steps/DocumentsStep.js
+// and the provider settings Documents tab. Anything else falls through as-is.
+const DOC_TYPE_LABELS = {
+  business_license: 'Business Registration Certificate',
+  tax_compliance:   'KRA PIN / Tax Compliance',
+  insurance:        'Insurance Certificate',
+  id_passport:      'ID / Passport Copy',
+}
+
+const DOC_ACTION_STYLES = {
+  uploaded: { label: 'Uploaded', cls: 'bg-green-100  text-green-800' },
+  replaced: { label: 'Replaced', cls: 'bg-blue-100   text-blue-800'  },
+  deleted:  { label: 'Deleted',  cls: 'bg-red-100    text-red-800'   },
 }
 
 // Some changed values are uuids (provider_type_id, currency_id). We resolve
@@ -32,6 +48,44 @@ const FIELD_LABELS = {
 const RESOLVABLE_FK = {
   provider_type_id: { table: 'service_provider_types', label: 'display_name' },
   currency_id:      { table: 'currencies',             label: 'display_name' },
+}
+
+// Renders a single row in the diff table for the `documents` field. Spans the
+// "previous" and "new" columns because document changes don't have a simple
+// "old → new" shape — each entry is { action, doc_type, file_name } and may
+// be uploaded, replaced, or deleted.
+function DocumentsDiffRow({ entries, compact = false }) {
+  const list = Array.isArray(entries) ? entries : []
+  if (list.length === 0) return null
+
+  const pad = compact ? 'py-1.5 pr-3' : 'px-4 py-2'
+  return (
+    <tr>
+      <td className={`${pad} font-medium text-gray-900 align-top w-44`}>
+        Documents
+      </td>
+      <td className={`${pad} align-top`} colSpan={2}>
+        <ul className="space-y-1.5">
+          {list.map((entry, i) => {
+            const style = DOC_ACTION_STYLES[entry.action] || { label: entry.action, cls: 'bg-gray-100 text-gray-700' }
+            return (
+              <li key={i} className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded ${style.cls}`}>
+                  {style.label}
+                </span>
+                <span className="text-sm text-gray-900">
+                  {DOC_TYPE_LABELS[entry.doc_type] || entry.doc_type}
+                </span>
+                {entry.file_name && (
+                  <span className="text-xs text-gray-500 break-all">— {entry.file_name}</span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </td>
+    </tr>
+  )
 }
 
 export default function ProviderDetailPage({ params }) {
@@ -62,10 +116,17 @@ export default function ProviderDetailPage({ params }) {
       const providerId     = resolvedParams.id
 
       // ── Provider profile ──
+      // Be explicit about the columns — relying on `select(*)` together with
+      // aliased nested selects has bitten us before (owner_user_id sometimes
+      // gets hidden by the `owner:user_profiles(...)` alias on the same row).
       const { data: providerData, error: pErr } = await supabase
         .from('service_providers')
         .select(`
-          *,
+          id, owner_user_id, provider_type_id, currency_id,
+          name, email, phone, description, website,
+          registration_number, tax_id, years_in_operation,
+          status, is_active, is_verified,
+          verified_at, verified_by, submitted_at, created_at, updated_at,
           owner:user_profiles!service_providers_owner_user_id_fkey(
             id, first_name, last_name, email, phone
           ),
@@ -80,23 +141,40 @@ export default function ProviderDetailPage({ params }) {
       setOwner(providerData.owner || null)
 
       // ── Documents ──
-      const { data: docsData } = await supabase
-        .from('uploaded_files')
-        .select('id, file_name, file_type, file_size, storage_path, storage_bucket, created_at')
-        .eq('reference_type', 'provider_document')
-        .eq('uploader_user_id', providerData.owner_user_id)
-        .order('created_at', { ascending: true })
+      // Documents are linked to the OWNER's user_profiles.id via
+      // uploaded_files.uploader_user_id, with reference_type='provider_document'.
+      // (Pattern set in src/components/provider-registration/steps/DocumentsStep.js.)
+      if (!providerData.owner_user_id) {
+        console.warn('[provider detail] no owner_user_id on provider, cannot fetch documents')
+        setDocuments([])
+      } else {
+        const { data: docsData, error: docsErr } = await supabase
+          .from('uploaded_files')
+          .select('id, file_name, file_type, file_size, storage_path, storage_bucket, created_at')
+          .eq('uploader_user_id', providerData.owner_user_id)
+          .eq('reference_type', 'provider_document')
+          .order('created_at', { ascending: false })
 
-      const docsWithUrls = await Promise.all(
-        (docsData || []).map(async (file) => {
-          const { data: signed, error: sErr } = await supabase
-            .storage
-            .from(file.storage_bucket || 'documents')
-            .createSignedUrl(file.storage_path, 3600)
-          return { ...file, publicUrl: sErr ? null : signed.signedUrl }
-        })
-      )
-      setDocuments(docsWithUrls)
+        if (docsErr) {
+          console.error('[provider detail] documents query failed:', docsErr)
+        }
+        console.log(
+          '[provider detail] documents lookup',
+          { owner_user_id: providerData.owner_user_id, count: docsData?.length ?? 0 }
+        )
+
+        const docsWithUrls = await Promise.all(
+          (docsData || []).map(async (file) => {
+            const { data: signed, error: sErr } = await supabase
+              .storage
+              .from(file.storage_bucket || 'documents')
+              .createSignedUrl(file.storage_path, 3600)
+            if (sErr) console.error('[provider detail] signed URL failed for', file.storage_path, sErr)
+            return { ...file, publicUrl: sErr ? null : signed.signedUrl }
+          })
+        )
+        setDocuments(docsWithUrls)
+      }
 
       // ── Shops ──
       const { data: shopsData } = await supabase
@@ -437,8 +515,15 @@ export default function ProviderDetailPage({ params }) {
               <p className="text-sm text-yellow-800 mt-0.5">
                 {pendingDiff.is_reverification ? (
                   <>
-                    Owner updated {Object.keys(pendingDiff.changed_fields).length} field
-                    {Object.keys(pendingDiff.changed_fields).length === 1 ? '' : 's'}
+                    {(() => {
+                      const f = pendingDiff.changed_fields || {}
+                      const scalarCount = Object.keys(f).filter(k => k !== 'documents').length
+                      const docCount    = Array.isArray(f.documents) ? f.documents.length : 0
+                      const parts = []
+                      if (scalarCount) parts.push(`${scalarCount} field${scalarCount === 1 ? '' : 's'}`)
+                      if (docCount)    parts.push(`${docCount} document${docCount === 1 ? '' : 's'}`)
+                      return parts.length ? `Owner updated ${parts.join(' + ')}` : 'Owner submitted changes'
+                    })()}
                     {pendingDiff.verified_at_snapshot && (
                       <> since last approval on {new Date(pendingDiff.verified_at_snapshot).toLocaleDateString()}</>
                     )}
@@ -456,21 +541,24 @@ export default function ProviderDetailPage({ params }) {
               <thead className="bg-yellow-100/50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-yellow-900 uppercase tracking-wider">Field</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-yellow-900 uppercase tracking-wider">Previous</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-yellow-900 uppercase tracking-wider">New</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-yellow-900 uppercase tracking-wider" colSpan="2">Change</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-yellow-50">
-                {Object.entries(pendingDiff.changed_fields).map(([field, { old: oldVal, new: newVal }]) => (
-                  <tr key={field}>
-                    <td className="px-4 py-2 font-medium text-gray-900">{FIELD_LABELS[field] || field}</td>
-                    <td className="px-4 py-2 text-gray-500 line-through decoration-red-300">
-                      {displayValue(field, oldVal)}
-                    </td>
-                    <td className="px-4 py-2 text-green-700 font-medium">
-                      {displayValue(field, newVal)}
-                    </td>
-                  </tr>
+                {Object.entries(pendingDiff.changed_fields).map(([field, value]) => (
+                  field === 'documents'
+                    ? <DocumentsDiffRow key={field} entries={value} />
+                    : (
+                      <tr key={field}>
+                        <td className="px-4 py-2 font-medium text-gray-900 align-top w-44">{FIELD_LABELS[field] || field}</td>
+                        <td className="px-4 py-2 text-gray-500 line-through decoration-red-300 align-top">
+                          {displayValue(field, value?.old)}
+                        </td>
+                        <td className="px-4 py-2 text-green-700 font-medium align-top">
+                          {displayValue(field, value?.new)}
+                        </td>
+                      </tr>
+                    )
                 ))}
               </tbody>
             </table>
@@ -622,7 +710,13 @@ export default function ProviderDetailPage({ params }) {
           {documents.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p>No documents uploaded for this provider</p>
+              <p className="font-medium">No documents found for this provider</p>
+              <p className="text-xs text-gray-400 mt-2 max-w-md mx-auto">
+                Documents are uploaded during registration and stored against the
+                owner's profile. If you expect documents here, verify your account
+                has the <span className="font-mono">admin</span> role and check the
+                browser console for diagnostic output.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -773,8 +867,15 @@ export default function ProviderDetailPage({ params }) {
                       )}
                     </div>
                     <span className="text-xs text-gray-500">
-                      {Object.keys(entry.changed_fields || {}).length} field
-                      {Object.keys(entry.changed_fields || {}).length === 1 ? '' : 's'} changed
+                      {(() => {
+                        const fields = entry.changed_fields || {}
+                        const scalarCount = Object.keys(fields).filter(k => k !== 'documents').length
+                        const docCount    = Array.isArray(fields.documents) ? fields.documents.length : 0
+                        const parts = []
+                        if (scalarCount) parts.push(`${scalarCount} field${scalarCount === 1 ? '' : 's'}`)
+                        if (docCount)    parts.push(`${docCount} document${docCount === 1 ? '' : 's'}`)
+                        return parts.length ? parts.join(' + ') + ' changed' : 'no field changes'
+                      })()}
                       {entry.previous_status !== entry.new_status && (
                         <> · status: {entry.previous_status?.replace(/_/g, ' ')} → {entry.new_status?.replace(/_/g, ' ')}</>
                       )}
@@ -782,18 +883,22 @@ export default function ProviderDetailPage({ params }) {
                   </div>
                   <table className="min-w-full text-xs mt-2">
                     <tbody className="divide-y divide-gray-50">
-                      {Object.entries(entry.changed_fields || {}).map(([field, { old: oldVal, new: newVal }]) => (
-                        <tr key={field}>
-                          <td className="py-1.5 pr-3 font-medium text-gray-700 align-top w-40">
-                            {FIELD_LABELS[field] || field}
-                          </td>
-                          <td className="py-1.5 pr-3 text-gray-500 line-through decoration-red-300 align-top">
-                            {displayValue(field, oldVal)}
-                          </td>
-                          <td className="py-1.5 text-green-700 align-top">
-                            {displayValue(field, newVal)}
-                          </td>
-                        </tr>
+                      {Object.entries(entry.changed_fields || {}).map(([field, value]) => (
+                        field === 'documents'
+                          ? <DocumentsDiffRow key={field} entries={value} compact />
+                          : (
+                            <tr key={field}>
+                              <td className="py-1.5 pr-3 font-medium text-gray-700 align-top w-40">
+                                {FIELD_LABELS[field] || field}
+                              </td>
+                              <td className="py-1.5 pr-3 text-gray-500 line-through decoration-red-300 align-top">
+                                {displayValue(field, value?.old)}
+                              </td>
+                              <td className="py-1.5 text-green-700 align-top">
+                                {displayValue(field, value?.new)}
+                              </td>
+                            </tr>
+                          )
                       ))}
                     </tbody>
                   </table>

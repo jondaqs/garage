@@ -68,9 +68,30 @@ export default function PendingProvidersPage() {
   }
 
   // ── Diff summary helpers ───────────────────────────────────────────────────
+  // Returns an array of short labels for the change badges. The `documents`
+  // field is special — it contains an array, so we surface each document
+  // change as its own label (e.g. "Replaced: Business Reg.").
+  const DOC_TYPE_SHORT = {
+    business_license: 'Business Reg.',
+    tax_compliance:   'KRA PIN',
+    insurance:        'Insurance',
+    id_passport:      'ID/Passport',
+  }
   const summarizeChanges = (changedFields) => {
     if (!changedFields) return []
-    return Object.keys(changedFields).map(f => FIELD_LABELS[f] || f)
+    const labels = []
+    for (const [field, value] of Object.entries(changedFields)) {
+      if (field === 'documents' && Array.isArray(value)) {
+        for (const entry of value) {
+          const action = entry.action?.replace(/^./, c => c.toUpperCase()) || 'Changed'
+          const type   = DOC_TYPE_SHORT[entry.doc_type] || entry.doc_type
+          labels.push(`${action}: ${type}`)
+        }
+      } else {
+        labels.push(FIELD_LABELS[field] || field)
+      }
+    }
+    return labels
   }
 
   if (loading) {
@@ -166,7 +187,7 @@ export default function PendingProvidersPage() {
                           <div className="flex items-center gap-1.5 mb-1">
                             <AlertTriangle className="w-3.5 h-3.5 text-yellow-600" />
                             <span className="text-xs font-medium text-gray-900">
-                              {p.change_count} field{p.change_count === 1 ? '' : 's'} changed
+                              {p.change_count} change{p.change_count === 1 ? '' : 's'}
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-1">

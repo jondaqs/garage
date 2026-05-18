@@ -164,9 +164,19 @@ export default function AllProvidersPage() {
             ) : (
               filtered.map(p => {
                 const diff = pendingDiffs[p.id]
-                const labels = diff?.changed_fields
-                  ? Object.keys(diff.changed_fields).map(f => FIELD_LABELS[f] || f)
-                  : []
+                const labels = []
+                if (diff?.changed_fields) {
+                  for (const [field, value] of Object.entries(diff.changed_fields)) {
+                    if (field === 'documents' && Array.isArray(value)) {
+                      for (const e of value) {
+                        const a = e.action?.replace(/^./, c => c.toUpperCase()) || 'Changed'
+                        labels.push(`${a}: ${e.doc_type || ''}`)
+                      }
+                    } else {
+                      labels.push(FIELD_LABELS[field] || field)
+                    }
+                  }
+                }
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 align-top">
                     <td className="px-6 py-4">
