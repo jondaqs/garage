@@ -1302,12 +1302,20 @@ export default function WorkOrderDetailPage() {
                     Requested in Booking
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {booking.booking_services.map((bs, i) => (
-                      <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">
-                        {bs.service?.name}
-                        {bs.estimated_cost ? ` · KES ${Number(bs.estimated_cost).toLocaleString()}` : ''}
-                      </span>
-                    ))}
+                    {booking.booking_services.map((bs, i) => {
+                      // booking_services has no currency column — these estimates
+                      // are entered at booking time and implicitly use the work
+                      // order's currency. Show the WO currency code, or just the
+                      // number if none is set.
+                      const num    = bs.estimated_cost ? Number(bs.estimated_cost).toLocaleString(undefined, { maximumFractionDigits: 2 }) : null
+                      const prefix = woCurrency ? (woCurrency.symbol || woCurrency.code) : ''
+                      return (
+                        <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">
+                          {bs.service?.name}
+                          {num ? ` · ${prefix ? `${prefix} ${num}` : num}` : ''}
+                        </span>
+                      )
+                    })}
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
                     These will be auto-imported when you open the Services tab.
@@ -1325,15 +1333,31 @@ export default function WorkOrderDetailPage() {
                       { label: 'Parts',    val: estimate.parts_total    },
                       { label: 'VAT 16%',  val: estimate.tax            },
                       { label: 'Total',    val: estimate.total, bold: true },
-                    ].map(({ label, val, bold }) => (
-                      <div key={label}>
-                        <p className="text-xs text-gray-500">{label}</p>
-                        <p className={`${bold ? 'font-bold text-blue-900 text-base' : 'font-medium text-gray-800'}`}>
-                          KES {Number(val || 0).toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
+                    ].map(({ label, val, bold }) => {
+                      // Render in the work order's currency. The estimate
+                      // numbers are computed in the work order's currency by
+                      // the services tab (parts converted via their snapshot
+                      // exchange_rate, services priced directly), so there's
+                      // no further conversion needed here — only labeling.
+                      const num    = Number(val || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                      const prefix = woCurrency
+                        ? (woCurrency.symbol || woCurrency.code)
+                        : ''
+                      return (
+                        <div key={label}>
+                          <p className="text-xs text-gray-500">{label}</p>
+                          <p className={`${bold ? 'font-bold text-blue-900 text-base' : 'font-medium text-gray-800'}`}>
+                            {prefix ? `${prefix} ${num}` : num}
+                          </p>
+                        </div>
+                      )
+                    })}
                   </div>
+                  {!woCurrency && (
+                    <p className="text-[11px] text-amber-700 mt-2">
+                      No billing currency set for this work order — totals shown without a currency label.
+                    </p>
+                  )}
                 </div>
               )}
 
