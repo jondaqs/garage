@@ -14,7 +14,8 @@ export default function TabbedFormModal({
   onSuccess,
   existingCategories = [],
   existingSuppliers = [],
-  existingLocations = []
+  existingLocations = [],
+  shops = []
 }) {
   const [activeTab, setActiveTab] = useState('basic')
   const [submitting, setSubmitting] = useState(false)
@@ -46,6 +47,7 @@ export default function TabbedFormModal({
     min_stock_level: item?.min_stock_level || 0,
     reorder_level: item?.reorder_level || '',
     reorder_quantity: item?.reorder_quantity || '',
+    shop_id: item?.shop_id || '',
     location_in_shop: item?.location_in_shop || '',
     
     // Tab 4: Pricing
@@ -236,6 +238,7 @@ export default function TabbedFormModal({
                 formData={formData}
                 onChange={handleChange}
                 existingLocations={existingLocations}
+                shops={shops}
               />
             </TabPanel>
 
@@ -455,7 +458,7 @@ function BrandTab({ formData, onChange }) {
 }
 
 // Tab 3: Stock & Location
-function StockTab({ formData, onChange, existingLocations }) {
+function StockTab({ formData, onChange, existingLocations, shops = [] }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -490,6 +493,33 @@ function StockTab({ formData, onChange, existingLocations }) {
           min="0"
           placeholder="Optional"
         />
+      </div>
+
+      {/* Shop dropdown — nullable. When empty, the part is provider-wide
+          inventory rather than tied to a specific branch. */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Shop <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <select
+          value={formData.shop_id || ''}
+          onChange={(e) => onChange('shop_id', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          disabled={shops.length === 0}
+        >
+          <option value="">— Not assigned to a specific shop —</option>
+          {shops.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+              {s.town ? ` · ${s.town}` : ''}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          {shops.length === 0
+            ? 'You have no shops yet. Stock will be tracked at the provider level.'
+            : 'Select the shop where this stock is physically held. Leave blank for provider-wide inventory.'}
+        </p>
       </div>
 
       <AutocompleteInput

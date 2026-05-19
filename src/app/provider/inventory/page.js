@@ -21,6 +21,7 @@ export default function ProviderInventoryPage() {
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [readOnly, setReadOnly] = useState(false)
+  const [shops, setShops] = useState([])
 
   useEffect(() => {
     loadInventory()
@@ -38,6 +39,7 @@ export default function ProviderInventoryPage() {
         setInventory(data.inventory || [])
         setStats(data.stats)
         setReadOnly(data.readOnly || false)
+        if (data.shops) setShops(data.shops)
       } else {
         alert(data.error || 'Failed to load inventory')
       }
@@ -278,6 +280,7 @@ export default function ProviderInventoryPage() {
           existingCategories={categories}
           existingSuppliers={suppliers}
           existingLocations={locations}
+          shops={shops}
         />
       )}
 
@@ -297,6 +300,7 @@ export default function ProviderInventoryPage() {
           existingCategories={categories}
           existingSuppliers={suppliers}
           existingLocations={locations}
+          shops={shops}
         />
       )}
 

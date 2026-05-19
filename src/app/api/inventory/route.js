@@ -56,7 +56,7 @@ export async function GET() {
         return NextResponse.json({ error: invError.message }, { status: 500 })
       }
 
-      return NextResponse.json({ inventory, readOnly: true })
+      return NextResponse.json({ inventory, shops: [], readOnly: true })
     }
 
     // Get inventory for provider (all fields)
@@ -69,6 +69,14 @@ export async function GET() {
     if (invError) {
       return NextResponse.json({ error: invError.message }, { status: 500 })
     }
+
+    // Also fetch this provider's shops so the inventory form can populate
+    // its Shop dropdown without a separate round trip.
+    const { data: shops } = await supabase
+      .from('shops')
+      .select('id, name, town')
+      .eq('service_provider_id', provider.id)
+      .order('name', { ascending: true })
 
     // Calculate statistics
     const totalItems = inventory.length
@@ -93,6 +101,7 @@ export async function GET() {
 
     return NextResponse.json({
       inventory,
+      shops: shops || [],
       stats: {
         totalItems,
         activeItems,
@@ -170,6 +179,7 @@ export async function POST(request) {
       // Category & Location
       category,
       location_in_shop,
+      shop_id,
       
       // Stock
       stock,
@@ -229,6 +239,8 @@ export async function POST(request) {
       warranty_months: warranty_months ? parseInt(warranty_months) : null,
       category: category || null,
       location_in_shop: location_in_shop || null,
+      // shop_id is a uuid FK; convert empty string to null so Postgres accepts it.
+      shop_id: shop_id || null,
       stock: parseInt(stock) || 0,
       min_stock_level: parseInt(min_stock_level) || 0,
       reorder_level: reorder_level ? parseInt(reorder_level) : null,

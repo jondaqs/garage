@@ -42,6 +42,7 @@ export async function PUT(request, context) {
       // Category & Location
       category,
       location_in_shop,
+      shop_id,
       
       // Stock
       stock,
@@ -98,6 +99,8 @@ export async function PUT(request, context) {
       warranty_months: warranty_months ? parseInt(warranty_months) : null,
       category: category || null,
       location_in_shop: location_in_shop || null,
+      // Empty string would be rejected as an invalid uuid; coerce to null.
+      shop_id: shop_id || null,
       stock: parseInt(stock) || 0,
       min_stock_level: parseInt(min_stock_level) || 0,
       reorder_level: reorder_level ? parseInt(reorder_level) : null,
