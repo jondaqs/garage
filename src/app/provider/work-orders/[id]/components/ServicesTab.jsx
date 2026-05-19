@@ -51,6 +51,27 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
   const [editing, setEditing]           = useState({})   // { [id]: { actual_cost, notes } }
   const [estimating, setEstimating]     = useState({})   // { [id]: { estimated_cost, notes } } for seeded services
 
+  // Work order's own currency — services are always priced in this currency
+  // (unlike parts, which can come from inventory in a different currency).
+  // We fetch it once on mount; the parent page passes `workOrder` with
+  // currency_id but no joined currencies row.
+  const [woCurrency, setWoCurrency]     = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadWoCurrency () {
+      if (!workOrder.currency_id) { setWoCurrency(null); return }
+      const { data } = await supabase
+        .from('currencies')
+        .select('id, code, symbol, display_name')
+        .eq('id', workOrder.currency_id)
+        .single()
+      if (!cancelled) setWoCurrency(data || null)
+    }
+    loadWoCurrency()
+    return () => { cancelled = true }
+  }, [workOrder.currency_id])
+
   const showToast = (msg) => {
     setToast(msg)
     setTimeout(() => setToast(''), 3500)
@@ -304,7 +325,21 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
     }
   }
 
-  const fmt = (n) => n != null ? `KES ${Number(n).toLocaleString()}` : '—'
+  // Currency formatter. Defaults to the work order's currency since all
+  // service line items are denominated in it; callers can override for
+  // edge cases. Falls back to a bare number if no currency is available.
+  const fmt = (n, currency = woCurrency) => {
+    if (n == null) return '—'
+    const num = Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    if (!currency) return num
+    return `${currency.symbol || currency.code} ${num}`
+  }
+
+  // Short label for the cost input fields, e.g. "KES" or "(KES)" — used in
+  // inline edit forms instead of the old hardcoded "(KES)".
+  const currencyLabel = woCurrency
+    ? (woCurrency.code || woCurrency.symbol || 'currency')
+    : 'currency'
 
   if (loading) return (
     <div className="flex justify-center py-12">
@@ -476,7 +511,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-gray-500 block mb-1">Estimated Cost (KES)</label>
+                        <label className="text-xs text-gray-500 block mb-1">Estimated Cost ({currencyLabel})</label>
                         <input type="number" min="0"
                           value={estimating[svc.id]?.estimated_cost}
                           onChange={e => setEstimating(ed => ({ ...ed, [svc.id]: { ...ed[svc.id], estimated_cost: e.target.value } }))}
@@ -512,7 +547,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                     <p className="text-xs font-medium text-gray-700">Complete service</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-gray-500 block mb-1">Actual Cost (KES)</label>
+                        <label className="text-xs text-gray-500 block mb-1">Actual Cost ({currencyLabel})</label>
                         <input type="number"
                           value={editing[svc.id]?.actual_cost}
                           onChange={e => setEditing(ed => ({ ...ed, [svc.id]: { ...ed[svc.id], actual_cost: e.target.value } }))}
@@ -635,7 +670,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                 )}
 
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Estimated Cost (KES)</label>
+                  <label className="text-xs text-gray-500 block mb-1">Estimated Cost ({currencyLabel})</label>
                   <input type="number" value={newService.estimated_cost}
                     onChange={e => setNewService(s => ({ ...s, estimated_cost: e.target.value }))}
                     placeholder="0"
