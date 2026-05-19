@@ -11,10 +11,15 @@
  *                    amount_paid, paid_at, notes, confirmed, confirmed_at)
  *   canConfirm     — boolean: show confirm button (provider owner/admin/accountant/mechanic-invoice)
  *   onConfirmed    — callback after successful confirmation (reload parent)
- *   workOrderId    — used only to route the confirm API
+ *   workOrderId    — used to route the confirm API; also used to fetch the
+ *                    work order's billing currency when `currency` isn't passed.
+ *   currency       — optional { id, code, symbol, display_name } from
+ *                    currencies. Pass this when the caller already has it to
+ *                    avoid an extra round trip; otherwise leave undefined and
+ *                    the card will resolve it from workOrderId.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   BadgeCheck, CheckCircle, Loader2, AlertCircle,
@@ -36,12 +41,41 @@ function fmtD(d) {
     hour: '2-digit', minute: '2-digit',
   })
 }
-function fmt(n) { return `KES ${Number(n || 0).toLocaleString('en-KE')}` }
 
-export default function ReceiptCard({ receipt, canConfirm = false, onConfirmed, workOrderId }) {
+// Currency-aware formatter. Falls back to a bare number when no currency
+// is supplied (callers that haven't been updated yet still render — just
+// without a currency prefix).
+function fmt(n, currency) {
+  const num = Number(n || 0).toLocaleString('en-KE')
+  if (!currency) return num
+  return `${currency.symbol || currency.code} ${num}`
+}
+
+export default function ReceiptCard({ receipt, canConfirm = false, onConfirmed, workOrderId, currency = null }) {
   const supabase = createClient()
-  const [confirming, setConfirming] = useState(false)
-  const [error,      setError]      = useState('')
+  const [confirming,    setConfirming]    = useState(false)
+  const [error,         setError]         = useState('')
+  // If the caller didn't supply a currency, resolve it from work_orders by
+  // workOrderId. This keeps the three existing callers working without
+  // changes; new callers should pass `currency` to skip the extra round trip.
+  const [resolvedCur,   setResolvedCur]   = useState(null)
+
+  useEffect(() => {
+    // Caller-provided currency wins; only fetch when missing.
+    if (currency || !workOrderId) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('work_orders')
+        .select('currency:currencies(id, code, symbol, display_name)')
+        .eq('id', workOrderId)
+        .maybeSingle()
+      if (!cancelled) setResolvedCur(data?.currency || null)
+    })()
+    return () => { cancelled = true }
+  }, [workOrderId, currency])
+
+  const effectiveCurrency = currency || resolvedCur
 
   if (!receipt) return null
 
@@ -102,7 +136,7 @@ export default function ReceiptCard({ receipt, canConfirm = false, onConfirmed, 
             Amount Paid
           </p>
           <p className={`font-bold text-base ${isConfirmed ? 'text-emerald-700' : 'text-amber-700'}`}>
-            {fmt(receipt.amount_paid)}
+            {fmt(receipt.amount_paid, effectiveCurrency)}
           </p>
         </div>
         <div>

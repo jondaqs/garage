@@ -37,7 +37,39 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const [amountPaid,   setAmountPaid]   = useState('')
   const [payNotes,     setPayNotes]     = useState('')
 
-  const fmt   = (n) => `KES ${Number(n || 0).toLocaleString('en-KE')}`
+  // Work order's billing currency — fetched once on mount. The work_order_id
+  // prop carries currency_id; we resolve it to a row here so we can label
+  // amounts throughout the invoice and the payment form. Falls back to a
+  // bare number with no prefix if no currency is set on the work order.
+  const [woCurrency, setWoCurrency] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadWoCurrency () {
+      if (!workOrder.currency_id) { setWoCurrency(null); return }
+      const { data } = await supabase
+        .from('currencies')
+        .select('id, code, symbol, display_name')
+        .eq('id', workOrder.currency_id)
+        .single()
+      if (!cancelled) setWoCurrency(data || null)
+    }
+    loadWoCurrency()
+    return () => { cancelled = true }
+  }, [workOrder.currency_id])
+
+  // Currency-aware formatter. Falls back to bare number if no currency set,
+  // so the file degrades cleanly even before a billing currency is chosen.
+  const fmt   = (n, opts = {}) => {
+    const num = Number(n || 0).toLocaleString('en-KE', {
+      minimumFractionDigits: opts.minimumFractionDigits ?? 0,
+      maximumFractionDigits: opts.maximumFractionDigits ?? 2,
+    })
+    if (!woCurrency) return num
+    return `${woCurrency.symbol || woCurrency.code} ${num}`
+  }
+  // Short string for input labels, e.g. "(KES)" or "(USD)".
+  const currencyLabel = woCurrency ? (woCurrency.code || woCurrency.symbol || 'currency') : 'currency'
   const fmtD  = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 
   const statusCode = workOrder.status?.code
@@ -226,23 +258,23 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
                   <div className="mt-3 pt-3 border-t border-gray-200 space-y-1 text-sm">
                     <div className="flex justify-between text-gray-600">
                       <span>Subtotal</span>
-                      <span>KES {Number(sub).toLocaleString('en-KE')}</span>
+                      <span>{fmt(sub)}</span>
                     </div>
                     {disc > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount ({disc}%)</span>
-                        <span>− KES {Number(discAmt).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>− {fmt(discAmt, { minimumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     {vat > 0 && (
                       <div className="flex justify-between text-gray-600">
                         <span>VAT ({vat}%)</span>
-                        <span>KES {Number(taxAmt).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>{fmt(taxAmt, { minimumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold text-gray-900 pt-1 border-t border-gray-200">
                       <span>Total</span>
-                      <span>KES {Number(total).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>{fmt(total, { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 )
@@ -461,6 +493,7 @@ Customer has been notified via email, SMS, and in-app notification.
           receipt={receipt}
           canConfirm={canConfirm}
           workOrderId={workOrder.id}
+          currency={woCurrency}
           onConfirmed={loadInvoice}
         />
       )}
@@ -496,7 +529,7 @@ Customer has been notified via email, SMS, and in-app notification.
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Amount (KES)</label>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Amount ({currencyLabel})</label>
                     <input type="number" value={amountPaid} onChange={e => setAmountPaid(e.target.value)}
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
                   </div>

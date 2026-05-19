@@ -23,7 +23,11 @@ const METHOD_ICONS = {
   bank_transfer: Building2, cheque: FileText,
 }
 
-function receiptFmt(n)  { return `KES ${Number(n || 0).toLocaleString('en-KE')}` }
+function receiptFmt(n, currency)  {
+  const num = Number(n || 0).toLocaleString('en-KE')
+  if (!currency) return num
+  return `${currency.symbol || currency.code} ${num}`
+}
 function receiptFmtD(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-KE', {
@@ -53,6 +57,40 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
   const [confirming,  setConfirming]  = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [confirmErr,  setConfirmErr]  = useState('')
+
+  // Work order's billing currency. The component receives only id + provider
+  // in the workOrder prop, so we fetch the currency separately. Falls back
+  // to bare numbers if no currency is set.
+  const [woCurrency, setWoCurrency] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    async function loadCur () {
+      if (!workOrder.currency_id) {
+        // Fall back to fetching the work order to pick up currency_id (the
+        // caller may not have included it in the prop).
+        const { data } = await supabase
+          .from('work_orders')
+          .select('currency:currencies(id, code, symbol, display_name)')
+          .eq('id', workOrder.id)
+          .maybeSingle()
+        if (!cancelled) setWoCurrency(data?.currency || null)
+        return
+      }
+      const { data } = await supabase
+        .from('currencies')
+        .select('id, code, symbol, display_name')
+        .eq('id', workOrder.currency_id)
+        .single()
+      if (!cancelled) setWoCurrency(data || null)
+    }
+    loadCur()
+    return () => { cancelled = true }
+  }, [workOrder.id, workOrder.currency_id])
+
+  // Component-local formatter bound to the work order's currency. We pass
+  // this into the printable receipt rather than the module-level receiptFmt
+  // so the rendered receipt carries the right currency code throughout.
+  const fmt = (n) => receiptFmt(n, woCurrency)
 
   const load = useCallback(async () => {
     try {
@@ -287,7 +325,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
     <div className="text-center py-12 text-gray-400">
       <Clock size={40} className="mx-auto mb-3 opacity-40" />
       <p className="text-sm font-medium">Awaiting Payment</p>
-      <p className="text-xs mt-1">Invoice {invoice.invoice_number} · {receiptFmt(invoice.total_amount)}</p>
+      <p className="text-xs mt-1">Invoice {invoice.invoice_number} · {fmt(invoice.total_amount)}</p>
       <p className="text-xs mt-1 text-gray-400">A receipt will appear here once payment is submitted.</p>
     </div>
   )
@@ -329,7 +367,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
           receipt={receipt} invoice={invoice} items={items}
           vehicle={vehicle} provider={provider} customer={customer}
           custName={custName} services={services} parts={parts}
-          tax={tax} fmt={receiptFmt} fmtD={receiptFmtD} fmtDs={receiptFmtDs}
+          tax={tax} fmt={fmt} fmtD={receiptFmtD} fmtDs={receiptFmtDs}
           MethodIcon={MethodIcon} isConfirmed={isConfirmed}
         />
       </div>
