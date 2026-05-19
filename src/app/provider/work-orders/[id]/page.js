@@ -7,7 +7,8 @@ import {
   ArrowLeft, Car, MapPin, User, Calendar, Clock,
   ClipboardList, AlertCircle, CheckCircle, ChevronRight,
   Wrench, Package, MessageSquare, Hash, ExternalLink,
-  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell, LogOut, BellRing
+  AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell, LogOut, BellRing,
+  Edit3, DollarSign, Lock, Info
 } from 'lucide-react'
 import ServicesTab      from './components/ServicesTab'
 import PartsTab         from './components/PartsTab'
@@ -101,6 +102,19 @@ export default function WorkOrderDetailPage() {
   // Internal notes (overview tab)
   const [internalNote, setInternalNote]         = useState('')
   const [savingNote, setSavingNote]             = useState(false)
+
+  // Overview inline edits: shop + currency
+  const [shopList,         setShopList]         = useState([])     // provider's shops
+  const [currencies,       setCurrencies]       = useState([])     // for the free-pick dropdown
+  const [providerCurrency, setProviderCurrency] = useState(null)   // joined from service_providers.currency_id
+  const [shopCurrency,     setShopCurrency]     = useState(null)   // joined from selected shop's currency_id
+  const [woCurrency,       setWoCurrency]       = useState(null)   // joined from work_orders.currency_id (display)
+  const [editingShop,      setEditingShop]      = useState(false)
+  const [editingCurrency,  setEditingCurrency]  = useState(false)
+  const [draftShopId,      setDraftShopId]      = useState('')
+  const [draftCurrencyId,  setDraftCurrencyId]  = useState('')
+  const [savingShop,       setSavingShop]       = useState(false)
+  const [savingCurrency,   setSavingCurrency]   = useState(false)
 
   // ── Load work order ─────────────────────────────────────────────────────
   const loadWorkOrder = useCallback(async () => {
@@ -281,6 +295,76 @@ export default function WorkOrderDetailPage() {
     }
   }, [params.id, loadWorkOrder, loadMechanics, loadEstimate])
 
+  // Load shops + currencies + the cascade-related currency rows for the
+  // overview inline editors. Runs whenever the work order's shop/currency
+  // selections change so the editors stay in sync after saves.
+  useEffect(() => {
+    if (!wo) return
+    let cancelled = false
+
+    async function loadOverviewData () {
+      const providerId        = wo.service_provider_id || wo.service_provider?.id
+      const shopId            = wo.shop_id || null
+      const providerCurId     = wo.service_provider?.currency_id || null
+      // Note: wo.service_provider doesn't always include currency_id; fetch it if missing.
+      const woCurId           = wo.currency_id || null
+
+      // 1. Shops for this provider — for the inline shop dropdown.
+      const shopsP = providerId
+        ? supabase.from('shops')
+            .select('id, name, town, currency_id')
+            .eq('service_provider_id', providerId)
+            .order('name')
+        : Promise.resolve({ data: [] })
+
+      // 2. Full currencies list — for the free-pick dropdown.
+      const currsP = supabase.from('currencies')
+        .select('id, code, display_name, symbol, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { nullsFirst: false })
+        .order('code')
+
+      // 3. Provider's currency (display + cascade).
+      const provCurP = providerCurId
+        ? supabase.from('currencies').select('id, code, display_name, symbol').eq('id', providerCurId).single()
+        : (providerId
+            ? supabase.from('service_providers')
+                .select('currency:currencies(id, code, display_name, symbol)')
+                .eq('id', providerId).single()
+            : Promise.resolve({ data: null }))
+
+      // 4. Work order's currency (display).
+      const woCurP = woCurId
+        ? supabase.from('currencies').select('id, code, display_name, symbol').eq('id', woCurId).single()
+        : Promise.resolve({ data: null })
+
+      const [{ data: shops }, { data: currs }, provRes, woRes] =
+        await Promise.all([shopsP, currsP, provCurP, woCurP])
+      if (cancelled) return
+
+      setShopList(shops || [])
+      setCurrencies(currs || [])
+      // provRes might be either a currency row or a {currency: {...}} wrapper.
+      setProviderCurrency(provRes?.data?.currency ?? provRes?.data ?? null)
+      setWoCurrency(woRes?.data || null)
+
+      // 5. Selected shop's currency_id (already in `shops`); fan out into a join.
+      const selectedShop = (shops || []).find(s => s.id === shopId)
+      if (selectedShop?.currency_id) {
+        const { data: sc } = await supabase
+          .from('currencies')
+          .select('id, code, display_name, symbol')
+          .eq('id', selectedShop.currency_id)
+          .single()
+        if (!cancelled) setShopCurrency(sc || null)
+      } else {
+        setShopCurrency(null)
+      }
+    }
+    loadOverviewData()
+    return () => { cancelled = true }
+  }, [wo])
+
   // ── Actions ─────────────────────────────────────────────────────────────
   const handleCheckIn = async () => {
     if (!checkinMileage || isNaN(Number(checkinMileage))) {
@@ -435,6 +519,73 @@ export default function WorkOrderDetailPage() {
       setSuccess('Note saved')
     } catch (e) { setError(e.message) }
     finally { setSavingNote(false) }
+  }
+
+  // ── Overview: currency cascade ──────────────────────────────────────────
+  // Rules (in order):
+  //   1. Provider has set currency           -> locked to provider currency
+  //   2. Provider has no currency,
+  //      shop selected and shop has currency -> locked to shop currency
+  //   3. Otherwise (no provider, no shop, or shop without currency)
+  //                                           -> free pick from currencies list
+  //
+  // (Slightly different from inventory's order, where shop wins over provider —
+  // the user asked for provider precedence here: "If provider has set currency
+  // it should be fixed to provider currency".)
+  const cascadeProviderCurrencyId = providerCurrency?.id || null
+  const cascadeShopCurrencyId     = shopCurrency?.id     || null
+  let   cascadeForced  = false
+  let   cascadeSource  = 'free'   // 'provider' | 'shop' | 'free'
+  let   cascadeCurId   = null
+  let   cascadeCurName = null
+  if (cascadeProviderCurrencyId) {
+    cascadeForced  = true
+    cascadeSource  = 'provider'
+    cascadeCurId   = cascadeProviderCurrencyId
+    cascadeCurName = providerCurrency?.code
+  } else if (cascadeShopCurrencyId) {
+    cascadeForced  = true
+    cascadeSource  = 'shop'
+    cascadeCurId   = cascadeShopCurrencyId
+    cascadeCurName = shopCurrency?.code
+  }
+
+  // ── Save handlers for inline edits ───────────────────────────────────────
+  const saveShop = async () => {
+    setSavingShop(true); setError('')
+    try {
+      // null = clear assignment. Empty-string from <select> → null.
+      const newShopId = draftShopId || null
+      const { error: upErr } = await supabase
+        .from('work_orders')
+        .update({ shop_id: newShopId })
+        .eq('id', wo.id)
+      if (upErr) throw upErr
+      setEditingShop(false)
+      setSuccess('Shop updated')
+      await loadWorkOrder()
+    } catch (e) { setError(e.message) }
+    finally { setSavingShop(false) }
+  }
+
+  const saveCurrency = async () => {
+    setSavingCurrency(true); setError('')
+    try {
+      // If the cascade forces a value, write that — guards against stale UI
+      // sending an old user pick after the cascade flipped.
+      const newCurrencyId = cascadeForced
+        ? cascadeCurId
+        : (draftCurrencyId || null)
+      const { error: upErr } = await supabase
+        .from('work_orders')
+        .update({ currency_id: newCurrencyId })
+        .eq('id', wo.id)
+      if (upErr) throw upErr
+      setEditingCurrency(false)
+      setSuccess('Currency updated')
+      await loadWorkOrder()
+    } catch (e) { setError(e.message) }
+    finally { setSavingCurrency(false) }
   }
 
   // ── Guard states ─────────────────────────────────────────────────────────
@@ -916,13 +1067,151 @@ export default function WorkOrderDetailPage() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
                     <MapPin size={13} /> Location &amp; Mechanic
                   </p>
-                  <div className="space-y-2 text-sm">
-                    {shop.name && (
-                      <div>
-                        <p className="font-medium text-gray-900">{shop.name}</p>
-                        <p className="text-gray-500">{[shop.town, shop.county].filter(Boolean).join(', ')}</p>
+                  <div className="space-y-3 text-sm">
+
+                    {/* ── Inline-editable Shop ── */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-gray-400">Shop</p>
+                        {!editingShop && !isTerminal && (
+                          <button
+                            onClick={() => { setDraftShopId(wo.shop_id || ''); setEditingShop(true) }}
+                            className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                            title="Change shop"
+                          >
+                            <Edit3 size={11} /> Edit
+                          </button>
+                        )}
                       </div>
-                    )}
+
+                      {editingShop ? (
+                        <div className="mt-1 space-y-2 bg-blue-50 border border-blue-100 rounded-lg p-2">
+                          <select
+                            value={draftShopId}
+                            onChange={e => setDraftShopId(e.target.value)}
+                            disabled={savingShop}
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-400"
+                          >
+                            <option value="">— No shop (provider-wide) —</option>
+                            {shopList.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}{s.town ? ` · ${s.town}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[11px] text-gray-500">
+                            Changing the shop may also change the work order's billing currency if the new shop has its own currency.
+                          </p>
+                          <div className="flex gap-2">
+                            <button onClick={saveShop} disabled={savingShop}
+                              className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-1">
+                              {savingShop ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                              Save
+                            </button>
+                            <button onClick={() => setEditingShop(false)} disabled={savingShop}
+                              className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : shop.name ? (
+                        <div>
+                          <p className="font-medium text-gray-900">{shop.name}</p>
+                          <p className="text-gray-500">{[shop.town, shop.county].filter(Boolean).join(', ')}</p>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 italic">No shop assigned</p>
+                      )}
+                    </div>
+
+                    {/* ── Inline Billing Currency ── */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-gray-400 inline-flex items-center gap-1">
+                          <DollarSign size={11} /> Billing Currency
+                        </p>
+                        {!editingCurrency && !isTerminal && (
+                          <button
+                            onClick={() => {
+                              setDraftCurrencyId(wo.currency_id || cascadeCurId || '')
+                              setEditingCurrency(true)
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                            title="Change currency"
+                          >
+                            <Edit3 size={11} /> Edit
+                          </button>
+                        )}
+                      </div>
+
+                      {editingCurrency ? (
+                        <div className="mt-1 space-y-2 bg-blue-50 border border-blue-100 rounded-lg p-2">
+                          {cascadeForced ? (
+                            <>
+                              <div className="flex items-center gap-2 text-sm bg-white border border-gray-200 rounded px-2 py-1.5">
+                                <Lock size={12} className="text-gray-400" />
+                                <span className="font-medium text-gray-900">
+                                  {cascadeCurName || 'Currency'}
+                                </span>
+                                <span className="text-[10px] uppercase tracking-wide font-medium text-gray-500 ml-auto">
+                                  from {cascadeSource}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-gray-600 flex items-start gap-1">
+                                <Info size={11} className="flex-shrink-0 mt-0.5" />
+                                {cascadeSource === 'provider'
+                                  ? <>Locked to your provider currency. To use a different one for this work order, clear your provider currency in Settings → Business Profile.</>
+                                  : <>Locked to the selected shop's currency. Switch shops above to change, or clear the shop's currency in shop settings.</>}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <select
+                                value={draftCurrencyId}
+                                onChange={e => setDraftCurrencyId(e.target.value)}
+                                disabled={savingCurrency || currencies.length === 0}
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-400"
+                              >
+                                <option value="">— Select currency —</option>
+                                {currencies.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.code}{c.symbol ? ` (${c.symbol})` : ''} — {c.display_name}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="text-[11px] text-gray-600 flex items-start gap-1">
+                                <Info size={11} className="flex-shrink-0 mt-0.5" />
+                                Neither your provider nor the selected shop has set a default currency. Pick one for this work order. Setting a default in Settings will lock this for future work orders.
+                              </p>
+                            </>
+                          )}
+                          <div className="flex gap-2">
+                            <button onClick={saveCurrency} disabled={savingCurrency || (!cascadeForced && !draftCurrencyId)}
+                              className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-1">
+                              {savingCurrency ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                              Save
+                            </button>
+                            <button onClick={() => setEditingCurrency(false)} disabled={savingCurrency}
+                              className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-gray-900">
+                            {woCurrency
+                              ? <>{woCurrency.code}{woCurrency.symbol ? ` (${woCurrency.symbol})` : ''} <span className="text-gray-400 font-normal">— {woCurrency.display_name}</span></>
+                              : <span className="text-gray-400 italic">Not set</span>}
+                          </p>
+                          {cascadeForced && (
+                            <span className="text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 inline-flex items-center gap-1">
+                              <Lock size={9} /> from {cascadeSource}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <p className="text-xs text-gray-400">Mechanic</p>
                       {(mechanicName || mechanic.id) ? (
