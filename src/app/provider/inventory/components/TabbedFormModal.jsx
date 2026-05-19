@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { TabContainer, TabPanel, AutocompleteInput, InputField, TextAreaField, 
          SelectField, CheckboxField, calculateProfitMargin, TagInput, RadioGroup } from './FormUtilities'
 
@@ -15,7 +15,9 @@ export default function TabbedFormModal({
   existingCategories = [],
   existingSuppliers = [],
   existingLocations = [],
-  shops = []
+  shops = [],
+  currencies = [],
+  provider = null
 }) {
   const [activeTab, setActiveTab] = useState('basic')
   const [submitting, setSubmitting] = useState(false)
@@ -54,6 +56,7 @@ export default function TabbedFormModal({
     cost_price: item?.cost_price || '',
     unit_price: item?.unit_price || 0,
     currency: item?.currency || 'KES',
+    currency_id: item?.currency_id || '',
     
     // Tab 5: Supplier
     supplier_name: item?.supplier_name || '',
@@ -247,6 +250,9 @@ export default function TabbedFormModal({
               <PricingTab 
                 formData={formData}
                 onChange={handleChange}
+                shops={shops}
+                currencies={currencies}
+                provider={provider}
               />
             </TabPanel>
 
@@ -541,7 +547,12 @@ function StockTab({ formData, onChange, existingLocations, shops = [] }) {
 }
 
 // Tab 4: Pricing
-function PricingTab({ formData, onChange }) {
+//
+// Currency cascade rules (in order):
+//   1. Shop selected AND that shop has its own currency_id  -> use shop currency, dropdown disabled
+//   2. No shop selected AND provider has currency_id        -> use provider currency, dropdown disabled
+//   3. Otherwise                                            -> free choice from full currencies list
+function PricingTab({ formData, onChange, shops = [], currencies = [], provider = null }) {
   const profitMargin = calculateProfitMargin(
     parseFloat(formData.cost_price) || 0,
     parseFloat(formData.unit_price) || 0
@@ -549,6 +560,38 @@ function PricingTab({ formData, onChange }) {
 
   const showWarning = formData.cost_price && formData.unit_price && 
                       parseFloat(formData.cost_price) > parseFloat(formData.unit_price)
+
+  // Resolve the cascade. Returns { forced, currencyId, source } where forced
+  // means the user cannot change it. We memoize on the inputs so the effect
+  // below doesn't fire unnecessarily.
+  const cascade = useMemo(() => {
+    const selectedShop = shops.find(s => s.id === formData.shop_id) || null
+
+    if (selectedShop?.currency_id) {
+      return { forced: true,  currencyId: selectedShop.currency_id, source: 'shop',     shop: selectedShop }
+    }
+    if (!formData.shop_id && provider?.currency_id) {
+      return { forced: true,  currencyId: provider.currency_id,     source: 'provider', shop: null }
+    }
+    return { forced: false, currencyId: null,                        source: 'free',     shop: selectedShop }
+  }, [formData.shop_id, shops, provider])
+
+  // Whenever the cascade forces a value, push it into the form. We only push
+  // when it differs to avoid an update loop. When the cascade is "free", we
+  // leave formData.currency_id alone — the user picks via the dropdown.
+  useEffect(() => {
+    if (cascade.forced && formData.currency_id !== cascade.currencyId) {
+      onChange('currency_id', cascade.currencyId)
+    }
+  }, [cascade.forced, cascade.currencyId])
+
+  // The select's value: forced value when cascade locks it, otherwise whatever
+  // the user has chosen (or empty so they're prompted).
+  const selectValue = cascade.forced ? cascade.currencyId : (formData.currency_id || '')
+
+  const forcedCurrency = cascade.forced
+    ? currencies.find(c => c.id === cascade.currencyId)
+    : null
 
   return (
     <div className="space-y-6">
@@ -572,17 +615,53 @@ function PricingTab({ formData, onChange }) {
           required
           placeholder="What you charge"
         />
-        <SelectField
-          label="Currency"
-          value={formData.currency}
-          onChange={(e) => onChange('currency', e.target.value)}
-          options={[
-            { value: 'KES', label: 'KES - Kenyan Shilling' },
-            { value: 'USD', label: 'USD - US Dollar' },
-            { value: 'EUR', label: 'EUR - Euro' },
-            { value: 'GBP', label: 'GBP - British Pound' }
-          ]}
-        />
+
+        {/* Currency dropdown — locked when cascade forces a value. */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Currency
+            {cascade.forced && (
+              <span className="ml-2 text-[10px] uppercase tracking-wide font-medium text-gray-500">
+                {cascade.source === 'shop' ? 'from shop' : 'from provider'}
+              </span>
+            )}
+          </label>
+          <select
+            value={selectValue}
+            onChange={(e) => onChange('currency_id', e.target.value)}
+            disabled={cascade.forced || currencies.length === 0}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm disabled:bg-gray-100 disabled:text-gray-700 disabled:cursor-not-allowed"
+          >
+            {!cascade.forced && (
+              <option value="">— Select currency —</option>
+            )}
+            {currencies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code}{c.symbol ? ` (${c.symbol})` : ''} — {c.display_name}
+              </option>
+            ))}
+            {/* If the forced currency isn't in the loaded list (e.g. an
+                inactive currency), show its id so the select has a matching
+                option and renders cleanly. */}
+            {cascade.forced && !forcedCurrency && (
+              <option value={cascade.currencyId}>(set by {cascade.source})</option>
+            )}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            {cascade.source === 'shop' && cascade.shop && (
+              <>Using <span className="font-medium">{cascade.shop.name}</span>'s currency. Change the shop above to use a different one.</>
+            )}
+            {cascade.source === 'provider' && (
+              <>Using your provider currency. Select a shop above to use that shop's currency instead.</>
+            )}
+            {cascade.source === 'free' && (
+              <>{cascade.shop
+                ? <>The selected shop has no currency set. Pick one for this item.</>
+                : <>Your provider has no default currency set. Pick one for this item.</>}
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       {profitMargin && (

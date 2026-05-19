@@ -29,7 +29,7 @@ export async function GET() {
     // Get service provider
     const { data: provider, error: providerError } = await supabase
       .from('service_providers')
-      .select('id, name')
+      .select('id, name, currency_id')
       .eq('owner_user_id', profile.id)
       .single()
 
@@ -71,12 +71,22 @@ export async function GET() {
     }
 
     // Also fetch this provider's shops so the inventory form can populate
-    // its Shop dropdown without a separate round trip.
+    // its Shop dropdown without a separate round trip. We include each shop's
+    // currency_id so the pricing tab can cascade-resolve the active currency.
     const { data: shops } = await supabase
       .from('shops')
-      .select('id, name, town')
+      .select('id, name, town, currency_id')
       .eq('service_provider_id', provider.id)
       .order('name', { ascending: true })
+
+    // Full currencies list — used as the fallback dropdown options when
+    // neither the selected shop nor the provider has set a currency.
+    const { data: currencies } = await supabase
+      .from('currencies')
+      .select('id, code, display_name, symbol, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { nullsFirst: false })
+      .order('code')
 
     // Calculate statistics
     const totalItems = inventory.length
@@ -102,6 +112,8 @@ export async function GET() {
     return NextResponse.json({
       inventory,
       shops: shops || [],
+      currencies: currencies || [],
+      provider: { id: provider.id, currency_id: provider.currency_id || null },
       stats: {
         totalItems,
         activeItems,
@@ -191,6 +203,7 @@ export async function POST(request) {
       unit_price,
       cost_price,
       currency,
+      currency_id,
       
       // Supplier
       supplier_name,
@@ -248,6 +261,8 @@ export async function POST(request) {
       unit_price: parseFloat(unit_price) || 0,
       cost_price: cost_price ? parseFloat(cost_price) : null,
       currency: currency || 'KES',
+      // Empty string would be rejected as an invalid uuid; coerce to null.
+      currency_id: currency_id || null,
       supplier_name: supplier_name || null,
       supplier_contact: supplier_contact || null,
       supplier_part_number: supplier_part_number || null,

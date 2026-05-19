@@ -54,6 +54,7 @@ export async function PUT(request, context) {
       unit_price,
       cost_price,
       currency,
+      currency_id,
       
       // Supplier
       supplier_name,
@@ -108,6 +109,8 @@ export async function PUT(request, context) {
       unit_price: parseFloat(unit_price) || 0,
       cost_price: cost_price ? parseFloat(cost_price) : null,
       currency: currency || 'KES',
+      // Empty string is not a valid uuid; coerce to null.
+      currency_id: currency_id || null,
       supplier_name: supplier_name || null,
       supplier_contact: supplier_contact || null,
       supplier_part_number: supplier_part_number || null,

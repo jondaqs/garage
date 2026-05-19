@@ -22,6 +22,8 @@ export default function ProviderInventoryPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [readOnly, setReadOnly] = useState(false)
   const [shops, setShops] = useState([])
+  const [currencies, setCurrencies] = useState([])
+  const [provider, setProvider] = useState(null)
 
   useEffect(() => {
     loadInventory()
@@ -40,6 +42,8 @@ export default function ProviderInventoryPage() {
         setStats(data.stats)
         setReadOnly(data.readOnly || false)
         if (data.shops) setShops(data.shops)
+        if (data.currencies) setCurrencies(data.currencies)
+        if (data.provider) setProvider(data.provider)
       } else {
         alert(data.error || 'Failed to load inventory')
       }
@@ -281,6 +285,8 @@ export default function ProviderInventoryPage() {
           existingSuppliers={suppliers}
           existingLocations={locations}
           shops={shops}
+          currencies={currencies}
+          provider={provider}
         />
       )}
 
@@ -301,6 +307,8 @@ export default function ProviderInventoryPage() {
           existingSuppliers={suppliers}
           existingLocations={locations}
           shops={shops}
+          currencies={currencies}
+          provider={provider}
         />
       )}
 
