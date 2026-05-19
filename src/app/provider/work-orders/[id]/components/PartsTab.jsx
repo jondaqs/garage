@@ -27,6 +27,9 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
   const [error,         setError]         = useState('')
   const [success,       setSuccess]       = useState('')
 
+  // Work order's own currency (the conversion target) — fetched once on mount.
+  const [woCurrency, setWoCurrency] = useState(null)
+
   // Search / reserve
   const [search,        setSearch]        = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -37,6 +40,9 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
 
   // Inline editing: unit_price while reserved
   const [editingPrice,  setEditingPrice]  = useState({})  // { [id]: string }
+  // Inline editing: exchange_rate while reserved (independent toggle so the
+  // provider can adjust the rate without re-entering the price).
+  const [editingRate,   setEditingRate]   = useState({})  // { [id]: string }
 
   // Inline actual price on mark-used
   const [markingUsed,   setMarkingUsed]   = useState({})  // { [id]: { actual_price: string } }
@@ -49,10 +55,39 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
   // Parts can only be transitioned after customer approves the estimate
   const customerApproved = ['approved','in_progress','quality_check','rework','completed','closed'].includes(statusCode)
 
-  const fmt      = (n) => n != null ? `KES ${Number(n).toLocaleString()}` : '—'
+  // Format a numeric value with the appropriate currency code/symbol.
+  // Falls back to bare number if no currency is available.
+  const fmt = (n, currency) => {
+    if (n == null) return '—'
+    const num = Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    if (!currency) return num
+    return `${currency.symbol || currency.code} ${num}`
+  }
+
+  // Resolve a part-line's currency. Snapshot on work_order_parts (currency_id +
+  // line_currency joined as `line_currency`) is the source of truth for the
+  // line's original currency; falls back to the inventory currency for legacy
+  // rows reserved before the snapshot column existed.
+  const lineCurrency = (p) => p.line_currency || p.part?.currency || null
+
+  // Total in the line's original currency.
   const lineTotal = (p) => {
     const price = p.unit_price ?? p.part?.unit_price
-    return (p.quantity && price) ? fmt(p.quantity * price) : '—'
+    return (p.quantity && price) ? fmt(p.quantity * price, lineCurrency(p)) : '—'
+  }
+
+  // Total in the work order's currency, applying the snapshotted exchange rate.
+  // Returns null when no conversion is needed (same currency) or no rate is
+  // available — the caller can decide whether to show the line.
+  const convertedLineTotal = (p) => {
+    const price = p.unit_price ?? p.part?.unit_price
+    if (!p.quantity || !price) return null
+    const lc = lineCurrency(p)
+    // Same currency or work order currency unknown — no conversion to render.
+    if (!woCurrency || !lc || lc.id === woCurrency.id) return null
+    const rate = Number(p.exchange_rate)
+    if (!rate || Number.isNaN(rate) || rate <= 0) return null
+    return p.quantity * price * rate
   }
 
   // ── Load ─────────────────────────────────────────────────────────────────
@@ -62,8 +97,13 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
         .from('work_order_parts')
         .select(`
           id, quantity, unit_price, notes, requested_at,
+          currency_id, exchange_rate,
+          line_currency:currencies!work_order_parts_currency_id_fkey(id, code, symbol, display_name),
           status:work_order_parts_statuses(code, display_name),
-          part:spare_parts(id, name, sku, brand, unit_price, stock, category)
+          part:spare_parts(
+            id, name, sku, brand, unit_price, stock, category,
+            currency:currencies(id, code, symbol, display_name)
+          )
         `)
         .eq('work_order_id', workOrder.id)
         .order('requested_at', { ascending: false })
@@ -72,6 +112,24 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }, [workOrder.id])
+
+  // Fetch this work order's own currency once. We do it separately because
+  // the parent page passes us `workOrder` with currency_id but no joined
+  // currencies row; keeping the join here means PartsTab is self-contained.
+  useEffect(() => {
+    let cancelled = false
+    async function loadWoCurrency () {
+      if (!workOrder.currency_id) { setWoCurrency(null); return }
+      const { data } = await supabase
+        .from('currencies')
+        .select('id, code, symbol, display_name')
+        .eq('id', workOrder.currency_id)
+        .single()
+      if (!cancelled) setWoCurrency(data || null)
+    }
+    loadWoCurrency()
+    return () => { cancelled = true }
+  }, [workOrder.currency_id])
 
   useEffect(() => { loadParts() }, [loadParts])
 
@@ -83,7 +141,10 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
     try {
       const { data } = await supabase
         .from('spare_parts')
-        .select('id, name, sku, brand, category, stock, min_stock_level, unit_price')
+        .select(`
+          id, name, sku, brand, category, stock, min_stock_level, unit_price,
+          currency:currencies(id, code, symbol, display_name)
+        `)
         .eq('service_provider_id', workOrder.service_provider_id)
         .eq('is_active', true)
         .or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%,category.ilike.%${q}%`)
@@ -102,12 +163,32 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
     setSaving(true); setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
+
+      // Resolve the exchange rate if the part is in a different currency than
+      // the work order. The API hits the cache first; only the first lookup
+      // of the day per currency pair touches the external provider.
+      let exchangeRate = null
+      const partCurrencyId = part.currency?.id || null
+      const woCurrencyId   = woCurrency?.id    || null
+      if (partCurrencyId && woCurrencyId && partCurrencyId !== woCurrencyId) {
+        const resp = await fetch(
+          `/api/exchange-rate?base_currency_id=${partCurrencyId}&quote_currency_id=${woCurrencyId}`
+        )
+        if (!resp.ok) {
+          const errBody = await resp.json().catch(() => ({}))
+          throw new Error(`Couldn't fetch exchange rate (${part.currency.code}→${woCurrency.code}): ${errBody.error || resp.statusText}`)
+        }
+        const body = await resp.json()
+        exchangeRate = body.rate
+      }
+
       const { data, error: rpcErr } = await supabase.rpc('reserve_part_for_work_order', {
         p_work_order_id:    workOrder.id,
         p_spare_part_id:    part.id,
         p_quantity:         quantity,
         p_provider_user_id: user.id,
         p_notes:            partNotes[part.id] || null,
+        p_exchange_rate:    exchangeRate,
       })
       if (rpcErr) throw rpcErr
       if (!data.success) throw new Error(data.error)
@@ -160,6 +241,32 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
         onReApprovalNeeded?.()
       } else {
         setSuccess('Price updated')
+      }
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  // Save an overridden exchange rate on a single work_order_parts row. Used
+  // when the provider wants to peg a line at a manually-agreed rate (e.g.
+  // they bought the imported part at a different FX than today's market).
+  const handleSaveRate = async (wopId) => {
+    const val = parseFloat(editingRate[wopId])
+    if (isNaN(val) || val <= 0) { setError('Enter a positive exchange rate'); return }
+    setSaving(true); setError('')
+    try {
+      const { error: upErr } = await supabase
+        .from('work_order_parts')
+        .update({ exchange_rate: val })
+        .eq('id', wopId)
+      if (upErr) throw upErr
+      const orig = reservedParts.find(p => p.id === wopId)?.exchange_rate
+      setReservedParts(prev => prev.map(p => p.id === wopId ? { ...p, exchange_rate: val } : p))
+      setEditingRate(e => { const n = { ...e }; delete n[wopId]; return n })
+      if (customerApproved && orig !== null && val !== Number(orig)) {
+        setSuccess('Exchange rate updated. Converted total changed — customer re-approval required.')
+        onReApprovalNeeded?.()
+      } else {
+        setSuccess('Exchange rate updated')
       }
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
@@ -254,9 +361,41 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
     finally { setSaving(false) }
   }
 
-  const activeTotal = reservedParts
-    .filter(p => ['reserved','in_use','used'].includes(p.status?.code))
-    .reduce((sum, p) => sum + (p.quantity * (p.unit_price || p.part?.unit_price || 0)), 0)
+  // Group active lines by their snapshotted currency, summing each independently.
+  // We never sum across currencies without conversion — that would be meaningless.
+  const activeLines = reservedParts.filter(p => ['reserved','in_use','used'].includes(p.status?.code))
+  const totalsByCurrency = activeLines.reduce((acc, p) => {
+    const price = p.unit_price || p.part?.unit_price || 0
+    const cur   = lineCurrency(p)
+    const key   = cur?.id || '__none__'
+    if (!acc[key]) acc[key] = { currency: cur, total: 0 }
+    acc[key].total += p.quantity * price
+    return acc
+  }, {})
+  const totalEntries    = Object.values(totalsByCurrency)
+  const isMixedCurrency = totalEntries.length > 1
+
+  // Grand total in the work order's own currency. Sum each line's converted
+  // total (lines in wo currency contribute directly, lines in other currencies
+  // are converted via their snapshotted exchange_rate). We surface this only
+  // when (a) work order has a known currency and (b) every conversion succeeds.
+  let woGrandTotal      = null
+  let conversionGap     = false
+  if (woCurrency) {
+    woGrandTotal = 0
+    for (const p of activeLines) {
+      const price = p.unit_price || p.part?.unit_price || 0
+      const qty   = p.quantity || 0
+      const lc    = lineCurrency(p)
+      if (!lc || lc.id === woCurrency.id) {
+        woGrandTotal += qty * price
+      } else if (p.exchange_rate && p.exchange_rate > 0) {
+        woGrandTotal += qty * price * Number(p.exchange_rate)
+      } else {
+        conversionGap = true
+      }
+    }
+  }
 
   if (loading) return (
     <div className="flex justify-center py-12">
@@ -309,7 +448,11 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
               const isCancelled = code === 'cancelled'
               const isUsed      = code === 'used'
               const isEditing   = editingPrice[p.id] !== undefined
-              const isMarking   = markingUsed[p.id] !== undefined
+              const isEditingRt = editingRate[p.id]  !== undefined
+              const isMarking   = markingUsed[p.id]  !== undefined
+              // Does this line need an exchange rate (currencies differ)?
+              const lc          = lineCurrency(p)
+              const needsRate   = woCurrency && lc && lc.id !== woCurrency.id
 
               return (
                 <div key={p.id}
@@ -334,9 +477,24 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                       )}
                       <div className="flex items-center gap-4 mt-1 text-xs text-gray-600">
                         <span>Qty: <strong>{p.quantity}</strong></span>
-                        <span>Unit: <strong>{fmt(p.unit_price ?? p.part?.unit_price)}</strong></span>
+                        <span>Unit: <strong>{fmt(p.unit_price ?? p.part?.unit_price, lineCurrency(p))}</strong></span>
                         <span>Total: <strong className="text-gray-900">{lineTotal(p)}</strong></span>
                       </div>
+                      {/* Conversion line — shown only when line is in a different
+                          currency than the work order AND we have a rate to convert. */}
+                      {(() => {
+                        const lc       = lineCurrency(p)
+                        const needsXR  = woCurrency && lc && lc.id !== woCurrency.id
+                        if (!needsXR) return null
+                        const converted = convertedLineTotal(p)
+                        const rate = p.exchange_rate
+                        return (
+                          <div className="flex items-center gap-4 mt-1 text-[11px] text-gray-500 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-flex">
+                            <span>≈ <strong className="text-gray-700">{converted != null ? fmt(converted, woCurrency) : '— (rate missing)'}</strong></span>
+                            <span>Rate: <strong>1 {lc.code} = {rate ?? '?'} {woCurrency.code}</strong></span>
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     {/* Action buttons */}
@@ -344,7 +502,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                       <div className="flex items-center gap-1 flex-shrink-0">
 
                         {/* Edit unit price — when reserved */}
-                        {code === 'reserved' && !isEditing && !isMarking && (
+                        {code === 'reserved' && !isEditing && !isEditingRt && !isMarking && (
                           <button
                             onClick={() => setEditingPrice(e => ({ ...e, [p.id]: String(p.unit_price ?? p.part?.unit_price ?? '') }))}
                             className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"
@@ -353,8 +511,18 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                           </button>
                         )}
 
+                        {/* Edit exchange rate — only when reserved AND currencies differ */}
+                        {code === 'reserved' && needsRate && !isEditing && !isEditingRt && !isMarking && (
+                          <button
+                            onClick={() => setEditingRate(e => ({ ...e, [p.id]: String(p.exchange_rate ?? '') }))}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg"
+                            title="Edit exchange rate">
+                            <span className="text-[10px] font-bold tracking-tight">FX</span>
+                          </button>
+                        )}
+
                         {/* Start using — reserved → in_use */}
-                        {code === 'reserved' && !isEditing && !isMarking && (
+                        {code === 'reserved' && !isEditing && !isEditingRt && !isMarking && (
                           <button
                             onClick={() => handleStartUsing(p.id)}
                             disabled={saving}
@@ -365,7 +533,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                         )}
 
                         {/* Mark installed — reserved or in_use → used */}
-                        {['reserved','in_use'].includes(code) && !isEditing && !isMarking && (
+                        {['reserved','in_use'].includes(code) && !isEditing && !isEditingRt && !isMarking && (
                           <button
                             onClick={() => {
                               if (!customerApproved) {
@@ -382,7 +550,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                         )}
 
                         {/* Cancel / skip */}
-                        {['reserved','in_use'].includes(code) && !isEditing && !isMarking && (
+                        {['reserved','in_use'].includes(code) && !isEditing && !isEditingRt && !isMarking && (
                           <button
                             onClick={() => handleCancel(p.id, p.part?.name)}
                             disabled={saving}
@@ -403,7 +571,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                       </p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <label className="text-xs text-gray-500 block mb-1">Unit Price (KES)</label>
+                          <label className="text-xs text-gray-500 block mb-1">Unit Price ({lineCurrency(p)?.code || lineCurrency(p)?.symbol || 'currency'})</label>
                           <input
                             type="number" min="0"
                             value={editingPrice[p.id]}
@@ -429,6 +597,51 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                     </div>
                   )}
 
+                  {/* Inline exchange-rate editor — appears when the FX button
+                      is clicked. Provider can override the auto-fetched rate. */}
+                  {isEditingRt && !readOnly && needsRate && (
+                    <div className="border-t border-amber-100 bg-amber-50 px-3 py-2.5 space-y-2">
+                      <p className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+                        <span className="font-bold">FX</span> Edit Exchange Rate
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <label className="text-xs text-gray-500 block mb-1">
+                            1 {lineCurrency(p)?.code} = ? {woCurrency?.code}
+                          </label>
+                          <input
+                            type="number" min="0" step="0.000001"
+                            value={editingRate[p.id]}
+                            onChange={e => setEditingRate(ed => ({ ...ed, [p.id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveRate(p.id); if (e.key === 'Escape') setEditingRate(ed => { const n = {...ed}; delete n[p.id]; return n }) }}
+                            autoFocus
+                            placeholder={`e.g. ${p.exchange_rate ?? '130.00'}`}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-amber-400"
+                          />
+                          {editingRate[p.id] && parseFloat(editingRate[p.id]) > 0 && p.unit_price && p.quantity && (
+                            <p className="text-[11px] text-amber-700 mt-1">
+                              New line total: {fmt(
+                                p.quantity * (p.unit_price ?? p.part?.unit_price) * parseFloat(editingRate[p.id]),
+                                woCurrency
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 mt-4">
+                          <button onClick={() => handleSaveRate(p.id)} disabled={saving}
+                            className="px-3 py-1.5 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1">
+                            {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                            Save
+                          </button>
+                          <button onClick={() => setEditingRate(ed => { const n = {...ed}; delete n[p.id]; return n })}
+                            className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Inline mark-used form */}
                   {isMarking && !readOnly && (
                     <div className="border-t border-green-100 bg-green-50 px-3 py-2.5 space-y-2">
@@ -438,7 +651,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                       <div className="flex items-end gap-2">
                         <div className="flex-1">
                           <label className="text-xs text-gray-500 block mb-1">
-                            Actual Unit Price (KES) <span className="text-gray-400">— leave blank to keep estimated</span>
+                            Actual Unit Price ({p.part?.currency?.code || p.part?.currency?.symbol || 'currency'}) <span className="text-gray-400">— leave blank to keep estimated</span>
                           </label>
                           <input
                             type="number" min="0"
@@ -467,10 +680,38 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
             })}
           </div>
 
-          {activeTotal > 0 && (
-            <div className="flex justify-end text-sm font-semibold text-gray-800 pt-1 border-t border-gray-200">
-              <span className="mr-8 text-gray-500">Parts total</span>
-              <span>KES {activeTotal.toLocaleString()}</span>
+          {totalEntries.length > 0 && (
+            <div className="pt-1 border-t border-gray-200 space-y-1">
+              {isMixedCurrency && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2 inline-block">
+                  ⚠ Parts use different currencies — per-currency subtotals shown below.
+                </p>
+              )}
+
+              {totalEntries.map(({ currency, total }, i) => (
+                <div key={currency?.id || i} className="flex justify-end text-sm font-medium text-gray-700">
+                  <span className="mr-8 text-gray-500">Subtotal ({currency?.code || 'unknown'})</span>
+                  <span>{fmt(total, currency)}</span>
+                </div>
+              ))}
+
+              {/* Grand total in the work order's currency. Shown when (a) we
+                  know the work order currency, and (b) either the lines are all
+                  in that currency, or every cross-currency line carries an
+                  exchange rate so the conversion is complete. */}
+              {woCurrency && woGrandTotal != null && (
+                <div className="flex justify-end text-base font-bold text-gray-900 pt-2 border-t border-gray-200">
+                  <span className="mr-8 text-gray-600 text-sm font-semibold">
+                    Total in {woCurrency.code} (work order)
+                  </span>
+                  <span>{fmt(woGrandTotal, woCurrency)}</span>
+                </div>
+              )}
+              {conversionGap && (
+                <p className="text-[11px] text-red-600 text-right">
+                  ⚠ Some cross-currency lines have no exchange rate — grand total is incomplete. Click the FX icon to set one.
+                </p>
+              )}
             </div>
           )}
         </>
@@ -519,7 +760,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                               {[part.brand, part.sku, part.category].filter(Boolean).join(' · ')}
                             </p>
                             <div className="flex items-center gap-3 mt-1">
-                              <span className="text-xs font-medium text-gray-700">{fmt(part.unit_price)}</span>
+                              <span className="text-xs font-medium text-gray-700">{fmt(part.unit_price, part.currency)}</span>
                               <span className={`text-xs flex items-center gap-1 ${
                                 isOut ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-green-700'
                               }`}>
