@@ -214,43 +214,63 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
   // Strip oklch/lab/color-mix colors that html2canvas can't parse.
   // Called via onclone so the original DOM is untouched.
   //
-  // We strip only specific properties that may carry colour values, and
-  // only when their computed value contains an unsupported function. We do
-  // NOT touch every property — overriding resolved layout values (border
-  // width, padding, etc.) would distort the rendered PDF.
+  // Instead of replacing unsupported colours with defaults (which wipes
+  // visual fidelity), we *convert* them to RGB using the browser's own
+  // colour engine. Write the value into a hidden canvas's fillStyle, read
+  // back the normalised RGB string, and use that as the override.
   const stripModernColors = (root) => {
     const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
 
+    const ctx = document.createElement('canvas').getContext('2d')
+
+    const toRgb = (cssColour) => {
+      if (!cssColour) return null
+      try {
+        ctx.fillStyle = '#000000'
+        ctx.fillStyle = cssColour
+        return ctx.fillStyle
+      } catch (_) { return null }
+    }
+
     const COLOUR_PROPS = [
-      ['color',                  '#000000'],
-      ['background-color',       'transparent'],
-      ['background-image',       'none'],
-      ['border-top-color',       '#e5e7eb'],
-      ['border-right-color',     '#e5e7eb'],
-      ['border-bottom-color',    '#e5e7eb'],
-      ['border-left-color',      '#e5e7eb'],
-      ['outline-color',          'transparent'],
-      ['text-decoration-color',  'currentColor'],
-      ['caret-color',            'auto'],
-      ['fill',                   'currentColor'],
-      ['stroke',                 'currentColor'],
-      ['box-shadow',             'none'],
-      ['filter',                 'none'],
+      'color', 'background-color',
+      'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+      'outline-color', 'text-decoration-color', 'caret-color',
+      'fill', 'stroke',
     ]
+
+    const replaceColoursInPropertyValue = (val) => {
+      if (!val || !UNSUPPORTED.test(val)) return val
+      const FUNC_CALL = /\b(?:oklch|oklab|lab|lch|color-mix|color)\(((?:[^()]+|\([^()]*\))*)\)/gi
+      return val.replace(FUNC_CALL, (match) => toRgb(match) || 'transparent')
+    }
 
     root.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-      COLOUR_PROPS.forEach(([prop, fallback]) => {
+
+      COLOUR_PROPS.forEach(prop => {
         try {
-          const val = cs.getPropertyValue(prop)
-          if (val && UNSUPPORTED.test(val)) {
-            el.style.setProperty(prop, fallback, 'important')
+          const v = cs.getPropertyValue(prop)
+          if (v && UNSUPPORTED.test(v)) {
+            const rgb = toRgb(v)
+            if (rgb) el.style.setProperty(prop, rgb, 'important')
           }
         } catch (_) {}
       })
-      if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
-        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*[^;]*(?:oklch|oklab|lab|lch|color-mix|color\()[^;]*;?/gi, '')
-        el.setAttribute('style', cleaned)
+
+      ;['background-image', 'box-shadow', 'filter'].forEach(prop => {
+        try {
+          const v = cs.getPropertyValue(prop)
+          if (v && UNSUPPORTED.test(v)) {
+            const fixed = replaceColoursInPropertyValue(v)
+            if (fixed) el.style.setProperty(prop, fixed, 'important')
+          }
+        } catch (_) {}
+      })
+
+      const inline = el.getAttribute('style')
+      if (inline && UNSUPPORTED.test(inline)) {
+        el.setAttribute('style', replaceColoursInPropertyValue(inline))
       }
     })
   }

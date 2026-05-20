@@ -182,50 +182,82 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
 
   // ── Download PDF ─────────────────────────────────────────────────────────
   // html2canvas can't parse newer CSS colour functions (oklch, oklab, lab,
-  // lch, color-mix, color()). Tailwind v4 and modern browsers emit these in
-  // computed values even when the source uses palette names. We strip only
-  // the specific properties that may carry colour values, and only when
-  // their computed value contains an unsupported function. We do NOT touch
-  // every property — overriding things like `border-width` or `padding`
-  // resolved values would distort the rendered PDF.
+  // lch, color-mix, color()). Tailwind v4 / modern browsers emit these in
+  // computed values for opacity-modified utilities like `bg-emerald-500/20`
+  // and ring/shadow utilities. Stripping these to a default (transparent /
+  // white) wipes the visual — the page ends up with only text.
+  //
+  // Instead, we *convert* every unsupported colour to its RGB equivalent
+  // using the browser's own colour engine: write the value into a hidden
+  // canvas's fillStyle, read back the normalised RGB string, and use that
+  // as the override. This preserves the visual fidelity of the printable.
   const stripModernColors = (root) => {
     const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
 
-    // Properties that may legitimately contain colour functions, paired with
-    // a safe visual fallback. Order matters for the gradient fallback:
-    // background-image needs to go to `none` so the lab() linear-gradient is
-    // killed, not just the colour stops inside it.
+    // A tiny offscreen canvas we reuse for colour conversion. The browser
+    // resolves any valid CSS colour assigned to fillStyle into a normalised
+    // rgb()/rgba() string.
+    const ctx = document.createElement('canvas').getContext('2d')
+
+    const toRgb = (cssColour) => {
+      if (!cssColour) return null
+      try {
+        ctx.fillStyle = '#000000'           // reset baseline (defends against malformed input)
+        ctx.fillStyle = cssColour           // browser normalises
+        return ctx.fillStyle                // 'rgb(...)' or '#rrggbb' or 'rgba(...)'
+      } catch (_) { return null }
+    }
+
+    // Properties that may carry colour values. We convert each whose computed
+    // value contains an unsupported colour function. Layout properties
+    // (border-width, padding, font-size, etc.) are deliberately not touched.
     const COLOUR_PROPS = [
-      ['color',                  '#000000'],
-      ['background-color',       'transparent'],
-      ['background-image',       'none'],
-      ['border-top-color',       '#e5e7eb'],
-      ['border-right-color',     '#e5e7eb'],
-      ['border-bottom-color',    '#e5e7eb'],
-      ['border-left-color',      '#e5e7eb'],
-      ['outline-color',          'transparent'],
-      ['text-decoration-color',  'currentColor'],
-      ['caret-color',            'auto'],
-      ['fill',                   'currentColor'],
-      ['stroke',                 'currentColor'],
-      ['box-shadow',             'none'],
-      ['filter',                 'none'],
+      'color', 'background-color',
+      'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+      'outline-color', 'text-decoration-color', 'caret-color',
+      'fill', 'stroke',
     ]
+
+    // For complex properties (background-image with a gradient, box-shadow,
+    // filter), parse out each colour function and replace it inline. We
+    // can't just stuff the whole value into fillStyle — these aren't
+    // colour values.
+    const replaceColoursInPropertyValue = (val) => {
+      if (!val || !UNSUPPORTED.test(val)) return val
+      // Match a full colour function call, allowing nested parentheses (1 level).
+      const FUNC_CALL = /\b(?:oklch|oklab|lab|lch|color-mix|color)\(((?:[^()]+|\([^()]*\))*)\)/gi
+      return val.replace(FUNC_CALL, (match) => toRgb(match) || 'transparent')
+    }
 
     root.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-      COLOUR_PROPS.forEach(([prop, fallback]) => {
+
+      // Single-colour properties
+      COLOUR_PROPS.forEach(prop => {
         try {
-          const val = cs.getPropertyValue(prop)
-          if (val && UNSUPPORTED.test(val)) {
-            el.style.setProperty(prop, fallback, 'important')
+          const v = cs.getPropertyValue(prop)
+          if (v && UNSUPPORTED.test(v)) {
+            const rgb = toRgb(v)
+            if (rgb) el.style.setProperty(prop, rgb, 'important')
           }
         } catch (_) {}
       })
-      // Scrub inline style attributes — they may contain inherited gradients
-      if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
-        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*[^;]*(?:oklch|oklab|lab|lch|color-mix|color\()[^;]*;?/gi, '')
-        el.setAttribute('style', cleaned)
+
+      // Properties that may contain MULTIPLE colour calls (gradients, shadows).
+      ;['background-image', 'box-shadow', 'filter'].forEach(prop => {
+        try {
+          const v = cs.getPropertyValue(prop)
+          if (v && UNSUPPORTED.test(v)) {
+            const fixed = replaceColoursInPropertyValue(v)
+            if (fixed) el.style.setProperty(prop, fixed, 'important')
+          }
+        } catch (_) {}
+      })
+
+      // Scrub inline style attributes by replacing colour calls inline
+      const inline = el.getAttribute('style')
+      if (inline && UNSUPPORTED.test(inline)) {
+        el.setAttribute('style', replaceColoursInPropertyValue(inline))
       }
     })
   }
