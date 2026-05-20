@@ -4,280 +4,441 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import ReceiptCard from '@/components/ReceiptCard'
 import { createClient } from '@/lib/supabase/client'
 import {
-  FileText, CheckCircle, AlertCircle, Loader2,
-  DollarSign, Send, Lock, BadgeCheck, CreditCard,
-  Banknote, Building2, ChevronDown, ChevronUp,
-  Wrench, Package, Clock, Bell, CheckCircle2, Download
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  DollarSign,
+  Send,
+  Lock,
+  BadgeCheck,
+  CreditCard,
+  Banknote,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  Wrench,
+  Package,
+  Clock,
+  Bell,
+  Download,
 } from 'lucide-react'
 
 const PAYMENT_METHODS = [
-  { value: 'cash',          label: 'Cash',     icon: Banknote   },
-  { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
-  { value: 'card',          label: 'Card',     icon: CreditCard },
-  { value: 'bank_transfer', label: 'Bank',     icon: Building2  },
-  { value: 'cheque',        label: 'Cheque',   icon: FileText   },
+  { value: 'cash', label: 'Cash', icon: Banknote },
+  { value: 'mpesa', label: 'M-Pesa', icon: CreditCard },
+  { value: 'card', label: 'Card', icon: CreditCard },
+  { value: 'bank_transfer', label: 'Bank', icon: Building2 },
+  { value: 'cheque', label: 'Cheque', icon: FileText },
 ]
 
 export default function InvoiceTab({ workOrder, permissions = null }) {
   const canConfirm = permissions?.canConfirm ?? false
   const supabase = createClient()
 
-  const [invoice,      setInvoice]      = useState(null)   // { invoice, line_items, receipt }
-  const [loading,      setLoading]      = useState(true)
-  const [generating,   setGenerating]   = useState(false)
-  const [sending,      setSending]      = useState(false)
-  const [paying,       setPaying]       = useState(false)
-  const [error,        setError]        = useState('')
-  const [success,      setSuccess]      = useState('')
-  const [showItems,    setShowItems]    = useState(true)
-  const [vatPct,       setVatPct]       = useState('16')
-  const [discountPct,  setDiscountPct]  = useState('0')
-  const [showPayForm,  setShowPayForm]  = useState(false)
-  const [payMethod,    setPayMethod]    = useState('cash')
-  const [amountPaid,   setAmountPaid]   = useState('')
-  const [payNotes,     setPayNotes]     = useState('')
-
-  // PDF download — printRef points to the on-screen invoice document so the
-  // capture matches exactly what the provider sees on the tab.
+  const [invoice, setInvoice] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [paying, setPaying] = useState(false)
   const [downloading, setDownloading] = useState(false)
+
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const [showItems, setShowItems] = useState(true)
+  const [vatPct, setVatPct] = useState('16')
+  const [discountPct, setDiscountPct] = useState('0')
+
+  const [showPayForm, setShowPayForm] = useState(false)
+  const [payMethod, setPayMethod] = useState('cash')
+  const [amountPaid, setAmountPaid] = useState('')
+  const [payNotes, setPayNotes] = useState('')
+
   const printRef = useRef(null)
 
-  // Work order's billing currency — fetched once on mount. The work_order_id
-  // prop carries currency_id; we resolve it to a row here so we can label
-  // amounts throughout the invoice and the payment form. Falls back to a
-  // bare number with no prefix if no currency is set on the work order.
   const [woCurrency, setWoCurrency] = useState(null)
 
   useEffect(() => {
     let cancelled = false
-    async function loadWoCurrency () {
-      if (!workOrder.currency_id) { setWoCurrency(null); return }
+
+    async function loadWoCurrency() {
+      if (!workOrder.currency_id) {
+        setWoCurrency(null)
+        return
+      }
+
       const { data } = await supabase
         .from('currencies')
         .select('id, code, symbol, display_name')
         .eq('id', workOrder.currency_id)
         .single()
-      if (!cancelled) setWoCurrency(data || null)
+
+      if (!cancelled) {
+        setWoCurrency(data || null)
+      }
     }
+
     loadWoCurrency()
-    return () => { cancelled = true }
+
+    return () => {
+      cancelled = true
+    }
   }, [workOrder.currency_id])
 
-  // Currency-aware formatter. Falls back to bare number if no currency set,
-  // so the file degrades cleanly even before a billing currency is chosen.
-  const fmt   = (n, opts = {}) => {
+  const fmt = (n, opts = {}) => {
     const num = Number(n || 0).toLocaleString('en-KE', {
-      minimumFractionDigits: opts.minimumFractionDigits ?? 0,
-      maximumFractionDigits: opts.maximumFractionDigits ?? 2,
+      minimumFractionDigits:
+        opts.minimumFractionDigits ?? 0,
+      maximumFractionDigits:
+        opts.maximumFractionDigits ?? 2,
     })
+
     if (!woCurrency) return num
+
     return `${woCurrency.symbol || woCurrency.code} ${num}`
   }
-  // Short string for input labels, e.g. "(KES)" or "(USD)".
-  const currencyLabel = woCurrency ? (woCurrency.code || woCurrency.symbol || 'currency') : 'currency'
-  const fmtD  = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+
+  const currencyLabel = woCurrency
+    ? woCurrency.code || woCurrency.symbol || 'currency'
+    : 'currency'
+
+  const fmtD = d =>
+    d
+      ? new Date(d).toLocaleDateString('en-KE', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : '—'
 
   const statusCode = workOrder.status?.code
-  const woComplete = ['completed', 'closed', 'quality_check'].includes(statusCode)
 
-  const canGenerate      = permissions ? (permissions.canGenerate      && woComplete) : woComplete
-  const canSendInvoice   = permissions ? permissions.canSendInvoice    : true
-  const canRecordPayment = permissions ? permissions.canRecordPayment  : true
+  const woComplete = [
+    'completed',
+    'closed',
+    'quality_check',
+  ].includes(statusCode)
 
-  // ── Load invoice + items + receipt via direct queries ────────────────────
+  const canGenerate = permissions
+    ? permissions.canGenerate && woComplete
+    : woComplete
+
+  const canSendInvoice = permissions
+    ? permissions.canSendInvoice
+    : true
+
+  const canRecordPayment = permissions
+    ? permissions.canRecordPayment
+    : true
+
   const loadInvoice = useCallback(async () => {
     try {
       const { data: inv, error: invErr } = await supabase
         .from('invoices')
-        .select('id, invoice_number, work_order_id, service_provider_id, issued_to_user_id, status, subtotal, discount, discount_pct, tax_rate, tax_amount, total_amount, notes, due_date, issued_at, paid_at')
+        .select(`
+          id,
+          invoice_number,
+          work_order_id,
+          service_provider_id,
+          issued_to_user_id,
+          status,
+          subtotal,
+          discount,
+          discount_pct,
+          tax_rate,
+          tax_amount,
+          total_amount,
+          notes,
+          due_date,
+          issued_at,
+          paid_at
+        `)
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
-      if (invErr) { console.error('invoices query error:', invErr.message); setLoading(false); return }
+      if (invErr) {
+        console.error(
+          'invoices query error:',
+          invErr.message
+        )
+
+        setLoading(false)
+        return
+      }
 
       if (inv) {
-        const [{ data: items }, { data: receipt }] = await Promise.all([
-          supabase
-            .from('invoice_items')
-            .select('id, item_type, item_name, description, quantity, unit_price, total_price')
-            .eq('invoice_id', inv.id)
-            .order('item_type'),
-          supabase
-            .from('receipts')
-            .select('id, receipt_number, payment_method, amount_paid, paid_at, notes, confirmed, confirmed_at')
-            .eq('invoice_id', inv.id)
-            .maybeSingle(),
-        ])
-        setInvoice({ invoice: inv, line_items: items || [], receipt: receipt || null })
+        const [{ data: items }, { data: receipt }] =
+          await Promise.all([
+            supabase
+              .from('invoice_items')
+              .select(`
+                id,
+                item_type,
+                item_name,
+                description,
+                quantity,
+                unit_price,
+                total_price
+              `)
+              .eq('invoice_id', inv.id)
+              .order('item_type'),
+
+            supabase
+              .from('receipts')
+              .select(`
+                id,
+                receipt_number,
+                payment_method,
+                amount_paid,
+                paid_at,
+                notes,
+                confirmed,
+                confirmed_at
+              `)
+              .eq('invoice_id', inv.id)
+              .maybeSingle(),
+          ])
+
+        setInvoice({
+          invoice: inv,
+          line_items: items || [],
+          receipt: receipt || null,
+        })
       } else {
         setInvoice(null)
       }
-    } catch (e) { console.error('loadInvoice threw:', e.message) }
-    finally { setLoading(false) }
+    } catch (e) {
+      console.error('loadInvoice threw:', e.message)
+    } finally {
+      setLoading(false)
+    }
   }, [workOrder.id])
 
-  useEffect(() => { loadInvoice() }, [loadInvoice])
+  useEffect(() => {
+    loadInvoice()
+  }, [loadInvoice])
 
-  // ── Generate ─────────────────────────────────────────────────────────────
-  const handleGenerate = async () => {
-    setGenerating(true); setError(''); setSuccess('')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const taxRate     = Math.max(0, Math.min(100, parseFloat(vatPct)     || 0)) / 100
-      const discountRate = Math.max(0, Math.min(100, parseFloat(discountPct) || 0)) / 100
-      const { data: result, error: rpcErr } = await supabase.rpc('generate_invoice_for_provider', {
-        p_work_order_id:   workOrder.id,
-        p_caller_auth_uid: user.id,
-        p_tax_rate:        taxRate,
-        p_discount_pct:    discountRate,
-        p_notes:           null,
-      })
-      if (rpcErr) throw rpcErr
-      if (!result.success && result.invoice_id) {
-        // Already exists — just load it
-        await loadInvoice()
-        return
-      }
-      if (!result.success) throw new Error(result.error)
-      setSuccess(`Invoice ${result.invoice_number} generated.`)
-      await loadInvoice()
-    } catch (err) { setError(err.message) }
-    finally { setGenerating(false) }
-  }
+  // ─────────────────────────────────────────────────────────────
+  // PDF DOWNLOAD
+  // ─────────────────────────────────────────────────────────────
 
-  // ── Send ─────────────────────────────────────────────────────────────────
-  const handleSend = async () => {
-    if (!confirm('Send this invoice to the customer?')) return
-    setSending(true); setError(''); setSuccess('')
-    try {
-      const resp = await fetch(`/api/work-orders/${workOrder.id}/send-invoice`, { method: 'POST' })
-      const data = await resp.json()
-      if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to send invoice')
-      const msgs = [data.email_sent && 'Email', data.sms_sent && 'SMS'].filter(Boolean)
-      setSuccess(`Invoice sent.${msgs.length ? ` Delivered via ${msgs.join(' & ')}.` : ''}`)
-      await loadInvoice()
-    } catch (err) { setError(err.message) }
-    finally { setSending(false) }
-  }
+  const stripModernColors = doc => {
+    const FALLBACKS = {
+      color: '#000000',
+      backgroundColor: '#ffffff',
+      borderColor: '#e5e7eb',
+      outlineColor: 'transparent',
+    }
 
-  // ── Record payment ────────────────────────────────────────────────────────
-  const handlePayment = async () => {
-    if (!amountPaid || parseFloat(amountPaid) <= 0) { setError('Enter a valid amount'); return }
-    setPaying(true); setError(''); setSuccess('')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: result, error: rpcErr } = await supabase.rpc('process_payment', {
-        p_invoice_id: invoice.invoice.id, p_payment_method: payMethod,
-        p_amount_paid: parseFloat(amountPaid), p_payer_user_id: user.id, p_notes: payNotes || null,
-      })
-      if (rpcErr) throw rpcErr
-      if (!result.success) throw new Error(result.error)
-      const change = result.change_given > 0 ? ` · Change: ${fmt(result.change_given)}` : ''
-      setSuccess(`Payment recorded! Receipt ${result.receipt_number}${change}`)
-      setShowPayForm(false)
-      await loadInvoice()
-    } catch (err) { setError(err.message) }
-    finally { setPaying(false) }
-  }
+    const UNSUPPORTED =
+      /(oklch|oklab|\blab\(|lch\(|color-mix\()/i
 
-  // ── PDF download ─────────────────────────────────────────────────────────
-  // Render the on-screen invoice document into a PDF the user can save.
-  // We strip oklch/lab/color-mix CSS at clone time because html2canvas can't
-  // parse those modern colour functions (Tailwind v4 emits them even when
-  // the source uses palette colours). Long invoices are sliced into multiple
-  // A4 pages. Mirrors the working pattern in ReceiptTab.jsx.
-  const stripModernColors = (doc) => {
-    const FALLBACKS  = { color: '#000000', backgroundColor: 'transparent', borderColor: '#e5e7eb', outlineColor: 'transparent' }
-    const UNSUPPORTED = /oklch|oklab|\blab\b|color-mix|lch/i
     doc.querySelectorAll('*').forEach(el => {
-      const cs = window.getComputedStyle(el)
-      Object.keys(FALLBACKS).forEach(prop => {
-        try {
-          const val = cs.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase())
-          if (val && UNSUPPORTED.test(val)) {
-            el.style[prop] = FALLBACKS[prop]
+      try {
+        const cs = window.getComputedStyle(el)
+
+        Object.entries(FALLBACKS).forEach(
+          ([prop, fallback]) => {
+            const cssProp = prop
+              .replace(/([A-Z])/g, '-$1')
+              .toLowerCase()
+
+            const val =
+              cs.getPropertyValue(cssProp)
+
+            if (val && UNSUPPORTED.test(val)) {
+              el.style[prop] = fallback
+            }
           }
-        } catch (_) {}
-      })
-      if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
-        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)[^;]+;?/gi, '')
-        el.setAttribute('style', cleaned)
-      }
+        )
+
+        const inlineStyle =
+          el.getAttribute('style')
+
+        if (
+          inlineStyle &&
+          UNSUPPORTED.test(inlineStyle)
+        ) {
+          const cleaned = inlineStyle.replace(
+            /[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)\([^)]+\);?/gi,
+            ''
+          )
+
+          el.setAttribute('style', cleaned)
+        }
+
+        // Tailwind vars fallback
+        el.style.setProperty(
+          '--tw-ring-color',
+          '#000000'
+        )
+
+        el.style.setProperty(
+          '--tw-shadow-color',
+          '#000000'
+        )
+      } catch (_) {}
     })
   }
 
   const handleDownload = async () => {
-    if (!inv) return
+    if (!invoice?.invoice) return
+
     setDownloading(true)
     setError('')
+
     try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      const [
+        { default: html2canvas },
+        { default: jsPDF },
+      ] = await Promise.all([
         import('html2canvas'),
         import('jspdf'),
       ])
+
       const el = printRef.current
-      if (!el) return
 
-      // Render into a fixed A4-width (794px @96dpi) off-screen container so
-      // the capture isn't constrained by the on-screen tab width.
-      const A4_PX = 794
-      const wrapper = document.createElement('div')
-      wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
-      const cloneEl = el.cloneNode(true)
-      cloneEl.style.cssText = 'width:100%;background:#ffffff;'
-      wrapper.appendChild(cloneEl)
-      document.body.appendChild(wrapper)
-
-      try {
-        const canvas = await html2canvas(wrapper, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          width: A4_PX,
-          height: wrapper.scrollHeight,
-          windowWidth: A4_PX,
-          onclone: (clonedDoc) => {
-            clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
-            stripModernColors(clonedDoc)
-          },
-        })
-
-        const imgData = canvas.toDataURL('image/png')
-        const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-        const pageW  = pdf.internal.pageSize.getWidth()   // 210mm
-        const pageH  = pdf.internal.pageSize.getHeight()  // 297mm
-        const margin = 8
-        const pdfW   = pageW - margin * 2                 // 194mm
-        const pdfH   = (canvas.height / canvas.width) * pdfW
-
-        if (pdfH <= pageH - margin * 2) {
-          // Fits on one page — centre vertically.
-          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
-        } else {
-          // Multi-page: slice the canvas row by row.
-          const pxPerMm = canvas.width / pdfW
-          const slicePx = Math.floor((pageH - margin * 2) * pxPerMm)
-          let srcY = 0
-          while (srcY < canvas.height) {
-            if (srcY > 0) pdf.addPage()
-            const h = Math.min(slicePx, canvas.height - srcY)
-            const slice = document.createElement('canvas')
-            slice.width  = canvas.width
-            slice.height = h
-            slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
-            const slicePdfH = h / pxPerMm
-            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, slicePdfH)
-            srcY += slicePx
-          }
-        }
-
-        pdf.save(`Invoice-${inv.invoice_number || workOrder.work_order_number}.pdf`)
-      } finally {
-        document.body.removeChild(wrapper)
+      if (!el) {
+        setError('Invoice element not found')
+        return
       }
+
+      await document.fonts.ready
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        allowTaint: true,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth:
+          document.documentElement.scrollWidth,
+
+        onclone: clonedDoc => {
+          stripModernColors(clonedDoc)
+
+          clonedDoc.body.style.background =
+            '#ffffff'
+        },
+      })
+
+      const imgData = canvas.toDataURL(
+        'image/png'
+      )
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      })
+
+      const pageWidth =
+        pdf.internal.pageSize.getWidth()
+
+      const pageHeight =
+        pdf.internal.pageSize.getHeight()
+
+      const margin = 8
+
+      const usableWidth = pageWidth - margin * 2
+      const usableHeight =
+        pageHeight - margin * 2
+
+      const imgWidth = usableWidth
+
+      const imgHeight =
+        (canvas.height * imgWidth) /
+        canvas.width
+
+      if (imgHeight <= usableHeight) {
+        pdf.addImage(
+          imgData,
+          'PNG',
+          margin,
+          margin,
+          imgWidth,
+          imgHeight
+        )
+      } else {
+        const pxPerMm =
+          canvas.width / usableWidth
+
+        const pageCanvasHeight = Math.floor(
+          usableHeight * pxPerMm
+        )
+
+        let renderedHeight = 0
+        let pageIndex = 0
+
+        while (renderedHeight < canvas.height) {
+          const sliceCanvas =
+            document.createElement('canvas')
+
+          const sliceContext =
+            sliceCanvas.getContext('2d')
+
+          const sliceHeight = Math.min(
+            pageCanvasHeight,
+            canvas.height - renderedHeight
+          )
+
+          sliceCanvas.width = canvas.width
+          sliceCanvas.height = sliceHeight
+
+          sliceContext.drawImage(
+            canvas,
+            0,
+            renderedHeight,
+            canvas.width,
+            sliceHeight,
+            0,
+            0,
+            canvas.width,
+            sliceHeight
+          )
+
+          const sliceImgData =
+            sliceCanvas.toDataURL('image/png')
+
+          const sliceHeightMm =
+            sliceHeight / pxPerMm
+
+          if (pageIndex > 0) {
+            pdf.addPage()
+          }
+
+          pdf.addImage(
+            sliceImgData,
+            'PNG',
+            margin,
+            margin,
+            usableWidth,
+            sliceHeightMm
+          )
+
+          renderedHeight += sliceHeight
+          pageIndex++
+        }
+      }
+
+      pdf.save(
+        `Invoice-${
+          invoice.invoice.invoice_number ||
+          workOrder.work_order_number
+        }.pdf`
+      )
     } catch (e) {
       console.error('PDF download error:', e)
-      setError('Could not generate PDF. Please try again.')
+
+      setError(
+        `Could not generate PDF: ${
+          e.message || 'Unknown error'
+        }`
+      )
     } finally {
       setDownloading(false)
     }
