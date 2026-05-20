@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ReceiptCard from '@/components/ReceiptCard'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileText, CheckCircle, AlertCircle, Loader2,
   DollarSign, Send, Lock, BadgeCheck, CreditCard,
   Banknote, Building2, ChevronDown, ChevronUp,
-  Wrench, Package, Clock, Bell, CheckCircle2, Download
+  Wrench, Package, Clock, Bell, CheckCircle2
 } from 'lucide-react'
 
 const PAYMENT_METHODS = [
@@ -27,13 +27,8 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const [generating,   setGenerating]   = useState(false)
   const [sending,      setSending]      = useState(false)
   const [paying,       setPaying]       = useState(false)
-  const [downloading,  setDownloading]  = useState(false)
   const [error,        setError]        = useState('')
   const [success,      setSuccess]      = useState('')
-
-  // Ref to the invoice document container — used by the Download PDF button to
-  // capture the rendered DOM via html2canvas.
-  const printRef = useRef(null)
   const [showItems,    setShowItems]    = useState(true)
   const [vatPct,       setVatPct]       = useState('16')
   const [discountPct,  setDiscountPct]  = useState('0')
@@ -180,166 +175,6 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     finally { setPaying(false) }
   }
 
-  // ── Download PDF ─────────────────────────────────────────────────────────
-  // html2canvas can't parse newer CSS colour functions (oklch, oklab, lab,
-  // lch, color-mix, color()). Tailwind v4 / modern browsers emit these in
-  // computed values for opacity-modified utilities like `bg-emerald-500/20`
-  // and ring/shadow utilities. Stripping these to a default (transparent /
-  // white) wipes the visual — the page ends up with only text.
-  //
-  // Instead, we *convert* every unsupported colour to its RGB equivalent
-  // using the browser's own colour engine: write the value into a hidden
-  // canvas's fillStyle, read back the normalised RGB string, and use that
-  // as the override. This preserves the visual fidelity of the printable.
-  const stripModernColors = (root) => {
-    const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
-
-    // A tiny offscreen canvas we reuse for colour conversion. The browser
-    // resolves any valid CSS colour assigned to fillStyle into a normalised
-    // rgb()/rgba() string.
-    const ctx = document.createElement('canvas').getContext('2d')
-
-    const toRgb = (cssColour) => {
-      if (!cssColour) return null
-      try {
-        ctx.fillStyle = '#000000'           // reset baseline (defends against malformed input)
-        ctx.fillStyle = cssColour           // browser normalises
-        return ctx.fillStyle                // 'rgb(...)' or '#rrggbb' or 'rgba(...)'
-      } catch (_) { return null }
-    }
-
-    // Properties that may carry colour values. We convert each whose computed
-    // value contains an unsupported colour function. Layout properties
-    // (border-width, padding, font-size, etc.) are deliberately not touched.
-    const COLOUR_PROPS = [
-      'color', 'background-color',
-      'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-      'outline-color', 'text-decoration-color', 'caret-color',
-      'fill', 'stroke',
-    ]
-
-    // For complex properties (background-image with a gradient, box-shadow,
-    // filter), parse out each colour function and replace it inline. We
-    // can't just stuff the whole value into fillStyle — these aren't
-    // colour values.
-    const replaceColoursInPropertyValue = (val) => {
-      if (!val || !UNSUPPORTED.test(val)) return val
-      // Match a full colour function call, allowing nested parentheses (1 level).
-      const FUNC_CALL = /\b(?:oklch|oklab|lab|lch|color-mix|color)\(((?:[^()]+|\([^()]*\))*)\)/gi
-      return val.replace(FUNC_CALL, (match) => toRgb(match) || 'transparent')
-    }
-
-    root.querySelectorAll('*').forEach(el => {
-      const cs = window.getComputedStyle(el)
-
-      // Single-colour properties
-      COLOUR_PROPS.forEach(prop => {
-        try {
-          const v = cs.getPropertyValue(prop)
-          if (v && UNSUPPORTED.test(v)) {
-            const rgb = toRgb(v)
-            if (rgb) el.style.setProperty(prop, rgb, 'important')
-          }
-        } catch (_) {}
-      })
-
-      // Properties that may contain MULTIPLE colour calls (gradients, shadows).
-      ;['background-image', 'box-shadow', 'filter'].forEach(prop => {
-        try {
-          const v = cs.getPropertyValue(prop)
-          if (v && UNSUPPORTED.test(v)) {
-            const fixed = replaceColoursInPropertyValue(v)
-            if (fixed) el.style.setProperty(prop, fixed, 'important')
-          }
-        } catch (_) {}
-      })
-
-      // Scrub inline style attributes by replacing colour calls inline
-      const inline = el.getAttribute('style')
-      if (inline && UNSUPPORTED.test(inline)) {
-        el.setAttribute('style', replaceColoursInPropertyValue(inline))
-      }
-    })
-  }
-
-  const handleDownload = async () => {
-    setDownloading(true)
-    try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ])
-      const el = printRef.current
-      if (!el) return
-
-      const A4_PX = 794   // A4 width @ 96dpi
-      const wrapper = document.createElement('div')
-      wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
-      const cloneEl = el.cloneNode(true)
-      cloneEl.style.cssText = 'width:100%;background:#ffffff;'
-      wrapper.appendChild(cloneEl)
-      document.body.appendChild(wrapper)
-
-      // Pre-strip on the off-screen wrapper. We can't always rely on `onclone`
-      // to run before html2canvas starts parsing colours, so we sweep the
-      // wrapper itself first. Scope is limited to the wrapper so the live
-      // page isn't mutated.
-      stripModernColors(wrapper)
-
-      try {
-        const canvas = await html2canvas(wrapper, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          width: A4_PX,
-          height: wrapper.scrollHeight,
-          windowWidth: A4_PX,
-          onclone: (clonedDoc) => {
-            clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
-            stripModernColors(clonedDoc)
-          },
-        })
-
-        const imgData = canvas.toDataURL('image/png')
-        const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-        const pageW  = pdf.internal.pageSize.getWidth()
-        const pageH  = pdf.internal.pageSize.getHeight()
-        const margin = 8
-        const pdfW   = pageW - margin * 2
-        const pdfH   = (canvas.height / canvas.width) * pdfW
-
-        if (pdfH <= pageH - margin * 2) {
-          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
-        } else {
-          // Multi-page: slice the canvas row by row
-          const pxPerMm  = canvas.width / pdfW
-          const slicePx  = Math.floor((pageH - margin * 2) * pxPerMm)
-          let srcY = 0
-          while (srcY < canvas.height) {
-            if (srcY > 0) pdf.addPage()
-            const h = Math.min(slicePx, canvas.height - srcY)
-            const slice = document.createElement('canvas')
-            slice.width  = canvas.width
-            slice.height = h
-            slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
-            const slicePdfH = (h / pxPerMm)
-            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, slicePdfH)
-            srcY += slicePx
-          }
-        }
-
-        pdf.save('Invoice-' + (invoice?.invoice?.invoice_number || workOrder.work_order_number) + '.pdf')
-      } finally {
-        document.body.removeChild(wrapper)
-      }
-    } catch (e) {
-      console.error('PDF download error:', e)
-      setError('Could not generate PDF: ' + e.message)
-    } finally {
-      setDownloading(false)
-    }
-  }
-
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -482,20 +317,8 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
         </div>
       )}
 
-      {/* ── Action bar ─────────────────────────────────────────────────── */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
-        >
-          {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          {downloading ? 'Generating PDF…' : 'Download PDF'}
-        </button>
-      </div>
-
       {/* ── Invoice document ─────────────────────────────────────────── */}
-      <div ref={printRef} className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+      <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
 
         {/* Header */}
         <div className="bg-gray-900 px-6 py-5 flex items-start justify-between">
