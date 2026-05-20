@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ReceiptCard from '@/components/ReceiptCard'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileText, CheckCircle, AlertCircle, Loader2,
   DollarSign, Send, Lock, BadgeCheck, CreditCard,
   Banknote, Building2, ChevronDown, ChevronUp,
-  Wrench, Package, Clock, Bell, CheckCircle2
+  Wrench, Package, Clock, Bell, CheckCircle2, Download
 } from 'lucide-react'
 
 const PAYMENT_METHODS = [
@@ -27,8 +27,13 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const [generating,   setGenerating]   = useState(false)
   const [sending,      setSending]      = useState(false)
   const [paying,       setPaying]       = useState(false)
+  const [downloading,  setDownloading]  = useState(false)
   const [error,        setError]        = useState('')
   const [success,      setSuccess]      = useState('')
+
+  // Ref to the invoice document container — used by the Download PDF button to
+  // capture the rendered DOM via html2canvas.
+  const printRef = useRef(null)
   const [showItems,    setShowItems]    = useState(true)
   const [vatPct,       setVatPct]       = useState('16')
   const [discountPct,  setDiscountPct]  = useState('0')
@@ -175,6 +180,104 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
     finally { setPaying(false) }
   }
 
+  // ── Download PDF ─────────────────────────────────────────────────────────
+  // Mirror of the receipt tab's PDF capture pipeline. html2canvas can't parse
+  // modern CSS colour functions (oklch, lab, color-mix), so we strip them in
+  // onclone to a safe fallback. The clone is rendered into an off-screen
+  // A4-width wrapper so we capture the document at print width regardless of
+  // the on-screen layout. Multi-page output is sliced row-by-row.
+  const stripModernColors = (doc) => {
+    const FALLBACKS = { color: '#000000', backgroundColor: 'transparent', borderColor: '#e5e7eb', outlineColor: 'transparent' }
+    const UNSUPPORTED = /oklch|oklab|\blab\b|color-mix|lch/i
+    doc.querySelectorAll('*').forEach(el => {
+      const cs = window.getComputedStyle(el)
+      Object.keys(FALLBACKS).forEach(prop => {
+        try {
+          const val = cs.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase())
+          if (val && UNSUPPORTED.test(val)) {
+            el.style[prop] = FALLBACKS[prop]
+          }
+        } catch (_) {}
+      })
+      if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
+        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)[^;]+;?/gi, '')
+        el.setAttribute('style', cleaned)
+      }
+    })
+  }
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+      const el = printRef.current
+      if (!el) return
+
+      const A4_PX = 794   // A4 width @ 96dpi
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
+      const cloneEl = el.cloneNode(true)
+      cloneEl.style.cssText = 'width:100%;background:#ffffff;'
+      wrapper.appendChild(cloneEl)
+      document.body.appendChild(wrapper)
+
+      try {
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          width: A4_PX,
+          height: wrapper.scrollHeight,
+          windowWidth: A4_PX,
+          onclone: (clonedDoc) => {
+            clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(s => s.remove())
+            stripModernColors(clonedDoc)
+          },
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pageW  = pdf.internal.pageSize.getWidth()
+        const pageH  = pdf.internal.pageSize.getHeight()
+        const margin = 8
+        const pdfW   = pageW - margin * 2
+        const pdfH   = (canvas.height / canvas.width) * pdfW
+
+        if (pdfH <= pageH - margin * 2) {
+          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
+        } else {
+          // Multi-page: slice the canvas row by row
+          const pxPerMm  = canvas.width / pdfW
+          const slicePx  = Math.floor((pageH - margin * 2) * pxPerMm)
+          let srcY = 0
+          while (srcY < canvas.height) {
+            if (srcY > 0) pdf.addPage()
+            const h = Math.min(slicePx, canvas.height - srcY)
+            const slice = document.createElement('canvas')
+            slice.width  = canvas.width
+            slice.height = h
+            slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
+            const slicePdfH = (h / pxPerMm)
+            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, slicePdfH)
+            srcY += slicePx
+          }
+        }
+
+        pdf.save('Invoice-' + (invoice?.invoice?.invoice_number || workOrder.work_order_number) + '.pdf')
+      } finally {
+        document.body.removeChild(wrapper)
+      }
+    } catch (e) {
+      console.error('PDF download error:', e)
+      setError('Could not generate PDF: ' + e.message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -317,8 +420,20 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
         </div>
       )}
 
+      {/* ── Action bar ─────────────────────────────────────────────────── */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        >
+          {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          {downloading ? 'Generating PDF…' : 'Download PDF'}
+        </button>
+      </div>
+
       {/* ── Invoice document ─────────────────────────────────────────── */}
-      <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+      <div ref={printRef} className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
 
         {/* Header */}
         <div className="bg-gray-900 px-6 py-5 flex items-start justify-between">
