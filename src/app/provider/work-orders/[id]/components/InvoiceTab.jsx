@@ -7,7 +7,7 @@ import {
   FileText, CheckCircle, AlertCircle, Loader2,
   DollarSign, Send, Lock, BadgeCheck, CreditCard,
   Banknote, Building2, ChevronDown, ChevronUp,
-  Wrench, Package, Clock, Bell, CheckCircle2
+  Wrench, Package, Clock, Bell, CheckCircle2, Download
 } from 'lucide-react'
 
 const PAYMENT_METHODS = [
@@ -36,6 +36,11 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const [payMethod,    setPayMethod]    = useState('cash')
   const [amountPaid,   setAmountPaid]   = useState('')
   const [payNotes,     setPayNotes]     = useState('')
+
+  // PDF download state. The downloaded PDF is rendered from the same HTML
+  // the email attaches (fetched on demand from /invoice/html), so there is
+  // no DOM ref to wire here.
+  const [downloading, setDownloading] = useState(false)
 
   // Work order's billing currency — fetched once on mount. The work_order_id
   // prop carries currency_id; we resolve it to a row here so we can label
@@ -173,6 +178,128 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
       await loadInvoice()
     } catch (err) { setError(err.message) }
     finally { setPaying(false) }
+  }
+
+  // ── PDF download ─────────────────────────────────────────────────────────
+  // The downloaded PDF must be a faithful render of the same HTML document
+  // attached to the customer's email. To guarantee that, we fetch the canonical
+  // invoice HTML from /api/work-orders/[id]/invoice/html (which uses the same
+  // `buildInvoiceHtml` module as the email sender), render it into a hidden
+  // iframe at A4 width, then capture with html2canvas → jsPDF.
+  //
+  // Why an iframe? The email HTML uses only hex colours and inline styles, so
+  // rendering it in isolation (away from this page's Tailwind v4 stylesheet)
+  // sidesteps every oklch/lab/color-mix parsing issue html2canvas has with
+  // the on-screen DOM. No colour-scrubbing shim required.
+  const handleDownload = async () => {
+    if (!inv) return
+    setDownloading(true)
+    setError('')
+
+    const A4_PX = 794   // 210mm @ ~96dpi
+    let iframe = null
+
+    try {
+      // 1. Fetch the canonical invoice HTML (same doc the email attaches).
+      const resp = await fetch(`/api/work-orders/${workOrder.id}/invoice/html`)
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}))
+        throw new Error(err.error || `Failed to load invoice (HTTP ${resp.status})`)
+      }
+      const html = await resp.text()
+
+      // 2. Lazy-load PDF libs in parallel with the iframe render.
+      const libsPromise = Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+
+      // 3. Build an off-screen iframe sized to A4 width and write the HTML.
+      iframe = document.createElement('iframe')
+      iframe.setAttribute('aria-hidden', 'true')
+      iframe.style.cssText =
+        'position:fixed;left:-10000px;top:0;width:' + A4_PX + 'px;height:1px;' +
+        'border:0;background:#ffffff;'
+      document.body.appendChild(iframe)
+
+      const idoc = iframe.contentDocument || iframe.contentWindow.document
+      idoc.open()
+      idoc.write(html)
+      idoc.close()
+
+      // 4. Wait for the iframe to finish layout. We resolve as soon as
+      // readyState hits 'complete' — the email HTML has no external scripts
+      // or remote images, so layout is essentially instant. A two-frame
+      // delay after that gives the browser a chance to flush styles.
+      await new Promise((resolve) => {
+        const ready = () => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        }
+        if (idoc.readyState === 'complete') ready()
+        else iframe.addEventListener('load', ready, { once: true })
+      })
+
+      // 5. Resize the iframe to its content height so html2canvas can capture
+      // the full document in one pass.
+      const fullHeight = Math.max(
+        idoc.documentElement.scrollHeight,
+        idoc.body.scrollHeight,
+      )
+      iframe.style.height = fullHeight + 'px'
+
+      const [{ default: html2canvas }, { default: jsPDF }] = await libsPromise
+
+      // 6. Capture. We point html2canvas at the iframe's documentElement so
+      // it renders inside the iframe's own document context — this is why
+      // the page's Tailwind stylesheet doesn't leak in.
+      const canvas = await html2canvas(idoc.documentElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#f1f5f9',  // matches the email body background
+        width: A4_PX,
+        height: fullHeight,
+        windowWidth: A4_PX,
+        windowHeight: fullHeight,
+      })
+
+      // 7. Compose the PDF — single page if it fits, sliced if it doesn't.
+      const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW  = pdf.internal.pageSize.getWidth()   // 210mm
+      const pageH  = pdf.internal.pageSize.getHeight()  // 297mm
+      const margin = 8
+      const pdfW   = pageW - margin * 2                 // 194mm
+      const pdfH   = (canvas.height / canvas.width) * pdfW
+
+      if (pdfH <= pageH - margin * 2) {
+        // Single page — centre vertically.
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG',
+          margin, (pageH - pdfH) / 2, pdfW, pdfH)
+      } else {
+        // Multi-page: slice the canvas row by row.
+        const pxPerMm = canvas.width / pdfW
+        const slicePx = Math.floor((pageH - margin * 2) * pxPerMm)
+        let srcY = 0
+        while (srcY < canvas.height) {
+          if (srcY > 0) pdf.addPage()
+          const h = Math.min(slicePx, canvas.height - srcY)
+          const slice = document.createElement('canvas')
+          slice.width  = canvas.width
+          slice.height = h
+          slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
+          const slicePdfH = h / pxPerMm
+          pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, slicePdfH)
+          srcY += slicePx
+        }
+      }
+
+      pdf.save(`Invoice-${inv.invoice_number || workOrder.work_order_number}.pdf`)
+    } catch (e) {
+      console.error('PDF download error:', e)
+      setError(e.message || 'Could not generate PDF. Please try again.')
+    } finally {
+      if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe)
+      setDownloading(false)
+    }
   }
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -318,6 +445,18 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
       )}
 
       {/* ── Invoice document ─────────────────────────────────────────── */}
+      {/* Action row — Download PDF (fetches the canonical invoice HTML and renders it). */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        >
+          {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          {downloading ? 'Generating PDF…' : 'Download PDF'}
+        </button>
+      </div>
+
       <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
 
         {/* Header */}
