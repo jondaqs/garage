@@ -211,29 +211,43 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
   // modern browsers emit these even when the source uses regular palette
   // colours (gradients especially). We scan EVERY computed property and
   // override any that contains an unsupported function.
+  // Strip oklch/lab/color-mix colors that html2canvas can't parse.
+  // Called via onclone so the original DOM is untouched.
+  //
+  // We strip only specific properties that may carry colour values, and
+  // only when their computed value contains an unsupported function. We do
+  // NOT touch every property — overriding resolved layout values (border
+  // width, padding, etc.) would distort the rendered PDF.
   const stripModernColors = (root) => {
     const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
 
-    const fallbackFor = (prop) => {
-      if (prop === 'color' || /-color$/i.test(prop))           return '#000000'
-      if (/^background(-color)?$/i.test(prop))                 return '#ffffff'
-      if (/^background/.test(prop) || /-image$/i.test(prop))   return 'none'
-      if (prop === 'fill')                                     return 'currentColor'
-      if (prop === 'stroke')                                   return 'currentColor'
-      if (prop === 'caret-color')                              return 'auto'
-      return ''
-    }
+    const COLOUR_PROPS = [
+      ['color',                  '#000000'],
+      ['background-color',       'transparent'],
+      ['background-image',       'none'],
+      ['border-top-color',       '#e5e7eb'],
+      ['border-right-color',     '#e5e7eb'],
+      ['border-bottom-color',    '#e5e7eb'],
+      ['border-left-color',      '#e5e7eb'],
+      ['outline-color',          'transparent'],
+      ['text-decoration-color',  'currentColor'],
+      ['caret-color',            'auto'],
+      ['fill',                   'currentColor'],
+      ['stroke',                 'currentColor'],
+      ['box-shadow',             'none'],
+      ['filter',                 'none'],
+    ]
 
     root.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-      for (let i = 0; i < cs.length; i++) {
-        const prop = cs[i]
-        let val
-        try { val = cs.getPropertyValue(prop) } catch (_) { continue }
-        if (val && UNSUPPORTED.test(val)) {
-          try { el.style.setProperty(prop, fallbackFor(prop), 'important') } catch (_) {}
-        }
-      }
+      COLOUR_PROPS.forEach(([prop, fallback]) => {
+        try {
+          const val = cs.getPropertyValue(prop)
+          if (val && UNSUPPORTED.test(val)) {
+            el.style.setProperty(prop, fallback, 'important')
+          }
+        } catch (_) {}
+      })
       if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
         const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*[^;]*(?:oklch|oklab|lab|lch|color-mix|color\()[^;]*;?/gi, '')
         el.setAttribute('style', cleaned)

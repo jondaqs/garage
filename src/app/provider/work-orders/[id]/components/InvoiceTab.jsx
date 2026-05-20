@@ -181,44 +181,48 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   }
 
   // ── Download PDF ─────────────────────────────────────────────────────────
-  // html2canvas (and the layout libraries underneath it) can't parse the
-  // newer CSS colour functions: oklch, oklab, lab, lch, color-mix, color().
-  // Tailwind v4 / modern browsers emit these in gradients and computed
-  // borders, even when the source uses regular palette colours. We can't
-  // know up front which CSS properties carry them, so we scan EVERY
-  // computed style property on every element and override any that
-  // contains an unsupported colour function.
-  //
-  // The override values are chosen to be visually safe defaults:
-  //   * any `color`-suffixed property → black or transparent
-  //   * any `background`-related      → transparent (kills colourful gradients)
-  //   * any `*-image`                  → none (drops gradient images)
-  //   * any `fill` / `stroke` (SVG)   → currentColor / transparent
-  //   * everything else                → empty string (revert to UA default)
+  // html2canvas can't parse newer CSS colour functions (oklch, oklab, lab,
+  // lch, color-mix, color()). Tailwind v4 and modern browsers emit these in
+  // computed values even when the source uses palette names. We strip only
+  // the specific properties that may carry colour values, and only when
+  // their computed value contains an unsupported function. We do NOT touch
+  // every property — overriding things like `border-width` or `padding`
+  // resolved values would distort the rendered PDF.
   const stripModernColors = (root) => {
     const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
 
-    const fallbackFor = (prop) => {
-      if (prop === 'color' || /-color$/i.test(prop))           return '#000000'
-      if (/^background(-color)?$/i.test(prop))                 return '#ffffff'
-      if (/^background/.test(prop) || /-image$/i.test(prop))   return 'none'
-      if (prop === 'fill')                                     return 'currentColor'
-      if (prop === 'stroke')                                   return 'currentColor'
-      if (prop === 'caret-color')                              return 'auto'
-      return ''
-    }
+    // Properties that may legitimately contain colour functions, paired with
+    // a safe visual fallback. Order matters for the gradient fallback:
+    // background-image needs to go to `none` so the lab() linear-gradient is
+    // killed, not just the colour stops inside it.
+    const COLOUR_PROPS = [
+      ['color',                  '#000000'],
+      ['background-color',       'transparent'],
+      ['background-image',       'none'],
+      ['border-top-color',       '#e5e7eb'],
+      ['border-right-color',     '#e5e7eb'],
+      ['border-bottom-color',    '#e5e7eb'],
+      ['border-left-color',      '#e5e7eb'],
+      ['outline-color',          'transparent'],
+      ['text-decoration-color',  'currentColor'],
+      ['caret-color',            'auto'],
+      ['fill',                   'currentColor'],
+      ['stroke',                 'currentColor'],
+      ['box-shadow',             'none'],
+      ['filter',                 'none'],
+    ]
 
-    // Accept either a Document or an Element. querySelectorAll works on both.
     root.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-      for (let i = 0; i < cs.length; i++) {
-        const prop = cs[i]
-        let val
-        try { val = cs.getPropertyValue(prop) } catch (_) { continue }
-        if (val && UNSUPPORTED.test(val)) {
-          try { el.style.setProperty(prop, fallbackFor(prop), 'important') } catch (_) {}
-        }
-      }
+      COLOUR_PROPS.forEach(([prop, fallback]) => {
+        try {
+          const val = cs.getPropertyValue(prop)
+          if (val && UNSUPPORTED.test(val)) {
+            el.style.setProperty(prop, fallback, 'important')
+          }
+        } catch (_) {}
+      })
+      // Scrub inline style attributes — they may contain inherited gradients
       if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
         const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*[^;]*(?:oklch|oklab|lab|lch|color-mix|color\()[^;]*;?/gi, '')
         el.setAttribute('style', cleaned)
