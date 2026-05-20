@@ -125,7 +125,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       // 4. Vehicle
       if (inv.vehicle_id) {
         const { data: veh } = await supabase
-          .from('vehicles').select('plate_number, make, model, year_of_manufacture').eq('id', inv.vehicle_id).maybeSingle()
+          .from('vehicles').select('plate_number, make, model, year').eq('id', inv.vehicle_id).maybeSingle()
         setVehicle(veh)
       }
 
@@ -205,72 +205,23 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
 
   // Strip oklch/lab/color-mix colors that html2canvas can't parse.
   // Called via onclone so the original DOM is untouched.
-  //
-  // html2canvas (and the layout libs underneath) can't parse newer CSS colour
-  // functions: oklch, oklab, lab, lch, color-mix, color(). Tailwind v4 /
-  // modern browsers emit these even when the source uses regular palette
-  // colours (gradients especially). We scan EVERY computed property and
-  // override any that contains an unsupported function.
-  // Strip oklch/lab/color-mix colors that html2canvas can't parse.
-  // Called via onclone so the original DOM is untouched.
-  //
-  // Instead of replacing unsupported colours with defaults (which wipes
-  // visual fidelity), we *convert* them to RGB using the browser's own
-  // colour engine. Write the value into a hidden canvas's fillStyle, read
-  // back the normalised RGB string, and use that as the override.
-  const stripModernColors = (root) => {
-    const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
-
-    const ctx = document.createElement('canvas').getContext('2d')
-
-    const toRgb = (cssColour) => {
-      if (!cssColour) return null
-      try {
-        ctx.fillStyle = '#000000'
-        ctx.fillStyle = cssColour
-        return ctx.fillStyle
-      } catch (_) { return null }
-    }
-
-    const COLOUR_PROPS = [
-      'color', 'background-color',
-      'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-      'outline-color', 'text-decoration-color', 'caret-color',
-      'fill', 'stroke',
-    ]
-
-    const replaceColoursInPropertyValue = (val) => {
-      if (!val || !UNSUPPORTED.test(val)) return val
-      const FUNC_CALL = /\b(?:oklch|oklab|lab|lch|color-mix|color)\(((?:[^()]+|\([^()]*\))*)\)/gi
-      return val.replace(FUNC_CALL, (match) => toRgb(match) || 'transparent')
-    }
-
-    root.querySelectorAll('*').forEach(el => {
+  const stripModernColors = (doc) => {
+    const FALLBACKS = { color: '#000000', backgroundColor: 'transparent', borderColor: '#e5e7eb', outlineColor: 'transparent' }
+    const UNSUPPORTED = /oklch|oklab|\blab\b|color-mix|lch/i
+    doc.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-
-      COLOUR_PROPS.forEach(prop => {
+      Object.keys(FALLBACKS).forEach(prop => {
         try {
-          const v = cs.getPropertyValue(prop)
-          if (v && UNSUPPORTED.test(v)) {
-            const rgb = toRgb(v)
-            if (rgb) el.style.setProperty(prop, rgb, 'important')
+          const val = cs.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase())
+          if (val && UNSUPPORTED.test(val)) {
+            el.style[prop] = FALLBACKS[prop]
           }
         } catch (_) {}
       })
-
-      ;['background-image', 'box-shadow', 'filter'].forEach(prop => {
-        try {
-          const v = cs.getPropertyValue(prop)
-          if (v && UNSUPPORTED.test(v)) {
-            const fixed = replaceColoursInPropertyValue(v)
-            if (fixed) el.style.setProperty(prop, fixed, 'important')
-          }
-        } catch (_) {}
-      })
-
-      const inline = el.getAttribute('style')
-      if (inline && UNSUPPORTED.test(inline)) {
-        el.setAttribute('style', replaceColoursInPropertyValue(inline))
+      // Also scrub inline style attributes that contain these functions
+      if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
+        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)[^;]+;?/gi, '')
+        el.setAttribute('style', cleaned)
       }
     })
   }
@@ -294,12 +245,6 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       cloneEl.style.cssText = 'width:100%;background:#ffffff;'
       wrapper.appendChild(cloneEl)
       document.body.appendChild(wrapper)
-
-      // Pre-strip on the off-screen wrapper. `onclone` doesn't always run
-      // before html2canvas starts parsing colours, so we sweep the wrapper
-      // itself first. Scope is limited to the wrapper — the live page is
-      // not mutated.
-      stripModernColors(wrapper)
 
       try {
         const canvas = await html2canvas(wrapper, {
@@ -544,7 +489,7 @@ export function ReceiptContent({
           ) : <p style={{ fontSize: 13, color: '#94a3b8' }}>Customer</p>}
           {vehicle && (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: '#475569', fontWeight: 600 }}>
-              🚗 {vehicle.plate_number} · {[vehicle.make, vehicle.model, vehicle.year_of_manufacture].filter(Boolean).join(' ')}
+              🚗 {vehicle.plate_number} · {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
             </p>
           )}
         </div>
