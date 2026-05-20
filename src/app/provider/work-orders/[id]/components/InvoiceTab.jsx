@@ -181,26 +181,46 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   }
 
   // ── Download PDF ─────────────────────────────────────────────────────────
-  // Mirror of the receipt tab's PDF capture pipeline. html2canvas can't parse
-  // modern CSS colour functions (oklch, lab, color-mix), so we strip them in
-  // onclone to a safe fallback. The clone is rendered into an off-screen
-  // A4-width wrapper so we capture the document at print width regardless of
-  // the on-screen layout. Multi-page output is sliced row-by-row.
-  const stripModernColors = (doc) => {
-    const FALLBACKS = { color: '#000000', backgroundColor: 'transparent', borderColor: '#e5e7eb', outlineColor: 'transparent' }
-    const UNSUPPORTED = /oklch|oklab|\blab\b|color-mix|lch/i
-    doc.querySelectorAll('*').forEach(el => {
+  // html2canvas (and the layout libraries underneath it) can't parse the
+  // newer CSS colour functions: oklch, oklab, lab, lch, color-mix, color().
+  // Tailwind v4 / modern browsers emit these in gradients and computed
+  // borders, even when the source uses regular palette colours. We can't
+  // know up front which CSS properties carry them, so we scan EVERY
+  // computed style property on every element and override any that
+  // contains an unsupported colour function.
+  //
+  // The override values are chosen to be visually safe defaults:
+  //   * any `color`-suffixed property → black or transparent
+  //   * any `background`-related      → transparent (kills colourful gradients)
+  //   * any `*-image`                  → none (drops gradient images)
+  //   * any `fill` / `stroke` (SVG)   → currentColor / transparent
+  //   * everything else                → empty string (revert to UA default)
+  const stripModernColors = (root) => {
+    const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
+
+    const fallbackFor = (prop) => {
+      if (prop === 'color' || /-color$/i.test(prop))           return '#000000'
+      if (/^background(-color)?$/i.test(prop))                 return '#ffffff'
+      if (/^background/.test(prop) || /-image$/i.test(prop))   return 'none'
+      if (prop === 'fill')                                     return 'currentColor'
+      if (prop === 'stroke')                                   return 'currentColor'
+      if (prop === 'caret-color')                              return 'auto'
+      return ''
+    }
+
+    // Accept either a Document or an Element. querySelectorAll works on both.
+    root.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-      Object.keys(FALLBACKS).forEach(prop => {
-        try {
-          const val = cs.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase())
-          if (val && UNSUPPORTED.test(val)) {
-            el.style[prop] = FALLBACKS[prop]
-          }
-        } catch (_) {}
-      })
+      for (let i = 0; i < cs.length; i++) {
+        const prop = cs[i]
+        let val
+        try { val = cs.getPropertyValue(prop) } catch (_) { continue }
+        if (val && UNSUPPORTED.test(val)) {
+          try { el.style.setProperty(prop, fallbackFor(prop), 'important') } catch (_) {}
+        }
+      }
       if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
-        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)[^;]+;?/gi, '')
+        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*[^;]*(?:oklch|oklab|lab|lch|color-mix|color\()[^;]*;?/gi, '')
         el.setAttribute('style', cleaned)
       }
     })
@@ -223,6 +243,12 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
       cloneEl.style.cssText = 'width:100%;background:#ffffff;'
       wrapper.appendChild(cloneEl)
       document.body.appendChild(wrapper)
+
+      // Pre-strip on the off-screen wrapper. We can't always rely on `onclone`
+      // to run before html2canvas starts parsing colours, so we sweep the
+      // wrapper itself first. Scope is limited to the wrapper so the live
+      // page isn't mutated.
+      stripModernColors(wrapper)
 
       try {
         const canvas = await html2canvas(wrapper, {

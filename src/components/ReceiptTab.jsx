@@ -205,22 +205,37 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
 
   // Strip oklch/lab/color-mix colors that html2canvas can't parse.
   // Called via onclone so the original DOM is untouched.
-  const stripModernColors = (doc) => {
-    const FALLBACKS = { color: '#000000', backgroundColor: 'transparent', borderColor: '#e5e7eb', outlineColor: 'transparent' }
-    const UNSUPPORTED = /oklch|oklab|\blab\b|color-mix|lch/i
-    doc.querySelectorAll('*').forEach(el => {
+  //
+  // html2canvas (and the layout libs underneath) can't parse newer CSS colour
+  // functions: oklch, oklab, lab, lch, color-mix, color(). Tailwind v4 /
+  // modern browsers emit these even when the source uses regular palette
+  // colours (gradients especially). We scan EVERY computed property and
+  // override any that contains an unsupported function.
+  const stripModernColors = (root) => {
+    const UNSUPPORTED = /\b(?:oklch|oklab|lab|lch|color-mix|color\()/i
+
+    const fallbackFor = (prop) => {
+      if (prop === 'color' || /-color$/i.test(prop))           return '#000000'
+      if (/^background(-color)?$/i.test(prop))                 return '#ffffff'
+      if (/^background/.test(prop) || /-image$/i.test(prop))   return 'none'
+      if (prop === 'fill')                                     return 'currentColor'
+      if (prop === 'stroke')                                   return 'currentColor'
+      if (prop === 'caret-color')                              return 'auto'
+      return ''
+    }
+
+    root.querySelectorAll('*').forEach(el => {
       const cs = window.getComputedStyle(el)
-      Object.keys(FALLBACKS).forEach(prop => {
-        try {
-          const val = cs.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase())
-          if (val && UNSUPPORTED.test(val)) {
-            el.style[prop] = FALLBACKS[prop]
-          }
-        } catch (_) {}
-      })
-      // Also scrub inline style attributes that contain these functions
+      for (let i = 0; i < cs.length; i++) {
+        const prop = cs[i]
+        let val
+        try { val = cs.getPropertyValue(prop) } catch (_) { continue }
+        if (val && UNSUPPORTED.test(val)) {
+          try { el.style.setProperty(prop, fallbackFor(prop), 'important') } catch (_) {}
+        }
+      }
       if (el.getAttribute('style') && UNSUPPORTED.test(el.getAttribute('style'))) {
-        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*(?:oklch|oklab|lab|lch|color-mix)[^;]+;?/gi, '')
+        const cleaned = el.getAttribute('style').replace(/[a-z-]+\s*:\s*[^;]*(?:oklch|oklab|lab|lch|color-mix|color\()[^;]*;?/gi, '')
         el.setAttribute('style', cleaned)
       }
     })
@@ -245,6 +260,12 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       cloneEl.style.cssText = 'width:100%;background:#ffffff;'
       wrapper.appendChild(cloneEl)
       document.body.appendChild(wrapper)
+
+      // Pre-strip on the off-screen wrapper. `onclone` doesn't always run
+      // before html2canvas starts parsing colours, so we sweep the wrapper
+      // itself first. Scope is limited to the wrapper — the live page is
+      // not mutated.
+      stripModernColors(wrapper)
 
       try {
         const canvas = await html2canvas(wrapper, {
