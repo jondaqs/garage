@@ -125,7 +125,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       // 4. Vehicle
       if (inv.vehicle_id) {
         const { data: veh } = await supabase
-          .from('vehicles').select('plate_number, make, model, year').eq('id', inv.vehicle_id).maybeSingle()
+          .from('vehicles').select('plate_number, make, model, year_of_manufacture').eq('id', inv.vehicle_id).maybeSingle()
         setVehicle(veh)
       }
 
@@ -203,6 +203,14 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
     }
   }
 
+  // Strip oklch/lab/color-mix colors that html2canvas can't parse.
+  // Called via onclone so the original DOM is untouched.
+  //
+  // html2canvas (and the layout libs underneath) can't parse newer CSS colour
+  // functions: oklch, oklab, lab, lch, color-mix, color(). Tailwind v4 /
+  // modern browsers emit these even when the source uses regular palette
+  // colours (gradients especially). We scan EVERY computed property and
+  // override any that contains an unsupported function.
   // Strip oklch/lab/color-mix colors that html2canvas can't parse.
   // Called via onclone so the original DOM is untouched.
   const stripModernColors = (doc) => {
@@ -489,7 +497,7 @@ export function ReceiptContent({
           ) : <p style={{ fontSize: 13, color: '#94a3b8' }}>Customer</p>}
           {vehicle && (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: '#475569', fontWeight: 600 }}>
-              🚗 {vehicle.plate_number} · {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
+              🚗 {vehicle.plate_number} · {[vehicle.make, vehicle.model, vehicle.year_of_manufacture].filter(Boolean).join(' ')}
             </p>
           )}
         </div>
