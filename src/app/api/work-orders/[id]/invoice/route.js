@@ -34,10 +34,11 @@ export async function GET(request, { params }) {
       .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 401 })
 
-    // Load work order (to get vehicle_id and service_provider_id)
+    // Load work order (to get vehicle_id and service_provider_id; also surface
+    // currency so the downstream invoice/receipt pages can render properly).
     const { data: wo } = await sc
       .from('work_orders')
-      .select('id, vehicle_id, service_provider_id')
+      .select('id, vehicle_id, service_provider_id, currency_id, currency:currencies(id, code, symbol, display_name)')
       .eq('id', workOrderId).maybeSingle()
     if (!wo) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
 
@@ -123,6 +124,9 @@ export async function GET(request, { params }) {
       receipt:    receipt || null,
       vehicle,
       provider,
+      // Currency resolved from work_orders.currency_id. Falls through to null
+      // if the work order has no billing currency set.
+      currency:   wo.currency || null,
       work_order: woDetails ? { id: workOrderId, number: woDetails.work_order_number } : null,
     })
 

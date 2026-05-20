@@ -23,7 +23,11 @@ const METHOD_ICONS = {
   bank_transfer: null, cheque: null,
 }
 
-function fmt(n)  { return `KES ${Number(n || 0).toLocaleString('en-KE')}` }
+function fmt(n, currency)  {
+  const num = Number(n || 0).toLocaleString('en-KE')
+  if (!currency) return num
+  return `${currency.symbol || currency.code} ${num}`
+}
 function fmtD(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-KE', {
@@ -49,6 +53,8 @@ function ReceiptPageInner({ backPath }) {
   const [vehicle,     setVehicle]     = useState(null)
   const [provider,    setProvider]    = useState(null)
   const [customer,    setCustomer]    = useState(null)
+  // Work order's billing currency, surfaced by /api/work-orders/[id]/invoice.
+  const [currency,    setCurrency]    = useState(null)
   const [items,       setItems]       = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState('')
@@ -67,6 +73,7 @@ function ReceiptPageInner({ backPath }) {
       setItems(data.line_items || [])
       setVehicle(data.vehicle || null)
       setProvider(data.provider || null)
+      setCurrency(data.currency || null)
 
       // Receipt (with confirmed fields — direct query since policy covers this user)
       const { data: rct } = await supabase
@@ -264,7 +271,7 @@ function ReceiptPageInner({ backPath }) {
           services={services}
           parts={parts}
           tax={tax}
-          fmt={fmt}
+          fmt={(n) => fmt(n, currency)}
           fmtD={fmtD}
           fmtDs={fmtDs}
           isConfirmed={isConfirmed}

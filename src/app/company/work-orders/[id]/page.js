@@ -195,7 +195,16 @@ export default function CompanyWorkOrderDetailPage() {
     finally { setReviewSubmitting(false) }
   }
 
-  const fmt = (n) => n != null ? `KES ${Number(n).toLocaleString()}` : '—'
+  // Currency-aware formatter. The work order's currency arrives as
+  // `wo.currency_obj` from the get_customer_work_order RPC. Falls back to
+  // a bare number when no currency is set.
+  const fmt = (n) => {
+    if (n == null) return '—'
+    const num = Number(n).toLocaleString()
+    const cur = wo?.currency_obj
+    if (!cur) return num
+    return `${cur.symbol || cur.code} ${num}`
+  }
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">

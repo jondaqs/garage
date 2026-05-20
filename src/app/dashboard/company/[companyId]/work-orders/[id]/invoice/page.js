@@ -35,7 +35,15 @@ export default function CompanyWorkOrderInvoicePage() {
   const [mpesaRef,    setMpesaRef]    = useState('')
   const [payNotes,    setPayNotes]    = useState('')
 
-  const fmt  = (n) => `KES ${Number(n || 0).toLocaleString('en-KE')}`
+  // Currency-aware formatter. The work order's currency arrives as
+  // `invoice.currency` from the updated get_invoice_details RPC. Falls back
+  // to bare number if no currency is set on the work order.
+  const fmt  = (n) => {
+    const num = Number(n || 0).toLocaleString('en-KE')
+    const cur = invoice?.currency
+    if (!cur) return num
+    return `${cur.symbol || cur.code} ${num}`
+  }
   const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric'
   }) : '—'

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import ReceiptCard from '@/components/ReceiptCard'
-
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import {
@@ -36,7 +35,15 @@ export default function CompanyWorkOrderInvoicePage() {
   const [mpesaRef,    setMpesaRef]    = useState('')
   const [payNotes,    setPayNotes]    = useState('')
 
-  const fmt  = (n) => `KES ${Number(n || 0).toLocaleString('en-KE')}`
+  // Currency-aware formatter. The work order's currency arrives as
+  // `invoice.currency` from the updated get_invoice_details RPC. Falls back
+  // to bare number if no currency is set on the work order.
+  const fmt  = (n) => {
+    const num = Number(n || 0).toLocaleString('en-KE')
+    const cur = invoice?.currency
+    if (!cur) return num
+    return `${cur.symbol || cur.code} ${num}`
+  }
   const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric'
   }) : '—'
@@ -52,9 +59,9 @@ export default function CompanyWorkOrderInvoicePage() {
         const { data: owned } = await supabase
           .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
         const { data: mem } = await supabase
-          .from('company_users').select('is_admin')
+          .from('company_users').select('is_admin, can_approve_payment')
           .eq('user_id', profile.id).eq('is_active', true).maybeSingle()
-        setCanPay(!!(owned || mem?.is_admin))
+        setCanPay(!!(owned || mem?.is_admin || mem?.can_approve_payment))
       }
 
       // Use the API route (service-role backed) to bypass RLS
@@ -139,7 +146,7 @@ export default function CompanyWorkOrderInvoicePage() {
   // ── No invoice ────────────────────────────────────────────────────────────
   if (!invoice) return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <button onClick={() => router.push(`/company/work-orders/${params.id}`)}
+      <button onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
         className="flex items-center text-gray-500 hover:text-gray-800 mb-6 text-sm">
         <ArrowLeft size={16} className="mr-1" /> Work Order
       </button>
@@ -151,7 +158,7 @@ export default function CompanyWorkOrderInvoicePage() {
         <p className="text-sm text-gray-500 mb-4">
           {error || 'The service provider has not issued an invoice for this work order yet.'}
         </p>
-        <button onClick={() => router.push(`/company/work-orders/${params.id}`)}
+        <button onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
           className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">
           Back to Work Order
         </button>
@@ -182,9 +189,9 @@ export default function CompanyWorkOrderInvoicePage() {
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
 
       {/* Back nav */}
-      <button onClick={() => router.push(`/company/work-orders/${params.id}`)}
+      <button onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
         className="flex items-center text-gray-500 hover:text-gray-800 text-sm">
-        <ArrowLeft size={16} className="mr-1" /> Fleet Work Orders
+        <ArrowLeft size={16} className="mr-1" /> Work Order
       </button>
 
       {/* Alerts */}
@@ -271,7 +278,7 @@ export default function CompanyWorkOrderInvoicePage() {
         {wo?.id && (
           <div className="px-6 py-3 border-b border-gray-100">
             <button
-              onClick={() => router.push(`/company/work-orders/${wo.id}`)}
+              onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
               className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium">
               <ExternalLink size={12} />
               View Work Order {wo.number}
