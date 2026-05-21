@@ -19,7 +19,7 @@ const QC_CHECKLIST = [
   { id: 'docs_ready',          label: 'Service documentation ready'               },
 ]
 
-export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvoice = true }) {
+export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvoice = false }) {
   const supabase = createClient()
 
   const [session, setSession]     = useState(null)
