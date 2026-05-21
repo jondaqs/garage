@@ -1429,6 +1429,7 @@ export default function WorkOrderDetailPage() {
           {activeTab === 'qc' && (
             <QualityCheckTab
               workOrder={woWithProvider}
+              canSendInvoice={canSendInvoice}
               onStatusChange={async (event) => {
                 if (event === 'go_to_invoice') {
                   setActiveTab('invoice')

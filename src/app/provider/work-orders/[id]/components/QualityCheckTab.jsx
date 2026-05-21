@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   CheckCircle, XCircle, AlertCircle, Loader2,
-  ClipboardCheck, Car, RefreshCw, FileText
+  ClipboardCheck, Car, RefreshCw, FileText, Lock
 } from 'lucide-react'
 
 // Standard QC checklist items — mechanic ticks these before submitting
@@ -19,7 +19,7 @@ const QC_CHECKLIST = [
   { id: 'docs_ready',          label: 'Service documentation ready'               },
 ]
 
-export default function QualityCheckTab({ workOrder, onStatusChange }) {
+export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvoice = true }) {
   const supabase = createClient()
 
   const [session, setSession]     = useState(null)
@@ -43,6 +43,18 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
   const [techNotes, setTechNotes]                 = useState('')
   const [invoiceNotified, setInvoiceNotified]     = useState(false)
   const [notifyingInvoice, setNotifyingInvoice]   = useState(false)
+
+  // Brief floating notice for permission-gated actions (e.g. Go-to-Invoice
+  // attempted by a team member without can_send_invoice). String is the
+  // message; auto-clears after 4s. Mirrors the pattern used in
+  // CheckoutAcceptanceCard's inline-toast state, just rendered as a fixed
+  // overlay so it can't be missed.
+  const [toast, setToast] = useState('')
+
+  const showToast = (msg, ms = 4000) => {
+    setToast(msg)
+    if (ms > 0) setTimeout(() => setToast(''), ms)
+  }
 
   const statusCode = workOrder.status?.code
 
@@ -385,8 +397,17 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
             )}
           </div>
 
-          {/* Invoice CTA — shown after completion */}
+          {/* Invoice CTA — shown after completion.
+              Visible to all provider team members so everyone sees that the
+              work order has reached this state, but the action itself
+              (jumping to the invoice tab to draft/send) is gated on
+              can_send_invoice. Without that permission:
+                – the button still renders, dimmed & not-allowed (so the
+                  user understands it exists but is unavailable to them),
+                – clicking it triggers a floating toast,
+                – a persistent helper below the card explains why. */}
           {(invoiceNotified || statusCode === 'completed') && (
+            <>
             <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <FileText className="text-green-600 flex-shrink-0" size={20} />
@@ -400,15 +421,50 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
                 </div>
               </div>
               <button
-                onClick={() => onStatusChange?.('go_to_invoice')}
+                onClick={() => {
+                  if (!canSendInvoice) {
+                    showToast("You don't have permission to send invoices. Ask an admin to enable Can send invoices on your account.")
+                    return
+                  }
+                  onStatusChange?.('go_to_invoice')
+                }}
                 disabled={notifyingInvoice}
-                className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
+                aria-disabled={!canSendInvoice || notifyingInvoice}
+                title={!canSendInvoice
+                  ? "You don't have permission to send invoices"
+                  : undefined}
+                className={
+                  'flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold ' +
+                  (canSendInvoice
+                    ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50'
+                    // Visually disabled but still clickable (so we can fire the toast).
+                    : 'bg-green-600/50 text-white/90 cursor-not-allowed')
+                }>
                 {notifyingInvoice
                   ? <Loader2 size={14} className="animate-spin" />
-                  : <FileText size={14} />}
+                  : !canSendInvoice
+                    ? <Lock size={14} />
+                    : <FileText size={14} />}
                 Go to Invoice
               </button>
             </div>
+
+            {/* Persistent permission helper — only shown to members who
+                can't act on the button above. Sets expectations so they
+                don't keep clicking. */}
+            {!canSendInvoice && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-2.5">
+                <Lock size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Invoice sending is restricted</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Your account doesn't have the <span className="font-semibold">Can send invoices</span> permission.
+                    A workshop admin, accountant, or the owner needs to draft and send the invoice — or grant you the permission from <span className="font-semibold">Team</span>.
+                  </p>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
       )}
@@ -419,6 +475,29 @@ export default function QualityCheckTab({ workOrder, onStatusChange }) {
           <ClipboardCheck className="mx-auto mb-2 opacity-40" size={32} />
           <p className="text-sm">QC checklist becomes available when the work order reaches Quality Check status.</p>
           <p className="text-xs mt-1 text-gray-400">Current status: {workOrder.status?.display_name}</p>
+        </div>
+      )}
+
+      {/* Floating toast — appears briefly when a permission-gated action
+          is blocked. Fixed at the bottom so it's visible even when the
+          page is scrolled to the QC checklist further up. */}
+      {toast && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none"
+        >
+          <div className="pointer-events-auto flex items-start gap-2.5 max-w-md w-full px-4 py-3 bg-gray-900 text-white rounded-xl shadow-2xl">
+            <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm flex-1">{toast}</p>
+            <button
+              onClick={() => setToast('')}
+              className="text-gray-400 hover:text-white text-xs font-semibold flex-shrink-0"
+              aria-label="Dismiss notification"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
     </div>
