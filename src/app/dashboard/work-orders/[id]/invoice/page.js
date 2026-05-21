@@ -10,8 +10,9 @@ import {
   Loader2, Car, MapPin, Clock, CreditCard,
   Banknote, Building2, Receipt, ExternalLink,
   Wrench, Package, BadgeCheck, CircleDollarSign,
-  ChevronRight
+  ChevronRight, Download
 } from 'lucide-react'
+import { useInvoicePdfDownload } from '@/lib/invoice/useInvoicePdfDownload'
 
 const PAYMENT_METHODS = [
   { value: 'cash',          label: 'Cash',          icon: Banknote   },
@@ -34,6 +35,10 @@ export default function UserWorkOrderInvoicePage() {
   const [payMethod,   setPayMethod]   = useState('mpesa')
   const [mpesaRef,    setMpesaRef]    = useState('')
   const [payNotes,    setPayNotes]    = useState('')
+
+  // PDF download — fetches the canonical invoice HTML and renders to PDF
+  // client-side. See @/lib/invoice/useInvoicePdfDownload for the full flow.
+  const { downloading, error: dlError, download: downloadPdf } = useInvoicePdfDownload()
 
   // Currency-aware formatter. The work order's currency arrives as
   // `invoice.currency` from the updated get_invoice_details RPC. Falls back
@@ -186,17 +191,29 @@ export default function UserWorkOrderInvoicePage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
 
-      {/* Back nav */}
-      <button onClick={() => router.push(`/dashboard/work-orders/${params.id}`)}
-        className="flex items-center text-gray-500 hover:text-gray-800 text-sm">
-        <ArrowLeft size={16} className="mr-1" /> Work Order
-      </button>
+      {/* Top action row — back nav on the left, Download PDF on the right. */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => router.push(`/dashboard/work-orders/${params.id}`)}
+          className="flex items-center text-gray-500 hover:text-gray-800 text-sm">
+          <ArrowLeft size={16} className="mr-1" /> Work Order
+        </button>
+        {inv && (
+          <button
+            onClick={() => downloadPdf({ workOrderId: params.id, invoiceNumber: inv.invoice_number })}
+            disabled={downloading}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            {downloading ? 'Generating PDF…' : 'Download PDF'}
+          </button>
+        )}
+      </div>
 
       {/* Alerts */}
-      {error && (
+      {(error || dlError) && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-sm">
           <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={14} />
-          <p className="text-red-700">{error}</p>
+          <p className="text-red-700">{error || dlError}</p>
         </div>
       )}
       {success && (
