@@ -374,6 +374,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         <ReceiptContent
           receipt={receipt} invoice={invoice} items={items}
           vehicle={vehicle} provider={provider} customer={customer}
+          workOrder={workOrder}
           custName={custName} services={services} parts={parts}
           tax={tax} fmt={fmt} fmtD={receiptFmtD} fmtDs={receiptFmtDs}
           MethodIcon={MethodIcon} isConfirmed={isConfirmed}
@@ -410,7 +411,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
 
 // ── Pure receipt layout (also used by standalone receipt page) ────────────────
 export function ReceiptContent({
-  receipt, invoice, items, vehicle, provider, customer,
+  receipt, invoice, items, vehicle, provider, customer, workOrder,
   custName, services, parts, tax, fmt, fmtD, fmtDs,
   MethodIcon = CreditCard, isConfirmed,
 }) {
@@ -456,6 +457,17 @@ export function ReceiptContent({
             <p style={{ margin: '0 0 2px', fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Invoice</p>
             <p style={{ margin: 0, fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>{invoice.invoice_number}</p>
           </div>
+          {/* Work Order number — accepts either shape: { number } from the receipt
+              page's API payload, or { work_order_number } from the provider's
+              ReceiptTab prop. Falls back gracefully when neither is supplied. */}
+          {(workOrder?.work_order_number || workOrder?.number) && (
+            <div>
+              <p style={{ margin: '0 0 2px', fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Work Order</p>
+              <p style={{ margin: 0, fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>
+                {workOrder.work_order_number || workOrder.number}
+              </p>
+            </div>
+          )}
           <div>
             <p style={{ margin: '0 0 2px', fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Method</p>
             <p style={{ margin: 0, fontSize: 13, color: '#e2e8f0', fontWeight: 600, textTransform: 'capitalize' }}>

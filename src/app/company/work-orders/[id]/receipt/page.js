@@ -53,6 +53,7 @@ function ReceiptPageInner({ backPath }) {
   const [vehicle,     setVehicle]     = useState(null)
   const [provider,    setProvider]    = useState(null)
   const [customer,    setCustomer]    = useState(null)
+  const [workOrder,   setWorkOrder]   = useState(null)
   // Work order's billing currency, surfaced by /api/work-orders/[id]/invoice.
   const [currency,    setCurrency]    = useState(null)
   const [items,       setItems]       = useState([])
@@ -74,6 +75,7 @@ function ReceiptPageInner({ backPath }) {
       setVehicle(data.vehicle || null)
       setProvider(data.provider || null)
       setCurrency(data.currency || null)
+      setWorkOrder(data.work_order || null)
 
       // Receipt (with confirmed fields — direct query since policy covers this user)
       const { data: rct } = await supabase
@@ -267,6 +269,7 @@ function ReceiptPageInner({ backPath }) {
           vehicle={vehicle}
           provider={provider}
           customer={customer}
+          workOrder={workOrder}
           custName={custName}
           services={services}
           parts={parts}
