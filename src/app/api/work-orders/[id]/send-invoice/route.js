@@ -277,12 +277,26 @@ export async function POST(request, { params }) {
     })
 
     // ── 8. Fan-out: email + SMS + in-app notification per recipient ───────
-    // Per-recipient CTA URL: company owners go to their /company portal so
-    // they land directly on the work order in their own UI; everyone else
-    // (members, individual customers, walk-ins) uses /dashboard.
-    const ctaUrlFor = (rcpt) => rcpt.isCompanyOwner
-      ? `${APP}/company/work-orders/${workOrderId}`
-      : `${APP}/dashboard/work-orders/${workOrderId}`
+    // Per-recipient CTA URL. Three categories:
+    //   • Company owner   → /company/work-orders/{id}
+    //       Their dedicated portal — middleware redirects them away from
+    //       /dashboard anyway, so we must give them a /company URL.
+    //   • Company member  → /dashboard/company/{companyId}/work-orders/{id}
+    //       Members stay on /dashboard, but their fleet work orders live
+    //       under the company-scoped subtree (where the action banners,
+    //       company sidebar, and member-aware tabs are wired). Sending
+    //       them to /dashboard/work-orders/{id} would land them on the
+    //       individual-customer view that doesn't know about their fleet.
+    //   • Individual customer / walk-in / booking → /dashboard/work-orders/{id}
+    //       The default customer route.
+    //
+    // `companyId` is set above iff this invoice is for a company-owned
+    // vehicle, which is exactly when categories 1+2 apply.
+    const ctaUrlFor = (rcpt) => {
+      if (rcpt.isCompanyOwner) return `${APP}/company/work-orders/${workOrderId}`
+      if (companyId)           return `${APP}/dashboard/company/${companyId}/work-orders/${workOrderId}`
+      return `${APP}/dashboard/work-orders/${workOrderId}`
+    }
 
     const buildEmailBody = (rcpt) => {
       const woUrl   = ctaUrlFor(rcpt)
