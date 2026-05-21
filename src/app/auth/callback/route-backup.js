@@ -143,20 +143,6 @@ export async function GET(request) {
       // ============================================
       // DEFAULT FLOW (EXISTING)
       // ============================================
-      // If a deep-link destination was preserved on the ?next= parameter
-      // (e.g. the user clicked an invoice email CTA), honour it ahead of
-      // the role default — but only if it's a safe relative path that
-      // isn't the generic /dashboard fallback or a signup flow already
-      // handled above.
-      const isDeepLinkNext =
-        next &&
-        next.startsWith('/') &&
-        !next.startsWith('//') &&
-        next !== '/dashboard'
-      if (isDeepLinkNext) {
-        return NextResponse.redirect(new URL(next, request.url))
-      }
-
       // Check user role and redirect appropriately for non-provider/non-company flows
       const { data: userProfile } = await supabase
         .from('user_profiles')

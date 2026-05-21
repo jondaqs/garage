@@ -1,28 +1,14 @@
 'use client'
 
-import React, { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Car, Mail, Lock, Eye, EyeOff, Chrome } from 'lucide-react'
 import Link from 'next/link'
 
-/**
- * Only accept relative same-origin paths as a post-login destination —
- * never a fully-qualified URL — to avoid open-redirect abuse via the
- * ?next= parameter (e.g. ?next=https://evil.example.com).
- */
-const safeNext = (raw) => {
-  if (!raw) return null
-  if (typeof raw !== 'string') return null
-  if (!raw.startsWith('/') || raw.startsWith('//')) return null
-  return raw
-}
-
-function LoginPageInner() {
-  const router       = useRouter()
-  const searchParams = useSearchParams()
-  const supabase     = createClient()
-  const nextParam    = safeNext(searchParams.get('next'))
+export default function LoginPage() {
+  const router = useRouter()
+  const supabase = createClient()
 
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
@@ -56,16 +42,6 @@ function LoginPageInner() {
           .single()
 
         const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
-
-        // ── Honour ?next= first ──────────────────────────────────
-        // If the user was deep-linked into a protected page (e.g. via
-        // the invoice email CTA), middleware preserved the path on the
-        // query string. Send them there in preference to the role default.
-        if (nextParam) {
-          router.push(nextParam)
-          router.refresh()
-          return
-        }
 
         // ── Priority order ──────────────────────────────────────
         // 1. Platform admin
@@ -121,14 +97,10 @@ function LoginPageInner() {
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
-    // Pass `next` through OAuth so /auth/callback can route the user to the
-    // original deep-link destination after Supabase finishes the exchange.
-    const callback = new URL('/auth/callback', window.location.origin)
-    if (nextParam) callback.searchParams.set('next', nextParam)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: callback.toString(),
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
     if (error) {
@@ -236,15 +208,5 @@ function LoginPageInner() {
         </div>
       </div>
     </div>
-  )
-}
-
-// Next 16 requires components using useSearchParams() to sit under a
-// Suspense boundary so the rest of the page can be statically rendered.
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginPageInner />
-    </Suspense>
   )
 }

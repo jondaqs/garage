@@ -43,13 +43,7 @@ export async function middleware(request) {
       pathname.startsWith('/company') ||
       pathname.startsWith('/admin')
     ) {
-      // Preserve where the user was trying to go (path + query) so the
-      // login page can send them back there after authentication. Used by
-      // email/SMS deep-links (e.g. the invoice "View & Pay" CTA).
-      const loginUrl = new URL('/auth/login', request.url)
-      const nextPath = pathname + (request.nextUrl.search || '')
-      loginUrl.searchParams.set('next', nextPath)
-      return NextResponse.redirect(loginUrl)
+      return NextResponse.redirect(new URL('/auth/login', request.url))
     }
     return response
   }
@@ -128,13 +122,6 @@ export async function middleware(request) {
 
   // /auth/login or /auth/signup — redirect already-logged-in users away
   if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')) {
-    // If the visitor was deep-linked here (e.g. clicked an invoice email link
-    // while their session was still valid), honour ?next= over the role
-    // default. We only accept relative paths to avoid open-redirect abuse.
-    const next = request.nextUrl.searchParams.get('next')
-    if (next && next.startsWith('/') && !next.startsWith('//')) {
-      return NextResponse.redirect(new URL(next, request.url))
-    }
     if (role === 'admin')   return NextResponse.redirect(new URL('/admin/dashboard',    request.url))
     if (role === 'company') return NextResponse.redirect(new URL('/company/dashboard',  request.url))
     if (role === 'provider')return NextResponse.redirect(new URL('/provider/dashboard', request.url))
