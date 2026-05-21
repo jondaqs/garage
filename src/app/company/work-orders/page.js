@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Car, ChevronRight, AlertCircle,
-  Loader2, Bell, Search, Filter
+  Loader2, Bell, Search, Filter, ClipboardCheck, CreditCard
 } from 'lucide-react'
 
 const STATUS_STYLES = {
@@ -22,13 +22,32 @@ const STATUS_STYLES = {
   closed:            'bg-gray-100 text-gray-400',
 }
 
+// ── "Needs action" predicates ─────────────────────────────────────────────
+// Mirrors the customer-side predicates in /dashboard/work-orders/page.js so
+// the company portal surfaces the same three customer-side actions for its
+// fleet: estimate approval, checkout-form review, and invoice payment.
+const needsEstimateApproval = (wo) => wo.status?.code === 'awaiting_approval'
+const needsCheckoutReview   = (wo) =>
+  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined
+const needsPayment          = (wo) => {
+  // Tolerant of either shape PostgREST returns for the one-to-one invoice.
+  const inv = Array.isArray(wo.invoice) ? wo.invoice[0] : wo.invoice
+  if (!inv) return false
+  return ['sent', 'overdue'].includes(inv.status) && !inv.paid_at
+}
+const needsAnyAction = (wo) =>
+  needsEstimateApproval(wo) || needsCheckoutReview(wo) || needsPayment(wo)
+
 const FILTER_OPTIONS = [
-  { value: 'all',              label: 'All' },
-  { value: 'awaiting_approval',label: 'Needs Approval' },
-  { value: 'in_progress',      label: 'In Progress' },
-  { value: 'diagnosing',       label: 'Diagnosing' },
-  { value: 'completed',        label: 'Completed' },
-  { value: 'closed',           label: 'Closed' },
+  { value: 'all',               label: 'All' },
+  { value: 'needs_action',      label: 'Needs Action' },
+  { value: 'awaiting_approval', label: 'Needs Approval' },
+  { value: 'checkout_pending',  label: 'Awaiting Checkout Review' },
+  { value: 'payment_pending',   label: 'Pending Payment' },
+  { value: 'in_progress',       label: 'In Progress' },
+  { value: 'diagnosing',        label: 'Diagnosing' },
+  { value: 'completed',         label: 'Completed' },
+  { value: 'closed',            label: 'Closed' },
 ]
 
 export default function CompanyWorkOrdersPage() {
@@ -76,10 +95,12 @@ export default function CompanyWorkOrdersPage() {
         .select(`
           id, work_order_number, priority, opened_at, total_amount,
           estimate_sent_at, is_walk_in,
+          checkout_requested, checkout_request_satisfied, checkout_declined,
           status:work_order_statuses(code, display_name),
           vehicle:vehicles(plate_number, make, model),
           provider:service_providers(name),
-          shop:shops(name, town)
+          shop:shops(name, town),
+          invoice:invoices(status, paid_at, total_amount)
         `)
         .in('vehicle_id', vehicleIds)
         .order('opened_at', { ascending: false })
@@ -94,7 +115,15 @@ export default function CompanyWorkOrdersPage() {
   }
 
   const filtered = workOrders.filter(wo => {
-    const matchStatus = statusFilter === 'all' || wo.status?.code === statusFilter
+    const code = wo.status?.code
+    let matchStatus
+    switch (statusFilter) {
+      case 'all':              matchStatus = true; break
+      case 'needs_action':     matchStatus = needsAnyAction(wo); break
+      case 'checkout_pending': matchStatus = needsCheckoutReview(wo); break
+      case 'payment_pending':  matchStatus = needsPayment(wo); break
+      default:                 matchStatus = code === statusFilter
+    }
     const q = search.toLowerCase()
     const matchSearch = !q
       || wo.work_order_number?.toLowerCase().includes(q)
@@ -104,7 +133,9 @@ export default function CompanyWorkOrdersPage() {
     return matchStatus && matchSearch
   })
 
-  const pendingApproval = workOrders.filter(wo => wo.status?.code === 'awaiting_approval')
+  const pendingApproval = workOrders.filter(needsEstimateApproval)
+  const pendingCheckout = workOrders.filter(needsCheckoutReview)
+  const pendingPayment  = workOrders.filter(needsPayment)
   const activeCount     = workOrders.filter(wo => !['completed','cancelled','closed'].includes(wo.status?.code)).length
   const fmt = (n) => n ? `KES ${Number(n).toLocaleString()}` : null
 
@@ -160,6 +191,54 @@ export default function CompanyWorkOrdersPage() {
         </div>
       )}
 
+      {/* Pending checkout-acceptance banner. */}
+      {pendingCheckout.length > 0 && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-300 rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <ClipboardCheck className="text-blue-600 flex-shrink-0" size={20} />
+            <div>
+              <p className="font-semibold text-blue-900 text-sm">
+                {pendingCheckout.length === 1
+                  ? '1 checkout form awaiting your review'
+                  : `${pendingCheckout.length} checkout forms awaiting your review`}
+              </p>
+              <p className="text-blue-700 text-xs mt-0.5">
+                Confirm the work was completed satisfactorily before payment is processed.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/company/work-orders/${pendingCheckout[0].id}`)}
+            className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
+            Review Now
+          </button>
+        </div>
+      )}
+
+      {/* Pending payment banner. */}
+      {pendingPayment.length > 0 && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CreditCard className="text-amber-600 flex-shrink-0" size={20} />
+            <div>
+              <p className="font-semibold text-amber-900 text-sm">
+                {pendingPayment.length === 1
+                  ? '1 fleet invoice pending payment'
+                  : `${pendingPayment.length} fleet invoices pending payment`}
+              </p>
+              <p className="text-amber-700 text-xs mt-0.5">
+                Settle outstanding balances to close out fleet work orders.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/company/work-orders/${pendingPayment[0].id}/invoice`)}
+            className="flex-shrink-0 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold">
+            Pay Now
+          </button>
+        </div>
+      )}
+
       {/* Search + filter */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -211,7 +290,17 @@ export default function CompanyWorkOrdersPage() {
                     )}
                     {wo.status?.code === 'awaiting_approval' && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-900 font-bold animate-pulse">
-                        Approval needed
+                        Approve estimate
+                      </span>
+                    )}
+                    {needsCheckoutReview(wo) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 font-bold animate-pulse">
+                        Review checkout
+                      </span>
+                    )}
+                    {needsPayment(wo) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold animate-pulse">
+                        Payment due
                       </span>
                     )}
                   </div>

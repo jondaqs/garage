@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Car, ChevronRight, AlertCircle,
-  Loader2, Bell, Search, Filter
+  Loader2, Bell, Search, Filter, ClipboardCheck, CreditCard
 } from 'lucide-react'
 
 const ACTIVE_STATUSES = new Set([
@@ -14,12 +14,15 @@ const ACTIVE_STATUSES = new Set([
 ])
 
 const FILTER_OPTIONS = [
-  { label: 'All',               value: 'all' },
-  { label: 'In Progress',       value: 'active' },
-  { label: 'Awaiting Approval', value: 'awaiting_approval' },
-  { label: 'Quality Check',     value: 'quality_check' },
-  { label: 'Completed',         value: 'completed' },
-  { label: 'Closed',            value: 'closed' },
+  { label: 'All',                       value: 'all' },
+  { label: 'Needs Action',              value: 'needs_action' },
+  { label: 'In Progress',               value: 'active' },
+  { label: 'Awaiting Approval',         value: 'awaiting_approval' },
+  { label: 'Awaiting Checkout Review',  value: 'checkout_pending' },
+  { label: 'Pending Payment',           value: 'payment_pending' },
+  { label: 'Quality Check',             value: 'quality_check' },
+  { label: 'Completed',                 value: 'completed' },
+  { label: 'Closed',                    value: 'closed' },
 ]
 
 const STATUS_STYLES = {
@@ -35,6 +38,29 @@ const STATUS_STYLES = {
   cancelled:         'bg-gray-100 text-gray-400',
   closed:            'bg-gray-100 text-gray-400',
 }
+
+// ── "Needs action" predicates ─────────────────────────────────────────────
+// Three customer-side actions block forward progress on a work order:
+//   1. Estimate approval — driven by status code, already surfaced today.
+//   2. Checkout acceptance — provider has submitted the checkout form and
+//      the customer hasn't accepted or declined it yet.
+//   3. Payment — invoice has been sent/overdue and no receipt has been
+//      recorded yet (paid_at is null).
+// Each predicate operates on a single work-order row from the list query.
+const needsEstimateApproval = (wo) => wo.status?.code === 'awaiting_approval'
+const needsCheckoutReview   = (wo) =>
+  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined
+const needsPayment          = (wo) => {
+  // Supabase returns the related row(s) as either a single object or an
+  // array depending on relationship-cardinality inference. Work-order →
+  // invoice is one-to-one (invoices.work_order_id is UNIQUE), but normalise
+  // here so this stays robust if PostgREST returns the array form.
+  const inv = Array.isArray(wo.invoice) ? wo.invoice[0] : wo.invoice
+  if (!inv) return false
+  return ['sent', 'overdue'].includes(inv.status) && !inv.paid_at
+}
+const needsAnyAction = (wo) =>
+  needsEstimateApproval(wo) || needsCheckoutReview(wo) || needsPayment(wo)
 
 export default function CustomerWorkOrdersPage() {
   const router   = useRouter()
@@ -83,9 +109,11 @@ export default function CustomerWorkOrdersPage() {
         .select(`
           id, work_order_number, priority, opened_at, total_amount,
           estimate_sent_at,
+          checkout_requested, checkout_request_satisfied, checkout_declined,
           status:work_order_statuses(code, display_name),
           vehicle:vehicles(plate_number, make, model),
-          provider:service_providers(name)
+          provider:service_providers(name),
+          invoice:invoices(status, paid_at, total_amount)
         `)
         .in('vehicle_id', vehicleIds)
         .order('opened_at', { ascending: false })
@@ -99,14 +127,23 @@ export default function CustomerWorkOrdersPage() {
     }
   }
 
-  const pendingApproval = workOrders.filter(wo => wo.status?.code === 'awaiting_approval')
-  const active          = workOrders.filter(wo => !['completed','cancelled','closed'].includes(wo.status?.code))
+  const pendingApproval     = workOrders.filter(needsEstimateApproval)
+  const pendingCheckout     = workOrders.filter(needsCheckoutReview)
+  const pendingPayment      = workOrders.filter(needsPayment)
+  const active              = workOrders.filter(wo => !['completed','cancelled','closed'].includes(wo.status?.code))
   const fmt = (n) => n ? `KES ${Number(n).toLocaleString()}` : null
 
   const filtered = workOrders.filter(wo => {
     const code = wo.status?.code
-    const matchStatus = statusFilter === 'all'
-      || (statusFilter === 'active' ? ACTIVE_STATUSES.has(code) : code === statusFilter)
+    let matchStatus
+    switch (statusFilter) {
+      case 'all':              matchStatus = true; break
+      case 'active':           matchStatus = ACTIVE_STATUSES.has(code); break
+      case 'needs_action':     matchStatus = needsAnyAction(wo); break
+      case 'checkout_pending': matchStatus = needsCheckoutReview(wo); break
+      case 'payment_pending':  matchStatus = needsPayment(wo); break
+      default:                 matchStatus = code === statusFilter
+    }
     const q = search.toLowerCase()
     const matchSearch = !q
       || wo.work_order_number?.toLowerCase().includes(q)
@@ -163,6 +200,60 @@ export default function CustomerWorkOrdersPage() {
             onClick={() => router.push(`/dashboard/work-orders/${pendingApproval[0].id}`)}
             className="flex-shrink-0 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm font-semibold">
             Review Now
+          </button>
+        </div>
+      )}
+
+      {/* Pending checkout-acceptance banner.
+          Shown when the provider has submitted the checkout form and the
+          customer hasn't accepted/declined it yet — they must do so before
+          payment is recorded. Matches the provider page's blue treatment. */}
+      {pendingCheckout.length > 0 && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-300 rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <ClipboardCheck className="text-blue-600 flex-shrink-0" size={20} />
+            <div>
+              <p className="font-semibold text-blue-900 text-sm">
+                {pendingCheckout.length === 1
+                  ? '1 checkout form awaiting your review'
+                  : `${pendingCheckout.length} checkout forms awaiting your review`}
+              </p>
+              <p className="text-blue-700 text-xs mt-0.5">
+                Confirm the work was completed satisfactorily before payment is processed.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/dashboard/work-orders/${pendingCheckout[0].id}`)}
+            className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
+            Review Now
+          </button>
+        </div>
+      )}
+
+      {/* Pending payment banner.
+          Shown when an invoice has been sent (or has gone overdue) and
+          paid_at is still null. Amber treatment to distinguish from the
+          yellow estimate-approval and blue checkout-review banners. */}
+      {pendingPayment.length > 0 && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CreditCard className="text-amber-600 flex-shrink-0" size={20} />
+            <div>
+              <p className="font-semibold text-amber-900 text-sm">
+                {pendingPayment.length === 1
+                  ? '1 invoice pending payment'
+                  : `${pendingPayment.length} invoices pending payment`}
+              </p>
+              <p className="text-amber-700 text-xs mt-0.5">
+                Please settle the balance to close out the work order.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/dashboard/work-orders/${pendingPayment[0].id}/invoice`)}
+            className="flex-shrink-0 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold">
+            Pay Now
           </button>
         </div>
       )}
@@ -236,7 +327,17 @@ export default function CustomerWorkOrdersPage() {
                     )}
                     {wo.status?.code === 'awaiting_approval' && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-900 font-bold animate-pulse">
-                        Action needed
+                        Approve estimate
+                      </span>
+                    )}
+                    {needsCheckoutReview(wo) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 font-bold animate-pulse">
+                        Review checkout
+                      </span>
+                    )}
+                    {needsPayment(wo) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold animate-pulse">
+                        Payment due
                       </span>
                     )}
                   </div>
