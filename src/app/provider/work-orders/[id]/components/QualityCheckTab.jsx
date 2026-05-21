@@ -414,9 +414,17 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
                 <div>
                   <p className="font-semibold text-green-900 text-sm">Ready to Invoice</p>
                   <p className="text-green-700 text-xs mt-0.5">
-                    {invoiceNotified
-                      ? 'Team notified. Generate and send the invoice to the customer.'
-                      : 'Work order complete. Generate and send the invoice to the customer.'}
+                    {/* Subtitle is role-aware. Users who can send invoices are
+                        addressed directly ("Generate and send…"); members who
+                        can't are told who *will* be acting on it, so the card
+                        doesn't read as an instruction they can't follow. */}
+                    {canSendInvoice
+                      ? (invoiceNotified
+                          ? 'Team notified. Generate and send the invoice to the customer.'
+                          : 'Work order complete. Generate and send the invoice to the customer.')
+                      : (invoiceNotified
+                          ? 'Work order complete. An admin or accountant has been notified to send the invoice.'
+                          : 'Work order complete. An admin or accountant will send the invoice to the customer.')}
                   </p>
                 </div>
               </div>
