@@ -14,7 +14,7 @@ const PRIORITY_STYLES = {
   urgent: 'bg-red-100 text-red-700',
 }
 
-export default function RecommendationsTab({ workOrder }) {
+export default function RecommendationsTab({ workOrder, canAdd = false }) {
   const supabase = createClient()
 
   const [recs, setRecs]           = useState([])
@@ -33,7 +33,15 @@ export default function RecommendationsTab({ workOrder }) {
     priority:             'normal',
   })
 
-  const isTerminal = ['cancelled'].includes(workOrder.status?.code)
+  // "Locked" means the WO has reached a terminal/post-work state. Recs are
+  // a forward-looking artefact, but after the WO is closed/cancelled/
+  // completed they freeze for everyone except the provider owner and SPU
+  // admins (enforced server-side by add_maintenance_recommendation; we
+  // mirror it here so the UI doesn't promise an action the RPC will reject
+  // for non-admins). The owner/admin override is reflected in the `canAdd`
+  // prop set by the parent — so checking `canAdd` is sufficient to decide
+  // whether to render the add UI.
+  const isLocked = ['cancelled', 'closed', 'completed'].includes(workOrder.status?.code)
 
   const loadRecs = useCallback(async () => {
     try {
@@ -116,11 +124,16 @@ export default function RecommendationsTab({ workOrder }) {
         <div className="text-center py-10 text-gray-400">
           <Wrench size={32} className="mx-auto mb-2 opacity-40" />
           <p className="text-sm">No recommendations added yet.</p>
-          {!isTerminal && (
+          {canAdd && (
             <button onClick={() => setShowForm(true)}
               className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
               + Add first recommendation
             </button>
+          )}
+          {!canAdd && isLocked && (
+            <p className="text-xs mt-2 text-gray-400">
+              Work order is {workOrder.status?.code} — only the provider owner or an admin can add recommendations now.
+            </p>
           )}
         </div>
       ) : (
@@ -174,8 +187,8 @@ export default function RecommendationsTab({ workOrder }) {
         </div>
       )}
 
-      {/* Add form */}
-      {!isTerminal && (
+      {/* Add form / lock notice */}
+      {canAdd ? (
         !showForm ? (
           <button onClick={() => setShowForm(true)}
             className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
@@ -250,6 +263,16 @@ export default function RecommendationsTab({ workOrder }) {
               </button>
             </div>
           </div>
+        )
+      ) : (
+        // canAdd is false. If the WO is locked AND there are existing recs
+        // (so we're not falling through to the empty-state notice above),
+        // surface a small notice so users understand why the add CTA is
+        // missing rather than wondering whether it failed to render.
+        isLocked && recs.length > 0 && (
+          <p className="text-xs text-gray-400 italic text-center pt-2">
+            Work order is {workOrder.status?.code} — only the provider owner or an admin can add further recommendations.
+          </p>
         )
       )}
     </div>

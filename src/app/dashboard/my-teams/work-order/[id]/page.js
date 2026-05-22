@@ -374,6 +374,16 @@ export default function MechanicWorkOrderPage() {
   const canCheckout     = isAdmin || !!(perms?.can_approve_work || memberPerms?.can_approve_work)
   const isMechanic      = !!perms?.mechanic_id || !memberPerms   // has mechanic record
   const memberRole      = memberPerms?.role || (isMechanic ? 'mechanic' : null)
+
+  // Recommendations add gate (mirrors add_maintenance_recommendation
+  // server-side). On the team-member page the viewer is never the provider
+  // owner (owners go through /provider/work-orders/), so "owner or admin"
+  // collapses to "is this an SPU admin". Accountants do NOT qualify for
+  // the post-close override even though they share isAdmin elsewhere.
+  const isProviderAdmin = memberPerms?.role === 'admin'
+  const canAddRecommendation =
+    isProviderAdmin
+    || (!isTerminal && (canApprove || !!memberPerms?.can_approve_work))
   const isAssigned      = !!perms?.is_assigned
 
   // Invoice permissions — admins get full access; can_send_invoice gives full invoice access including generate
@@ -866,8 +876,8 @@ export default function MechanicWorkOrderPage() {
                 onStatusChange={() => { load() }}
               />
             )}
-            {activeTab === 'recommendations' && (canApprove || isAdmin) && (
-              <RecommendationsTab workOrder={woWithProvider} />
+            {activeTab === 'recommendations' && (
+              <RecommendationsTab workOrder={woWithProvider} canAdd={canAddRecommendation} />
             )}
             {activeTab === 'qc' && (canApprove || (isAdmin && !isReadOnly)) && (
               <QualityCheckTab

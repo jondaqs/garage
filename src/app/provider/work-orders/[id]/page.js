@@ -64,7 +64,7 @@ const TABS = [
   { id: 'issues',          label: 'Issues/Diagnostics',  icon: AlertTriangle  },
   { id: 'services',        label: 'Services',            icon: Wrench         },
   { id: 'parts',           label: 'Parts',               icon: Package        },
-  { id: 'recommendations', label: 'Next Service',        icon: Bell           },
+  { id: 'recommendations', label: 'Recommendations',     icon: Bell           },
   { id: 'qc',              label: 'QC & Complete',       icon: ClipboardCheck },
   { id: 'invoice',         label: 'Invoice',             icon: FileText       },
   { id: 'receipt',         label: 'Receipt',             icon: Receipt        },
@@ -638,6 +638,18 @@ export default function WorkOrderDetailPage() {
     canRecordPayment: canSendInvoice,
     canConfirm:       canSendInvoice,
   }
+
+  // Recommendation add gate:
+  //   • Provider owner OR SPU admin → always (even after the WO is closed,
+  //     so they can record follow-up work for the next visit)
+  //   • Anyone else with can_approve_work → only while the WO is still
+  //     open. Once it's terminal (closed/cancelled/completed), only the
+  //     owner/admin can add further recommendations.
+  // Mirrors add_maintenance_recommendation's server-side gate.
+  const isProviderAdmin   = isOwner || spuPermissions.role === 'admin'
+  const canAddRecommendation =
+    isProviderAdmin
+    || (!isTerminal && (spuPermissions.can_approve_work || isAdminOrOwner))
 
   // Inject service_provider_id into wo for tab components (needed for parts search)
   const woWithProvider = { ...wo, service_provider_id: wo.service_provider?.id || wo.service_provider_id }
@@ -1422,7 +1434,7 @@ export default function WorkOrderDetailPage() {
 
           {/* ── RECOMMENDATIONS TAB ── */}
           {activeTab === 'recommendations' && (
-            <RecommendationsTab workOrder={woWithProvider} />
+            <RecommendationsTab workOrder={woWithProvider} canAdd={canAddRecommendation} />
           )}
 
           {/* ── QC & COMPLETE TAB ── */}
