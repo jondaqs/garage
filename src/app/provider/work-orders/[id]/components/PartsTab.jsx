@@ -38,6 +38,15 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
   const [qty,           setQty]           = useState({})
   const [partNotes,     setPartNotes]     = useState({})
 
+  // Shop scoping: when this work order has a shop_id and the toggle is on,
+  // inventory search results are restricted to parts assigned to the same
+  // shop (parts with shop_id IS NULL are also excluded, since "assigned to
+  // shop X" means strictly equal). Defaults ON when the WO has a shop so
+  // mechanics see their local stock first; toggle off to widen the search
+  // to the provider's full inventory across all shops.
+  const woShopId = workOrder.shop_id || null
+  const [restrictToShop, setRestrictToShop] = useState(!!woShopId)
+
   // Inline editing: unit_price while reserved
   const [editingPrice,  setEditingPrice]  = useState({})  // { [id]: string }
   // Inline editing: exchange_rate while reserved (independent toggle so the
@@ -139,21 +148,36 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
     if (q.trim().length < 2) { setSearchResults([]); return }
     setSearching(true)
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('spare_parts')
         .select(`
-          id, name, sku, brand, category, stock, min_stock_level, unit_price,
+          id, name, sku, brand, category, stock, min_stock_level, unit_price, shop_id,
           currency:currencies(id, code, symbol, display_name)
         `)
         .eq('service_provider_id', workOrder.service_provider_id)
         .eq('is_active', true)
         .or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%,category.ilike.%${q}%`)
-        .order('name')
-        .limit(20)
+
+      // Optional shop-scope filter. .eq with a uuid won't match NULL rows,
+      // so unassigned inventory (shop_id IS NULL) is correctly excluded when
+      // the toggle is on.
+      if (restrictToShop && woShopId) {
+        query = query.eq('shop_id', woShopId)
+      }
+
+      const { data } = await query.order('name').limit(20)
       setSearchResults(data || [])
     } catch {}
     finally { setSearching(false) }
-  }, [workOrder.service_provider_id])
+  }, [workOrder.service_provider_id, restrictToShop, woShopId, supabase])
+
+  // Re-run the current search when the shop-scope toggle flips so results
+  // refresh without the user having to retype. Guarded on >=2 chars to
+  // match handleSearch's own guard above.
+  useEffect(() => {
+    if (search.trim().length >= 2) handleSearch(search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restrictToShop])
 
   // ── Reserve ───────────────────────────────────────────────────────────────
   const handleReserve = async (part) => {
@@ -745,6 +769,31 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={14} />
                 )}
               </div>
+
+              {/* Shop-scope toggle. Only relevant when the work order is
+                  bound to a shop; otherwise the toggle is meaningless and
+                  we hide it. Defaults ON when a shop is set. */}
+              {woShopId && (
+                <label className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-white border border-gray-200 cursor-pointer select-none">
+                  <span className="text-xs text-gray-700">
+                    Limit to{' '}
+                    <span className="font-semibold">
+                      {workOrder.shop?.name || 'this shop'}
+                    </span>{' '}
+                    inventory
+                  </span>
+                  <span className="relative inline-flex items-center flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={restrictToShop}
+                      onChange={e => setRestrictToShop(e.target.checked)}
+                    />
+                    <span className="w-9 h-5 bg-gray-200 peer-checked:bg-green-500 rounded-full transition-colors" />
+                    <span className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow" />
+                  </span>
+                </label>
+              )}
 
               {searchResults.length > 0 && (
                 <div className="space-y-2 max-h-72 overflow-y-auto">
