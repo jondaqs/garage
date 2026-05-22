@@ -7,8 +7,17 @@ import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
   Loader2, DollarSign, ThumbsUp, ThumbsDown, Edit3,
-  ChevronDown, ChevronUp, Star, FileText, ChevronRight, Receipt, ClipboardCheck
+  ChevronDown, ChevronUp, Star, FileText, ChevronRight, Receipt, ClipboardCheck,
+  AlertTriangle, ShieldAlert
 } from 'lucide-react'
+
+// Severity → colour mapping for the diagnostic-findings card.
+const SEVERITY_STYLES = {
+  critical: { ring: 'ring-red-300',    dot: 'bg-red-500',    label: 'bg-red-100 text-red-800'    },
+  high:     { ring: 'ring-orange-300', dot: 'bg-orange-500', label: 'bg-orange-100 text-orange-800' },
+  medium:   { ring: 'ring-amber-300',  dot: 'bg-amber-500',  label: 'bg-amber-100 text-amber-800' },
+  low:      { ring: 'ring-slate-300',  dot: 'bg-slate-400',  label: 'bg-slate-100 text-slate-700'  },
+}
 
 const STATUS_COLORS = {
   intake:            { bg: 'bg-gray-100',    text: 'text-gray-600'   },
@@ -230,11 +239,70 @@ export default function CustomerWorkOrderPage() {
   const services = wo.services || []
   const parts    = wo.parts    || []
 
+  // Issues from the diagnostic stage. The RPC always returns `issues` for
+  // every reader of the work order — they're context everyone benefits from.
+  // The `can_approve_estimates` flag below decides whether *this* user gets
+  // the actionable highlight on top; company members without that permission
+  // still see the diagnostic-findings card, just without the highlight.
+  const issues               = Array.isArray(wo.issues) ? wo.issues : []
+  const canViewIssues        = wo.can_view_issues !== false
+  const canApproveEstimates  = wo.can_approve_estimates !== false  // permissive default
+  const approvalIssues       = issues.filter(i => i.requires_approval)
+  // Highlight banner shows only when the caller can act on the estimate AND
+  // the work order is awaiting approval AND there's something flagged.
+  const highlightApprovalIssues =
+    canApproveEstimates && isAwaiting && approvalIssues.length > 0
+
   const servicesTotal = services.reduce((s, sv) => s + Number(sv.actual_cost || sv.estimated_cost || 0), 0)
   const partsTotal    = parts.reduce((s, p) => s + (p.quantity * Number(p.unit_price || 0)), 0)
   const subtotal      = wo.subtotal || (servicesTotal + partsTotal)
   const tax           = wo.tax      || subtotal * 0.16
   const total         = wo.total_amount || (subtotal + tax)
+
+  // ── Issue card renderer (shared between the inline list and the highlight) ──
+  // Defined inline so we can pass the per-context emphasis class.
+  const renderIssue = (iss, emphasised = false) => {
+    const sev = SEVERITY_STYLES[iss.severity] || SEVERITY_STYLES.medium
+    return (
+      <div
+        key={iss.id}
+        className={
+          'rounded-lg border bg-white p-3 ' +
+          (emphasised ? 'ring-2 ' + sev.ring + ' border-transparent' : 'border-gray-200')
+        }
+      >
+        <div className="flex items-start gap-2.5">
+          <span className={'mt-1.5 inline-block w-2 h-2 rounded-full flex-shrink-0 ' + sev.dot} />
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <p className="text-sm font-semibold text-gray-900">{iss.title || 'Issue'}</p>
+              <span className={'text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ' + sev.label}>
+                {iss.severity || 'medium'}
+              </span>
+              {iss.requires_approval && (
+                <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 inline-flex items-center gap-1">
+                  <ShieldAlert size={10} /> Needs approval
+                </span>
+              )}
+              {iss.resolved_at && (
+                <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800 inline-flex items-center gap-1">
+                  <CheckCircle size={10} /> Resolved
+                </span>
+              )}
+            </div>
+            {iss.description && (
+              <p className="text-xs text-gray-600 whitespace-pre-line">{iss.description}</p>
+            )}
+            {iss.reported_at && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                Reported {new Date(iss.reported_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -304,6 +372,64 @@ export default function CustomerWorkOrderPage() {
           </div>
         )}
       </div>
+
+      {/* ── HIGHLIGHTED REQUIRES-APPROVAL ISSUES ──────────────────────────
+          Shown above the Estimate card while the work order is awaiting
+          the customer's approval AND the mechanic flagged one or more
+          issues as requires_approval. No separate decision flow — the
+          customer reviews these here and then approves or rejects the
+          estimate below using the existing buttons. ─────────────────── */}
+      {highlightApprovalIssues && (
+        <div className="rounded-xl border-2 border-yellow-400 bg-yellow-50 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 bg-yellow-100 border-b border-yellow-300 flex items-center gap-2">
+            <ShieldAlert className="text-yellow-700 flex-shrink-0" size={18} />
+            <div className="flex-1">
+              <p className="font-semibold text-yellow-900 text-sm">
+                {approvalIssues.length === 1
+                  ? 'The mechanic flagged 1 finding for your attention'
+                  : `The mechanic flagged ${approvalIssues.length} findings for your attention`}
+              </p>
+              <p className="text-yellow-800 text-xs mt-0.5">
+                Review these before approving the estimate. If anything concerns you, reject the estimate and explain why.
+              </p>
+            </div>
+          </div>
+          <div className="p-3 space-y-2">
+            {approvalIssues.map(iss => renderIssue(iss, true))}
+          </div>
+        </div>
+      )}
+
+      {/* ── DIAGNOSTIC FINDINGS CARD ───────────────────────────────────
+          All issues recorded against the work order. Hidden for company
+          members who don't have can_approve_estimates (server returns
+          can_view_issues=false and issues=null for them). ────────────── */}
+      {canViewIssues && issues.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+            <AlertTriangle className="text-gray-500 flex-shrink-0" size={16} />
+            <p className="font-semibold text-gray-900 text-sm">
+              Diagnostic Findings ({issues.length})
+            </p>
+          </div>
+          <div className="p-3 space-y-2">
+            {/* When the approval-required highlight is active above, those
+                issues are already shown there — don't repeat them here, but
+                still show any informational/resolved issues. */}
+            {issues
+              .filter(iss => !(highlightApprovalIssues && iss.requires_approval))
+              .map(iss => renderIssue(iss, false))}
+            {/* If the filter removed everything (every issue is in the
+                highlight), show a friendly pointer instead of a blank card. */}
+            {highlightApprovalIssues
+              && issues.every(iss => iss.requires_approval) && (
+              <p className="text-xs text-gray-500 italic px-1">
+                All findings are listed in the approval highlight above.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── ESTIMATE CARD (shown when awaiting_approval or already decided) ── */}
       {(isAwaiting || wo.subtotal) && (
