@@ -463,24 +463,44 @@ export default function MechanicWorkOrderPage() {
         </div>
       )}
 
-      {/* Assignment action card */}
-      {isAssigned && !isTerminal && (
+      {/* ── Work-order action card ───────────────────────────────────────
+          Visible whenever the work order isn't terminal AND the viewer has
+          *some* role-driven action available — either they're the assigned
+          mechanic, or they're a manager-level member (admin/accountant) who
+          can drive the workflow. Inside the card each section guards on the
+          specific permission booleans (canApprove, canSendEst, etc.) rather
+          than role labels, so an admin without can_approve_work will see
+          the card but not see the status-advance buttons. */}
+      {!isTerminal && (isAssigned || isAdmin) && (
         <div className={`rounded-xl p-4 border space-y-3 ${
-          isPending      ? 'bg-yellow-50 border-yellow-300' :
-          isAcknowledged ? 'bg-green-50 border-green-300' :
-                           'bg-gray-50 border-gray-200'
+          isAssigned
+            ? (isPending      ? 'bg-yellow-50 border-yellow-300'
+              : isAcknowledged ? 'bg-green-50 border-green-300'
+              :                  'bg-gray-50 border-gray-200')
+            // Admin-as-viewer skin: neutral, no assignment status colouring.
+            : 'bg-slate-50 border-slate-200'
         }`}>
           <div className="flex items-center gap-2">
-            <span className="text-lg">{isAcknowledged ? '✅' : '🔧'}</span>
+            <span className="text-lg">
+              {isAssigned ? (isAcknowledged ? '✅' : '🔧') : '🛠️'}
+            </span>
             <p className="font-semibold text-sm text-gray-900">
-              {isAcknowledged
-                ? 'Assignment acknowledged — you are working on this'
-                : 'You have been assigned to this work order'}
+              {isAssigned
+                ? (isAcknowledged
+                    ? 'Assignment acknowledged — you are working on this'
+                    : 'You have been assigned to this work order')
+                // Non-assigned viewer (admin, accountant). Don't pretend
+                // they're the mechanic; just frame it as oversight.
+                : 'Work order actions'}
             </p>
           </div>
 
-          {/* Check-in vehicle — shown when acknowledged and not yet checked in */}
-          {isAcknowledged && !wo.vehicle_checked_in_at && (
+          {/* Check-in vehicle — available to the assigned mechanic once
+              they've acknowledged, or to any admin (who may be checking in
+              on the mechanic's behalf, e.g. when the customer drops the
+              car at the front desk). Hidden once the vehicle is already
+              checked in. */}
+          {((isAcknowledged || isAdmin) && !wo.vehicle_checked_in_at) && (
             <div className="border-t border-green-200 pt-3">
               {showCheckin ? (
                 <div className="flex items-center gap-2 flex-wrap">
@@ -516,8 +536,9 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
-          {/* Acknowledge / Decline */}
-          {isPending && !showDecline && (
+          {/* Acknowledge / Decline — only the assigned mechanic accepts an
+              assignment. Admins viewing this card don't see these buttons. */}
+          {isAssigned && isPending && !showDecline && (
             <div className="flex gap-2">
               <button onClick={handleAcknowledge} disabled={acting}
                 className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
@@ -531,7 +552,7 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
-          {showDecline && (
+          {isAssigned && showDecline && (
             <div className="space-y-2">
               <textarea value={declineReason} onChange={e => setDeclineReason(e.target.value)}
                 placeholder="Reason for declining (optional)..." rows={2}
@@ -550,8 +571,11 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
-          {/* Internal Estimate Review — only for mechanics with can_send_estimates, not for admin/accountant viewers */}
-          {statusCode === 'internal_review' && canSendEst && !isAdmin && (
+          {/* Internal Estimate Review — gated on can_send_estimates only.
+              Same model as the other actions: role doesn't grant access,
+              the boolean does. An admin without can_send_estimates won't
+              see this panel. */}
+          {statusCode === 'internal_review' && canSendEst && (
             <div className="border-t border-violet-100 pt-3">
               <EstimateReviewPanel
                 workOrder={woWithProvider}
@@ -562,8 +586,14 @@ export default function MechanicWorkOrderPage() {
             </div>
           )}
 
-          {/* Status advance actions */}
-          {((isAcknowledged && canApprove) || (isAdmin && !isTerminal)) && (<>
+          {/* Status advance actions — gated purely on can_approve_work.
+              Per the chosen permission model, admin alone is not enough; an
+              admin without can_approve_work sees the card but not these
+              buttons. Mechanics with can_approve_work additionally need to
+              have acknowledged the assignment (the operational handshake);
+              non-mechanic members aren't in that handshake flow and so
+              don't carry the isAcknowledged requirement. */}
+          {(canApprove && (isAcknowledged || !isAssigned)) && !isTerminal && (<>
             <div className="border-t border-green-200 pt-3">
               <p className="text-xs font-medium text-green-800 mb-2">Advance status:</p>
               <div className="flex flex-wrap gap-2">
@@ -695,15 +725,9 @@ export default function MechanicWorkOrderPage() {
         </div>
       )}
 
-      {/* EstimateReviewPanel for admin/accountant — outside assignment card, always visible when status = internal_review */}
-      {statusCode === 'internal_review' && isAdmin && (
-        <EstimateReviewPanel
-          workOrder={woWithProvider}
-          canSend={canSendEst || isAdmin}
-          estimate={estimate}
-          onSent={() => { load(); setSuccess('Estimate sent to customer for approval.') }}
-        />
-      )}
+      {/* (The previous admin-only EstimateReviewPanel that lived here was
+          removed: the in-card panel above now fires for admins too, gated
+          on can_send_estimates like every other action.) */}
 
       {/* ── Estimate approved banner ── */}
       {wo.estimate_approved && wo.status?.code === 'approved' && (
