@@ -872,6 +872,7 @@ export default function MechanicWorkOrderPage() {
             {activeTab === 'qc' && (canApprove || (isAdmin && !isReadOnly)) && (
               <QualityCheckTab
                 workOrder={woWithProvider}
+                canSendInvoice={canSendInvoice}
                 onStatusChange={(event) => {
                   if (event === 'go_to_invoice') {
                     setActiveTab('invoice')
