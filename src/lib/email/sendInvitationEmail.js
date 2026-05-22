@@ -193,7 +193,7 @@ export async function sendInvitationEmail(invitation_id) {
       email: invitation.invited_email,
       mailjet_message_id:
         mailjetData.Messages?.[0]?.To?.[0]?.MessageID,
-      queued_email_id: queuedEmail?.id
+      queued_email_id: queuedEmailId
     }
 
   } catch (error) {
