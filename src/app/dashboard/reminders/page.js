@@ -253,9 +253,9 @@ export default function RemindersPage() {
           </summary>
           <div className="border-t border-gray-100 divide-y divide-gray-50">
             {past.map(rem => (
-              <div key={rem.id} className="px-5 py-3 flex items-center gap-3 text-sm opacity-60">
+              <div key={rem.id} className="px-5 py-3 flex items-center gap-3 text-sm">
                 <BellOff size={14} className="text-gray-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 opacity-60">
                   <p className="font-medium text-gray-700">
                     {rem.title || rem.recommendation?.service?.name || 'Service Reminder'}
                   </p>
@@ -269,6 +269,19 @@ export default function RemindersPage() {
                     : 'Dismissed'
                   }
                 </span>
+                {/* Book Service available even after acknowledgement — a
+                    past reminder still represents work the customer may
+                    want to schedule. Outside the .opacity-60 wrapper above
+                    so the button itself stays at full opacity even though
+                    the row text is dimmed. */}
+                {rem.vehicle?.id && (
+                  <button
+                    onClick={() => router.push(`/dashboard/bookings/book?vehicle=${rem.vehicle.id}`)}
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 whitespace-nowrap flex-shrink-0"
+                  >
+                    Book Service
+                  </button>
+                )}
               </div>
             ))}
           </div>

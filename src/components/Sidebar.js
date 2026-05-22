@@ -451,6 +451,12 @@ export default function Sidebar({ user }) {
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
       { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
       { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },
+      // Reminders — shows the same fleet recommendations as the owner's
+      // /company/reminders. Renders via the shared CompanyRemindersView
+      // component with this portal's basePath. No badge for now — a fleet-
+      // wide reminder count would need its own query + realtime channel
+      // (mirroring the personal-nav pattern); can be added later.
+      { icon: Bell,         label: 'Reminders',   path: `${base}/reminders`,        everyone: true  },
       // Find Providers + Chat — both gated on can_chat (admins see them too).
       // Visually grouped: discover → message.
       ...(canChat ? [
