@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
+import CustomerCommentsCard from '@/components/CustomerCommentsCard'
 import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
@@ -787,6 +788,13 @@ export default function CompanyWorkOrderDetailPage() {
           </div>
         )
       })()}
+
+      {/* ── Notes from the provider (read-only) ─────────────────────────
+          Surfaces non-internal comments the provider has posted on this
+          work order. RLS filters out internal notes for customer-side
+          callers, so this card never shows internal-only content. If the
+          card has nothing to display it hides itself. ──────────────── */}
+      <CustomerCommentsCard workOrderId={wo.id} />
 
       {/* ── Receipt banner (paid only) ── */}
 
