@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import CustomerCommentsCard from '@/components/CustomerCommentsCard'
+import CustomerRecommendationsCard from '@/components/CustomerRecommendationsCard'
 import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
@@ -246,7 +247,6 @@ export default function CustomerWorkOrderPage() {
   // the actionable highlight on top; company members without that permission
   // still see the diagnostic-findings card, just without the highlight.
   const issues               = Array.isArray(wo.issues) ? wo.issues : []
-  const recommendations      = Array.isArray(wo.recommendations) ? wo.recommendations : []
   const canViewIssues        = wo.can_view_issues !== false
   const canApproveEstimates  = wo.can_approve_estimates !== false  // permissive default
   const approvalIssues       = issues.filter(i => i.requires_approval)
@@ -685,6 +685,14 @@ export default function CustomerWorkOrderPage() {
       )}
 
 
+      {/* ── Recommendations + Notes (read-only, collapsible) ────────────
+          Both are derived/fetched read-only views of provider-authored
+          content. They live above the Invoice banner so customers see them
+          while reviewing what was done before paying. Each card is
+          collapsed by default — they auto-hide when empty. ──────────── */}
+      <CustomerRecommendationsCard recommendations={wo.recommendations} />
+      <CustomerCommentsCard workOrderId={wo.id} />
+
       {/* ── Invoice banner ── */}
       {invoiceStatus && (
         <div className={`rounded-xl shadow-sm overflow-hidden border ${
@@ -792,68 +800,6 @@ export default function CustomerWorkOrderPage() {
         </div>
       )}
 
-
-      {/* ── Maintenance Recommendations (read-only) ──────────────────────
-          Forward-looking suggestions the mechanic added during this work
-          order. Read-only here — providers manage them under the
-          Recommendations tab on their side. Customer reminders flow stays
-          unchanged; this card is a per-WO snapshot. ───────────────────── */}
-      {recommendations.length > 0 && (() => {
-        const PRIO = { low: 'bg-gray-100 text-gray-600', normal: 'bg-blue-100 text-blue-700', high: 'bg-orange-100 text-orange-700', urgent: 'bg-red-100 text-red-700' }
-        return (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-              <Bell className="text-blue-500 flex-shrink-0" size={16} />
-              <p className="font-semibold text-gray-900 text-sm">
-                Maintenance Recommendations ({recommendations.length})
-              </p>
-            </div>
-            <div className="p-3 space-y-2">
-              {recommendations.map(rec => (
-                <div key={rec.id} className="rounded-lg border border-gray-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    {rec.service && (
-                      <span className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                        <Wrench size={13} className="text-gray-400" />
-                        {rec.service.name}
-                      </span>
-                    )}
-                    <span className={'text-xs px-2 py-0.5 rounded-full font-medium ' + (PRIO[rec.priority] || PRIO.normal)}>
-                      {rec.priority}
-                    </span>
-                    {rec.is_acknowledged && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                        Acknowledged
-                      </span>
-                    )}
-                  </div>
-                  {rec.note && <p className="text-sm text-gray-700 whitespace-pre-line">{rec.note}</p>}
-                  <div className="flex flex-wrap gap-4 text-xs text-gray-500 mt-2">
-                    {rec.recommended_mileage && (
-                      <span className="flex items-center gap-1">
-                        <Gauge size={12} /> Due at {rec.recommended_mileage.toLocaleString()} km
-                      </span>
-                    )}
-                    {rec.recommended_date && (
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        Due {new Date(rec.recommended_date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* ── Notes from the provider (read-only) ─────────────────────────
-          Surfaces non-internal comments the provider has posted on this
-          work order. RLS filters out internal notes for customer-side
-          callers, so this card never shows internal-only content. If the
-          card has nothing to display it hides itself. ──────────────── */}
-      <CustomerCommentsCard workOrderId={wo.id} />
 
       {/* ── Receipt banner (paid only) ── */}
       {invoiceStatus === 'paid' && (
