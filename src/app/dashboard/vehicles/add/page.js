@@ -37,10 +37,18 @@ export default function AddVehiclePage() {
     getUser()
   }, [router])
 
+  // Plate validation is now intentionally permissive — non-empty and at
+  // least one alphanumeric character. The DB enforces UNIQUE; format is
+  // the caller's responsibility (we may register vehicles from various
+  // jurisdictions, not just Kenya).
   const validatePlateNumber = (plate) => {
-    const kenyaFormat = /^[A-Z]{3}\s?\d{3}[A-Z]?$/i
-    return kenyaFormat.test(plate.trim())
+    const trimmed = plate.trim()
+    return trimmed.length > 0 && /[A-Za-z0-9]/.test(trimmed)
   }
+
+  // VIN is mandatory at creation. Minimum sanity check: non-empty after
+  // trimming. The server-side RPC enforces the same rule.
+  const validateVin = (vin) => vin.trim().length > 0
 
   const handleAddVehicle = async (e) => {
     e.preventDefault()
@@ -55,7 +63,13 @@ export default function AddVehiclePage() {
     }
 
     if (!validatePlateNumber(vehicleForm.plateNumber)) {
-      setError('Invalid plate number format. Use format: KAA 123A')
+      setError('Plate number is required.')
+      setLoading(false)
+      return
+    }
+
+    if (!validateVin(vehicleForm.vin)) {
+      setError('VIN is required.')
       setLoading(false)
       return
     }
@@ -101,7 +115,7 @@ export default function AddVehiclePage() {
         p_model:               vehicleForm.model,
         p_year_of_manufacture: vehicleForm.year ? parseInt(vehicleForm.year) : null,
         p_color:               vehicleForm.color || null,
-        p_vin:                 vehicleForm.vin.trim() || null,
+        p_vin:                 vehicleForm.vin.trim().toUpperCase(),
         p_owner_user_id:       profile.id,
       })
 
@@ -226,11 +240,12 @@ export default function AddVehiclePage() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">VIN <span className="text-gray-400 font-normal">(Optional)</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">VIN</label>
             <input
               type="text"
               value={vehicleForm.vin}
               onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value.toUpperCase() })}
+              required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase font-mono"
               placeholder="1HGBH41JXMN109186"
               maxLength={17}

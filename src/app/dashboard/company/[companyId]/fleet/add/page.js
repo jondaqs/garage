@@ -97,9 +97,14 @@ export default function AddCompanyFleetVehiclePage() {
     setError('')
     setSuccess('')
 
-    const kenyaPlate = /^[A-Z]{3}\s?\d{3}[A-Z]?$/i
-    if (!kenyaPlate.test(form.plateNumber.trim())) {
-      setError('Invalid plate number format. Expected e.g. KAA 123A')
+    if (!form.plateNumber.trim() || !/[A-Za-z0-9]/.test(form.plateNumber)) {
+      setError('Plate number is required.')
+      setLoading(false)
+      return
+    }
+
+    if (!form.vin.trim()) {
+      setError('VIN is required.')
       setLoading(false)
       return
     }
@@ -128,7 +133,7 @@ export default function AddCompanyFleetVehiclePage() {
         p_model:               form.model,
         p_year_of_manufacture: form.year ? parseInt(form.year) : null,
         p_color:               form.color || null,
-        p_vin:                 form.vin.trim() || null,
+        p_vin:                 form.vin.trim().toUpperCase(),
         p_mileage:             form.mileage ? parseInt(form.mileage) : null,
         p_owner_user_id:       profileId,
         p_owner_company_id:    companyId,
@@ -289,13 +294,12 @@ export default function AddCompanyFleetVehiclePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                VIN <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">VIN</label>
               <input
                 type="text"
                 value={form.vin}
                 onChange={e => field('vin', e.target.value.toUpperCase())}
+                required
                 maxLength={17}
                 placeholder="1HGBH41JXMN109186"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase font-mono text-sm"

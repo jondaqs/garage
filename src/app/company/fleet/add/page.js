@@ -93,9 +93,16 @@ export default function AddFleetVehiclePage() {
     setError('')
     setSuccess('')
 
-    const kenyaPlate = /^[A-Z]{3}\s?\d{3}[A-Z]?$/i
-    if (!kenyaPlate.test(formData.plateNumber.trim())) {
-      setError('Invalid plate number format. Expected e.g. KAA 123A')
+    // Plate-format validation is intentionally permissive (non-empty +
+    // contains an alphanumeric); the DB enforces UNIQUE plate_number.
+    if (!formData.plateNumber.trim() || !/[A-Za-z0-9]/.test(formData.plateNumber)) {
+      setError('Plate number is required.')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.vin.trim()) {
+      setError('VIN is required.')
       setLoading(false)
       return
     }
@@ -124,7 +131,7 @@ export default function AddFleetVehiclePage() {
         p_model:               formData.model,
         p_year_of_manufacture: formData.year ? parseInt(formData.year) : null,
         p_color:               formData.color || null,
-        p_vin:                 formData.vin.trim() || null,
+        p_vin:                 formData.vin.trim().toUpperCase(),
         p_mileage:             formData.mileage ? parseInt(formData.mileage) : null,
         p_owner_user_id:       profileId,
         p_owner_company_id:    companyId,
@@ -272,13 +279,12 @@ export default function AddFleetVehiclePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  VIN <span className="text-gray-400 font-normal">(Optional)</span>
-                </label>
+                <label className="block text-sm font-medium mb-2">VIN</label>
                 <input
                   type="text"
                   value={formData.vin}
                   onChange={(e) => field('vin', e.target.value.toUpperCase())}
+                  required
                   className="w-full p-3 border border-gray-300 rounded-lg uppercase font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="17-character VIN"
                   maxLength={17}

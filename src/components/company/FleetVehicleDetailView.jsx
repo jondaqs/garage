@@ -158,26 +158,23 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
+  // Plate and VIN are immutable after creation — the server-side
+  // update_fleet_vehicle RPC ignores p_plate_number and p_vin. We still
+  // pass them so the function signature stays satisfied; the current
+  // values flow through unchanged.
   const handleSave = async () => {
     setSaving(true)
     setEditError('')
 
-    const kenyaPlate = /^[A-Z]{3}\s?\d{3}[A-Z]?$/i
-    if (!kenyaPlate.test(editForm.plate_number.trim())) {
-      setEditError('Invalid plate number format. Expected e.g. KAA 123A')
-      setSaving(false)
-      return
-    }
-
     try {
       const { error: rpcErr } = await supabase.rpc('update_fleet_vehicle', {
         p_vehicle_id:          vehicleId,
-        p_plate_number:        editForm.plate_number.trim().toUpperCase(),
+        p_plate_number:        editForm.plate_number,
         p_make:                editForm.make,
         p_model:               editForm.model,
         p_year_of_manufacture: editForm.year_of_manufacture ? parseInt(editForm.year_of_manufacture) : null,
         p_color:               editForm.color || null,
-        p_vin:                 editForm.vin.trim() || null,
+        p_vin:                 editForm.vin || null,
         p_owner_company_id:    companyId,
       })
 
@@ -186,7 +183,10 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       setVehicle(prev => ({
         ...prev,
         ...editForm,
-        plate_number: editForm.plate_number.toUpperCase(),
+        // Plate and VIN aren't actually being changed server-side; preserve
+        // the existing values in local state so the UI is consistent.
+        plate_number: prev.plate_number,
+        vin:          prev.vin,
         year_of_manufacture: editForm.year_of_manufacture ? parseInt(editForm.year_of_manufacture) : null,
       }))
       setEditing(false)
@@ -358,13 +358,16 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         {editing && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Plate Number *</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Plate Number
+                <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+              </label>
               <input
                 type="text"
                 value={editForm.plate_number}
-                onChange={e => field('plate_number', e.target.value.toUpperCase())}
-                maxLength={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono uppercase tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled
+                maxLength={16}
+                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg font-mono uppercase tracking-widest cursor-not-allowed"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -408,13 +411,16 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">VIN <span className="font-normal">(optional)</span></label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                VIN
+                <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+              </label>
               <input
                 type="text"
                 value={editForm.vin}
-                onChange={e => field('vin', e.target.value.toUpperCase())}
+                disabled
                 maxLength={17}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono uppercase text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg font-mono uppercase text-sm cursor-not-allowed"
               />
             </div>
           </div>
