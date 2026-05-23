@@ -42,8 +42,10 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   // Permission gates. Owner is the company owner; admin is any active
   // company_user.is_admin; can_manage_fleet is the explicit per-member flag.
   //   • canEdit  → owner OR admin OR can_manage_fleet
-  //   • canDelete → owner OR admin (Phase 2 will introduce a request/approval
-  //                 workflow so admins can request and owners can approve)
+  //   • canDelete → owner OR admin (owner deletes immediately; admin
+  //                 raises a deletion request that the owner approves)
+  const [isOwner,   setIsOwner]   = useState(false)
+  const [profileId, setProfileId] = useState(null)
   const [canEdit,   setCanEdit]   = useState(false)
   const [canDelete, setCanDelete] = useState(false)
   const [loading, setLoading]     = useState(true)
@@ -55,9 +57,19 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   const [editForm, setEditForm]   = useState({})
   const [editError, setEditError] = useState('')
 
-  // Delete state
+  // Delete / deletion-request state
+  //   pendingRequest: the current 'pending' row in fleet_deletion_requests
+  //   for this vehicle, or null. Drives the approval panel.
+  //   confirming + deleting: legacy state for the owner's immediate-delete
+  //   confirmation modal; admins use the requestModal instead.
+  const [pendingRequest, setPendingRequest] = useState(null)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting]     = useState(false)
+  const [requestModal, setRequestModal]     = useState(false)
+  const [requestReason, setRequestReason]   = useState('')
+  const [decisionReason, setDecisionReason] = useState('')
+  const [workflowError, setWorkflowError]   = useState(null)
+  const [actingOnRequest, setActingOnRequest] = useState(false)
 
   useEffect(() => {
     if (vehicleId) loadData()
@@ -76,6 +88,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         .single()
 
       if (!profile) throw new Error('Profile not found')
+      setProfileId(profile.id)
 
       // Resolve permissions. Owner of any company gets both edit + delete.
       // Members get edit if is_admin OR can_manage_fleet; delete only if
@@ -88,6 +101,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
 
       if (owned) {
         if (!companyIdHint) setCompanyId(owned.id)
+        setIsOwner(true)
         setCanEdit(true)
         setCanDelete(true)
       } else {
@@ -149,6 +163,21 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         historyData = h ?? []
       }
       setHistory(historyData)
+
+      // Any current pending deletion request on this vehicle? RLS limits
+      // this to the caller's company. Used to drive the approval/cancel
+      // UI panel inline with the detail view.
+      const { data: pending } = await supabase
+        .from('fleet_deletion_requests')
+        .select(`
+          id, status, requested_at, request_reason,
+          requested_by_user_id,
+          requester:user_profiles!requested_by_user_id(first_name, last_name)
+        `)
+        .eq('vehicle_id', vehicleId)
+        .eq('status', 'pending')
+        .maybeSingle()
+      setPendingRequest(pending || null)
     } catch (err) {
       console.error(err)
       setError('Failed to load vehicle details.')
@@ -210,20 +239,107 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
     })
   }
 
-  // ── Delete ────────────────────────────────────────────────────────────────
+  // ── Delete / deletion workflow ────────────────────────────────────────────
+  // Owner path: calls request_fleet_vehicle_deletion which auto-approves
+  //   and deactivates the vehicle. The same RPC handles both cases —
+  //   the result.status tells us which path was taken.
+  // Admin path: calls request_fleet_vehicle_deletion which creates a
+  //   pending request and notifies the owner.
   const handleDelete = async () => {
     setDeleting(true)
+    setWorkflowError(null)
     try {
-      const { error: rpcErr } = await supabase.rpc('delete_fleet_vehicle', {
-        p_vehicle_id:       vehicleId,
-        p_owner_company_id: companyId,
+      const { data, error: rpcErr } = await supabase.rpc('request_fleet_vehicle_deletion', {
+        p_vehicle_id: vehicleId,
+        p_reason:     requestReason?.trim() || null,
       })
       if (rpcErr) throw rpcErr
+      if (data?.success === false) throw new Error(data.error || 'Failed')
+
+      // Owner-initiated: the vehicle is already deactivated. Route back.
+      if (data?.status === 'approved') {
+        router.push(`${basePath}/fleet`)
+        return
+      }
+      // Admin path: now there's a pending request. Refresh and close modal.
+      setRequestModal(false)
+      setConfirming(false)
+      setRequestReason('')
+      // Re-fetch the request so the approval banner appears.
+      const { data: pending } = await supabase
+        .from('fleet_deletion_requests')
+        .select(`
+          id, status, requested_at, request_reason,
+          requested_by_user_id,
+          requester:user_profiles!requested_by_user_id(first_name, last_name)
+        `)
+        .eq('vehicle_id', vehicleId)
+        .eq('status', 'pending')
+        .maybeSingle()
+      setPendingRequest(pending || null)
+    } catch (err) {
+      setWorkflowError(err?.message ?? 'Failed')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // Owner approves the pending request → vehicle gets deactivated server-side.
+  const handleApprove = async () => {
+    if (!pendingRequest) return
+    setActingOnRequest(true)
+    setWorkflowError(null)
+    try {
+      const { data, error: e } = await supabase.rpc('approve_fleet_vehicle_deletion', {
+        p_request_id: pendingRequest.id,
+        p_reason:     decisionReason?.trim() || null,
+      })
+      if (e) throw e
+      if (data?.success === false) throw new Error(data.error || 'Failed')
       router.push(`${basePath}/fleet`)
     } catch (err) {
-      setError(err?.message ?? 'Failed to delete vehicle.')
-      setConfirming(false)
-      setDeleting(false)
+      setWorkflowError(err?.message ?? 'Failed')
+      setActingOnRequest(false)
+    }
+  }
+
+  // Owner rejects the pending request → request stays in history as rejected.
+  const handleReject = async () => {
+    if (!pendingRequest) return
+    setActingOnRequest(true)
+    setWorkflowError(null)
+    try {
+      const { data, error: e } = await supabase.rpc('reject_fleet_vehicle_deletion', {
+        p_request_id: pendingRequest.id,
+        p_reason:     decisionReason?.trim() || null,
+      })
+      if (e) throw e
+      if (data?.success === false) throw new Error(data.error || 'Failed')
+      setPendingRequest(null)
+      setDecisionReason('')
+    } catch (err) {
+      setWorkflowError(err?.message ?? 'Failed')
+    } finally {
+      setActingOnRequest(false)
+    }
+  }
+
+  // Admin cancels their own pending request.
+  const handleCancelRequest = async () => {
+    if (!pendingRequest) return
+    setActingOnRequest(true)
+    setWorkflowError(null)
+    try {
+      const { data, error: e } = await supabase.rpc('cancel_fleet_vehicle_deletion', {
+        p_request_id: pendingRequest.id,
+      })
+      if (e) throw e
+      if (data?.success === false) throw new Error(data.error || 'Failed')
+      setPendingRequest(null)
+    } catch (err) {
+      setWorkflowError(err?.message ?? 'Failed')
+    } finally {
+      setActingOnRequest(false)
     }
   }
 
@@ -267,10 +383,110 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
             {[vehicle.year_of_manufacture, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
           </p>
         </div>
-        <span className="ml-auto px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-          Active
-        </span>
+        {pendingRequest ? (
+          <span className="ml-auto px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+            Pending deletion
+          </span>
+        ) : (
+          <span className="ml-auto px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+            Active
+          </span>
+        )}
       </div>
+
+      {/* Pending deletion-request panel
+          Shown whenever there's a pending request on this vehicle. Drives
+          the workflow visually:
+            • Owner   → Approve / Reject buttons + decision-reason input
+            • Admin who raised it → "Cancel my request"
+            • Anyone else permitted to see this (e.g. another admin) → info banner
+          Hides itself when no pending request exists. */}
+      {pendingRequest && (
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-2 mb-2">
+            <AlertCircle size={18} className="text-amber-700 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900 text-sm">Deletion requested</p>
+              <p className="text-amber-800 text-xs mt-0.5">
+                Requested by{' '}
+                <span className="font-medium">
+                  {pendingRequest.requester?.first_name} {pendingRequest.requester?.last_name}
+                </span>
+                {' on '}
+                {new Date(pendingRequest.requested_at).toLocaleDateString('en-KE',
+                  { day: 'numeric', month: 'short', year: 'numeric' })}.
+              </p>
+              {pendingRequest.request_reason && (
+                <p className="text-sm text-amber-900 mt-2 italic">
+                  "{pendingRequest.request_reason}"
+                </p>
+              )}
+            </div>
+          </div>
+
+          {workflowError && (
+            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+              {workflowError}
+            </div>
+          )}
+
+          {/* Owner branch — Approve / Reject */}
+          {isOwner && (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={decisionReason}
+                onChange={e => setDecisionReason(e.target.value)}
+                placeholder="Reason / note (optional)..."
+                rows={2}
+                className="w-full p-2 text-sm border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 bg-white"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleApprove}
+                  disabled={actingOnRequest}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                >
+                  {actingOnRequest
+                    ? <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                    : <Trash2 size={13} />}
+                  Approve & delete
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={actingOnRequest}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50"
+                >
+                  <X size={13} />
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Requester branch — Cancel my request */}
+          {!isOwner && pendingRequest.requested_by_user_id === profileId && (
+            <div className="mt-3">
+              <button
+                onClick={handleCancelRequest}
+                disabled={actingOnRequest}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50"
+              >
+                {actingOnRequest
+                  ? <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-amber-800" />
+                  : <X size={13} />}
+                Cancel my request
+              </button>
+            </div>
+          )}
+
+          {/* Other admin viewing — informational only */}
+          {!isOwner && pendingRequest.requested_by_user_id !== profileId && (
+            <p className="text-xs text-amber-800 mt-2 italic">
+              Awaiting owner approval. Only the requester can cancel.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Details card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
@@ -278,12 +494,14 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
           <h2 className="text-base font-semibold text-gray-800">Vehicle Details</h2>
 
           {/* Actions — Edit and Delete are gated independently.
-              • Edit  → anyone with edit rights (owner / admin / can_manage_fleet)
-              • Delete → admin or owner only (Phase 2 will let admins
-                request deletion subject to owner approval)
-              Non-admin/non-can_manage_fleet members see neither — the
-              page remains useful as a read-only detail view. */}
-          {!editing && companyId && (canEdit || canDelete) && (
+              • Edit   → anyone with edit rights (owner / admin / can_manage_fleet)
+              • Delete → admin or owner. Owner sees "Delete" (immediate, with
+                         confirmation modal). Admin sees "Request deletion"
+                         (raises a pending request the owner approves).
+              When a pending deletion request already exists for this
+              vehicle, neither button shows — the approval/cancel panel
+              below takes over. */}
+          {!editing && companyId && !pendingRequest && (canEdit || canDelete) && (
             <div className="flex items-center gap-2">
               {canEdit && (
                 <button
@@ -296,11 +514,11 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
               )}
               {canDelete && (
                 <button
-                  onClick={() => setConfirming(true)}
+                  onClick={() => isOwner ? setConfirming(true) : setRequestModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
                 >
                   <Trash2 size={14} />
-                  Delete
+                  {isOwner ? 'Delete' : 'Request deletion'}
                 </button>
               )}
             </div>
@@ -427,7 +645,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         )}
       </div>
 
-      {/* Delete confirmation modal */}
+      {/* Owner-only immediate-delete confirmation modal */}
       {confirming && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
@@ -437,12 +655,20 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
               </div>
               <h3 className="font-semibold text-gray-900">Delete Vehicle</h3>
             </div>
-            <p className="text-gray-600 text-sm mb-5">
-              Are you sure you want to remove <span className="font-semibold">{vehicle.plate_number}</span> from the fleet? This cannot be undone.
+            <p className="text-gray-600 text-sm mb-2">
+              Remove <span className="font-semibold">{vehicle.plate_number}</span> from the active fleet?
             </p>
+            <p className="text-gray-500 text-xs mb-5">
+              The vehicle will be deactivated (not erased) and its service history is preserved. You can restore it later from the fleet page unless someone else registers it in the meantime.
+            </p>
+            {workflowError && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                {workflowError}
+              </div>
+            )}
             <div className="flex gap-3">
               <button
-                onClick={() => setConfirming(false)}
+                onClick={() => { setConfirming(false); setWorkflowError(null) }}
                 disabled={deleting}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition"
               >
@@ -457,6 +683,59 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
                   ? <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                   : <Trash2 size={15} />}
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin-only deletion-request modal. Same RPC as the owner path, but
+          for non-owners it doesn't auto-approve — it creates a pending
+          request the owner must approve. The reason field is forwarded
+          server-side and surfaces in the owner's approval panel. */}
+      {requestModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-amber-700" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Request deletion</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-3">
+              Send a deletion request to the company owner for{' '}
+              <span className="font-semibold">{vehicle.plate_number}</span>. The vehicle will only be deactivated once the owner approves.
+            </p>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Reason (optional)</label>
+            <textarea
+              value={requestReason}
+              onChange={e => setRequestReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Vehicle sold, replaced, decommissioned..."
+              className="w-full p-2 text-sm border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-amber-500"
+            />
+            {workflowError && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                {workflowError}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setRequestModal(false); setRequestReason(''); setWorkflowError(null) }}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-50 transition flex items-center justify-center gap-2"
+              >
+                {deleting
+                  ? <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  : <AlertCircle size={15} />}
+                Submit request
               </button>
             </div>
           </div>

@@ -13,6 +13,9 @@ export default function MemberFleetPage() {
 
   const [fleet,      setFleet]      = useState([])
   const [membership, setMembership] = useState(null)
+  // Set of vehicle ids that currently have a pending deletion request.
+  // Used to badge cards as "pending deletion" so members see the state.
+  const [pendingIds, setPendingIds] = useState(() => new Set())
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
 
@@ -43,7 +46,9 @@ export default function MemberFleetPage() {
       if (!mem) { setError('You are not a member of this company.'); setLoading(false); return }
       setMembership(mem)
 
-      // Fetch fleet
+      // Fetch fleet (deactivated vehicles are naturally excluded — their
+      // vehicle_ownership row is moved to vehicle_ownership_history on
+      // deactivation, so they drop out of this join).
       const { data: fleetData, error: fleetErr } = await supabase
         .from('vehicle_ownership')
         .select(`
@@ -54,6 +59,15 @@ export default function MemberFleetPage() {
 
       if (fleetErr) throw fleetErr
       setFleet(fleetData ?? [])
+
+      // Mark vehicles with pending deletion requests so we can badge them.
+      // RLS limits this to requests on the caller's company.
+      const { data: pending } = await supabase
+        .from('fleet_deletion_requests')
+        .select('vehicle_id')
+        .eq('company_id', companyId)
+        .eq('status', 'pending')
+      setPendingIds(new Set((pending ?? []).map(p => p.vehicle_id)))
     } catch (err) {
       setError('Failed to load fleet.')
     } finally {
@@ -111,38 +125,47 @@ export default function MemberFleetPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {fleet.map(item => (
-            <Link
-              key={item.vehicle_id}
-              href={`/dashboard/company/${companyId}/fleet/${item.vehicle_id}`}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow block"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Truck className="w-5 h-5 text-blue-600" />
+          {fleet.map(item => {
+            const isPending = pendingIds.has(item.vehicle_id)
+            return (
+              <Link
+                key={item.vehicle_id}
+                href={`/dashboard/company/${companyId}/fleet/${item.vehicle_id}`}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow block"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <Truck className="w-5 h-5 text-blue-600" />
+                  </div>
+                  {isPending ? (
+                    <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                      Pending deletion
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                      Active
+                    </span>
+                  )}
                 </div>
-                <span className="px-2.5 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                  Active
-                </span>
-              </div>
-              <h3 className="font-bold text-lg text-gray-900 mb-1">
-                {item.vehicle?.plate_number || '—'}
-              </h3>
-              <p className="text-gray-600 text-sm">
-                {[item.vehicle?.year_of_manufacture, item.vehicle?.make, item.vehicle?.model]
-                  .filter(Boolean).join(' ')}
-              </p>
-              {item.vehicle?.color && (
-                <p className="text-xs text-gray-400 mt-1 capitalize">{item.vehicle.color}</p>
-              )}
-              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-1 text-xs text-gray-400">
-                <Calendar className="w-3 h-3" />
-                Added {item.vehicle?.created_at
-                  ? new Date(item.vehicle.created_at).toLocaleDateString()
-                  : '—'}
-              </div>
-            </Link>
-          ))}
+                <h3 className="font-bold text-lg text-gray-900 mb-1">
+                  {item.vehicle?.plate_number || '—'}
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  {[item.vehicle?.year_of_manufacture, item.vehicle?.make, item.vehicle?.model]
+                    .filter(Boolean).join(' ')}
+                </p>
+                {item.vehicle?.color && (
+                  <p className="text-xs text-gray-400 mt-1 capitalize">{item.vehicle.color}</p>
+                )}
+                <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-1 text-xs text-gray-400">
+                  <Calendar className="w-3 h-3" />
+                  Added {item.vehicle?.created_at
+                    ? new Date(item.vehicle.created_at).toLocaleDateString()
+                    : '—'}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>
