@@ -77,22 +77,15 @@ export default function AddVehiclePage() {
     try {
       const plate = vehicleForm.plateNumber.trim().toUpperCase()
 
-      // Step 1: Check for duplicate plate
-      const { data: existing, error: checkError } = await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('plate_number', plate)
-        .maybeSingle()
+      // Duplicate detection is now handled inside add_vehicle_with_ownership:
+      //   * Active collision → RPC raises a clear error.
+      //   * Inactive collision → RPC reactivates the existing row under
+      //     the new owner, preserving service history.
+      // We deliberately don't pre-check here — a naive SELECT can't tell
+      // active from inactive and would block legitimate re-registrations
+      // of soft-deleted vehicles.
 
-      if (checkError) throw checkError
-
-      if (existing) {
-        setError('A vehicle with this plate number already exists.')
-        setLoading(false)
-        return
-      }
-
-      // Step 2: Get user profile id first
+      // Get user profile id first
       const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('id')
@@ -103,13 +96,20 @@ export default function AddVehiclePage() {
         throw new Error('Could not find your user profile. Please contact support.')
       }
 
-      // Step 3: Insert vehicle AND ownership in one atomic RPC call.
-      // This avoids the RLS chicken-and-egg problem where:
-      //   - INSERT vehicles needs no .select() (would fail: ownership not yet created)
-      //   - ownership INSERT needs the vehicle id
-      // The function runs as SECURITY DEFINER so it can read the inserted id
-      // before ownership exists, then creates both rows atomically.
-      const { error: rpcError } = await supabase.rpc('add_vehicle_with_ownership', {
+      // Insert vehicle AND ownership in one atomic RPC call.
+      // SECURITY DEFINER bypasses RLS for the duplicate check + the
+      // inserts, so duplicates against vehicles the caller can't read
+      // (e.g. owned by a different user) are still detected.
+      //
+      // The RPC returns JSONB: { success, vehicle_id, reactivated,
+      // immutable_overrides }. reactivated=true means we matched an
+      // existing (soft-deleted) row by VIN and brought it back under
+      // this user; in that case make/model/year_of_manufacture are
+      // *not* overwritten because they're physical-vehicle attributes
+      // tied to the VIN. immutable_overrides lists fields the user
+      // tried to change but which we kept from the existing record —
+      // we surface that so they know.
+      const { data: result, error: rpcError } = await supabase.rpc('add_vehicle_with_ownership', {
         p_plate_number:        plate,
         p_make:                vehicleForm.make,
         p_model:               vehicleForm.model,
@@ -120,11 +120,32 @@ export default function AddVehiclePage() {
       })
 
       if (rpcError) throw rpcError
+      if (result?.success === false) throw new Error(result.error || 'Failed to add vehicle')
 
-      setSuccess('Vehicle added successfully!')
+      // Compose the success message. Reactivation gets a longer,
+      // explanatory message so the user understands why their fields
+      // may differ from what they entered, and a delayed redirect so
+      // they can actually read it.
+      const overrides = Array.isArray(result?.immutable_overrides)
+        ? result.immutable_overrides
+        : []
+      let message = 'Vehicle added successfully!'
+      let redirectDelay = 1800
+      if (result?.reactivated) {
+        message =
+          'This vehicle has been re-registered under your account. ' +
+          'Its full service history from previous ownership has been preserved.'
+        if (overrides.length > 0) {
+          message +=
+            ' Note: ' + overrides.join(', ').replace('year_of_manufacture', 'year') +
+            ' could not be changed — these are tied to the VIN and were kept from the existing record.'
+        }
+        redirectDelay = 5000
+      }
+      setSuccess(message)
       setVehicleForm({ plateNumber: '', make: '', model: '', year: '', color: '', vin: '' })
 
-      setTimeout(() => router.push('/dashboard'), 1800)
+      setTimeout(() => router.push('/dashboard'), redirectDelay)
 
     } catch (err) {
       console.error('Add vehicle error:', err)
@@ -162,7 +183,8 @@ export default function AddVehiclePage() {
             <CheckCircle className="text-green-600 mr-3 mt-0.5 flex-shrink-0" size={20} />
             <div>
               <h4 className="font-semibold text-green-800">Success!</h4>
-              <p className="text-green-600 text-sm">{success} Redirecting…</p>
+              <p className="text-green-600 text-sm">{success}</p>
+              <p className="text-green-500 text-xs mt-1 italic">Redirecting…</p>
             </div>
           </div>
         )}
@@ -177,7 +199,6 @@ export default function AddVehiclePage() {
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase tracking-widest font-mono"
               placeholder="KAA 123A"
-              maxLength={8}
             />
           </div>
 

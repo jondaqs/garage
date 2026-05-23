@@ -22,6 +22,15 @@ export default function VehicleDetailPage() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
 
+  // Set to true when the vehicle has been deactivated (soft-deleted) or
+  // when its ownership row no longer ties it to the current user. In
+  // either case the page becomes read-only: the editable detail card is
+  // replaced by a summary notice and the Edit / Delete / Book Service
+  // controls are hidden. Service history stays visible because it's
+  // still useful as a historical record.
+  const [inactiveForUser, setInactiveForUser] = useState(false)
+  const [deactivatedAt, setDeactivatedAt]     = useState(null)
+
   // Edit state
   const [editing, setEditing]   = useState(false)
   const [saving, setSaving]     = useState(false)
@@ -41,10 +50,22 @@ export default function VehicleDetailPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/login'); return }
 
-      // Load vehicle — RLS vehicles_select_personal allows this
+      // Resolve the caller's profile id — needed to detect whether the
+      // current ownership row still ties this vehicle to this user.
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle()
+      const profileId = profile?.id || null
+
+      // Load vehicle. is_active / deactivated_at are needed to detect
+      // soft-deleted vehicles. RLS vehicles_select_personal covers the
+      // active case; vehicles_select_history covers the soft-deleted
+      // one, so a previous owner can still view the detail page.
       const { data: v, error: vErr } = await supabase
         .from('vehicles')
-        .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at, updated_at')
+        .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at, updated_at, is_active, deactivated_at')
         .eq('id', vehicleId)
         .single()
 
@@ -58,6 +79,26 @@ export default function VehicleDetailPage() {
         color:               v.color               ?? '',
         vin:                 v.vin                 ?? '',
       })
+
+      // Determine whether this vehicle is still in the caller's active
+      // garage. Two cases mark it inactive:
+      //   1. vehicles.is_active === false (soft-deleted).
+      //   2. No vehicle_ownership row currently ties this vehicle to the
+      //      caller (e.g. ownership was archived). Defensive check that
+      //      handles edge cases where is_active wasn't flipped.
+      let stillOwnedByUser = true
+      if (profileId) {
+        const { data: currentOwnership } = await supabase
+          .from('vehicle_ownership')
+          .select('vehicle_id')
+          .eq('vehicle_id', vehicleId)
+          .eq('owner_user_id', profileId)
+          .maybeSingle()
+        stillOwnedByUser = !!currentOwnership
+      }
+      const isInactive = (v.is_active === false) || !stillOwnedByUser
+      setInactiveForUser(isInactive)
+      setDeactivatedAt(v.deactivated_at || null)
 
       // Load enriched service history timeline
       const { data: timelineResult } = await supabase.rpc('get_vehicle_history_timeline', {
@@ -92,13 +133,15 @@ export default function VehicleDetailPage() {
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
+  // Only color is mutable post-creation. plate, vin, make, model, and
+  // year_of_manufacture are all immutable — they identify the physical
+  // vehicle. The RPC enforces the same rule server-side; we still pass
+  // the values so the function signature stays satisfied, but only
+  // color actually gets written.
   const handleSave = async () => {
     setSaving(true)
     setEditError('')
 
-    // Plate and VIN are immutable post-creation — the server-side RPC
-    // ignores p_plate_number and p_vin. We still pass them so the RPC
-    // signature stays satisfied; the existing values flow through unchanged.
     try {
       const { error: rpcErr } = await supabase.rpc('update_personal_vehicle', {
         p_vehicle_id:          vehicleId,
@@ -112,14 +155,12 @@ export default function VehicleDetailPage() {
 
       if (rpcErr) throw rpcErr
 
+      // Only color is reflected back into local state. Every other field
+      // is preserved from the previous vehicle record since the RPC
+      // doesn't (and won't) write them.
       setVehicle(prev => ({
         ...prev,
-        ...editForm,
-        // Plate and VIN aren't actually being changed server-side; preserve
-        // the existing values in local state so UI is in sync.
-        plate_number:        prev.plate_number,
-        vin:                 prev.vin,
-        year_of_manufacture: editForm.year_of_manufacture ? parseInt(editForm.year_of_manufacture) : null,
+        color: editForm.color || null,
       }))
       setEditing(false)
     } catch (err) {
@@ -198,17 +239,50 @@ export default function VehicleDetailPage() {
             {[vehicle.year_of_manufacture, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
           </p>
         </div>
-        <span className="ml-auto px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-          Active
-        </span>
+        {inactiveForUser ? (
+          <span className="ml-auto px-3 py-1 bg-gray-200 text-gray-700 text-sm font-medium rounded-full">
+            Inactive
+          </span>
+        ) : (
+          <span className="ml-auto px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+            Active
+          </span>
+        )}
       </div>
+
+      {/* Vehicle inactive notice.
+          Surfaced when the vehicle has been deactivated (soft-deleted by
+          the owner) or when its ownership row no longer ties it to this
+          user. The page becomes read-only: the editable detail card
+          shows but its Edit / Delete buttons are hidden, and Book
+          Service is suppressed below. Service history stays visible. */}
+      {inactiveForUser && (
+        <div className="mb-6 rounded-xl border border-gray-300 bg-gray-50 p-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={18} className="text-gray-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900 text-sm">
+                This vehicle is no longer active in your garage
+              </p>
+              <p className="text-gray-700 text-xs mt-1">
+                It was removed
+                {deactivatedAt && (
+                  <> on {new Date(deactivatedAt).toLocaleDateString('en-KE',
+                    { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                )}
+                . Service history is preserved below for reference.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Details card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800">Vehicle Details</h2>
 
-          {!editing && (
+          {!editing && !inactiveForUser && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setEditing(true)}
@@ -293,32 +367,39 @@ export default function VehicleDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Make *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Make
+                  <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+                </label>
                 <input
                   type="text"
                   value={editForm.make}
-                  onChange={e => field('make', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Model *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Model
+                  <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+                </label>
                 <input
                   type="text"
                   value={editForm.model}
-                  onChange={e => field('model', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Year
+                  <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+                </label>
                 <input
                   type="number"
                   value={editForm.year_of_manufacture}
-                  onChange={e => field('year_of_manufacture', e.target.value)}
-                  min="1900"
-                  max={new Date().getFullYear() + 1}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg cursor-not-allowed"
                 />
               </div>
               <div>
@@ -358,8 +439,11 @@ export default function VehicleDetailPage() {
               </div>
               <h3 className="font-semibold text-gray-900">Delete Vehicle</h3>
             </div>
-            <p className="text-gray-600 text-sm mb-5">
-              Are you sure you want to remove <span className="font-semibold">{vehicle.plate_number}</span>? This cannot be undone.
+            <p className="text-gray-600 text-sm mb-2">
+              Remove <span className="font-semibold">{vehicle.plate_number}</span> from your garage?
+            </p>
+            <p className="text-gray-500 text-xs mb-5">
+              The vehicle will be deactivated (not erased) and its service history is preserved. You can restore it later unless someone else registers it in the meantime.
             </p>
             <div className="flex gap-3">
               <button
@@ -391,13 +475,15 @@ export default function VehicleDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800">Service History</h2>
-          <Link
-            href={`/dashboard/bookings/book?vehicle=${vehicleId}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            <Wrench className="w-3.5 h-3.5" />
-            Book Service
-          </Link>
+          {!inactiveForUser && (
+            <Link
+              href={`/dashboard/bookings/book?vehicle=${vehicleId}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              Book Service
+            </Link>
+          )}
         </div>
 
         {history.length === 0 ? (

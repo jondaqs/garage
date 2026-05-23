@@ -112,22 +112,20 @@ export default function AddCompanyFleetVehiclePage() {
     try {
       const plate = form.plateNumber.trim().toUpperCase()
 
-      // Duplicate plate check
-      const { data: existing } = await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('plate_number', plate)
-        .maybeSingle()
-
-      if (existing) {
-        setError('A vehicle with this plate number already exists.')
-        setLoading(false)
-        return
-      }
+      // Duplicate detection is owned by add_fleet_vehicle_with_ownership:
+      //   * Active collision → RPC raises a clear error.
+      //   * Inactive collision → RPC reactivates the existing row under
+      //     this company, preserving service history.
+      // No client-side pre-check — a naive SELECT can't tell active
+      // from inactive and would block legitimate re-registrations of
+      // soft-deleted vehicles.
 
       // Single atomic RPC — inserts vehicle + ownership (+ optional mileage history)
-      // SECURITY DEFINER sidesteps the RLS chicken-and-egg
-      const { error: rpcError } = await supabase.rpc('add_fleet_vehicle_with_ownership', {
+      // SECURITY DEFINER sidesteps the RLS chicken-and-egg.
+      //
+      // Returns JSONB: { success, vehicle_id, reactivated, immutable_overrides }.
+      // See add_fleet_vehicle_with_ownership for the full contract.
+      const { data: result, error: rpcError } = await supabase.rpc('add_fleet_vehicle_with_ownership', {
         p_plate_number:        plate,
         p_make:                form.make,
         p_model:               form.model,
@@ -140,9 +138,24 @@ export default function AddCompanyFleetVehiclePage() {
       })
 
       if (rpcError) throw rpcError
+      if (result?.success === false) throw new Error(result.error || 'Failed to add vehicle')
 
-      setSuccess('Vehicle added to fleet successfully!')
-      setTimeout(() => router.push(`/dashboard/company/${companyId}/fleet`), 1800)
+      const overrides = Array.isArray(result?.immutable_overrides) ? result.immutable_overrides : []
+      let message = 'Vehicle added to fleet successfully!'
+      let redirectDelay = 1800
+      if (result?.reactivated) {
+        message =
+          'This vehicle has been re-registered to your fleet. ' +
+          'Its full service history from previous ownership has been preserved.'
+        if (overrides.length > 0) {
+          message +=
+            ' Note: ' + overrides.join(', ').replace('year_of_manufacture', 'year') +
+            ' could not be changed — these are tied to the VIN and were kept from the existing record.'
+        }
+        redirectDelay = 5000
+      }
+      setSuccess(message)
+      setTimeout(() => router.push(`/dashboard/company/${companyId}/fleet`), redirectDelay)
 
     } catch (err) {
       console.error('Add fleet vehicle error:', err)
@@ -210,7 +223,10 @@ export default function AddCompanyFleetVehiclePage() {
         {success && (
           <div className="mb-5 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
             <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={18} />
-            <p className="text-green-700 text-sm">{success} Redirecting…</p>
+            <div>
+              <p className="text-green-700 text-sm">{success}</p>
+              <p className="text-green-600 text-xs italic mt-1">Redirecting…</p>
+            </div>
           </div>
         )}
 
@@ -224,7 +240,6 @@ export default function AddCompanyFleetVehiclePage() {
               value={form.plateNumber}
               onChange={e => field('plateNumber', e.target.value.toUpperCase())}
               required
-              maxLength={8}
               placeholder="KAA 123A"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase tracking-widest font-mono text-lg"
             />

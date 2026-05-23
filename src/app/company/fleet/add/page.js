@@ -110,22 +110,23 @@ export default function AddFleetVehiclePage() {
     try {
       const plate = formData.plateNumber.trim().toUpperCase()
 
-      // Duplicate plate check
-      const { data: existing } = await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('plate_number', plate)
-        .maybeSingle()
-
-      if (existing) {
-        setError('A vehicle with this plate number already exists.')
-        setLoading(false)
-        return
-      }
+      // Duplicate detection is owned by add_fleet_vehicle_with_ownership:
+      //   * Active collision → RPC raises a clear error.
+      //   * Inactive collision → RPC reactivates the existing row under
+      //     this company, preserving service history.
+      // No client-side pre-check — a naive SELECT can't tell active
+      // from inactive and would block legitimate re-registrations of
+      // soft-deleted vehicles.
 
       // Single atomic RPC — inserts vehicle + ownership (+ optional mileage history)
-      // SECURITY DEFINER function sidesteps the RLS chicken-and-egg
-      const { error: rpcError } = await supabase.rpc('add_fleet_vehicle_with_ownership', {
+      // SECURITY DEFINER function sidesteps the RLS chicken-and-egg.
+      //
+      // Returns JSONB: { success, vehicle_id, reactivated, immutable_overrides }.
+      // reactivated=true means we matched an existing (soft-deleted) row
+      // by VIN and brought it back under this company; make/model/year
+      // are kept from that record and any caller overrides are listed
+      // in immutable_overrides so we can warn the user.
+      const { data: result, error: rpcError } = await supabase.rpc('add_fleet_vehicle_with_ownership', {
         p_plate_number:        plate,
         p_make:                formData.make,
         p_model:               formData.model,
@@ -138,9 +139,24 @@ export default function AddFleetVehiclePage() {
       })
 
       if (rpcError) throw rpcError
+      if (result?.success === false) throw new Error(result.error || 'Failed to add vehicle')
 
-      setSuccess('Vehicle added to fleet successfully!')
-      setTimeout(() => router.push('/company/dashboard?tab=fleet'), 1800)
+      const overrides = Array.isArray(result?.immutable_overrides) ? result.immutable_overrides : []
+      let message = 'Vehicle added to fleet successfully!'
+      let redirectDelay = 1800
+      if (result?.reactivated) {
+        message =
+          'This vehicle has been re-registered to your fleet. ' +
+          'Its full service history from previous ownership has been preserved.'
+        if (overrides.length > 0) {
+          message +=
+            ' Note: ' + overrides.join(', ').replace('year_of_manufacture', 'year') +
+            ' could not be changed — these are tied to the VIN and were kept from the existing record.'
+        }
+        redirectDelay = 5000
+      }
+      setSuccess(message)
+      setTimeout(() => router.push('/company/dashboard?tab=fleet'), redirectDelay)
 
     } catch (err) {
       console.error('Add fleet vehicle error:', err)
@@ -203,7 +219,10 @@ export default function AddFleetVehiclePage() {
           {success && (
             <div className="mx-6 mt-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-start gap-3">
               <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{success} Redirecting…</p>
+              <div>
+                <p className="text-sm">{success}</p>
+                <p className="text-xs italic mt-1 opacity-80">Redirecting…</p>
+              </div>
             </div>
           )}
 

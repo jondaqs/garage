@@ -232,10 +232,11 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
-  // Plate and VIN are immutable after creation — the server-side
-  // update_fleet_vehicle RPC ignores p_plate_number and p_vin. We still
-  // pass them so the function signature stays satisfied; the current
-  // values flow through unchanged.
+  // Only color is mutable post-creation. plate, vin, make, model, and
+  // year_of_manufacture are all immutable — they identify the physical
+  // vehicle and are tied to the VIN. The RPC enforces the same rule
+  // server-side; we still pass every field so the function signature
+  // stays satisfied, but only color actually gets written.
   const handleSave = async () => {
     setSaving(true)
     setEditError('')
@@ -254,14 +255,11 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
 
       if (rpcErr) throw rpcErr
 
+      // Only color is reflected back into local state. The other fields
+      // are preserved unchanged since the RPC doesn't (and won't) write them.
       setVehicle(prev => ({
         ...prev,
-        ...editForm,
-        // Plate and VIN aren't actually being changed server-side; preserve
-        // the existing values in local state so the UI is consistent.
-        plate_number: prev.plate_number,
-        vin:          prev.vin,
-        year_of_manufacture: editForm.year_of_manufacture ? parseInt(editForm.year_of_manufacture) : null,
+        color: editForm.color || null,
       }))
       setEditing(false)
     } catch (err) {
@@ -668,32 +666,39 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Make *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Make
+                  <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+                </label>
                 <input
                   type="text"
                   value={editForm.make}
-                  onChange={e => field('make', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Model *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Model
+                  <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+                </label>
                 <input
                   type="text"
                   value={editForm.model}
-                  onChange={e => field('model', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Year
+                  <span className="ml-2 text-gray-400 font-normal">(cannot be changed)</span>
+                </label>
                 <input
                   type="number"
                   value={editForm.year_of_manufacture}
-                  onChange={e => field('year_of_manufacture', e.target.value)}
-                  min="1900"
-                  max={new Date().getFullYear() + 1}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg cursor-not-allowed"
                 />
               </div>
               <div>
