@@ -39,7 +39,13 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   // Tracks whether the caller has admin powers (company owner OR
   // company_users.is_admin). Used to gate Edit/Delete buttons; non-admin
   // members can still view this page in read-only mode.
-  const [canManage, setCanManage] = useState(false)
+  // Permission gates. Owner is the company owner; admin is any active
+  // company_user.is_admin; can_manage_fleet is the explicit per-member flag.
+  //   • canEdit  → owner OR admin OR can_manage_fleet
+  //   • canDelete → owner OR admin (Phase 2 will introduce a request/approval
+  //                 workflow so admins can request and owners can approve)
+  const [canEdit,   setCanEdit]   = useState(false)
+  const [canDelete, setCanDelete] = useState(false)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
 
@@ -71,8 +77,9 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
 
       if (!profile) throw new Error('Profile not found')
 
-      // Resolve write authority. Always grant if caller is the company
-      // owner; otherwise grant only when company_users.is_admin = true.
+      // Resolve permissions. Owner of any company gets both edit + delete.
+      // Members get edit if is_admin OR can_manage_fleet; delete only if
+      // is_admin (Phase 1).
       const { data: owned } = await supabase
         .from('company_profiles')
         .select('id')
@@ -81,17 +88,19 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
 
       if (owned) {
         if (!companyIdHint) setCompanyId(owned.id)
-        setCanManage(true)
+        setCanEdit(true)
+        setCanDelete(true)
       } else {
         const { data: mem } = await supabase
           .from('company_users')
-          .select('company_id, is_admin')
+          .select('company_id, is_admin, can_manage_fleet')
           .eq('user_id', profile.id)
           .eq('is_active', true)
           .maybeSingle()
         if (mem) {
           if (!companyIdHint) setCompanyId(mem.company_id)
-          setCanManage(!!mem.is_admin)
+          setCanEdit(!!(mem.is_admin || mem.can_manage_fleet))
+          setCanDelete(!!mem.is_admin)
         }
       }
 
@@ -268,25 +277,32 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800">Vehicle Details</h2>
 
-          {/* Edit / Delete — only for admins and the company owner. Non-admin
-              members see no action buttons (the page itself remains useful
-              as a read-only detail view). */}
-          {!editing && canManage && companyId && (
+          {/* Actions — Edit and Delete are gated independently.
+              • Edit  → anyone with edit rights (owner / admin / can_manage_fleet)
+              • Delete → admin or owner only (Phase 2 will let admins
+                request deletion subject to owner approval)
+              Non-admin/non-can_manage_fleet members see neither — the
+              page remains useful as a read-only detail view. */}
+          {!editing && companyId && (canEdit || canDelete) && (
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setEditing(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-              >
-                <Pencil size={14} />
-                Edit
-              </button>
-              <button
-                onClick={() => setConfirming(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
-              >
-                <Trash2 size={14} />
-                Delete
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <Pencil size={14} />
+                  Edit
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => setConfirming(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              )}
             </div>
           )}
 

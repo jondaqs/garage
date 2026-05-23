@@ -14,7 +14,12 @@ export default function AddCompanyFleetVehiclePage() {
   const router = useRouter()
 
   const [profileId, setProfileId] = useState(null)
-  const [isAdmin, setIsAdmin]     = useState(false)
+  // canManage: caller can add a fleet vehicle. True for the company owner,
+  // for any active company_user with is_admin OR can_manage_fleet. The
+  // server-side gate on add_fleet_vehicle_with_ownership enforces the same
+  // rule; this state just controls whether we render the form vs an
+  // access-denied notice.
+  const [canManage, setCanManage] = useState(false)
   const [checking, setChecking]   = useState(true)
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
@@ -58,24 +63,24 @@ export default function AddCompanyFleetVehiclePage() {
         .maybeSingle()
 
       if (owned) {
-        setIsAdmin(true)
+        setCanManage(true)
         setChecking(false)
         return
       }
 
-      // Active admin member?
+      // Active member with admin OR fleet-management permission
       const { data: membership } = await supabase
         .from('company_users')
-        .select('is_admin')
+        .select('is_admin, can_manage_fleet')
         .eq('company_id', companyId)
         .eq('user_id', profile.id)
         .eq('is_active', true)
         .maybeSingle()
 
-      if (membership?.is_admin) {
-        setIsAdmin(true)
+      if (membership?.is_admin || membership?.can_manage_fleet) {
+        setCanManage(true)
       } else {
-        setError('Only company owners or admins can add fleet vehicles.')
+        setError('You do not have permission to add fleet vehicles. Ask a company admin for the Manage Fleet permission.')
       }
       setChecking(false)
     }
@@ -151,7 +156,7 @@ export default function AddCompanyFleetVehiclePage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!canManage) {
     return (
       <div className="max-w-lg mx-auto mt-12">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">

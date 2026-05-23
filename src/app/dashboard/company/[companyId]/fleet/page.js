@@ -34,7 +34,7 @@ export default function MemberFleetPage() {
       // Verify membership
       const { data: mem } = await supabase
         .from('company_users')
-        .select('is_admin, staff_role')
+        .select('is_admin, staff_role, can_manage_fleet')
         .eq('user_id', profile.id)
         .eq('company_id', companyId)
         .eq('is_active', true)
@@ -74,6 +74,11 @@ export default function MemberFleetPage() {
     </div>
   )
 
+  // canManageFleet: company admins always pass; non-admin members pass when
+  // their company_users.can_manage_fleet flag is set. Mirrors the server-side
+  // gate on add_fleet_vehicle_with_ownership and update_fleet_vehicle.
+  const canManageFleet = !!(membership?.is_admin || membership?.can_manage_fleet)
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -83,8 +88,7 @@ export default function MemberFleetPage() {
             {fleet.length} vehicle{fleet.length !== 1 ? 's' : ''} registered
           </p>
         </div>
-        {/* Only admins can add vehicles — via the owner portal */}
-        {membership?.is_admin && (
+        {canManageFleet && (
           <Link
             href={`/dashboard/company/${companyId}/fleet/add`}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -100,7 +104,7 @@ export default function MemberFleetPage() {
           <Truck className="w-14 h-14 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles in the fleet</h3>
           <p className="text-gray-500">
-            {membership?.is_admin
+            {canManageFleet
               ? 'Add the first vehicle to get started.'
               : 'Ask a company admin to add vehicles.'}
           </p>
