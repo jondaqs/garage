@@ -108,8 +108,10 @@ export default function MemberFleetPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {fleet.map(item => (
-            <div key={item.vehicle_id}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow"
+            <Link
+              key={item.vehicle_id}
+              href={`/dashboard/company/${companyId}/fleet/${item.vehicle_id}`}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow block"
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-blue-50 rounded-lg">
@@ -135,7 +137,7 @@ export default function MemberFleetPage() {
                   ? new Date(item.vehicle.created_at).toLocaleDateString()
                   : '—'}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
