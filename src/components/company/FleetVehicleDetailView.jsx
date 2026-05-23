@@ -36,6 +36,20 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   const [vehicle, setVehicle]     = useState(null)
   const [history, setHistory]     = useState([])
   const [companyId, setCompanyId] = useState(companyIdHint)
+  // Set to true when this vehicle is no longer part of the active fleet
+  // *for the current company*. Two cases trigger this:
+  //   1. The vehicle row itself has is_active = false (deactivated by the
+  //      owner approving a deletion request, or by the owner deleting it
+  //      directly).
+  //   2. There is no current vehicle_ownership row tying this vehicle to
+  //      companyId — meaning the ownership has been moved to history (the
+  //      same outcome of the deactivation path, defensive check).
+  // When true the page renders a read-only "no longer active" notice
+  // instead of the editable detail card and hides the Edit / Delete /
+  // pending-request UI. Service history stays visible because it's still
+  // useful as a historical record.
+  const [inactiveForCompany, setInactiveForCompany] = useState(false)
+  const [deactivatedAt, setDeactivatedAt]           = useState(null)
   // Tracks whether the caller has admin powers (company owner OR
   // company_users.is_admin). Used to gate Edit/Delete buttons; non-admin
   // members can still view this page in read-only mode.
@@ -99,8 +113,14 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         .eq('owner_user_id', profile.id)
         .maybeSingle()
 
+      // Track the company id we resolved during this load so subsequent
+      // queries (like the ownership check below) don't have to wait for
+      // setCompanyId state to flush.
+      let resolvedCompanyId = companyIdHint || null
+
       if (owned) {
         if (!companyIdHint) setCompanyId(owned.id)
+        resolvedCompanyId = resolvedCompanyId || owned.id
         setIsOwner(true)
         setCanEdit(true)
         setCanDelete(true)
@@ -113,16 +133,21 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
           .maybeSingle()
         if (mem) {
           if (!companyIdHint) setCompanyId(mem.company_id)
+          resolvedCompanyId = resolvedCompanyId || mem.company_id
           setCanEdit(!!(mem.is_admin || mem.can_manage_fleet))
           setCanDelete(!!mem.is_admin)
         }
       }
 
       // Load vehicle (read access is governed by RLS — non-admin members
-      // can still view their fleet vehicles, just not mutate them)
+      // can still view their fleet vehicles, just not mutate them).
+      // is_active / deactivated_at are needed to detect vehicles that have
+      // been removed from the fleet; admins and can_manage_fleet members
+      // can still reach those rows via the vehicles_select_history RLS
+      // policy, so we must render an inactive state explicitly.
       const { data: v, error: vErr } = await supabase
         .from('vehicles')
-        .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at, updated_at')
+        .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at, updated_at, is_active, deactivated_at')
         .eq('id', vehicleId)
         .single()
 
@@ -136,6 +161,26 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         color:               v.color               ?? '',
         vin:                 v.vin                 ?? '',
       })
+
+      // Determine whether this vehicle is still active for the company
+      // being viewed. We use the company id resolved during this load
+      // (companyIdHint when provided, else the owner/member record).
+      // If no company context exists there's nothing to compare against
+      // so we skip the check and lean only on vehicle.is_active.
+      let stillOwnedByCompany = true
+      if (resolvedCompanyId) {
+        const { data: currentOwnership } = await supabase
+          .from('vehicle_ownership')
+          .select('vehicle_id')
+          .eq('vehicle_id', vehicleId)
+          .eq('owner_company_id', resolvedCompanyId)
+          .maybeSingle()
+        stillOwnedByCompany = !!currentOwnership
+      }
+
+      const isInactive = (v.is_active === false) || !stillOwnedByCompany
+      setInactiveForCompany(isInactive)
+      setDeactivatedAt(v.deactivated_at || null)
 
       // Load enriched service history timeline
       const { data: timelineResult } = await supabase.rpc('get_vehicle_history_timeline', {
@@ -383,7 +428,11 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
             {[vehicle.year_of_manufacture, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
           </p>
         </div>
-        {pendingRequest ? (
+        {inactiveForCompany ? (
+          <span className="ml-auto px-3 py-1 bg-gray-200 text-gray-700 text-sm font-medium rounded-full">
+            Inactive
+          </span>
+        ) : pendingRequest ? (
           <span className="ml-auto px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
             Pending deletion
           </span>
@@ -394,14 +443,42 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         )}
       </div>
 
+      {/* Vehicle inactive for this company.
+          Surfaced when the vehicle has been deactivated (e.g. owner
+          approved a deletion request) or when its ownership row no
+          longer ties it to this company. The page becomes read-only:
+          the editable detail card is replaced by a summary, and the
+          Edit / Delete / pending-request controls below are hidden. */}
+      {inactiveForCompany && (
+        <div className="mb-6 rounded-xl border border-gray-300 bg-gray-50 p-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={18} className="text-gray-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900 text-sm">
+                This vehicle is no longer active for this company
+              </p>
+              <p className="text-gray-700 text-xs mt-1">
+                It has been removed from the active fleet
+                {deactivatedAt && (
+                  <> on {new Date(deactivatedAt).toLocaleDateString('en-KE',
+                    { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                )}
+                . Service history is preserved below for reference.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pending deletion-request panel
           Shown whenever there's a pending request on this vehicle. Drives
           the workflow visually:
             • Owner   → Approve / Reject buttons + decision-reason input
             • Admin who raised it → "Cancel my request"
             • Anyone else permitted to see this (e.g. another admin) → info banner
-          Hides itself when no pending request exists. */}
-      {pendingRequest && (
+          Hides itself when no pending request exists, or when the
+          vehicle is already inactive (the request has been resolved). */}
+      {pendingRequest && !inactiveForCompany && (
         <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
           <div className="flex items-start gap-2 mb-2">
             <AlertCircle size={18} className="text-amber-700 flex-shrink-0 mt-0.5" />
@@ -500,8 +577,9 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
                          (raises a pending request the owner approves).
               When a pending deletion request already exists for this
               vehicle, neither button shows — the approval/cancel panel
-              below takes over. */}
-          {!editing && companyId && !pendingRequest && (canEdit || canDelete) && (
+              below takes over. Inactive vehicles hide everything;
+              there's nothing left to edit or delete. */}
+          {!editing && companyId && !pendingRequest && !inactiveForCompany && (canEdit || canDelete) && (
             <div className="flex items-center gap-2">
               {canEdit && (
                 <button
@@ -746,13 +824,15 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800">Service History</h2>
-          <Link
-            href={`${basePath}/bookings/new?vehicleId=${vehicleId}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            <Wrench className="w-3.5 h-3.5" />
-            Book Service
-          </Link>
+          {!inactiveForCompany && (
+            <Link
+              href={`${basePath}/bookings/new?vehicleId=${vehicleId}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              Book Service
+            </Link>
+          )}
         </div>
 
         {history.length === 0 ? (
