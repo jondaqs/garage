@@ -68,7 +68,11 @@ export default function FleetPage() {
   // vehicle_ownership_history — the deactivation RPC writes a history row
   // with owner_company_id and owned_until, so this is the canonical source.
   const fetchInactive = useCallback(async () => {
-    if (!companyId) return
+    console.log('[diag] fetchInactive called, companyId =', companyId)
+    if (!companyId) {
+      console.log('[diag] aborting: companyId is falsy')
+      return
+    }
     setLoadingInactive(true)
     try {
       const { data, error: e } = await supabase
@@ -83,11 +87,14 @@ export default function FleetPage() {
         .eq('owner_company_id', companyId)
         .order('owned_until', { ascending: false })
 
+      console.log('[diag] query result — error:', e, 'data:', data)
+
       if (e) throw e
-      // The history can in principle hold rows for vehicles that were
-      // restored or sold to another party. We only want rows that are
-      // *currently* inactive — i.e. vehicle.is_active = false.
-      setInactiveFleet((data ?? []).filter(row => row.vehicle && row.vehicle.is_active === false))
+
+      const filtered = (data ?? []).filter(row => row.vehicle && row.vehicle.is_active === false)
+      console.log('[diag] after filter:', filtered)
+
+      setInactiveFleet(filtered)
     } catch (err) {
       console.error('Inactive fetch error:', err)
       setInactiveFleet([])
