@@ -24,7 +24,8 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import {
   ArrowLeft, Truck, Calendar, Gauge, Hash, Palette,
-  AlertCircle, Clock, Wrench, Pencil, Trash2, X, Check
+  AlertCircle, Clock, Wrench, Pencil, Trash2, X, Check,
+  Download, Loader2
 } from 'lucide-react'
 
 const supabase = createClient()
@@ -85,6 +86,14 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
   const [workflowError, setWorkflowError]   = useState(null)
   const [actingOnRequest, setActingOnRequest] = useState(false)
 
+  // Report download (owner-only). companyName is fetched alongside the
+  // ownership check so it can be rendered in the PDF header; spend is
+  // lifted from the spend RPC so the report can include the same stats
+  // the on-page widget shows.
+  const [downloading, setDownloading] = useState(false)
+  const [spend,       setSpend]       = useState(null)
+  const [companyName, setCompanyName] = useState(null)
+
   useEffect(() => {
     if (vehicleId) loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,7 +118,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       // is_admin (Phase 1).
       const { data: owned } = await supabase
         .from('company_profiles')
-        .select('id')
+        .select('id, name')
         .eq('owner_user_id', profile.id)
         .maybeSingle()
 
@@ -124,6 +133,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         setIsOwner(true)
         setCanEdit(true)
         setCanDelete(true)
+        setCompanyName(owned.name || null)
       } else {
         const { data: mem } = await supabase
           .from('company_users')
@@ -208,6 +218,15 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         historyData = h ?? []
       }
       setHistory(historyData)
+
+      // Spend summary — non-fatal if it fails. Used by the PDF report
+      // for owners; the on-page widget renders its own copy from the
+      // same RPC.
+      const { data: spendResult } = await supabase.rpc('get_vehicle_spend_summary', {
+        p_vehicle_id:      vehicleId,
+        p_requesting_user: user.id,
+      })
+      if (spendResult?.success) setSpend(spendResult)
 
       // Any current pending deletion request on this vehicle? RLS limits
       // this to the caller's company. Used to drive the approval/cancel
@@ -388,6 +407,247 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
 
   const field = (key, value) => setEditForm(prev => ({ ...prev, [key]: value }))
 
+  // ── Download report (owner only) ─────────────────────────────────────────
+  // Builds a native-text PDF (vector text, selectable, small file) covering
+  // identity, spend, and the full service timeline for this fleet vehicle.
+  // Useful for handover, insurance claims, audit trails, and resale.
+  // Mirrors the personal vehicle report but uses the "Fleet Vehicle Report"
+  // header and renders the owning company's name in the document.
+  const handleDownloadReport = async () => {
+    setDownloading(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const margin = 14
+      const contentW = pageW - margin * 2
+      let y = margin
+
+      const ensureSpace = (needed) => {
+        if (y + needed > pageH - margin) { pdf.addPage(); y = margin }
+      }
+      const setFont = (size, weight = 'normal') => {
+        pdf.setFont('helvetica', weight); pdf.setFontSize(size)
+      }
+      const rgb = (r, g, b) => pdf.setTextColor(r, g, b)
+      const grayLine = () => {
+        pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.2)
+        pdf.line(margin, y, pageW - margin, y)
+      }
+      const fmtDate = (d) => d
+        ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+        : '—'
+      const fmtMoney = (n) => 'KES ' + Number(n || 0).toLocaleString()
+
+      // ── Header ─────────────────────────────────────────────────────────
+      setFont(20, 'bold'); rgb(20, 20, 20)
+      pdf.text('Fleet Vehicle Report', margin, y + 6)
+      setFont(9, 'normal'); rgb(120, 120, 120)
+      pdf.text('Generated ' + fmtDate(new Date()), pageW - margin, y + 6, { align: 'right' })
+      y += 12
+
+      if (companyName) {
+        setFont(10, 'normal'); rgb(90, 90, 90)
+        pdf.text(companyName, margin, y)
+        y += 6
+      }
+
+      setFont(16, 'bold'); rgb(30, 64, 175)
+      pdf.text(vehicle.plate_number, margin, y)
+      const subtitle = [vehicle.year_of_manufacture, vehicle.make, vehicle.model]
+        .filter(Boolean).join(' ')
+      if (subtitle) {
+        setFont(11, 'normal'); rgb(90, 90, 90)
+        pdf.text(subtitle, margin, y + 6)
+      }
+      setFont(9, 'bold')
+      if (inactiveForCompany)        { rgb(120, 120, 120); pdf.text('INACTIVE',         pageW - margin, y, { align: 'right' }) }
+      else if (pendingRequest)       { rgb(180, 83, 9);    pdf.text('PENDING DELETION', pageW - margin, y, { align: 'right' }) }
+      else                           { rgb(22, 163, 74);   pdf.text('ACTIVE',           pageW - margin, y, { align: 'right' }) }
+      y += subtitle ? 12 : 8
+      grayLine()
+      y += 6
+
+      // ── Section 1: Vehicle details ─────────────────────────────────────
+      setFont(11, 'bold'); rgb(40, 40, 40)
+      pdf.text('Vehicle Details', margin, y)
+      y += 6
+
+      const latestMileageVal = history.find(h => h.mileage)?.mileage
+      const details = [
+        ['Plate Number',  vehicle.plate_number || '—'],
+        ['VIN',           vehicle.vin || '—'],
+        ['Make',          vehicle.make || '—'],
+        ['Model',         vehicle.model || '—'],
+        ['Year',          vehicle.year_of_manufacture ? String(vehicle.year_of_manufacture) : '—'],
+        ['Color',         vehicle.color || '—'],
+        ['Latest Mileage', latestMileageVal ? latestMileageVal.toLocaleString() + ' km' : '—'],
+        ['Added',         fmtDate(vehicle.created_at)],
+      ]
+      if (inactiveForCompany && deactivatedAt) {
+        details.push(['Removed', fmtDate(deactivatedAt)])
+      }
+
+      const colW = contentW / 2
+      details.forEach((row, idx) => {
+        const col = idx % 2
+        const rowY = y + Math.floor(idx / 2) * 10
+        const x = margin + col * colW
+        setFont(8, 'normal'); rgb(140, 140, 140)
+        pdf.text(row[0].toUpperCase(), x, rowY)
+        setFont(10, 'normal'); rgb(30, 30, 30)
+        pdf.text(String(row[1]), x, rowY + 4.5)
+      })
+      y += Math.ceil(details.length / 2) * 10 + 4
+      grayLine()
+      y += 6
+
+      // ── Section 2: Spend summary ───────────────────────────────────────
+      if (spend) {
+        ensureSpace(28)
+        setFont(11, 'bold'); rgb(40, 40, 40)
+        pdf.text('Service Spend', margin, y)
+        y += 6
+
+        const stats = [
+          ['Total Spent',    fmtMoney(spend.all_time_total)],
+          ['Services',       String(spend.service_count || 0)],
+          ['Last 12 Months', fmtMoney(spend.last_12_months_total)],
+        ]
+        const sw = contentW / stats.length
+        stats.forEach(([label, value], i) => {
+          const x = margin + i * sw
+          setFont(8, 'normal'); rgb(140, 140, 140)
+          pdf.text(label.toUpperCase(), x, y)
+          setFont(13, 'bold'); rgb(22, 101, 52)
+          pdf.text(value, x, y + 6)
+        })
+        y += 14
+        grayLine()
+        y += 6
+      }
+
+      // ── Section 3: Service history ─────────────────────────────────────
+      ensureSpace(14)
+      setFont(11, 'bold'); rgb(40, 40, 40)
+      pdf.text('Service History', margin, y)
+      setFont(9, 'normal'); rgb(140, 140, 140)
+      pdf.text(history.length + ' event' + (history.length === 1 ? '' : 's'),
+        pageW - margin, y, { align: 'right' })
+      y += 6
+
+      if (history.length === 0) {
+        setFont(10, 'normal'); rgb(140, 140, 140)
+        pdf.text('No service events recorded yet.', margin, y + 4)
+        y += 8
+      } else {
+        const EVENT_LABELS = {
+          service_completed:      'Service Completed',
+          checkin:                'Vehicle Check-in',
+          check_in:               'Check-in',
+          checkout:               'Vehicle Check-out',
+          service_started:        'Service Started',
+          quality_check:          'Quality Check',
+          rework:                 'Rework',
+          diagnosis:              'Diagnosis',
+          invoice_generated:      'Invoice Generated',
+          issue_found:            'Issue Found',
+          recommendation_created: 'Recommendation',
+          mileage_recorded:       'Mileage Recorded',
+        }
+
+        history.forEach((h) => {
+          const eventType = h.event_type || 'service_completed'
+          const label     = EVENT_LABELS[eventType] || 'Service Event'
+          const provider  = (h.provider || h.service_provider)?.name
+          const services  = h.services || []
+          const totalAmt  = h.total_amount || h.work_order?.total_amount
+          const desc      = h.description || h.work_order?.problem_description || ''
+          const wo        = h.work_order
+
+          ensureSpace(20 + (desc ? 8 : 0) + (services.length ? 6 : 0))
+
+          // Date column (left)
+          setFont(9, 'bold'); rgb(60, 60, 60)
+          pdf.text(fmtDate(h.recorded_at), margin, y)
+          setFont(8, 'normal'); rgb(140, 140, 140)
+          if (h.mileage) pdf.text(h.mileage.toLocaleString() + ' km', margin, y + 4)
+
+          // Event content (indented)
+          const xContent = margin + 32
+          const wContent = contentW - 32
+
+          setFont(10, 'bold'); rgb(20, 20, 20)
+          pdf.text(label, xContent, y)
+          if (provider) {
+            setFont(9, 'normal'); rgb(110, 110, 110)
+            pdf.text(provider, xContent, y + 4.5)
+            y += 9
+          } else {
+            y += 5
+          }
+
+          if (services.length > 0) {
+            setFont(8, 'normal'); rgb(22, 101, 52)
+            const svcLine = services.join('  •  ')
+            const svcLines = pdf.splitTextToSize(svcLine, wContent)
+            ensureSpace(svcLines.length * 3.5 + 2)
+            pdf.text(svcLines, xContent, y)
+            y += svcLines.length * 3.5 + 1
+          }
+
+          if (desc) {
+            setFont(9, 'normal'); rgb(80, 80, 80)
+            const descLines = pdf.splitTextToSize(desc, wContent)
+            ensureSpace(descLines.length * 4 + 2)
+            pdf.text(descLines, xContent, y)
+            y += descLines.length * 4 + 1
+          }
+
+          if (wo?.id || totalAmt) {
+            setFont(8, 'normal')
+            if (wo?.number || wo?.work_order_number) {
+              rgb(30, 64, 175)
+              pdf.text('WO ' + (wo.number || wo.work_order_number), xContent, y + 3)
+            }
+            if (totalAmt) {
+              rgb(40, 40, 40); setFont(9, 'bold')
+              pdf.text(fmtMoney(totalAmt), pageW - margin, y + 3, { align: 'right' })
+            }
+            y += 5
+          }
+
+          y += 3
+          pdf.setDrawColor(240, 240, 240)
+          pdf.setLineWidth(0.15)
+          pdf.line(margin, y, pageW - margin, y)
+          y += 4
+        })
+      }
+
+      // ── Page numbers ───────────────────────────────────────────────────
+      const totalPages = pdf.internal.getNumberOfPages()
+      const footerLeft = (companyName ? companyName + ' · ' : '')
+        + vehicle.plate_number + ' · Fleet Vehicle Report'
+      for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p)
+        setFont(8, 'normal'); rgb(160, 160, 160)
+        pdf.text('Page ' + p + ' of ' + totalPages, pageW - margin, pageH - 6, { align: 'right' })
+        pdf.text(footerLeft, margin, pageH - 6)
+      }
+
+      const fileDate = new Date().toISOString().slice(0, 10)
+      pdf.save('Fleet-Report-' + vehicle.plate_number + '-' + fileDate + '.pdf')
+    } catch (err) {
+      console.error('PDF error:', err)
+      setError('Failed to generate report. Please try again.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="flex justify-center items-center py-24">
@@ -426,19 +686,36 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
             {[vehicle.year_of_manufacture, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
           </p>
         </div>
-        {inactiveForCompany ? (
-          <span className="ml-auto px-3 py-1 bg-gray-200 text-gray-700 text-sm font-medium rounded-full">
-            Inactive
-          </span>
-        ) : pendingRequest ? (
-          <span className="ml-auto px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
-            Pending deletion
-          </span>
-        ) : (
-          <span className="ml-auto px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-            Active
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {isOwner && (
+            <button
+              onClick={handleDownloadReport}
+              disabled={downloading}
+              title="Download a full PDF report for this vehicle"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {downloading
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Download size={14} />}
+              <span className="hidden sm:inline">
+                {downloading ? 'Generating…' : 'Download Report'}
+              </span>
+            </button>
+          )}
+          {inactiveForCompany ? (
+            <span className="px-3 py-1 bg-gray-200 text-gray-700 text-sm font-medium rounded-full">
+              Inactive
+            </span>
+          ) : pendingRequest ? (
+            <span className="px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+              Pending deletion
+            </span>
+          ) : (
+            <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+              Active
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Vehicle inactive for this company.
