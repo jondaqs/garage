@@ -472,7 +472,7 @@ export default function VehicleDetailPage() {
       <VehicleSpendWidget vehicleId={vehicleId} />
 
       {/* Service history */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mt-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800">Service History</h2>
           {!inactiveForUser && (
