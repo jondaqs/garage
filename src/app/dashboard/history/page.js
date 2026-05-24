@@ -64,7 +64,7 @@ export default function HistoryPage() {
         .from('vehicle_ownership')
         .select(`
           vehicle_id,
-          vehicle:vehicles(id, plate_number, make, model, year, color)
+          vehicle:vehicles(id, plate_number, make, model, year_of_manufacture, color)
         `)
         .eq('owner_user_id', profile.id)
 
@@ -175,7 +175,7 @@ export default function HistoryPage() {
                     {selectedVehicle.plate_number}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {[selectedVehicle.year, selectedVehicle.make, selectedVehicle.model, selectedVehicle.color]
+                    {[selectedVehicle.year_of_manufacture, selectedVehicle.make, selectedVehicle.model, selectedVehicle.color]
                       .filter(Boolean).join(' · ')}
                   </p>
                 </div>
