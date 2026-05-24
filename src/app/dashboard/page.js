@@ -554,7 +554,7 @@ export default function DashboardPage() {
             </button>
 
             <button 
-              onClick={() => alert('Find Garages feature coming soon!')}
+              onClick={() => router.push('/dashboard/providers')}
               className="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-600 hover:bg-blue-50 transition text-left group"
             >
               <Car className="text-blue-600 mb-3 group-hover:scale-110 transition" size={32} />
