@@ -442,6 +442,31 @@ export default function UserBudgetPage() {
             ))}
           </div>
 
+          {/* Delete action for the current period. Lives here (not in
+              the header) so it's clearly tied to the budget object and
+              doesn't clash with the prominent Edit button at the top. */}
+          <div className="pt-3 border-t border-gray-100 flex justify-end">
+            {deletingId === budget.id ? (
+              <span className="flex items-center gap-2 text-xs">
+                <span className="text-gray-500">Delete this budget?</span>
+                <button onClick={() => handleDelete(budget.id)}
+                  className="font-semibold text-red-600 hover:text-red-700 uppercase tracking-wide">
+                  Confirm
+                </button>
+                <span className="text-gray-300">·</span>
+                <button onClick={() => setDeletingId(null)}
+                  className="font-semibold text-gray-400 hover:text-gray-600 uppercase tracking-wide">
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button onClick={() => setDeletingId(budget.id)}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-600 transition-colors">
+                <Trash2 size={12} /> Delete budget
+              </button>
+            )}
+          </div>
+
           {otherCurrency.length > 0 && (
             <div className="pt-4 border-t border-gray-100">
               <div className="flex items-center gap-2 mb-3">
@@ -595,7 +620,7 @@ export default function UserBudgetPage() {
       </div>
 
       {/* Budget history */}
-      {history.length > 1 && (
+      {history.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Budget History</h2>
           <div className="space-y-3">
@@ -638,7 +663,7 @@ export default function UserBudgetPage() {
                       ) : (
                         <button onClick={() => setDeletingId(h.id)}
                           title="Delete this period"
-                          className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                          className="text-gray-300 hover:text-red-500 transition-colors">
                           <Trash2 size={12} />
                         </button>
                       )}

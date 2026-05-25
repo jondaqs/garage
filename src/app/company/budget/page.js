@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  DollarSign, Plus, Edit2, AlertCircle, CheckCircle,
+  DollarSign, Plus, Edit2, Trash2, AlertCircle, CheckCircle,
   Car, ChevronDown, ChevronUp, Calendar, TrendingUp, Coins,
 } from 'lucide-react'
 
@@ -39,6 +39,7 @@ export default function CompanyBudgetPage() {
   const [showFleet,     setShowFleet]     = useState(false)
   const [error,         setError]         = useState(null)
   const [success,       setSuccess]       = useState(null)
+  const [deletingId,    setDeletingId]    = useState(null)
 
   const today = new Date()
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
@@ -290,6 +291,21 @@ export default function CompanyBudgetPage() {
     }
   }
 
+  // ── Delete ─────────────────────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    try {
+      const res = await fetch('/api/company/budget?id=' + encodeURIComponent(id), { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete')
+      setDeletingId(null)
+      setSuccess('Budget period deleted.')
+      setTimeout(() => setSuccess(null), 2500)
+      await fetchBudget()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   // ── Derived display values ─────────────────────────────────────────────
   const spentPct = budget && budget.budget_amount > 0
     ? Math.min(Math.round((budget.spent_amount / budget.budget_amount) * 100), 100)
@@ -450,6 +466,32 @@ export default function CompanyBudgetPage() {
               </div>
             ))}
           </div>
+
+          {/* Delete action — admins only. Same placement as the user
+              page so the two budget surfaces feel symmetric. */}
+          {isAdmin && (
+            <div className="pt-3 border-t border-gray-100 flex justify-end">
+              {deletingId === budget.id ? (
+                <span className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500">Delete this budget?</span>
+                  <button onClick={() => handleDelete(budget.id)}
+                    className="font-semibold text-red-600 hover:text-red-700 uppercase tracking-wide">
+                    Confirm
+                  </button>
+                  <span className="text-gray-300">·</span>
+                  <button onClick={() => setDeletingId(null)}
+                    className="font-semibold text-gray-400 hover:text-gray-600 uppercase tracking-wide">
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button onClick={() => setDeletingId(budget.id)}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-600 transition-colors">
+                  <Trash2 size={12} /> Delete budget
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Other-currency spend disclosure */}
           {otherCurrency.length > 0 && (
@@ -614,7 +656,7 @@ export default function CompanyBudgetPage() {
       </div>
 
       {/* Budget history */}
-      {history.length > 1 && (
+      {history.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Budget History</h2>
           <div className="space-y-3">
@@ -622,19 +664,48 @@ export default function CompanyBudgetPage() {
               const pct    = h.budget_amount > 0
                 ? Math.min(Math.round((h.spent_amount / h.budget_amount) * 100), 100)
                 : 0
-              const isOver = h.spent_amount > h.budget_amount
-              const barClr = pct > 90 ? 'bg-red-400' : pct > 70 ? 'bg-yellow-400' : 'bg-green-400'
+              const isOver    = h.spent_amount > h.budget_amount
+              const barClr    = pct > 90 ? 'bg-red-400' : pct > 70 ? 'bg-yellow-400' : 'bg-green-400'
+              const isCurrent = budget?.id === h.id
               return (
                 <div key={h.id || i}>
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1 gap-2">
+                    <span className="flex items-center gap-2">
                       {new Date(h.period_start).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}
                       {' · '}
                       <span className="font-semibold text-gray-600">{h.currency?.code || '—'}</span>
+                      {isCurrent && (
+                        <span className="text-[10px] uppercase font-semibold text-blue-600 tracking-wide">
+                          Current
+                        </span>
+                      )}
                     </span>
-                    <span className={`font-medium ${isOver ? 'text-red-600' : 'text-gray-700'}`}>
-                      {fmtCurrency(h.spent_amount, h.currency)} / {fmtCurrency(h.budget_amount, h.currency)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-medium ${isOver ? 'text-red-600' : 'text-gray-700'}`}>
+                        {fmtCurrency(h.spent_amount, h.currency)} / {fmtCurrency(h.budget_amount, h.currency)}
+                      </span>
+                      {isAdmin && (
+                        deletingId === h.id ? (
+                          <span className="flex items-center gap-1.5">
+                            <button onClick={() => handleDelete(h.id)}
+                              className="text-[10px] uppercase font-semibold text-red-600 hover:text-red-700">
+                              Confirm
+                            </button>
+                            <span className="text-gray-300">·</span>
+                            <button onClick={() => setDeletingId(null)}
+                              className="text-[10px] uppercase font-semibold text-gray-400 hover:text-gray-600">
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setDeletingId(h.id)}
+                            title="Delete this period"
+                            className="text-gray-300 hover:text-red-500 transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-1.5">
                     <div className={`h-1.5 rounded-full ${barClr}`} style={{ width: `${pct}%` }} />
