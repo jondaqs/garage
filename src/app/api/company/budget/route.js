@@ -20,7 +20,13 @@ import { NextResponse } from 'next/server'
 // currency snippet (code + symbol) without an extra round-trip.
 const BUDGET_SELECT = '*, currency:currencies(id, code, symbol, display_name)'
 
-// ── Resolve company + admin status for the current user ────────────────────
+// ── Resolve company + budget access for the current user ──────────────────
+// Two access tiers:
+//   canEdit — owner, is_admin, or staff_role='accountant'. Can POST/PATCH/DELETE.
+//   canView — canEdit, or can_approve_payment=true (read-only access).
+// Anyone outside both tiers gets a 403 even on GET. The legacy `isAdmin`
+// flag is still returned in payloads for backwards-compat with callers
+// that haven't been updated; new callers should use canEdit/canView.
 async function resolveCompany(supabase) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Unauthorized', status: 401 }
@@ -29,19 +35,37 @@ async function resolveCompany(supabase) {
     .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
   if (!profile) return { error: 'User profile not found', status: 404 }
 
+  // Owner — full access.
   const { data: owned } = await supabase
     .from('company_profiles').select('id')
     .eq('owner_user_id', profile.id).maybeSingle()
+  if (owned) {
+    return {
+      companyId: owned.id, profileId: profile.id,
+      canEdit:   true, canView: true,
+      isAdmin:   true,   // legacy flag for older callers
+    }
+  }
 
-  if (owned) return { companyId: owned.id, isAdmin: true, profileId: profile.id }
-
+  // Otherwise check the membership row for the relevant flags.
   const { data: member } = await supabase
-    .from('company_users').select('company_id, is_admin')
-    .eq('user_id', profile.id).eq('is_active', true).maybeSingle()
+    .from('company_users')
+    .select('company_id, is_admin, staff_role, can_approve_payment')
+    .eq('user_id', profile.id)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (!member) return { error: 'Not associated with a company', status: 403 }
 
-  if (member) return { companyId: member.company_id, isAdmin: member.is_admin, profileId: profile.id }
+  const canEdit = !!member.is_admin || member.staff_role === 'accountant'
+  const canView = canEdit || !!member.can_approve_payment
 
-  return { error: 'Not associated with a company', status: 403 }
+  if (!canView) return { error: 'You do not have access to budgets', status: 403 }
+
+  return {
+    companyId: member.company_id, profileId: profile.id,
+    canEdit, canView,
+    isAdmin: !!member.is_admin,
+  }
 }
 
 // Translate a legacy `currency` text code into a currency_id when only the
@@ -168,7 +192,9 @@ export async function GET(request) {
       success: true,
       budget:  budget || null,
       history: history || [],
-      isAdmin: resolved.isAdmin,
+      canEdit: resolved.canEdit,
+      canView: resolved.canView,
+      isAdmin: resolved.isAdmin,  // legacy, kept for any older caller
     })
   } catch (error) {
     console.error('Budget GET error:', error)
@@ -182,8 +208,11 @@ export async function POST(request) {
     const supabase = await createClient()
     const resolved = await resolveCompany(supabase)
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-    if (!resolved.isAdmin) {
-      return NextResponse.json({ error: 'Only company admins can set budgets' }, { status: 403 })
+    if (!resolved.canEdit) {
+      return NextResponse.json(
+        { error: 'Only admins or accountants can set budgets' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -256,8 +285,11 @@ export async function PATCH(request) {
     const supabase = await createClient()
     const resolved = await resolveCompany(supabase)
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-    if (!resolved.isAdmin) {
-      return NextResponse.json({ error: 'Only company admins can update budgets' }, { status: 403 })
+    if (!resolved.canEdit) {
+      return NextResponse.json(
+        { error: 'Only admins or accountants can update budgets' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -340,8 +372,11 @@ export async function DELETE(request) {
     const supabase = await createClient()
     const resolved = await resolveCompany(supabase)
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-    if (!resolved.isAdmin) {
-      return NextResponse.json({ error: 'Only company admins can delete budgets' }, { status: 403 })
+    if (!resolved.canEdit) {
+      return NextResponse.json(
+        { error: 'Only admins or accountants can delete budgets' },
+        { status: 403 }
+      )
     }
 
     const { searchParams } = new URL(request.url)

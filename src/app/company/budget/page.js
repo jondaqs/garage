@@ -30,7 +30,7 @@ export default function CompanyBudgetPage() {
   const [fleetSpend,    setFleetSpend]    = useState(null)
   const [otherCurrency, setOtherCurrency] = useState([])  // for current period
   const [currencies,    setCurrencies]    = useState([])
-  const [isAdmin,       setIsAdmin]       = useState(false)
+  const [canEdit,       setCanEdit]       = useState(false)
   const [companyId,     setCompanyId]     = useState(null)
   const [loading,       setLoading]       = useState(true)
   const [fleetLoading,  setFleetLoading]  = useState(false)
@@ -65,7 +65,9 @@ export default function CompanyBudgetPage() {
 
       setBudget(data.budget || null)
       setHistory(data.history || [])
-      setIsAdmin(data.isAdmin ?? true)
+      // Prefer the explicit canEdit flag; fall back to the legacy
+      // isAdmin field for older API responses still in flight.
+      setCanEdit(data.canEdit ?? data.isAdmin ?? false)
 
       if (data.budget) {
         setFormData(f => ({
@@ -350,7 +352,7 @@ export default function CompanyBudgetPage() {
             Track and control your company&apos;s service spend
           </p>
         </div>
-        {isAdmin && (
+        {canEdit && (
           <button
             onClick={() => setShowForm(s => !s)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -373,7 +375,7 @@ export default function CompanyBudgetPage() {
       )}
 
       {/* Form */}
-      {showForm && isAdmin && (
+      {showForm && canEdit && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">
             {budget ? 'Update Budget' : 'Set Budget'}
@@ -497,7 +499,7 @@ export default function CompanyBudgetPage() {
 
           {/* Delete action — admins only. Same placement as the user
               page so the two budget surfaces feel symmetric. */}
-          {isAdmin && (
+          {canEdit && (
             <div className="pt-3 border-t border-gray-100 flex justify-end">
               {deletingId === budget.id ? (
                 <span className="flex items-center gap-2 text-xs">
@@ -557,7 +559,7 @@ export default function CompanyBudgetPage() {
           <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-700 mb-1">No budget set for this period</p>
           <p className="text-xs text-gray-400">
-            {isAdmin ? 'Click "Set Budget" to define a spend limit.' : 'Contact your company admin to set a budget.'}
+            {canEdit ? 'Click "Set Budget" to define a spend limit.' : 'Contact a company admin or accountant to set a budget.'}
           </p>
         </div>
       )}
@@ -712,7 +714,7 @@ export default function CompanyBudgetPage() {
                       <span className={`font-medium ${isOver ? 'text-red-600' : 'text-gray-700'}`}>
                         {fmtCurrency(h.spent_amount, h.currency)} / {fmtCurrency(h.budget_amount, h.currency)}
                       </span>
-                      {isAdmin && (
+                      {canEdit && (
                         deletingId === h.id ? (
                           <span className="flex items-center gap-1.5">
                             <button onClick={() => handleDelete(h.id)}

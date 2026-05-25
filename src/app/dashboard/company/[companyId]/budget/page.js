@@ -32,7 +32,7 @@ export default function MemberBudgetPage() {
   const [budget,        setBudget]        = useState(null)
   const [history,       setHistory]       = useState([])
   const [otherCurrency, setOtherCurrency] = useState([])
-  const [isAdmin,       setIsAdmin]       = useState(false)
+  const [canView,       setCanView]       = useState(false)
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
 
@@ -47,7 +47,7 @@ export default function MemberBudgetPage() {
 
       const { data: mem } = await supabase
         .from('company_users')
-        .select('is_admin')
+        .select('is_admin, staff_role, can_approve_payment')
         .eq('user_id', profile.id)
         .eq('company_id', companyId)
         .eq('is_active', true)
@@ -58,8 +58,16 @@ export default function MemberBudgetPage() {
         setLoading(false); return
       }
 
-      setIsAdmin(mem.is_admin)
-      if (!mem.is_admin) { setLoading(false); return }
+      // View access for: admins, accountants, and anyone who can
+      // approve payments. Matches the API's canView definition; if it
+      // diverges, the API will block the read anyway.
+      const memberCanView =
+        !!mem.is_admin ||
+        mem.staff_role === 'accountant' ||
+        !!mem.can_approve_payment
+
+      setCanView(memberCanView)
+      if (!memberCanView) { setLoading(false); return }
 
       const today = new Date().toISOString().split('T')[0]
       const select = '*, currency:currencies(id, code, symbol, display_name)'
@@ -93,7 +101,7 @@ export default function MemberBudgetPage() {
 
   // Other-currency spend disclosure for the current period (admin-only).
   const loadOtherCurrencySpend = useCallback(async () => {
-    if (!budget || !companyId || !isAdmin) { setOtherCurrency([]); return }
+    if (!budget || !companyId || !canView) { setOtherCurrency([]); return }
 
     const { data: ownership } = await supabase
       .from('vehicle_ownership')
@@ -128,7 +136,7 @@ export default function MemberBudgetPage() {
       buckets.set(cur.id, prev)
     }
     setOtherCurrency(Array.from(buckets.values()).sort((a, b) => b.total - a.total))
-  }, [budget, companyId, isAdmin, supabase])
+  }, [budget, companyId, canView, supabase])
 
   useEffect(() => { loadOtherCurrencySpend() }, [loadOtherCurrencySpend])
 
@@ -144,13 +152,16 @@ export default function MemberBudgetPage() {
     </div>
   )
 
-  if (!isAdmin) return (
+  if (!canView) return (
     <div className="max-w-md mx-auto mt-16 text-center">
       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <Lock className="w-8 h-8 text-gray-400" />
       </div>
-      <h2 className="text-lg font-semibold text-gray-900 mb-2">Budget is admin-only</h2>
-      <p className="text-gray-500 text-sm">Only company admins can view budget information.</p>
+      <h2 className="text-lg font-semibold text-gray-900 mb-2">Budget access restricted</h2>
+      <p className="text-gray-500 text-sm">
+        Budget information is visible to admins, accountants, and members
+        with payment approval rights.
+      </p>
     </div>
   )
 

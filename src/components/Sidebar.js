@@ -429,7 +429,6 @@ export default function Sidebar({ user }) {
     { icon: Plus,          label: 'Add Vehicle',            path: '/dashboard/vehicles/add' },
     { icon: Search,        label: 'Search Providers',       path: '/dashboard/providers' },
     { icon: Calendar,      label: 'Bookings',               path: '/dashboard/bookings' },
-    { icon: DollarSign,    label: 'Budget',                 path: '/dashboard/budget' },
     { icon: ClipboardList, label: 'My Work Orders',         path: '/dashboard/work-orders' },
     { icon: MessageSquare, label: 'Chat',                   path: '/dashboard/chat',
       badge: unreadMessages > 0 ? unreadMessages : null },
@@ -466,11 +465,23 @@ export default function Sidebar({ user }) {
           badge: companyUnread > 0 ? companyUnread : null },
       ] : []),
       { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
-      { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // admin only
+      { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // budget access has its own rules — see filter below
       { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
     ]
-    // Filter out admin-only items for non-admins
-    return items.filter(item => item.everyone || membership.is_admin)
+    // Filter out restricted items for users who don't qualify.
+    //   • Most admin-only rows show only to is_admin
+    //   • Budget shows to is_admin, accountants, and members who can
+    //     approve payments (view tier) — matches the budget page's
+    //     access model.
+    const canViewBudget =
+      membership.is_admin ||
+      membership.staff_role === 'accountant' ||
+      membership.can_approve_payment
+    return items.filter(item => {
+      if (item.everyone)        return true
+      if (item.label === 'Budget') return canViewBudget
+      return membership.is_admin
+    })
   }
 
   // ── Provider (mechanic) nav items ────────────────────────────────────────
