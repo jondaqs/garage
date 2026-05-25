@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   DollarSign, Plus, Edit2, Trash2, AlertCircle, CheckCircle,
-  Car, ChevronDown, ChevronUp, Calendar, TrendingUp, Coins,
+  Car, ChevronDown, ChevronUp, Calendar, TrendingUp, Coins, RefreshCw,
 } from 'lucide-react'
 
 const fmtCurrency = (amount, currency) => {
@@ -40,6 +40,7 @@ export default function CompanyBudgetPage() {
   const [error,         setError]         = useState(null)
   const [success,       setSuccess]       = useState(null)
   const [deletingId,    setDeletingId]    = useState(null)
+  const [syncing,       setSyncing]       = useState(false)
 
   const today = new Date()
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
@@ -55,9 +56,10 @@ export default function CompanyBudgetPage() {
   const [fleetPeriodEnd,   setFleetPeriodEnd]   = useState(monthEnd)
 
   // ── Bootstrap ──────────────────────────────────────────────────────────
-  const fetchBudget = useCallback(async () => {
+  const fetchBudget = useCallback(async ({ recompute = false } = {}) => {
     try {
-      const res  = await fetch('/api/company/budget')
+      const url = recompute ? '/api/company/budget?recompute=1' : '/api/company/budget'
+      const res  = await fetch(url)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to load budget')
 
@@ -78,6 +80,22 @@ export default function CompanyBudgetPage() {
       setError(err.message || 'Failed to load budget data')
     }
   }, [])
+
+  // Manual sync: forces the server to recompute spent_amount from
+  // receipts. Useful for backdated payments or any drift between the
+  // trigger-maintained total and the actual receipt history.
+  const handleSync = async () => {
+    setError(null); setSuccess(null); setSyncing(true)
+    try {
+      await fetchBudget({ recompute: true })
+      setSuccess('Spend re-synced from receipts.')
+      setTimeout(() => setSuccess(null), 2500)
+    } catch (err) {
+      setError(err.message || 'Failed to sync')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const loadCurrencies = useCallback(async () => {
     const { data } = await supabase
@@ -431,12 +449,22 @@ export default function CompanyBudgetPage() {
                 Tracked in {budget.currency?.code || '—'}{budget.currency?.symbol && budget.currency?.symbol !== budget.currency?.code ? ` (${budget.currency.symbol})` : ''}
               </p>
             </div>
-            <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              isOverBudget       ? 'bg-red-100 text-red-700'
-              : spentPct > 70    ? 'bg-yellow-100 text-yellow-700'
-                                 : 'bg-green-100 text-green-700'
-            }`}>
-              {isOverBudget ? 'Over Budget' : spentPct > 70 ? 'High Usage' : 'On Track'}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                title="Recalculate spend from receipts"
+                className="text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+              </button>
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                isOverBudget       ? 'bg-red-100 text-red-700'
+                : spentPct > 70    ? 'bg-yellow-100 text-yellow-700'
+                                   : 'bg-green-100 text-green-700'
+              }`}>
+                {isOverBudget ? 'Over Budget' : spentPct > 70 ? 'High Usage' : 'On Track'}
+              </div>
             </div>
           </div>
 

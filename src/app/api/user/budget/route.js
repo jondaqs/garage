@@ -39,16 +39,78 @@ async function resolveCurrencyId(supabase, { currency_id, currency }) {
   return data?.id ?? null
 }
 
+// ── Recompute spent_amount from receipts ────────────────────────────────
+// Mirror of the company-side helper. See /api/company/budget/route.js for
+// the rationale. In short: the trigger only credits new payments; this
+// function reconciles spent_amount with the true total of past + present
+// payments in the budget's currency and window. Called on every save.
+async function recomputeUserSpentAmount(supabase, budget, userId) {
+  if (!budget?.id || !budget?.currency_id || !userId) return budget
+
+  const { data: ownership } = await supabase
+    .from('vehicle_ownership')
+    .select('vehicle_id')
+    .eq('owner_user_id', userId)
+  const vehicleIds = (ownership || []).map(r => r.vehicle_id)
+  if (vehicleIds.length === 0) {
+    await supabase.from('user_budgets')
+      .update({ spent_amount: 0, updated_at: new Date().toISOString() })
+      .eq('id', budget.id)
+    return { ...budget, spent_amount: 0 }
+  }
+
+  const startTs = budget.period_start + 'T00:00:00'
+  const endTs   = budget.period_end   + 'T23:59:59'
+
+  const { data: receipts, error } = await supabase
+    .from('receipts')
+    .select(`
+      amount_paid,
+      invoice:invoices!inner(
+        vehicle_id, status,
+        work_order:work_orders!inner(currency_id)
+      )
+    `)
+    .gte('paid_at', startTs)
+    .lte('paid_at', endTs)
+    .eq('invoice.status', 'paid')
+    .in('invoice.vehicle_id', vehicleIds)
+
+  if (error) {
+    console.error('recompute spend error:', error)
+    return budget
+  }
+
+  // Currency filter in JS — see company-side comment for why.
+  const total = (receipts || [])
+    .filter(r => r.invoice?.work_order?.currency_id === budget.currency_id)
+    .reduce((s, r) => s + Number(r.amount_paid || 0), 0)
+
+  const { data: updated } = await supabase
+    .from('user_budgets')
+    .update({ spent_amount: total, updated_at: new Date().toISOString() })
+    .eq('id', budget.id)
+    .select(BUDGET_SELECT)
+    .single()
+
+  return updated || { ...budget, spent_amount: total }
+}
+
 // ── GET ────────────────────────────────────────────────────────────────────
-export async function GET() {
+// Query params:
+//   ?recompute=1 — re-sync the current budget's spent_amount from receipts.
+export async function GET(request) {
   try {
     const supabase = await createClient()
     const resolved = await resolveUser(supabase)
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
 
+    const url       = new URL(request.url)
+    const recompute = url.searchParams.get('recompute') === '1'
+
     const today = new Date().toISOString().split('T')[0]
 
-    const { data: budget, error } = await supabase
+    let { data: budget, error } = await supabase
       .from('user_budgets')
       .select(BUDGET_SELECT)
       .eq('user_id', resolved.userId)
@@ -56,6 +118,10 @@ export async function GET() {
       .gte('period_end', today)
       .maybeSingle()
     if (error) throw error
+
+    if (recompute && budget) {
+      budget = await recomputeUserSpentAmount(supabase, budget, resolved.userId)
+    }
 
     const { data: history } = await supabase
       .from('user_budgets')
@@ -127,7 +193,12 @@ export async function POST(request) {
       .select(BUDGET_SELECT).single()
     if (error) throw error
 
-    return NextResponse.json({ success: true, budget })
+    // Backfill spent_amount from existing receipts. Without this, any
+    // payments made before this budget was created don't appear on the
+    // tracker — the trigger only credits new payments going forward.
+    const synced = await recomputeUserSpentAmount(supabase, budget, resolved.userId)
+
+    return NextResponse.json({ success: true, budget: synced })
   } catch (error) {
     console.error('User budget POST error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -198,7 +269,11 @@ export async function PATCH(request) {
       .select(BUDGET_SELECT).single()
     if (error) throw error
 
-    return NextResponse.json({ success: true, budget })
+    // Same backfill rationale as POST. Also handles period moves and
+    // currency changes — both reshape what "spent" means.
+    const synced = await recomputeUserSpentAmount(supabase, budget, resolved.userId)
+
+    return NextResponse.json({ success: true, budget: synced })
   } catch (error) {
     console.error('User budget PATCH error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

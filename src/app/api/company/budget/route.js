@@ -55,16 +55,96 @@ async function resolveCurrencyId(supabase, { currency_id, currency }) {
   return data?.id ?? null
 }
 
+// ── Recompute spent_amount from receipts ────────────────────────────────
+// Why this exists: the trigger pipeline (update_company_spending +
+// process_payment) only increments spent_amount on *new* payments.
+// Receipts that pre-date the budget row never get credited that way,
+// so the on-page progress bar shows 0 while the receipts panel
+// (which queries live) shows real spend.
+//
+// We recompute on every successful POST/PATCH so the stored value
+// converges with reality whenever the user touches the budget. Trigger
+// increments still keep it live between saves; this is the corrective
+// anchor that fixes the historical-spend gap.
+//
+// Filter shape matches the trigger:
+//   • only paid invoices
+//   • only company-owned vehicles
+//   • only payments in the budget's currency
+//   • only payments inside the budget window
+async function recomputeCompanySpentAmount(supabase, budget, companyId) {
+  if (!budget?.id || !budget?.currency_id || !companyId) return budget
+
+  const { data: ownership } = await supabase
+    .from('vehicle_ownership')
+    .select('vehicle_id')
+    .eq('owner_company_id', companyId)
+  const vehicleIds = (ownership || []).map(r => r.vehicle_id)
+  if (vehicleIds.length === 0) {
+    // No fleet vehicles — just zero it out.
+    await supabase.from('company_budgets')
+      .update({ spent_amount: 0, updated_at: new Date().toISOString() })
+      .eq('id', budget.id)
+    return { ...budget, spent_amount: 0 }
+  }
+
+  const startTs = budget.period_start + 'T00:00:00'
+  const endTs   = budget.period_end   + 'T23:59:59'
+
+  const { data: receipts, error } = await supabase
+    .from('receipts')
+    .select(`
+      amount_paid,
+      invoice:invoices!inner(
+        vehicle_id, status,
+        work_order:work_orders!inner(currency_id)
+      )
+    `)
+    .gte('paid_at', startTs)
+    .lte('paid_at', endTs)
+    .eq('invoice.status', 'paid')
+    .in('invoice.vehicle_id', vehicleIds)
+
+  if (error) {
+    console.error('recompute spend error:', error)
+    return budget
+  }
+
+  // Filter by currency in JS rather than via a nested PostgREST filter.
+  // Nested-filter chains across multiple joins can behave inconsistently
+  // depending on PostgREST version; this is rock-solid and the volume
+  // is tiny (one budget period × one company's fleet).
+  const total = (receipts || [])
+    .filter(r => r.invoice?.work_order?.currency_id === budget.currency_id)
+    .reduce((s, r) => s + Number(r.amount_paid || 0), 0)
+
+  const { data: updated } = await supabase
+    .from('company_budgets')
+    .update({ spent_amount: total, updated_at: new Date().toISOString() })
+    .eq('id', budget.id)
+    .select(BUDGET_SELECT)
+    .single()
+
+  return updated || { ...budget, spent_amount: total }
+}
+
 // ── GET — fetch current period budget + history ────────────────────────────
-export async function GET() {
+// Query params:
+//   ?recompute=1 — re-sync the current budget's spent_amount from receipts
+//                  before returning. Use this when the on-page bar looks
+//                  out of step with the receipts panel.
+export async function GET(request) {
   try {
     const supabase = await createClient()
     const resolved = await resolveCompany(supabase)
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
 
+    const url       = new URL(request.url)
+    const recompute = url.searchParams.get('recompute') === '1'
+
     const today = new Date().toISOString().split('T')[0]
 
-    const { data: budget, error } = await supabase
+    let { data: budget, error } = await supabase
       .from('company_budgets')
       .select(BUDGET_SELECT)
       .eq('company_id', resolved.companyId)
@@ -72,6 +152,10 @@ export async function GET() {
       .gte('period_end', today)
       .maybeSingle()
     if (error) throw error
+
+    if (recompute && budget) {
+      budget = await recomputeCompanySpentAmount(supabase, budget, resolved.companyId)
+    }
 
     const { data: history } = await supabase
       .from('company_budgets')
@@ -150,7 +234,12 @@ export async function POST(request) {
       .select(BUDGET_SELECT).single()
     if (error) throw error
 
-    return NextResponse.json({ success: true, budget })
+    // Backfill spent_amount from existing receipts. Without this, any
+    // payments made before this budget was created don't appear in
+    // spent_amount — the trigger only credits new payments going forward.
+    const synced = await recomputeCompanySpentAmount(supabase, budget, resolved.companyId)
+
+    return NextResponse.json({ success: true, budget: synced })
   } catch (error) {
     console.error('Budget POST error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -233,7 +322,12 @@ export async function PATCH(request) {
       .select(BUDGET_SELECT).single()
     if (error) throw error
 
-    return NextResponse.json({ success: true, budget })
+    // Same backfill rationale as POST. Also handles the case where the
+    // period was moved or the currency was changed — both reshape what
+    // "spent" means and need a fresh recompute.
+    const synced = await recomputeCompanySpentAmount(supabase, budget, resolved.companyId)
+
+    return NextResponse.json({ success: true, budget: synced })
   } catch (error) {
     console.error('Budget PATCH error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
