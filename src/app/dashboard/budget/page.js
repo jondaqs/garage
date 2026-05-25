@@ -3,250 +3,217 @@
 /**
  * Personal budget page.
  *
- * Mirrors /company/budget but scoped to the current user. Two important
- * differences from the company version:
+ * Symmetric to /company/budget but scoped to the current user. Budgets
+ * live in the user_budgets table (server-managed, cross-device) and
+ * spent_amount is maintained by the update_user_spending trigger +
+ * process_payment — both currency-aware.
  *
- *   1. Storage — budget periods live in localStorage (per device, keyed
- *      by the user's profile id). No new DB tables or RLS work. If we
- *      later promote this to a `user_budgets` table, swap the
- *      load/save helpers below for fetch() calls; the rest of the
- *      page can stay.
- *
- *   2. Spend — derived on read from the user's own paid receipts joined
- *      to invoices joined to vehicle_ownership.owner_user_id. The
- *      company version trusts a server-maintained spent_amount column
- *      kept in sync by process_payment + update_company_spending. For
- *      personal vehicles there's no equivalent trigger, so computing
- *      live both keeps the page accurate and avoids drift entirely.
+ * Only vehicles the user individually owns
+ * (vehicle_ownership.owner_user_id) contribute to spend; fleet vehicles
+ * paid by a company member never bleed into a personal budget.
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   DollarSign, Plus, Edit2, Trash2, AlertCircle, CheckCircle,
-  Car, ChevronDown, ChevronUp, Calendar, TrendingUp,
+  Car, ChevronDown, ChevronUp, Calendar, TrendingUp, Coins,
 } from 'lucide-react'
 
-// ── localStorage helpers ─────────────────────────────────────────────────
-// Schema:
-//   garicare:user_budget:<profileId> = JSON.stringify([{ id, budget_amount,
-//     spent_amount (transient — recomputed on load), period_start, period_end,
-//     currency, created_at, updated_at }])
-// The "current" budget is whichever row covers today's date. We keep up
-// to 12 historical periods to match the company page's history table.
-const LS_KEY = (profileId) => `garicare:user_budget:${profileId}`
-const LS_LIMIT = 24
-
-const loadBudgets = (profileId) => {
-  if (!profileId || typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(LS_KEY(profileId))
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+const fmtCurrency = (amount, currency) => {
+  const symbol = currency?.symbol || currency?.code || 'KES'
+  return `${symbol} ${Number(amount || 0).toLocaleString()}`
 }
-
-const saveBudgets = (profileId, rows) => {
-  if (!profileId || typeof window === 'undefined') return
-  try {
-    // Bound storage. Oldest periods drop first.
-    const trimmed = [...rows]
-      .sort((a, b) => (b.period_start || '').localeCompare(a.period_start || ''))
-      .slice(0, LS_LIMIT)
-    window.localStorage.setItem(LS_KEY(profileId), JSON.stringify(trimmed))
-  } catch {}
-}
-
-const todayIso = () => new Date().toISOString().split('T')[0]
-const uuid = () =>
-  (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'b' + Math.random().toString(36).slice(2) + Date.now().toString(36)
 
 export default function UserBudgetPage() {
   const supabase = createClient()
 
-  const [profileId,  setProfileId]  = useState(null)
-  const [budget,     setBudget]     = useState(null)      // current-period row
-  const [history,    setHistory]    = useState([])        // most-recent first
-  const [loading,    setLoading]    = useState(true)
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState(null)
-  const [success,    setSuccess]    = useState(null)
+  const [profileId,    setProfileId]    = useState(null)
+  const [budget,       setBudget]       = useState(null)
+  const [history,      setHistory]      = useState([])
+  const [otherCurrency, setOtherCurrency] = useState([])
+  const [currencies,   setCurrencies]   = useState([])
+  const [breakdown,    setBreakdown]    = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [breakdownLoading, setBreakdownLoading] = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [showForm,     setShowForm]     = useState(false)
+  const [showBreakdown, setShowBreakdown] = useState(false)
+  const [error,        setError]        = useState(null)
+  const [success,      setSuccess]      = useState(null)
+  const [deletingId,   setDeletingId]   = useState(null)
 
-  // Form
   const today = new Date()
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd   = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
-  const [showForm, setShowForm]   = useState(false)
-  const [formData, setFormData]   = useState({
+  const [formData, setFormData] = useState({
     budget_amount: '',
     period_start:  monthStart,
     period_end:    monthEnd,
-    currency:      'KES',
+    currency_id:   '',
   })
 
-  // Vehicle spend breakdown
-  const [showBreakdown,    setShowBreakdown]    = useState(false)
-  const [breakdownLoading, setBreakdownLoading] = useState(false)
-  const [breakdown,        setBreakdown]        = useState(null)
-  const [breakdownStart,   setBreakdownStart]   = useState(monthStart)
-  const [breakdownEnd,     setBreakdownEnd]     = useState(monthEnd)
+  const [breakdownStart, setBreakdownStart] = useState(monthStart)
+  const [breakdownEnd,   setBreakdownEnd]   = useState(monthEnd)
 
-  // Delete confirmation
-  const [deletingId, setDeletingId] = useState(null)
-
-  // ── Bootstrap: resolve profile, load budgets, compute spend ───────────
-  const bootstrap = useCallback(async () => {
+  // ── Bootstrap ──────────────────────────────────────────────────────────
+  const fetchBudget = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const res  = await fetch('/api/user/budget')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load budget')
 
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single()
-      if (!profile) { setError('Profile not found.'); return }
-      setProfileId(profile.id)
+      setBudget(data.budget || null)
+      setHistory(data.history || [])
 
-      // Load saved budgets and compute live spend for each. Computing
-      // spend for every period in one shot avoids N round-trips and lets
-      // the history table show the same number it did when the period
-      // was current.
-      const stored = loadBudgets(profile.id)
-      if (stored.length === 0) {
-        setBudget(null)
-        setHistory([])
-        return
-      }
-
-      const today = todayIso()
-      const withSpend = await Promise.all(stored.map(async (row) => {
-        const spent = await computeSpend(profile.id, row.period_start, row.period_end)
-        return { ...row, spent_amount: spent }
-      }))
-
-      // Sort newest first; pick the row whose period covers today.
-      withSpend.sort((a, b) => (b.period_start || '').localeCompare(a.period_start || ''))
-      const current = withSpend.find(r => r.period_start <= today && r.period_end >= today) || null
-      setBudget(current)
-      setHistory(withSpend)
-
-      if (current) {
-        setFormData({
-          budget_amount: String(current.budget_amount ?? ''),
-          period_start:  current.period_start,
-          period_end:    current.period_end,
-          currency:      current.currency || 'KES',
-        })
+      if (data.budget) {
+        setFormData(f => ({
+          ...f,
+          budget_amount: data.budget.budget_amount,
+          period_start:  data.budget.period_start,
+          period_end:    data.budget.period_end,
+          currency_id:   data.budget.currency_id || data.budget.currency?.id || '',
+        }))
       }
     } catch (err) {
-      console.error(err)
-      setError('Failed to load budget data.')
-    } finally {
-      setLoading(false)
+      setError(err.message || 'Failed to load budget data')
     }
+  }, [])
+
+  const loadCurrencies = useCallback(async () => {
+    const { data } = await supabase
+      .from('currencies')
+      .select('id, code, display_name, symbol, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { nullsFirst: false })
+      .order('code')
+    setCurrencies(data || [])
+    setFormData(f => f.currency_id
+      ? f
+      : { ...f, currency_id: data?.find(c => c.code === 'KES')?.id || data?.[0]?.id || '' })
   }, [supabase])
 
-  useEffect(() => { bootstrap() }, [bootstrap])
+  const loadProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: profile } = await supabase
+      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+    if (profile) setProfileId(profile.id)
+  }, [supabase])
 
-  // ── Spend computation ────────────────────────────────────────────────
-  // Sums amount_paid from receipts whose invoice is paid and whose
-  // vehicle is currently owned by this user, restricted to the period.
-  // RLS on receipts already lets the owner read these rows.
-  const computeSpend = async (pid, periodStart, periodEnd) => {
-    try {
-      // 1. Vehicles the user currently owns. We only consider active
-      //    ownership rows — vehicles handed off mid-period legitimately
-      //    drop off the budget here, mirroring how the company side
-      //    behaves when a vehicle leaves the fleet.
-      const { data: ownership } = await supabase
-        .from('vehicle_ownership')
-        .select('vehicle_id')
-        .eq('owner_user_id', pid)
-      const vehicleIds = (ownership || []).map(r => r.vehicle_id)
-      if (vehicleIds.length === 0) return 0
+  useEffect(() => {
+    Promise.all([fetchBudget(), loadCurrencies(), loadProfile()])
+      .finally(() => setLoading(false))
+  }, [fetchBudget, loadCurrencies, loadProfile])
 
-      // 2. Receipts in window for those vehicles. We use an inner join
-      //    so PostgREST filters down by invoice.vehicle_id efficiently.
-      const startTs = periodStart + 'T00:00:00'
-      const endTs   = periodEnd   + 'T23:59:59'
-      const { data: receipts } = await supabase
-        .from('receipts')
-        .select('amount_paid, paid_at, invoice:invoices!inner(vehicle_id, status)')
-        .gte('paid_at', startTs)
-        .lte('paid_at', endTs)
-        .eq('invoice.status', 'paid')
-        .in('invoice.vehicle_id', vehicleIds)
+  // ── Other-currency spend disclosure for current period ─────────────────
+  const loadOtherCurrencySpend = useCallback(async () => {
+    if (!budget || !profileId) { setOtherCurrency([]); return }
 
-      return (receipts || []).reduce((sum, r) => sum + Number(r.amount_paid || 0), 0)
-    } catch {
-      return 0
+    const { data: ownership } = await supabase
+      .from('vehicle_ownership')
+      .select('vehicle_id')
+      .eq('owner_user_id', profileId)
+    const vehicleIds = (ownership || []).map(r => r.vehicle_id)
+    if (vehicleIds.length === 0) { setOtherCurrency([]); return }
+
+    const { data: receipts } = await supabase
+      .from('receipts')
+      .select(`
+        amount_paid,
+        invoice:invoices!inner(
+          vehicle_id, status,
+          work_order:work_orders!inner(
+            currency:currencies(id, code, symbol)
+          )
+        )
+      `)
+      .gte('paid_at', budget.period_start + 'T00:00:00')
+      .lte('paid_at', budget.period_end   + 'T23:59:59')
+      .eq('invoice.status', 'paid')
+      .in('invoice.vehicle_id', vehicleIds)
+
+    const buckets = new Map()
+    for (const r of (receipts || [])) {
+      const cur = r.invoice?.work_order?.currency
+      if (!cur?.id || cur.id === budget.currency_id) continue
+      const prev = buckets.get(cur.id) || { currency: cur, total: 0, count: 0 }
+      prev.total += Number(r.amount_paid || 0)
+      prev.count += 1
+      buckets.set(cur.id, prev)
     }
-  }
+    setOtherCurrency(Array.from(buckets.values()).sort((a, b) => b.total - a.total))
+  }, [budget, profileId, supabase])
 
-  // ── Per-vehicle breakdown ─────────────────────────────────────────────
-  // Same shape as company's get_fleet_spend_summary.by_vehicle: a row
-  // per vehicle with plate / make / model / invoice count / total_spent.
+  useEffect(() => { loadOtherCurrencySpend() }, [loadOtherCurrencySpend])
+
+  // ── Per-vehicle breakdown (grouped by currency) ────────────────────────
   const fetchBreakdown = useCallback(async () => {
     if (!profileId) return
     setBreakdownLoading(true)
     try {
-      // Vehicles the user owns (with display fields).
       const { data: ownership } = await supabase
         .from('vehicle_ownership')
         .select('vehicle_id, vehicle:vehicles(id, plate_number, make, model)')
         .eq('owner_user_id', profileId)
       const vehicles = (ownership || []).map(r => r.vehicle).filter(Boolean)
       if (vehicles.length === 0) {
-        setBreakdown({ total_spend: 0, by_vehicle: [] })
+        setBreakdown({ rows: [], totals: [] })
         return
       }
 
-      const startTs = breakdownStart + 'T00:00:00'
-      const endTs   = breakdownEnd   + 'T23:59:59'
       const { data: receipts } = await supabase
         .from('receipts')
-        .select('amount_paid, invoice:invoices!inner(id, vehicle_id, status)')
-        .gte('paid_at', startTs)
-        .lte('paid_at', endTs)
+        .select(`
+          amount_paid,
+          invoice:invoices!inner(
+            id, vehicle_id, status,
+            work_order:work_orders!inner(
+              currency:currencies(id, code, symbol)
+            )
+          )
+        `)
+        .gte('paid_at', breakdownStart + 'T00:00:00')
+        .lte('paid_at', breakdownEnd   + 'T23:59:59')
         .eq('invoice.status', 'paid')
         .in('invoice.vehicle_id', vehicles.map(v => v.id))
 
-      // Aggregate per vehicle. invoice_count counts distinct invoices.
-      const perVeh = new Map()
-      for (const v of vehicles) {
-        perVeh.set(v.id, {
-          vehicle_id:    v.id,
-          plate_number:  v.plate_number,
-          make:          v.make,
-          model:         v.model,
-          total_spent:   0,
-          _invoiceIds:   new Set(),
-        })
-      }
+      const vehById = new Map(vehicles.map(v => [v.id, v]))
+      const rows    = new Map()
       for (const r of (receipts || [])) {
         const vid = r.invoice?.vehicle_id
-        const row = perVeh.get(vid)
-        if (!row) continue
-        row.total_spent += Number(r.amount_paid || 0)
-        if (r.invoice?.id) row._invoiceIds.add(r.invoice.id)
+        const cur = r.invoice?.work_order?.currency
+        if (!vid || !cur?.id) continue
+        const k = vid + '::' + cur.id
+        const prev = rows.get(k) || {
+          vehicle:    vehById.get(vid),
+          currency:   cur,
+          total:      0,
+          invoiceIds: new Set(),
+        }
+        prev.total += Number(r.amount_paid || 0)
+        if (r.invoice?.id) prev.invoiceIds.add(r.invoice.id)
+        rows.set(k, prev)
       }
 
-      const by_vehicle = Array.from(perVeh.values())
-        .map(({ _invoiceIds, ...rest }) => ({ ...rest, invoice_count: _invoiceIds.size }))
-        .filter(r => r.invoice_count > 0 || r.total_spent > 0)
-        .sort((a, b) => b.total_spent - a.total_spent)
-      const total_spend = by_vehicle.reduce((s, r) => s + r.total_spent, 0)
+      const out = Array.from(rows.values()).map(r => ({
+        vehicle:       r.vehicle,
+        currency:      r.currency,
+        total:         r.total,
+        invoice_count: r.invoiceIds.size,
+      })).sort((a, b) => b.total - a.total)
 
-      setBreakdown({ total_spend, by_vehicle })
-    } catch (err) {
-      console.error(err)
-      setBreakdown({ total_spend: 0, by_vehicle: [] })
+      const totMap = new Map()
+      for (const r of out) {
+        const prev = totMap.get(r.currency.id) || { currency: r.currency, total: 0, invoice_count: 0 }
+        prev.total         += r.total
+        prev.invoice_count += r.invoice_count
+        totMap.set(r.currency.id, prev)
+      }
+
+      setBreakdown({ rows: out, totals: Array.from(totMap.values()) })
+    } catch {
+      setBreakdown({ rows: [], totals: [] })
     } finally {
       setBreakdownLoading(false)
     }
@@ -254,86 +221,59 @@ export default function UserBudgetPage() {
 
   useEffect(() => {
     if (showBreakdown) fetchBreakdown()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showBreakdown])
+  }, [showBreakdown, fetchBreakdown])
 
-  // ── Save / delete ─────────────────────────────────────────────────────
+  // ── Save / delete ──────────────────────────────────────────────────────
   const handleSave = async () => {
-    setError(null)
+    setError(null); setSuccess(null)
     const amt = parseFloat(formData.budget_amount)
-    if (!amt || amt <= 0) { setError('Please enter a valid budget amount.'); return }
+    if (!amt || amt <= 0)            { setError('Please enter a valid budget amount.'); return }
+    if (!formData.currency_id)       { setError('Please select a currency.'); return }
     if (!formData.period_start || !formData.period_end) {
       setError('Period start and end are required.'); return
     }
     if (formData.period_end <= formData.period_start) {
       setError('Period end must be after period start.'); return
     }
-
     setSaving(true)
     try {
-      const stored = loadBudgets(profileId)
-      const now = new Date().toISOString()
-
-      let next
-      if (budget?.id) {
-        // Update in place. Reject overlap with another existing row.
-        const overlap = stored.find(r =>
-          r.id !== budget.id &&
-          !(formData.period_end < r.period_start || formData.period_start > r.period_end)
-        )
-        if (overlap) {
-          setError('This period overlaps with another saved budget period.')
-          setSaving(false); return
-        }
-        next = stored.map(r => r.id === budget.id ? {
-          ...r,
-          budget_amount: amt,
-          period_start:  formData.period_start,
-          period_end:    formData.period_end,
-          currency:      formData.currency,
-          updated_at:    now,
-        } : r)
-      } else {
-        const overlap = stored.find(r =>
-          !(formData.period_end < r.period_start || formData.period_start > r.period_end)
-        )
-        if (overlap) {
-          setError('This period overlaps with an existing saved budget period.')
-          setSaving(false); return
-        }
-        next = [{
-          id:            uuid(),
-          budget_amount: amt,
-          period_start:  formData.period_start,
-          period_end:    formData.period_end,
-          currency:      formData.currency,
-          created_at:    now,
-          updated_at:    now,
-        }, ...stored]
-      }
-
-      saveBudgets(profileId, next)
-      setShowForm(false)
+      const method  = budget ? 'PATCH' : 'POST'
+      const payload = budget
+        ? { id: budget.id, ...formData, budget_amount: amt }
+        : { ...formData, budget_amount: amt }
+      const res = await fetch('/api/user/budget', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save budget')
       setSuccess('Budget saved.')
+      setShowForm(false)
+      await fetchBudget()
       setTimeout(() => setSuccess(null), 2500)
-      await bootstrap()
     } catch (err) {
-      setError('Failed to save budget.')
+      setError(err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = (id) => {
-    const stored = loadBudgets(profileId).filter(r => r.id !== id)
-    saveBudgets(profileId, stored)
-    setDeletingId(null)
-    setSuccess('Budget period deleted.')
-    setTimeout(() => setSuccess(null), 2500)
-    bootstrap()
+  const handleDelete = async (id) => {
+    try {
+      const res = await fetch('/api/user/budget?id=' + encodeURIComponent(id), { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete')
+      setDeletingId(null)
+      setSuccess('Budget period deleted.')
+      setTimeout(() => setSuccess(null), 2500)
+      await fetchBudget()
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
-  // ── Derived display values ────────────────────────────────────────────
+  // ── Derived display values ─────────────────────────────────────────────
   const spentPct = budget && budget.budget_amount > 0
     ? Math.min(Math.round((budget.spent_amount / budget.budget_amount) * 100), 100)
     : 0
@@ -342,8 +282,6 @@ export default function UserBudgetPage() {
   const barColor     = spentPct > 90 ? 'bg-red-500'
                      : spentPct > 70 ? 'bg-yellow-500'
                                      : 'bg-green-500'
-  const currency = budget?.currency || 'KES'
-  const fmt = (n) => `${currency} ${Number(n || 0).toLocaleString()}`
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -357,20 +295,19 @@ export default function UserBudgetPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Budget</h1>
-          <p className="text-sm text-gray-500 mt-1">Track and control your personal service spend</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Track and control your personal service spend
+          </p>
         </div>
         <button
           onClick={() => {
-            // Toggle. When opening fresh (no current budget) reset the
-            // form to a default current-month window so the inputs aren't
-            // stuck on an old period from history.
             if (!showForm && !budget) {
-              setFormData({
+              setFormData(f => ({
                 budget_amount: '',
                 period_start:  monthStart,
                 period_end:    monthEnd,
-                currency:      'KES',
-              })
+                currency_id:   f.currency_id || currencies.find(c => c.code === 'KES')?.id || currencies[0]?.id || '',
+              }))
             }
             setShowForm(s => !s)
           }}
@@ -379,12 +316,6 @@ export default function UserBudgetPage() {
           {budget ? <><Edit2 className="w-4 h-4" /> Edit Budget</> : <><Plus className="w-4 h-4" /> Set Budget</>}
         </button>
       </div>
-
-      {/* Per-device disclosure. Necessary because budgets only live in
-          localStorage; users with multiple devices should know up front. */}
-      <p className="text-xs text-gray-400 -mt-3">
-        Budget data is stored on this device only.
-      </p>
 
       {/* Alerts */}
       {error && (
@@ -404,6 +335,7 @@ export default function UserBudgetPage() {
           <h2 className="text-base font-semibold text-gray-900">
             {budget ? 'Update Budget' : 'Set Budget'}
           </h2>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
@@ -418,13 +350,34 @@ export default function UserBudgetPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Budget Amount (KES)</label>
-            <input type="number" min="0" step="500" value={formData.budget_amount}
-              onChange={e => setFormData({ ...formData, budget_amount: e.target.value })}
-              placeholder="e.g. 20000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <select value={formData.currency_id}
+                onChange={e => setFormData({ ...formData, currency_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                {currencies.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.code}{c.symbol && c.symbol !== c.code ? ` (${c.symbol})` : ''} — {c.display_name}
+                  </option>
+                ))}
+              </select>
+              {budget && formData.currency_id !== budget.currency_id && (
+                <p className="text-xs text-amber-600 mt-1.5">
+                  Changing currency will reset spend tracking for this period.
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Budget Amount</label>
+              <input type="number" min="0" step="500" value={formData.budget_amount}
+                onChange={e => setFormData({ ...formData, budget_amount: e.target.value })}
+                placeholder="e.g. 20000"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
+
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} disabled={saving}
               className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -449,15 +402,19 @@ export default function UserBudgetPage() {
                 {' – '}
                 {new Date(budget.period_end).toLocaleDateString('en-KE', { month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Tracked in {budget.currency?.code || '—'}{budget.currency?.symbol && budget.currency?.symbol !== budget.currency?.code ? ` (${budget.currency.symbol})` : ''}
+              </p>
             </div>
             <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              isOverBudget ? 'bg-red-100 text-red-700'
-              : spentPct > 70 ? 'bg-yellow-100 text-yellow-700'
-              : 'bg-green-100 text-green-700'
+              isOverBudget      ? 'bg-red-100 text-red-700'
+              : spentPct > 70   ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-green-100 text-green-700'
             }`}>
               {isOverBudget ? 'Over Budget' : spentPct > 70 ? 'High Usage' : 'On Track'}
             </div>
           </div>
+
           <div>
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-500">Spent</span>
@@ -467,22 +424,53 @@ export default function UserBudgetPage() {
               <div className={`h-3 rounded-full transition-all ${barColor}`} style={{ width: `${spentPct}%` }} />
             </div>
           </div>
+
           <div className="grid grid-cols-3 gap-4 pt-2 border-t border-gray-100">
             {[
               { label: 'Budget',    value: budget.budget_amount, color: 'text-gray-900' },
               { label: 'Spent',     value: budget.spent_amount,  color: 'text-red-600'  },
               { label: 'Remaining', value: Math.abs(remaining),
-                color: isOverBudget ? 'text-red-600' : 'text-green-600',
+                color:  isOverBudget ? 'text-red-600' : 'text-green-600',
                 prefix: isOverBudget ? '−' : '' },
             ].map(({ label, value, color, prefix = '' }) => (
               <div key={label} className="text-center">
                 <p className="text-xs text-gray-500">{label}</p>
                 <p className={`text-base font-bold mt-0.5 ${color}`}>
-                  {prefix}{currency} {Number(value).toLocaleString()}
+                  {prefix}{fmtCurrency(value, budget.currency)}
                 </p>
               </div>
             ))}
           </div>
+
+          {otherCurrency.length > 0 && (
+            <div className="pt-4 border-t border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Coins size={14} className="text-amber-600" />
+                <p className="text-xs font-semibold text-gray-700">
+                  Spend in other currencies this period
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                These payments don&apos;t count against your {budget.currency?.code} budget. Shown
+                for visibility — set a separate budget per period in another currency
+                if you want to track them.
+              </p>
+              <div className="space-y-1.5">
+                {otherCurrency.map(({ currency, total, count }) => (
+                  <div key={currency.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">
+                      <span className="font-semibold text-gray-800">{currency.code}</span>
+                      {' '}
+                      <span className="text-xs text-gray-400">({count} payment{count !== 1 ? 's' : ''})</span>
+                    </span>
+                    <span className="font-medium text-gray-700">
+                      {fmtCurrency(total, currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-12 text-center">
@@ -494,7 +482,7 @@ export default function UserBudgetPage() {
         </div>
       )}
 
-      {/* ── Vehicle spend breakdown ─────────────────────────────────────── */}
+      {/* Spend-by-vehicle */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <button
           onClick={() => setShowBreakdown(s => !s)}
@@ -504,7 +492,7 @@ export default function UserBudgetPage() {
             <Car size={18} className="text-blue-600" />
             <div>
               <p className="font-semibold text-gray-900 text-sm">Spend by Vehicle</p>
-              <p className="text-xs text-gray-500 mt-0.5">Per-vehicle service costs in a period</p>
+              <p className="text-xs text-gray-500 mt-0.5">Per-vehicle costs, grouped by currency</p>
             </div>
           </div>
           {showBreakdown ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
@@ -512,7 +500,6 @@ export default function UserBudgetPage() {
 
         {showBreakdown && (
           <div className="border-t border-gray-100 p-5 space-y-4">
-            {/* Period selector */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
                 <Calendar size={14} className="text-gray-400" />
@@ -535,73 +522,65 @@ export default function UserBudgetPage() {
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
               </div>
-            ) : breakdown?.by_vehicle?.length > 0 ? (
+            ) : breakdown?.rows?.length > 0 ? (
               <>
-                {/* Total */}
-                <div className="bg-blue-50 rounded-lg p-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-blue-900 flex items-center gap-2">
-                    <TrendingUp size={15} /> Total spend this period
-                  </span>
-                  <span className="text-base font-bold text-blue-900">
-                    {fmt(breakdown.total_spend)}
-                  </span>
+                <div className="flex flex-wrap gap-2">
+                  {breakdown.totals.map(t => (
+                    <div key={t.currency.id} className="bg-blue-50 rounded-lg px-3 py-2 flex items-center gap-2">
+                      <TrendingUp size={13} className="text-blue-700" />
+                      <span className="text-xs font-medium text-blue-900">{fmtCurrency(t.total, t.currency)}</span>
+                      <span className="text-[10px] text-blue-700">({t.invoice_count} inv.)</span>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Per-vehicle table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase">Vehicle</th>
+                        <th className="text-left  py-2 text-xs font-semibold text-gray-500 uppercase">Vehicle</th>
+                        <th className="text-left  py-2 text-xs font-semibold text-gray-500 uppercase">Currency</th>
                         <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase">Invoices</th>
                         <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase">Spend</th>
                         {budget && <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase">% of Budget</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {breakdown.by_vehicle.map((v, i) => {
-                        const pct = budget?.budget_amount > 0
-                          ? Math.round((v.total_spent / budget.budget_amount) * 100)
+                      {breakdown.rows.map((row, i) => {
+                        const matchesBudget = budget && row.currency.id === budget.currency_id
+                        const pct = (matchesBudget && budget.budget_amount > 0)
+                          ? Math.round((row.total / budget.budget_amount) * 100)
                           : null
                         return (
-                          <tr key={v.vehicle_id || i} className="border-b border-gray-50 hover:bg-gray-50">
+                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                             <td className="py-3">
-                              <p className="font-medium text-gray-900">{v.plate_number}</p>
+                              <p className="font-medium text-gray-900">{row.vehicle?.plate_number}</p>
                               <p className="text-xs text-gray-400">
-                                {[v.make, v.model].filter(Boolean).join(' ')}
+                                {[row.vehicle?.make, row.vehicle?.model].filter(Boolean).join(' ')}
                               </p>
                             </td>
-                            <td className="py-3 text-right text-gray-600 text-xs">{v.invoice_count}</td>
+                            <td className="py-3">
+                              <span className="text-xs font-semibold text-gray-700">{row.currency.code}</span>
+                            </td>
+                            <td className="py-3 text-right text-gray-600 text-xs">{row.invoice_count}</td>
                             <td className="py-3 text-right font-semibold text-gray-900">
-                              {fmt(v.total_spent)}
+                              {fmtCurrency(row.total, row.currency)}
                             </td>
                             {budget && (
                               <td className="py-3 text-right">
-                                <span className={`text-xs font-medium ${
-                                  pct > 30 ? 'text-red-600' : pct > 15 ? 'text-yellow-600' : 'text-green-600'
-                                }`}>
-                                  {pct}%
-                                </span>
+                                {pct == null ? (
+                                  <span className="text-xs text-gray-300">—</span>
+                                ) : (
+                                  <span className={`text-xs font-medium ${
+                                    pct > 30 ? 'text-red-600' : pct > 15 ? 'text-yellow-600' : 'text-green-600'
+                                  }`}>{pct}%</span>
+                                )}
                               </td>
                             )}
                           </tr>
                         )
                       })}
                     </tbody>
-                    {breakdown.by_vehicle.length > 1 && (
-                      <tfoot>
-                        <tr className="border-t-2 border-gray-200">
-                          <td className="py-2.5 font-bold text-gray-900">Total</td>
-                          <td className="py-2.5 text-right text-gray-600 text-xs">
-                            {breakdown.by_vehicle.reduce((s, v) => s + Number(v.invoice_count || 0), 0)}
-                          </td>
-                          <td className="py-2.5 text-right font-bold text-gray-900">
-                            {fmt(breakdown.total_spend)}
-                          </td>
-                          {budget && <td />}
-                        </tr>
-                      </tfoot>
-                    )}
                   </table>
                 </div>
               </>
@@ -625,16 +604,15 @@ export default function UserBudgetPage() {
                 ? Math.min(Math.round((h.spent_amount / h.budget_amount) * 100), 100)
                 : 0
               const isOver = h.spent_amount > h.budget_amount
-              const barClr = pct > 90 ? 'bg-red-400'
-                           : pct > 70 ? 'bg-yellow-400'
-                                      : 'bg-green-400'
+              const barClr = pct > 90 ? 'bg-red-400' : pct > 70 ? 'bg-yellow-400' : 'bg-green-400'
               const isCurrent = budget?.id === h.id
-
               return (
                 <div key={h.id || i} className="group">
                   <div className="flex items-center justify-between text-xs text-gray-500 mb-1 gap-2">
                     <span className="flex items-center gap-2">
                       {new Date(h.period_start).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}
+                      {' · '}
+                      <span className="font-semibold text-gray-600">{h.currency?.code || '—'}</span>
                       {isCurrent && (
                         <span className="text-[10px] uppercase font-semibold text-blue-600 tracking-wide">
                           Current
@@ -643,7 +621,7 @@ export default function UserBudgetPage() {
                     </span>
                     <div className="flex items-center gap-3">
                       <span className={`font-medium ${isOver ? 'text-red-600' : 'text-gray-700'}`}>
-                        {fmt(h.spent_amount)} / {fmt(h.budget_amount)}
+                        {fmtCurrency(h.spent_amount, h.currency)} / {fmtCurrency(h.budget_amount, h.currency)}
                       </span>
                       {deletingId === h.id ? (
                         <span className="flex items-center gap-1.5">
