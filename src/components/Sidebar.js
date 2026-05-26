@@ -429,6 +429,7 @@ export default function Sidebar({ user }) {
     { icon: Plus,          label: 'Add Vehicle',            path: '/dashboard/vehicles/add' },
     { icon: Search,        label: 'Search Providers',       path: '/dashboard/providers' },
     { icon: Calendar,      label: 'Bookings',               path: '/dashboard/bookings' },
+    { icon: DollarSign,    label: 'Budget',                 path: '/dashboard/budget' },
     { icon: ClipboardList, label: 'My Work Orders',         path: '/dashboard/work-orders' },
     { icon: MessageSquare, label: 'Chat',                   path: '/dashboard/chat',
       badge: unreadMessages > 0 ? unreadMessages : null },
@@ -436,6 +437,7 @@ export default function Sidebar({ user }) {
       badge: remindersCount > 0 ? remindersCount : null },
     { icon: CalendarDays,  label: 'Calendar',               path: '/dashboard/calendar' },
     { icon: History,       label: 'History',                path: '/dashboard/history' },
+    { icon: BarChart3,     label: 'Reports',                path: '/dashboard/reports' },
     { icon: Settings,      label: 'Profile',                path: '/dashboard/profile' },
   ]
 
