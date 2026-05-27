@@ -34,6 +34,8 @@ export default function Sidebar({ user }) {
   const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number } — customer chat unread
   const [providerPeerUnreadByProviderId, setProviderPeerUnreadByProviderId] = useState({}) // { [providerId]: number } — peer chat unread (provider-to-provider)
   const [companyUnread, setCompanyUnread] = useState(0)
+  const [woActionCount,        setWoActionCount]        = useState(0)
+  const [companyWoActionCount,  setCompanyWoActionCount] = useState(0)
   // Phase: per-provider upcoming-bookings count for the Calendar badge.
   // Keyed by providerId: { '<uuid>': <count>, ... }
   const [providerUpcomingByProvider, setProviderUpcomingByProvider] = useState({})
@@ -79,11 +81,111 @@ export default function Sidebar({ user }) {
     } catch {}
   }, [profileId])
 
+  // ── Personal WO action count ────────────────────────────────────────────
+  // Counts work orders where the user needs to take action:
+  // awaiting_approval (estimate approval), checkout submitted but not
+  // accepted, or invoice sent/overdue and unpaid.
+  const loadWoActionCount = useCallback(async () => {
+    if (!profileId) return
+    try {
+      // Get vehicles owned personally
+      const { data: owned } = await supabase
+        .from('vehicle_ownership').select('vehicle_id')
+        .eq('owner_user_id', profileId).is('owner_company_id', null)
+      const vehicleIds = (owned || []).map(o => o.vehicle_id)
+      if (vehicleIds.length === 0) { setWoActionCount(0); return }
+
+      // awaiting_approval
+      const { data: statuses } = await supabase
+        .from('work_order_statuses').select('id, code')
+        .in('code', ['awaiting_approval'])
+      const awaitingId = statuses?.find(s => s.code === 'awaiting_approval')?.id
+
+      let count = 0
+      if (awaitingId) {
+        const { count: c } = await supabase
+          .from('work_orders').select('id', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds).eq('status_id', awaitingId)
+        count += (c || 0)
+      }
+
+      // checkout submitted but not accepted
+      const { count: checkoutCount } = await supabase
+        .from('work_orders').select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('checkout_requested', true)
+        .not('checkout_request_satisfied', 'eq', true)
+        .not('checkout_declined', 'eq', true)
+      count += (checkoutCount || 0)
+
+      // invoices sent/overdue and unpaid
+      const { data: woIds } = await supabase
+        .from('work_orders').select('id').in('vehicle_id', vehicleIds)
+      if (woIds?.length) {
+        const { count: invCount } = await supabase
+          .from('invoices').select('id', { count: 'exact', head: true })
+          .in('work_order_id', woIds.map(w => w.id))
+          .in('status', ['sent', 'overdue'])
+          .is('paid_at', null)
+        count += (invCount || 0)
+      }
+
+      setWoActionCount(count)
+    } catch {}
+  }, [profileId])
+
+  // ── Company fleet WO action count ───────────────────────────────────────
+  const loadCompanyWoActionCount = useCallback(async () => {
+    if (!companyMembership) { setCompanyWoActionCount(0); return }
+    try {
+      const companyId = companyMembership.id
+      const { data: fleet } = await supabase
+        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', companyId)
+      const vehicleIds = (fleet || []).map(f => f.vehicle_id)
+      if (vehicleIds.length === 0) { setCompanyWoActionCount(0); return }
+
+      const { data: statuses } = await supabase
+        .from('work_order_statuses').select('id, code')
+        .in('code', ['awaiting_approval'])
+      const awaitingId = statuses?.find(s => s.code === 'awaiting_approval')?.id
+
+      let count = 0
+      if (awaitingId) {
+        const { count: c } = await supabase
+          .from('work_orders').select('id', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds).eq('status_id', awaitingId)
+        count += (c || 0)
+      }
+
+      const { count: checkoutCount } = await supabase
+        .from('work_orders').select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('checkout_requested', true)
+        .not('checkout_request_satisfied', 'eq', true)
+        .not('checkout_declined', 'eq', true)
+      count += (checkoutCount || 0)
+
+      const { data: woIds } = await supabase
+        .from('work_orders').select('id').in('vehicle_id', vehicleIds)
+      if (woIds?.length) {
+        const { count: invCount } = await supabase
+          .from('invoices').select('id', { count: 'exact', head: true })
+          .in('work_order_id', woIds.map(w => w.id))
+          .in('status', ['sent', 'overdue'])
+          .is('paid_at', null)
+        count += (invCount || 0)
+      }
+
+      setCompanyWoActionCount(count)
+    } catch {}
+  }, [companyMembership])
+
   // ── Reload + realtime: fire when profile id becomes known ───────────────
   useEffect(() => {
     if (!profileId) return
     loadUnreadMessages()
     loadRemindersCount()
+    loadWoActionCount()
 
     // Subscribe to conversation changes so the message badge updates live.
     // Filter is on user_id (personal chats only — matches loadUnreadMessages
@@ -110,7 +212,7 @@ export default function Sidebar({ user }) {
       supabase.removeChannel(convChannel)
       supabase.removeChannel(remindChannel)
     }
-  }, [profileId, loadUnreadMessages, loadRemindersCount])
+  }, [profileId, loadUnreadMessages, loadRemindersCount, loadWoActionCount])
 
   // ── Per-provider unread chat counts (Service Provider Membership) ───────
   // For each provider this user has can_chat on, sum provider_unread_count
@@ -242,6 +344,11 @@ export default function Sidebar({ user }) {
 
     return () => { supabase.removeChannel(channel) }
   }, [companyMembership?.id])
+
+  // ── Company fleet WO action count ─────────────────────────────────────
+  useEffect(() => {
+    loadCompanyWoActionCount()
+  }, [loadCompanyWoActionCount])
 
   // ── Fetch company membership once on mount ────────────────────────────────
   useEffect(() => {
@@ -440,7 +547,8 @@ export default function Sidebar({ user }) {
     { icon: Search,        label: 'Search Providers',       path: '/dashboard/providers' },
     { icon: Calendar,      label: 'Bookings',               path: '/dashboard/bookings' },
     { icon: DollarSign,    label: 'Budget',                 path: '/dashboard/budget' },
-    { icon: ClipboardList, label: 'My Work Orders',         path: '/dashboard/work-orders' },
+    { icon: ClipboardList, label: 'My Work Orders',         path: '/dashboard/work-orders',
+      badge: woActionCount > 0 ? woActionCount : null },
     { icon: MessageSquare, label: 'Chat',                   path: '/dashboard/chat',
       badge: unreadMessages > 0 ? unreadMessages : null },
     { icon: Bell,          label: 'Reminders',              path: '/dashboard/reminders',
@@ -462,7 +570,8 @@ export default function Sidebar({ user }) {
       { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
       { icon: UserCheck,    label: 'Fleet Assignments', path: `${base}/fleet-assignments`, everyone: true },
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
-      { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
+      { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true,
+        badge: companyWoActionCount > 0 ? companyWoActionCount : null },
       { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },
       // Reminders — shows the same fleet recommendations as the owner's
       // /company/reminders. Renders via the shared CompanyRemindersView
