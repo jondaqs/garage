@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export default function Sidebar({ user }) {
   const router   = useRouter()
@@ -25,6 +25,7 @@ export default function Sidebar({ user }) {
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [profileId,      setProfileId]      = useState(null)
   const [mobileOpen,      setMobileOpen]      = useState(false)
+  const activeItemRef = useRef(null)
   const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }
   const [companyNavOpen,  setCompanyNavOpen]  = useState(true)       // expanded by default
   const [membershipLoading, setMembershipLoading] = useState(true)
@@ -254,6 +255,15 @@ export default function Sidebar({ user }) {
     window.addEventListener('spu-membership-updated', handler)
     return () => window.removeEventListener('spu-membership-updated', handler)
   }, [user])
+
+  // Scroll the active nav item into view when the route changes
+  useEffect(() => {
+    // Small delay to let the DOM settle after accordion expansions
+    const t = setTimeout(() => {
+      activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [pathname])
 
   const fetchMembership = async () => {
     try {
@@ -514,6 +524,7 @@ export default function Sidebar({ user }) {
 
     return (
       <button
+        ref={isActive ? activeItemRef : null}
         onClick={() => { router.push(item.path); setMobileOpen(false) }}
         className={`w-full flex items-center rounded-lg transition mb-0.5
           ${compact ? 'px-3 py-2 text-sm' : 'px-4 py-3'}

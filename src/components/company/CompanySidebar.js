@@ -2,7 +2,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Home, Truck, Users, Calendar, CalendarDays, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle,
@@ -127,6 +127,15 @@ export default function CompanySidebar({ company, userRole }) {
   }
   const statusCfg = company?.status ? statusConfig[company.status] : null
   const isActive  = (href) => pathname === href || pathname.startsWith(href + '/')
+  const activeItemRef = useRef(null)
+
+  // Scroll the active nav item into view when the route changes
+  useEffect(() => {
+    const t = setTimeout(() => {
+      activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [pathname])
 
   // ── Sidebar inner content ──────────────────────────────────────────────────
   const SidebarContent = () => (
@@ -184,6 +193,7 @@ export default function CompanySidebar({ company, userRole }) {
           const active = isActive(item.href)
           return (
             <button key={item.name}
+              ref={active ? activeItemRef : null}
               onClick={() => { router.push(item.href); setMobileOpen(false) }}
               className={`
                 w-full group flex items-center justify-between px-3 py-2.5 text-sm font-medium
