@@ -2,7 +2,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   LayoutDashboard, Calendar, CalendarDays, Users, Package, FileText,
   BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare,
@@ -177,6 +177,14 @@ export default function ProviderSidebar({ provider }) {
   }
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/')
+  const activeItemRef = useRef(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [pathname])
 
   // ── Sidebar inner content ──────────────────────────────────────────────────
   const SidebarContent = () => (
@@ -220,6 +228,7 @@ export default function ProviderSidebar({ provider }) {
           const active = isActive(item.href)
           return (
             <button key={item.name}
+              ref={active ? activeItemRef : null}
               onClick={() => { router.push(item.href); setMobileOpen(false) }}
               className={`
                 w-full group flex items-center justify-between px-3 py-2.5 text-sm font-medium
