@@ -8,7 +8,7 @@ import {
   ClipboardList, AlertCircle, CheckCircle, ChevronRight,
   Wrench, Package, MessageSquare, Hash, ExternalLink,
   AlertTriangle, FileText, Loader2, ClipboardCheck, Receipt, Bell, LogOut, BellRing,
-  Edit3, DollarSign, Lock, Info
+  Edit3, DollarSign, Lock, Info, RefreshCw
 } from 'lucide-react'
 import ServicesTab      from './components/ServicesTab'
 import PartsTab         from './components/PartsTab'
@@ -115,6 +115,7 @@ export default function WorkOrderDetailPage() {
   const [draftCurrencyId,  setDraftCurrencyId]  = useState('')
   const [savingShop,       setSavingShop]       = useState(false)
   const [savingCurrency,   setSavingCurrency]   = useState(false)
+  const [refreshing,       setRefreshing]       = useState(false)
 
   // ── Load work order ─────────────────────────────────────────────────────
   const loadWorkOrder = useCallback(async () => {
@@ -718,6 +719,14 @@ export default function WorkOrderDetailPage() {
               )}
             </p>
           </div>
+          <button
+            onClick={async () => { setRefreshing(true); await loadWorkOrder(); setRefreshing(false) }}
+            disabled={refreshing}
+            title="Refresh"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          </button>
         </div>
 
         {/* Status timeline */}

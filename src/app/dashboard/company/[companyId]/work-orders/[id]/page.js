@@ -12,7 +12,7 @@ import {
   ChevronDown, ChevronUp, Building2, Star, FileText,
   ChevronRight, Receipt, ClipboardCheck,
   AlertTriangle, ShieldAlert,
-  Bell, Calendar, Gauge} from 'lucide-react'
+  Bell, Calendar, Gauge, RefreshCw} from 'lucide-react'
 
 // Severity → colour mapping for the diagnostic-findings card.
 const SEVERITY_STYLES = {
@@ -56,6 +56,7 @@ export default function CompanyMemberWorkOrderDetailPage() {
   const [checkoutRequested,   setCheckoutRequested]   = useState(false)
   const [requestingCheckout,  setRequestingCheckout]  = useState(false)
   const [checkoutReqSuccess,  setCheckoutReqSuccess]  = useState(false)
+  const [refreshing,          setRefreshing]          = useState(false)
   const [review,          setReview]          = useState({ rating: 0, title: '', body: '' })
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [reviewSubmitting,setReviewSubmitting]= useState(false)
@@ -342,9 +343,19 @@ export default function CompanyMemberWorkOrderDetailPage() {
               })}
             </p>
           </div>
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
-            {wo.status?.display_name}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
+              {wo.status?.display_name}
+            </span>
+            <button
+              onClick={async () => { setRefreshing(true); await loadWorkOrder(); setRefreshing(false) }}
+              disabled={refreshing}
+              title="Refresh"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
