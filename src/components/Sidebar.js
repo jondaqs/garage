@@ -6,7 +6,7 @@ import {
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
   AlertCircle, Wrench, ClipboardList, Search, MessageSquare,
-  MessageCircle, UserCheck
+  MessageCircle, UserCheck, Package
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -840,6 +840,14 @@ export default function Sidebar({ user }) {
                           ? providerUpcomingByProvider[m.providerId]
                           : null,
                       }} />
+                      {/* Inventory — only visible to members with can_manage_inventory */}
+                      {m.can_manage_inventory && (
+                        <NavItem key={`${m.providerId}-inventory`} compact item={{
+                          icon:  Package,
+                          label: 'Inventory',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/inventory`,
+                        }} />
+                      )}
                       {/* Chat for this provider lives below Assigned Work Orders
                           in the shared block — keeps the provider-membership
                           quick-look (Overview only) tight, and groups all chat
