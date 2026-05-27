@@ -186,6 +186,108 @@ export async function POST(request, { params }) {
       }
     }
 
+    // ── 6. Notify company members with can_approve_estimates (non-fatal) ──────
+    // When the vehicle belongs to a company fleet, the owner alone may not be
+    // the person who approves estimates. We also notify every active
+    // company_users member that has can_approve_estimates = true (skipping the
+    // owner if already notified above).
+    let companyMembersNotified = 0
+    try {
+      // Re-fetch vehicle_id → ownership if not already known
+      const { data: woForFleet } = await sc
+        .from('work_orders')
+        .select('vehicle_id')
+        .eq('id', workOrderId)
+        .maybeSingle()
+      if (woForFleet?.vehicle_id) {
+        const { data: ownershipForFleet } = await sc
+          .from('vehicle_ownership')
+          .select('owner_company_id')
+          .eq('vehicle_id', woForFleet.vehicle_id)
+          .maybeSingle()
+
+        if (ownershipForFleet?.owner_company_id) {
+          const companyId = ownershipForFleet.owner_company_id
+
+          // Get company owner profile id so we can skip them (already notified)
+          const { data: companyOwnerRow } = await sc
+            .from('company_profiles')
+            .select('owner_user_id')
+            .eq('id', companyId)
+            .maybeSingle()
+          const companyOwnerProfileId = companyOwnerRow?.owner_user_id
+
+          // Fetch members with can_approve_estimates
+          const { data: approvers } = await sc
+            .from('company_users')
+            .select(`
+              user_id,
+              user:user_profiles(id, first_name, last_name, phone, email, auth_user_id)
+            `)
+            .eq('company_id', companyId)
+            .eq('is_active', true)
+            .eq('can_approve_estimates', true)
+
+          const seenIds = new Set()
+          // Skip company owner — they were already emailed above
+          if (companyOwnerProfileId) seenIds.add(companyOwnerProfileId)
+
+          for (const row of approvers || []) {
+            const u = row.user
+            if (!u || seenIds.has(u.id)) continue
+            seenIds.add(u.id)
+
+            const memberName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Team Member'
+
+            // Resolve email — fall back to auth.users if needed
+            let memberEmail = u.email || null
+            if (!memberEmail && u.auth_user_id) {
+              try {
+                const { data: au } = await sc.auth.admin.getUserById(u.auth_user_id)
+                memberEmail = au?.user?.email || null
+              } catch {}
+            }
+
+            // Send email
+            if (memberEmail) {
+              try {
+                await sendEstimateApprovalEmail(supabase, {
+                  to:              memberEmail,
+                  ownerName:       memberName,
+                  workOrderNumber: work_order_number,
+                  providerName:    provider_name,
+                  vehiclePlate,
+                  estimate,
+                  workOrderId,
+                })
+                companyMembersNotified++
+              } catch (e) {
+                console.error(`Estimate email to company member ${u.id} failed:`, e.message)
+              }
+            }
+
+            // Send SMS
+            if (u.phone) {
+              try {
+                await sendEstimateApprovalSms(supabase, {
+                  phone:           u.phone,
+                  ownerName:       memberName,
+                  workOrderNumber: work_order_number,
+                  providerName:    provider_name,
+                  estimateTotal:   estimate?.total,
+                  workOrderId,
+                })
+              } catch (e) {
+                console.error(`Estimate SMS to company member ${u.id} failed:`, e.message)
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Company member estimate notification (non-fatal):', e.message)
+    }
+
     return NextResponse.json({
       success:           true,
       work_order_number,
@@ -194,6 +296,7 @@ export async function POST(request, { params }) {
       sms_sent:          smsSent,
       owner_has_email:   !!ownerEmail,
       owner_has_phone:   !!ownerPhone,
+      company_members_notified: companyMembersNotified,
     })
 
   } catch (err) {

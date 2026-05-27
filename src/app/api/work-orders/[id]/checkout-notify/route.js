@@ -48,26 +48,41 @@ export async function POST(request, { params }) {
 
     let ownerProfileId = vo?.owner_user_id
     if (!ownerProfileId && vo?.owner_company_id) {
-      const { data: cu } = await sc
-        .from('company_users').select('user_id').eq('company_id', vo.owner_company_id)
-        .eq('is_active', true).limit(1).maybeSingle()
-      ownerProfileId = cu?.user_id
+      // Company fleet — resolve the actual company owner, not an arbitrary member
+      const { data: companyRow } = await sc
+        .from('company_profiles').select('owner_user_id')
+        .eq('id', vo.owner_company_id).maybeSingle()
+      ownerProfileId = companyRow?.owner_user_id || null
     }
     if (!ownerProfileId) return NextResponse.json({ success: true, skipped: 'no owner' })
 
     const { data: profile } = await sc
-      .from('user_profiles').select('first_name, last_name, email, phone').eq('id', ownerProfileId).maybeSingle()
+      .from('user_profiles').select('first_name, last_name, email, phone, auth_user_id').eq('id', ownerProfileId).maybeSingle()
     if (!profile) return NextResponse.json({ success: true, skipped: 'no profile' })
+
+    // Resolve email — fall back to auth.users if not on profile
+    let ownerEmail = profile.email || null
+    if (!ownerEmail && profile.auth_user_id) {
+      try {
+        const { data: au } = await sc.auth.admin.getUserById(profile.auth_user_id)
+        ownerEmail = au?.user?.email || null
+      } catch {}
+    }
 
     const ownerName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Customer'
     const woUrl     = `${APP_URL()}/dashboard/work-orders/${workOrderId}/invoice`
+    // Company members see work orders at a different path
+    const companyWoUrl = vo?.owner_company_id
+      ? `${APP_URL()}/dashboard/company/${vo.owner_company_id}/work-orders/${workOrderId}`
+      : woUrl
     const plate     = veh?.plate_number || ''
     const provider  = sp?.name || 'Your garage'
 
     const subject = `Action Required: Review Checkout for ${plate} — ${wo.work_order_number}`
     const smsBody  = `${BRAND}: ${provider} has submitted the checkout for your vehicle ${plate} (${wo.work_order_number}). Please review and confirm: ${woUrl}`
 
-    const emailHtml = `<!DOCTYPE html>
+    // Parameterised email builder so we can personalise per recipient
+    const buildEmailHtml = (recipientName, reviewUrl) => `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Checkout Review</title></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
@@ -80,7 +95,7 @@ export async function POST(request, { params }) {
   </td></tr>
   <tr><td style="height:3px;background:linear-gradient(90deg,#f59e0b,#fbbf24,transparent);"></td></tr>
   <tr><td style="padding:28px 32px;">
-    <p style="margin:0 0 12px;color:#1e293b;font-size:15px;">Hi ${ownerName},</p>
+    <p style="margin:0 0 12px;color:#1e293b;font-size:15px;">Hi ${recipientName},</p>
     <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">
       <strong>${provider}</strong> has completed the checkout process for your vehicle
       <strong>${plate}</strong> (Work Order ${wo.work_order_number}).
@@ -90,7 +105,7 @@ export async function POST(request, { params }) {
       <strong>accept or decline</strong> the checkout. Once accepted, your work order will be officially closed.
     </p>
     <div style="text-align:center;margin:0 0 24px;">
-      <a href="${woUrl}"
+      <a href="${reviewUrl}"
         style="display:inline-block;background:#0f172a;color:#fff;
           padding:14px 36px;border-radius:10px;text-decoration:none;
           font-weight:700;font-size:15px;">
@@ -108,12 +123,13 @@ export async function POST(request, { params }) {
 
     let emailSent = false, smsSent = false
 
-    if (profile.email) {
+    // Send to the primary owner
+    if (ownerEmail) {
       try {
         await sendAndQueueEmail(sc, {
-          to:             [{ Email: profile.email, Name: ownerName }],
+          to:             [{ Email: ownerEmail, Name: ownerName }],
           subject,
-          html:           emailHtml,
+          html:           buildEmailHtml(ownerName, woUrl),
           text:           smsBody,
           referenceTable: 'work_orders',
           referenceId:    workOrderId,
@@ -136,7 +152,76 @@ export async function POST(request, { params }) {
       } catch (e) { console.error('[checkout-notify] sms:', e.message) }
     }
 
-    return NextResponse.json({ success: true, email_sent: emailSent, sms_sent: smsSent })
+    // ── Notify company members with can_approve_checkout (non-fatal) ──────
+    let companyMembersNotified = 0
+    if (vo?.owner_company_id) {
+      try {
+        const companyId = vo.owner_company_id
+        const seenIds = new Set()
+        // Skip the company owner — already notified above
+        if (ownerProfileId) seenIds.add(ownerProfileId)
+
+        const { data: checkoutApprovers } = await sc
+          .from('company_users')
+          .select(`
+            user_id,
+            user:user_profiles(id, first_name, last_name, phone, email, auth_user_id)
+          `)
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+          .eq('can_approve_checkout', true)
+
+        for (const row of checkoutApprovers || []) {
+          const u = row.user
+          if (!u || seenIds.has(u.id)) continue
+          seenIds.add(u.id)
+
+          const memberName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Team Member'
+
+          // Resolve email
+          let memberEmail = u.email || null
+          if (!memberEmail && u.auth_user_id) {
+            try {
+              const { data: au } = await sc.auth.admin.getUserById(u.auth_user_id)
+              memberEmail = au?.user?.email || null
+            } catch {}
+          }
+
+          const memberSmsBody = `${BRAND}: ${provider} has submitted the checkout for fleet vehicle ${plate} (${wo.work_order_number}). Please review and confirm: ${companyWoUrl}`
+
+          if (memberEmail) {
+            try {
+              await sendAndQueueEmail(sc, {
+                to:             [{ Email: memberEmail, Name: memberName }],
+                subject,
+                html:           buildEmailHtml(memberName, companyWoUrl),
+                text:           memberSmsBody,
+                referenceTable: 'work_orders',
+                referenceId:    workOrderId,
+              })
+              companyMembersNotified++
+            } catch (e) { console.error(`[checkout-notify] company member ${u.id} email:`, e.message) }
+          }
+
+          const memberPhone = normalisePhone(u.phone)
+          if (memberPhone) {
+            try {
+              await sendAndQueueSms(sc, {
+                to:            memberPhone,
+                recipientName: memberName,
+                message:       memberSmsBody,
+                referenceTable:'work_orders',
+                referenceId:   workOrderId,
+              })
+            } catch (e) { console.error(`[checkout-notify] company member ${u.id} sms:`, e.message) }
+          }
+        }
+      } catch (e) {
+        console.error('[checkout-notify] company members notification (non-fatal):', e.message)
+      }
+    }
+
+    return NextResponse.json({ success: true, email_sent: emailSent, sms_sent: smsSent, company_members_notified: companyMembersNotified })
 
   } catch (err) {
     console.error('POST /api/work-orders/[id]/checkout-notify error:', err)
