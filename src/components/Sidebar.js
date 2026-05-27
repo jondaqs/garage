@@ -6,7 +6,7 @@ import {
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
   AlertCircle, Wrench, ClipboardList, Search, MessageSquare,
-  MessageCircle
+  MessageCircle, UserCheck
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -450,6 +450,7 @@ export default function Sidebar({ user }) {
     const items = [
       { icon: Building2,    label: 'Overview',    path: base,                       everyone: true  },
       { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
+      { icon: UserCheck,    label: 'Fleet Assignments', path: `${base}/fleet-assignments`, everyone: true },
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
       { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true  },
       { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },

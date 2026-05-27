@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Home, Truck, Users, Calendar, CalendarDays, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle,
-  Bell, Menu, X, Search, MessageSquare, MessageCircle
+  Bell, Menu, X, Search, MessageSquare, MessageCircle, UserCheck
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -95,8 +95,9 @@ export default function CompanySidebar({ company, userRole }) {
 
   const navigation = [
     { name: 'Dashboard',         href: '/company/dashboard',   icon: Home         },
-    { name: 'Fleet',             href: '/company/fleet',        icon: Truck        },
-    { name: 'Team',              href: '/company/team',         icon: Users        },
+    { name: 'Fleet',             href: '/company/fleet',              icon: Truck        },
+    { name: 'Fleet Assignments', href: '/company/fleet-assignments',  icon: UserCheck    },
+    { name: 'Team',              href: '/company/team',               icon: Users        },
     { name: 'Bookings',          href: '/company/bookings',     icon: Calendar     },
     { name: 'Calendar',          href: '/company/calendar',     icon: CalendarDays },
     { name: 'Work Orders',       href: '/company/work-orders',  icon: ClipboardList,
