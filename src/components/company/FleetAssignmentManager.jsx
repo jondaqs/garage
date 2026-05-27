@@ -315,9 +315,9 @@ export default function FleetAssignmentManager({ canEdit = false }) {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200">
           {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -396,7 +396,7 @@ export default function FleetAssignmentManager({ canEdit = false }) {
                       </td>
                       {/* Action */}
                       {canEdit && (
-                        <td className="px-5 py-4 text-right">
+                        <td className="px-5 py-5 text-right">
                           <div className="relative inline-block" data-fleet-dropdown>
                             {u ? (
                               <div className="flex items-center gap-2 justify-end">
@@ -437,7 +437,7 @@ export default function FleetAssignmentManager({ canEdit = false }) {
 
                             {/* Member picker dropdown */}
                             {openDropdown === item.vehicleId && (
-                              <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-lg z-30 overflow-hidden">
+                              <div className="absolute right-0 bottom-full mb-1 w-72 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
                                 {/* Search within members */}
                                 <div className="p-2 border-b border-gray-100">
                                   <div className="relative">
@@ -512,7 +512,7 @@ export default function FleetAssignmentManager({ canEdit = false }) {
               const v = item.vehicle || {}
               const u = item.assignedUser
               return (
-                <div key={item.vehicleId} className="p-4 space-y-3">
+                <div key={item.vehicleId} className="p-5 space-y-3 min-h-[120px]">
                   {/* Vehicle info */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -584,7 +584,7 @@ export default function FleetAssignmentManager({ canEdit = false }) {
 
                       {/* Mobile dropdown */}
                       {openDropdown === item.vehicleId && (
-                        <div className="absolute left-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-lg z-30 overflow-hidden">
+                        <div className="absolute left-0 bottom-full mb-1 w-72 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
                           <div className="p-2 border-b border-gray-100">
                             <div className="relative">
                               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
