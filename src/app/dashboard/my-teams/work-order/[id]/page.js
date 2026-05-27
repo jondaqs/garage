@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import {ArrowLeft, CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle,
   Wrench, Package, MessageSquare, Shield, ClipboardList,
   Star, ChevronDown, Car, Gauge, Gauge as GaugeIcon, FileText, Receipt, LogOut,
-  BellRing, ClipboardCheck
+  BellRing, ClipboardCheck, RefreshCw
 } from 'lucide-react'
 import ServicesTab        from '@/app/provider/work-orders/[id]/components/ServicesTab'
 import PartsTab           from '@/app/provider/work-orders/[id]/components/PartsTab'
@@ -116,6 +116,7 @@ export default function MechanicWorkOrderPage() {
 
   // Check-in
   const [showCheckin,    setShowCheckin]    = useState(false)
+  const [refreshing,     setRefreshing]     = useState(false)
   const [checkinMileage, setCheckinMileage] = useState('')
 
   const load = useCallback(async () => {
@@ -444,6 +445,15 @@ export default function MechanicWorkOrderPage() {
             <p className="text-sm text-gray-500 mt-1">{wo.service_provider?.name}</p>
           </div>
           <div className="text-right text-sm text-gray-500">
+            <button
+              onClick={async () => { setRefreshing(true); await load(); setRefreshing(false) }}
+              disabled={refreshing}
+              title="Refresh"
+              className="inline-flex items-center gap-1.5 mb-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
             <p className="flex items-center gap-1 justify-end">
               <Car size={13} /> {wo.vehicle?.plate_number}
               {wo.vehicle?.make && ` · ${wo.vehicle.make} ${wo.vehicle.model || ''}`}
