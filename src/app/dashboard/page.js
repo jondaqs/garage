@@ -1,13 +1,10 @@
-// src/app/dashboard/page.js
-// ALTERNATIVE SIMPLER APPROACH - Use this if the nested query fails
-
 'use client'
 
 import PendingInvitationsCard from '@/components/PendingInvitationsCard'
 import PendingCompanyInvitationsCard from '@/components/PendingCompanyInvitationsCard'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Car, Calendar, Check, CreditCard, Plus, ChevronDown, ChevronUp, RotateCcw, AlertCircle } from 'lucide-react'
+import { Car, Calendar, BarChart3, DollarSign, Plus, ChevronDown, ChevronUp, RotateCcw, AlertCircle, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import MobileHeader from '../../components/MobileHeader'
 import MobileVehicleCard from '../../components/MobileVehicleCard'
@@ -22,19 +19,9 @@ export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalVehicles: 0,
-    activeBookings: 0,
-    completedServices: 0,
-    totalSpent: 0
-  })
+  const [totalVehicles, setTotalVehicles] = useState(0)
 
   // ── Inactive (soft-deleted) vehicles ──────────────────────────────────
-  // Lazy-loaded only when the user expands the collapsible section,
-  // mirroring the company owner fleet page. Source is
-  // vehicle_ownership_history filtered by the caller's profile id.
-  // profileId is captured from the same lookup in fetchData() so we can
-  // reuse it for the lazy fetch + the restore RPC.
   const [profileId, setProfileId]               = useState(null)
   const [inactiveVehicles, setInactiveVehicles] = useState([])
   const [showInactive, setShowInactive]         = useState(false)
@@ -92,8 +79,6 @@ export default function DashboardPage() {
           return
         }
 
-        // Remember profile id for the inactive-vehicles lazy fetch and
-        // the restore RPC below.
         setProfileId(userProfile.id)
 
         // Step 2: Get vehicle IDs owned by user
@@ -111,7 +96,7 @@ export default function DashboardPage() {
 
         if (!ownerships || ownerships.length === 0) {
           setVehicles([])
-          setStats(prev => ({ ...prev, totalVehicles: 0 }))
+          setTotalVehicles(0)
           setLoading(false)
           return
         }
@@ -128,28 +113,12 @@ export default function DashboardPage() {
           console.error('Vehicles error:', vehiclesError)
           setVehicles([])
         } else {
-          // Map year_of_manufacture to year for display
           const mappedVehicles = (vehiclesData || []).map(v => ({
             ...v,
             year: v.year_of_manufacture
           }))
           setVehicles(mappedVehicles)
-          setStats(prev => ({
-            ...prev,
-            totalVehicles: mappedVehicles?.length || 0
-          }))
-
-          // Compute total spent from paid receipts for this user's vehicles
-          if (mappedVehicles?.length > 0) {
-            const vids = mappedVehicles.map(v => v.id)
-            const { data: spendData } = await supabase
-              .from('receipts')
-              .select('amount_paid, invoice:invoices!invoice_id(vehicle_id, status)')
-              .eq('invoice.status', 'paid')
-              .in('invoice.vehicle_id', vids)
-            const totalSpent = (spendData || []).reduce((sum, r) => sum + Number(r.amount_paid || 0), 0)
-            setStats(prev => ({ ...prev, totalSpent }))
-          }
+          setTotalVehicles(mappedVehicles?.length || 0)
         }
 
       } catch (error) {
@@ -163,11 +132,6 @@ export default function DashboardPage() {
   }, [supabase, router])
 
   // ── Inactive vehicles: lazy fetch + restore ──────────────────────────
-  // Fetches from vehicle_ownership_history filtered by the caller's
-  // profile id. We then narrow the result to rows whose vehicle is
-  // *currently* inactive (is_active === false) — the history table can
-  // also hold rows for vehicles that were restored or transferred to a
-  // new owner, and those should not appear here.
   const fetchInactive = useCallback(async () => {
     if (!profileId) return
     setLoadingInactive(true)
@@ -196,9 +160,6 @@ export default function DashboardPage() {
     }
   }, [profileId, supabase])
 
-  // Trigger the lazy fetch the first time the user expands, and refetch
-  // whenever they re-expand after a restore (we clear the list on
-  // restore so the next expand grabs the fresh state).
   useEffect(() => {
     if (showInactive && profileId) fetchInactive()
   }, [showInactive, profileId, fetchInactive])
@@ -212,12 +173,8 @@ export default function DashboardPage() {
       if (e) throw e
       if (data?.success === false) throw new Error(data.error || 'Restore failed')
 
-      // Refresh inactive list locally (remove the restored row) and bump
-      // the active list with a fresh fetch of vehicle_ownership.
       setInactiveVehicles(prev => prev.filter(row => row.vehicle_id !== vehicleId))
 
-      // Re-pull active vehicles so the restored one appears in "My Vehicles"
-      // without a full page reload.
       const { data: ownerships } = await supabase
         .from('vehicle_ownership')
         .select('vehicle_id')
@@ -231,7 +188,7 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false })
         const mapped = (vs ?? []).map(v => ({ ...v, year: v.year_of_manufacture }))
         setVehicles(mapped)
-        setStats(prev => ({ ...prev, totalVehicles: mapped.length }))
+        setTotalVehicles(mapped.length)
       }
     } catch (err) {
       setActionError(err?.message ?? 'Restore failed')
@@ -293,8 +250,7 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* Inactive vehicles — collapsible. Same data + restore RPC as
-            the desktop card, condensed into a list for narrow screens. */}
+        {/* Inactive vehicles — collapsible */}
         <section>
           <button
             onClick={() => setShowInactive(v => !v)}
@@ -365,46 +321,68 @@ export default function DashboardPage() {
 
       <MobileBottomNav />
     </div>
-    {/* ================= DESKTOP (UNCHANGED) ================= */}
+    {/* ================= DESKTOP ================= */}
     <div className="hidden md:block">
       <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-gray-800 mb-8">
           Welcome back, {userName}! 👋
         </h2>
 
-        {/* Stats */}
+        {/* Stats strip — 1 real stat + 3 navigation cards */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
+          {/* Total Vehicles — real data */}
           <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition">
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-600 text-sm">Total Vehicles</span>
               <Car className="text-blue-600" size={24} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{stats.totalVehicles}</p>
+            <p className="text-3xl font-bold text-gray-800">{totalVehicles}</p>
           </div>
 
-          <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition">
+          {/* Bookings — link card */}
+          <button
+            onClick={() => router.push('/dashboard/bookings')}
+            className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg hover:border-green-300 transition text-left group"
+          >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">Active Bookings</span>
+              <span className="text-gray-600 text-sm">Bookings</span>
               <Calendar className="text-green-600" size={24} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{stats.activeBookings}</p>
-          </div>
+            <p className="text-sm text-gray-500 mb-2">View and manage your service bookings</p>
+            <span className="text-green-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+              See Bookings <ArrowRight size={14} />
+            </span>
+          </button>
 
-          <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition">
+          {/* Reports — link card */}
+          <button
+            onClick={() => router.push('/dashboard/reports')}
+            className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg hover:border-purple-300 transition text-left group"
+          >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">Completed Services</span>
-              <Check className="text-purple-600" size={24} />
+              <span className="text-gray-600 text-sm">Service Reports</span>
+              <BarChart3 className="text-purple-600" size={24} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">{stats.completedServices}</p>
-          </div>
+            <p className="text-sm text-gray-500 mb-2">Work orders, providers, and downtime</p>
+            <span className="text-purple-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+              See Reports <ArrowRight size={14} />
+            </span>
+          </button>
 
-          <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition">
+          {/* Budget — link card */}
+          <button
+            onClick={() => router.push('/dashboard/budget')}
+            className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg hover:border-orange-300 transition text-left group"
+          >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">Total Spent</span>
-              <CreditCard className="text-orange-600" size={24} />
+              <span className="text-gray-600 text-sm">Budget & Spend</span>
+              <DollarSign className="text-orange-600" size={24} />
             </div>
-            <p className="text-3xl font-bold text-gray-800">KSh {stats.totalSpent.toLocaleString()}</p>
-          </div>
+            <p className="text-sm text-gray-500 mb-2">Track spend limits and per-vehicle costs</p>
+            <span className="text-orange-600 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+              See Budget <ArrowRight size={14} />
+            </span>
+          </button>
         </div>
 
         {/* Vehicles */}
@@ -463,11 +441,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ─── Inactive vehicles (collapsed by default) ─────────────────
-            Mirrors the company owner fleet page. Lazy-loaded on expand,
-            with a Restore button on each card. Restore goes through
-            restore_personal_vehicle, which blocks restoring a vehicle
-            that has been re-registered to another owner. ──────────── */}
+        {/* Inactive vehicles (collapsed by default) */}
         <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
           <button
             onClick={() => setShowInactive(v => !v)}
@@ -566,7 +540,7 @@ export default function DashboardPage() {
               onClick={() => router.push('/dashboard/history')}
               className="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-600 hover:bg-blue-50 transition text-left group"
             >
-              <Check className="text-blue-600 mb-3 group-hover:scale-110 transition" size={32} />
+              <BarChart3 className="text-blue-600 mb-3 group-hover:scale-110 transition" size={32} />
               <h4 className="font-bold text-gray-800 mb-2">View History</h4>
               <p className="text-sm text-gray-600">Check past service records</p>
             </button>
