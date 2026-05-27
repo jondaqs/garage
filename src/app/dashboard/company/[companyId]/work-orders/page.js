@@ -274,42 +274,43 @@ export default function CompanyDashboardWorkOrdersPage() {
         </div>
       )}
 
-      {/* Search + filter bar */}
-      {workOrders.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by vehicle, provider…"
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={e => setFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            {FILTER_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+      {/* Search + filter bar — always visible so users can change filters
+           even when the current filter yields zero results. */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by vehicle, provider…"
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
-      )}
+        <select
+          value={statusFilter}
+          onChange={e => setFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          {FILTER_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
 
       {/* List */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <ClipboardList className="mx-auto text-gray-300 mb-4" size={48} />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {workOrders.length === 0 ? 'No work orders yet' : 'No results'}
+            {workOrders.length === 0 && statusFilter === 'all' && !search.trim()
+              ? 'No work orders yet'
+              : 'No matching work orders'}
           </h3>
           <p className="text-gray-500 text-sm">
-            {workOrders.length === 0
+            {workOrders.length === 0 && statusFilter === 'all' && !search.trim()
               ? 'Work orders appear here when a service provider accepts a fleet vehicle booking.'
-              : 'Try adjusting your search or filter.'}
+              : 'Try selecting a different filter or adjusting your search.'}
           </p>
         </div>
       ) : (
