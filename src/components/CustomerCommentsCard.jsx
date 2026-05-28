@@ -7,23 +7,13 @@ import { MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 /**
  * Read-only Comments card for the customer-side work-order pages.
  *
- * Renders comments the provider has shared on this work order. RLS
- * (see migration `comments_select_widen.sql`) ensures only non-internal
- * comments come back for customer-side callers — we don't filter
- * `is_internal` client-side because the server already enforces it.
+ * Uses the get_customer_comments RPC (SECURITY DEFINER) which enforces
+ * is_internal = false at the database level, regardless of the caller's
+ * other roles. This prevents a user who is both a company member AND a
+ * provider team member from seeing internal provider notes on customer
+ * pages.
  *
- * Collapsed by default. Customers won't usually need to read these on
- * every page load, and keeping the page short matters more than always
- * showing every byte. The list is only fetched once.
- *
- * If the query returns zero rows the card is hidden entirely — we don't
- * want to render an empty collapsible header that opens to nothing.
- *
- * The card is intentionally simple: no replies, no posting, no
- * editing — just a chronological list. Customer-side authorship can
- * be a follow-up if needed; the back-end insert policy currently
- * requires author = current user, which would let it work as soon as
- * a UI is added.
+ * Collapsed by default. Hidden entirely if zero comments.
  */
 export default function CustomerCommentsCard({ workOrderId }) {
   const supabase = createClient()
@@ -35,23 +25,18 @@ export default function CustomerCommentsCard({ workOrderId }) {
     let cancelled = false
     async function load() {
       try {
-        const { data, error } = await supabase
-          .from('comments')
-          .select(`
-            id, content, created_at,
-            author:user_profiles!author_user_id(first_name, last_name)
-          `)
-          .eq('work_order_id', workOrderId)
-          .order('created_at', { ascending: true })
+        const { data, error } = await supabase.rpc('get_customer_comments', {
+          p_work_order_id: workOrderId,
+        })
         if (cancelled) return
         if (error) {
-          // Silently degrade — a customer not seeing this card is far
-          // better than a red error banner over what should be a calm
-          // status page. Logged for the dev console.
-          console.warn('CustomerCommentsCard load error:', error.message)
+          console.warn('CustomerCommentsCard RPC error:', error.message)
           setComments([])
+        } else if (data?.success) {
+          setComments(data.comments || [])
         } else {
-          setComments(data || [])
+          console.warn('CustomerCommentsCard:', data?.error)
+          setComments([])
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -61,9 +46,6 @@ export default function CustomerCommentsCard({ workOrderId }) {
     return () => { cancelled = true }
   }, [workOrderId, supabase])
 
-  // While the first fetch is in flight, render nothing rather than a
-  // skeleton header. The card is collapsed by default; an extra header
-  // that may disappear if there are zero rows would just be visual noise.
   if (loading) return null
   if (comments.length === 0) return null
 
@@ -89,7 +71,7 @@ export default function CustomerCommentsCard({ workOrderId }) {
             <div key={c.id} className="rounded-lg border border-gray-200 bg-white p-3">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-xs font-semibold text-gray-700">
-                  {c.author?.first_name} {c.author?.last_name}
+                  {c.author_name}
                 </span>
                 <span className="text-[11px] text-gray-400">
                   {new Date(c.created_at).toLocaleString('en-KE', {
