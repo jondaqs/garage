@@ -317,9 +317,6 @@ export default function ProviderAnalyticsPage() {
       const cancelledWOs = (workOrders || []).filter(w => w.status?.code === 'cancelled').length
 
       // ── Top Customers (personal users — via invoice.issued_to_user_id) ────
-      // Provider CAN read invoices (embedded in WO query). We aggregate by
-      // issued_to_user_id, then separate personal users from company users
-      // by checking user_profiles.company_id.
       const customerMap = {}
       ;(workOrders || []).forEach(wo => {
         const uid = wo.invoice?.issued_to_user_id
@@ -329,63 +326,44 @@ export default function ProviderAnalyticsPage() {
         customerMap[uid].revenue += Number(wo.invoice?.total_amount || 0)
       })
 
-      // Fetch profiles for all invoice recipients — user_profiles is readable
-      // by everyone (user_profiles_select_open policy). company_id tells us
-      // if the user belongs to a company (fleet) or is a personal customer.
       const allUserIds = Object.keys(customerMap)
       let topCustomers = []
-      let topCompanies = []
 
       if (allUserIds.length > 0) {
         const { data: profiles } = await supabase
           .from('user_profiles')
-          .select('id, first_name, last_name, company_id')
+          .select('id, first_name, last_name')
           .in('id', allUserIds)
 
         const profileMap = {}
         ;(profiles || []).forEach(p => { profileMap[p.id] = p })
 
-        // Split into personal customers vs company-affiliated users
-        const personalCustomers = []
-        const companyAgg = {}
+        topCustomers = Object.values(customerMap)
+          .map(c => ({
+            ...c,
+            name: profileMap[c.userId]
+              ? `${profileMap[c.userId].first_name || ''} ${profileMap[c.userId].last_name || ''}`.trim() || 'Unnamed'
+              : 'Unknown',
+          }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5)
+      }
 
-        Object.values(customerMap).forEach(c => {
-          const prof = profileMap[c.userId]
-          if (prof?.company_id) {
-            // Company user → aggregate under company
-            if (!companyAgg[prof.company_id]) {
-              companyAgg[prof.company_id] = { companyId: prof.company_id, woCount: 0, revenue: 0 }
-            }
-            companyAgg[prof.company_id].woCount += c.woCount
-            companyAgg[prof.company_id].revenue += c.revenue
-          } else {
-            // Personal customer
-            personalCustomers.push({
-              ...c,
-              name: prof
-                ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() || 'Unnamed'
-                : 'Unknown',
-            })
-          }
-        })
-
-        topCustomers = personalCustomers.sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-
-        // ── Top Companies (company-affiliated invoice recipients) ────────────
-        // company_profiles readable by any authenticated user (active companies)
-        const companyIds = Object.keys(companyAgg)
-        if (companyIds.length > 0) {
-          const { data: companyProfiles } = await supabase
-            .from('company_profiles')
-            .select('id, name')
-            .in('id', companyIds)
-          const compMap = {}
-          ;(companyProfiles || []).forEach(cp => { compMap[cp.id] = cp.name })
-          topCompanies = Object.values(companyAgg)
-            .map(c => ({ ...c, name: compMap[c.companyId] || 'Unknown Company' }))
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 5)
-        }
+      // ── Top Companies (via RPC — bypasses RLS on vehicle_ownership) ───────
+      let topCompanies = []
+      const { data: companyResult } = await supabase.rpc('get_provider_top_companies', {
+        p_provider_id: providerId,
+        p_since: since,
+        p_shop_id: shopFilter || null,
+        p_limit: 5,
+      })
+      if (companyResult?.success && companyResult.companies) {
+        topCompanies = companyResult.companies.map(c => ({
+          companyId: c.company_id,
+          name: c.company_name,
+          woCount: c.wo_count,
+          revenue: Number(c.revenue || 0),
+        }))
       }
 
       // ── Shop performance (revenue per shop) ───────────────────────────────

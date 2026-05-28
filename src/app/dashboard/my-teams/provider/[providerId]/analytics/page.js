@@ -341,54 +341,42 @@ export default function MemberAnalyticsPage() {
 
       const allUserIds = Object.keys(customerMap)
       let topCustomers = []
-      let topCompanies = []
 
       if (allUserIds.length > 0) {
         const { data: profiles } = await supabase
           .from('user_profiles')
-          .select('id, first_name, last_name, company_id')
+          .select('id, first_name, last_name')
           .in('id', allUserIds)
 
         const profileMap = {}
         ;(profiles || []).forEach(p => { profileMap[p.id] = p })
 
-        const personalCustomers = []
-        const companyAgg = {}
+        topCustomers = Object.values(customerMap)
+          .map(c => ({
+            ...c,
+            name: profileMap[c.userId]
+              ? `${profileMap[c.userId].first_name || ''} ${profileMap[c.userId].last_name || ''}`.trim() || 'Unnamed'
+              : 'Unknown',
+          }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5)
+      }
 
-        Object.values(customerMap).forEach(c => {
-          const prof = profileMap[c.userId]
-          if (prof?.company_id) {
-            if (!companyAgg[prof.company_id]) {
-              companyAgg[prof.company_id] = { companyId: prof.company_id, woCount: 0, revenue: 0 }
-            }
-            companyAgg[prof.company_id].woCount += c.woCount
-            companyAgg[prof.company_id].revenue += c.revenue
-          } else {
-            personalCustomers.push({
-              ...c,
-              name: prof
-                ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() || 'Unnamed'
-                : 'Unknown',
-            })
-          }
-        })
-
-        topCustomers = personalCustomers.sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-
-        // ── Top Companies ───────────────────────────────────────────────────
-        const companyIds = Object.keys(companyAgg)
-        if (companyIds.length > 0) {
-          const { data: companyProfiles } = await supabase
-            .from('company_profiles')
-            .select('id, name')
-            .in('id', companyIds)
-          const compMap = {}
-          ;(companyProfiles || []).forEach(cp => { compMap[cp.id] = cp.name })
-          topCompanies = Object.values(companyAgg)
-            .map(c => ({ ...c, name: compMap[c.companyId] || 'Unknown Company' }))
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 5)
-        }
+      // ── Top Companies (via RPC — bypasses RLS on vehicle_ownership) ───────
+      let topCompanies = []
+      const { data: companyResult } = await supabase.rpc('get_provider_top_companies', {
+        p_provider_id: providerId,
+        p_since: since,
+        p_shop_id: shopFilter || null,
+        p_limit: 5,
+      })
+      if (companyResult?.success && companyResult.companies) {
+        topCompanies = companyResult.companies.map(c => ({
+          companyId: c.company_id,
+          name: c.company_name,
+          woCount: c.wo_count,
+          revenue: Number(c.revenue || 0),
+        }))
       }
 
       // ── Shop performance ──────────────────────────────────────────────────
