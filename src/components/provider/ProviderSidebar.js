@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   LayoutDashboard, Calendar, CalendarDays, Users, Package, FileText,
-  BarChart3, Settings, Store, LogOut, Menu, X, MessageSquare,
+  BarChart3, DollarSign, Settings, Store, LogOut, Menu, X, MessageSquare,
   Search, Building2, MessageCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -168,6 +168,7 @@ export default function ProviderSidebar({ provider }) {
     { name: 'Team Members',     href: '/provider/team',        icon: Users           },
     { name: 'Inventory',        href: '/provider/inventory',   icon: Package         },
     { name: 'Analytics',        href: '/provider/analytics',   icon: BarChart3       },
+    { name: 'Revenue',          href: '/provider/revenue',     icon: DollarSign      },
     { name: 'Settings',         href: '/provider/settings',    icon: Settings        },
   ]
 

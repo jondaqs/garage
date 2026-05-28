@@ -976,6 +976,14 @@ export default function Sidebar({ user }) {
                           path:  `/dashboard/my-teams/provider/${m.providerId}/analytics`,
                         }} />
                       )}
+                      {/* Revenue — only visible to admin roles (owner, admin, accountant) */}
+                      {['service_provider_owner', 'admin', 'accountant'].includes(m.role) && (
+                        <NavItem key={`${m.providerId}-revenue`} compact item={{
+                          icon:  DollarSign,
+                          label: 'Revenue',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/revenue`,
+                        }} />
+                      )}
                       {/* Chat for this provider lives below Assigned Work Orders
                           in the shared block — keeps the provider-membership
                           quick-look (Overview only) tight, and groups all chat
