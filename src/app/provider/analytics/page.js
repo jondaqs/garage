@@ -316,85 +316,75 @@ export default function ProviderAnalyticsPage() {
       const doneWOs     = (workOrders || []).filter(w => ['completed','closed'].includes(w.status?.code)).length
       const cancelledWOs = (workOrders || []).filter(w => w.status?.code === 'cancelled').length
 
-      // ── Top Customers (by WO revenue via vehicle ownership) ───────────────
-      // Gather all vehicle IDs from work orders, look up personal ownership,
-      // then aggregate by owner user.
-      const vehicleIdsFromWOs = [...new Set((workOrders || []).map(wo => wo.vehicle_id).filter(Boolean))]
+      // ── Top Customers (personal users — via invoice.issued_to_user_id) ────
+      // Provider CAN read invoices (embedded in WO query). We aggregate by
+      // issued_to_user_id, then separate personal users from company users
+      // by checking user_profiles.company_id.
+      const customerMap = {}
+      ;(workOrders || []).forEach(wo => {
+        const uid = wo.invoice?.issued_to_user_id
+        if (!uid) return
+        if (!customerMap[uid]) customerMap[uid] = { userId: uid, woCount: 0, revenue: 0 }
+        customerMap[uid].woCount++
+        customerMap[uid].revenue += Number(wo.invoice?.total_amount || 0)
+      })
+
+      // Fetch profiles for all invoice recipients — user_profiles is readable
+      // by everyone (user_profiles_select_open policy). company_id tells us
+      // if the user belongs to a company (fleet) or is a personal customer.
+      const allUserIds = Object.keys(customerMap)
       let topCustomers = []
-      if (vehicleIdsFromWOs.length > 0) {
-        // Personal owners (not company-owned)
-        const { data: personalOwnerships } = await supabase
-          .from('vehicle_ownership')
-          .select('vehicle_id, owner_user_id')
-          .in('vehicle_id', vehicleIdsFromWOs)
-          .not('owner_user_id', 'is', null)
-
-        if (personalOwnerships && personalOwnerships.length > 0) {
-          const vehicleOwnerMap = {}
-          personalOwnerships.forEach(o => { vehicleOwnerMap[o.vehicle_id] = o.owner_user_id })
-
-          const customerMap = {}
-          ;(workOrders || []).forEach(wo => {
-            const ownerId = vehicleOwnerMap[wo.vehicle_id]
-            if (!ownerId) return
-            if (!customerMap[ownerId]) customerMap[ownerId] = { userId: ownerId, woCount: 0, revenue: 0 }
-            customerMap[ownerId].woCount++
-            customerMap[ownerId].revenue += Number(wo.invoice?.total_amount || 0)
-          })
-
-          const topCustomerIds = Object.values(customerMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-          if (topCustomerIds.length > 0) {
-            const { data: profiles } = await supabase
-              .from('user_profiles')
-              .select('id, first_name, last_name')
-              .in('id', topCustomerIds.map(c => c.userId))
-            const profileMap = {}
-            ;(profiles || []).forEach(p => { profileMap[p.id] = p })
-            topCustomers = topCustomerIds.map(c => ({
-              ...c,
-              name: profileMap[c.userId]
-                ? `${profileMap[c.userId].first_name || ''} ${profileMap[c.userId].last_name || ''}`.trim() || 'Unnamed'
-                : 'Unknown',
-            }))
-          }
-        }
-      }
-
-      // ── Top Companies (by vehicle WOs — company-owned vehicles) ───────────
       let topCompanies = []
-      if (vehicleIdsFromWOs.length > 0) {
-        const { data: ownerships } = await supabase
-          .from('vehicle_ownership')
-          .select('vehicle_id, owner_company_id')
-          .in('vehicle_id', vehicleIdsFromWOs)
-          .not('owner_company_id', 'is', null)
 
-        if (ownerships && ownerships.length > 0) {
-          const companyWOMap = {}
-          const vehicleCompanyMap = {}
-          ownerships.forEach(o => { vehicleCompanyMap[o.vehicle_id] = o.owner_company_id })
+      if (allUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, first_name, last_name, company_id')
+          .in('id', allUserIds)
 
-          ;(workOrders || []).forEach(wo => {
-            const compId = vehicleCompanyMap[wo.vehicle_id]
-            if (!compId) return
-            if (!companyWOMap[compId]) companyWOMap[compId] = { companyId: compId, woCount: 0, revenue: 0 }
-            companyWOMap[compId].woCount++
-            companyWOMap[compId].revenue += Number(wo.invoice?.total_amount || 0)
-          })
+        const profileMap = {}
+        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
 
-          const topCompanyIds = Object.values(companyWOMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-          if (topCompanyIds.length > 0) {
-            const { data: companyProfiles } = await supabase
-              .from('company_profiles')
-              .select('id, name')
-              .in('id', topCompanyIds.map(c => c.companyId))
-            const compMap = {}
-            ;(companyProfiles || []).forEach(c => { compMap[c.id] = c.name })
-            topCompanies = topCompanyIds.map(c => ({
+        // Split into personal customers vs company-affiliated users
+        const personalCustomers = []
+        const companyAgg = {}
+
+        Object.values(customerMap).forEach(c => {
+          const prof = profileMap[c.userId]
+          if (prof?.company_id) {
+            // Company user → aggregate under company
+            if (!companyAgg[prof.company_id]) {
+              companyAgg[prof.company_id] = { companyId: prof.company_id, woCount: 0, revenue: 0 }
+            }
+            companyAgg[prof.company_id].woCount += c.woCount
+            companyAgg[prof.company_id].revenue += c.revenue
+          } else {
+            // Personal customer
+            personalCustomers.push({
               ...c,
-              name: compMap[c.companyId] || 'Unknown Company',
-            }))
+              name: prof
+                ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() || 'Unnamed'
+                : 'Unknown',
+            })
           }
+        })
+
+        topCustomers = personalCustomers.sort((a, b) => b.revenue - a.revenue).slice(0, 5)
+
+        // ── Top Companies (company-affiliated invoice recipients) ────────────
+        // company_profiles readable by any authenticated user (active companies)
+        const companyIds = Object.keys(companyAgg)
+        if (companyIds.length > 0) {
+          const { data: companyProfiles } = await supabase
+            .from('company_profiles')
+            .select('id, name')
+            .in('id', companyIds)
+          const compMap = {}
+          ;(companyProfiles || []).forEach(cp => { compMap[cp.id] = cp.name })
+          topCompanies = Object.values(companyAgg)
+            .map(c => ({ ...c, name: compMap[c.companyId] || 'Unknown Company' }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5)
         }
       }
 
