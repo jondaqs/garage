@@ -194,8 +194,6 @@ export default function MemberRevenuePage() {
       const shopFilter = shopId !== 'all' ? shopId : null
       const custFilter = customerId !== 'all' ? customerId : null
 
-      console.log('[Revenue] period:', days, 'days | since:', since, '| until:', now, '| customer:', custFilter)
-
       const [{ data: current }, { data: prev }] = await Promise.all([
         supabase.rpc('get_provider_revenue', {
           p_provider_id: providerId, p_since: since, p_until: now,
@@ -208,8 +206,6 @@ export default function MemberRevenuePage() {
       ])
 
       if (current?.success) {
-        console.log('[Revenue] RPC debug_since:', current.debug_since, '| debug_until:', current.debug_until,
-          '| receipts:', current.by_currency?.reduce((s,c) => s + Number(c.receipt_count||0), 0))
         setData(current)
         if (currencyFilter !== 'all') {
           const codes = (current.by_currency || []).map(c => c.currency_code)

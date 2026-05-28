@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   TrendingUp, DollarSign, Users, Star,
   Calendar, Wrench, Loader2, AlertCircle,
-  ChevronDown, Store, UserCheck, Car, Building2, Crown, ArrowLeft
+  ChevronDown, Store, UserCheck, Car, Building2, Crown, ArrowLeft, Coins
 } from 'lucide-react'
 
 const PERIODS = [
@@ -146,6 +146,7 @@ export default function MemberAnalyticsPage() {
 
   const [days, setDays]         = useState('30')
   const [shopId, setShopId]     = useState('all')
+  const [currencyFilter, setCurrencyFilter] = useState('all')
   const [shops, setShops]       = useState([])
   const [data, setData]         = useState(null)
   const [loading, setLoading]   = useState(true)
@@ -217,73 +218,100 @@ export default function MemberAnalyticsPage() {
       if (shopFilter) prevBookingsQ = prevBookingsQ.eq('shop_id', shopFilter)
       const { count: prevBookings } = await prevBookingsQ
 
-      // ── Work orders ───────────────────────────────────────────────────────
+      // ── Work orders (opened_at — for WO statuses, completion, mechanics) ─
       let woQ = supabase
         .from('work_orders')
         .select(`
           id, opened_at, assigned_mechanic_id, vehicle_id, shop_id,
-          status:work_order_statuses(code, display_name),
-          invoice:invoices(id, total_amount, issued_to_user_id, vehicle_id)
+          status:work_order_statuses(code, display_name)
         `)
         .eq('service_provider_id', providerId)
         .gte('opened_at', since)
       if (shopFilter) woQ = woQ.eq('shop_id', shopFilter)
       const { data: workOrders } = await woQ
 
-      // ── Revenue ───────────────────────────────────────────────────────────
-      const { data: receipts } = await supabase
-        .from('receipts')
-        .select(`
-          amount_paid, paid_at,
-          invoice:invoices!invoice_id(service_provider_id, work_order_id, issued_to_user_id, vehicle_id,
-            work_order:work_orders!work_order_id(shop_id))
-        `)
-        .eq('invoice.service_provider_id', providerId)
-        .gte('paid_at', since)
+      // ── Invoices (issued_at — for revenue, top services, shops) ─────────
+      let invQ = supabase
+        .from('invoices')
+        .select('id, total_amount, issued_at, issued_to_user_id, work_order_id, work_order:work_orders!work_order_id(shop_id, vehicle_id, currency, currency_id, currency_ref:currencies!currency_id(code, symbol))')
+        .eq('service_provider_id', providerId)
+        .gte('issued_at', since)
+      if (shopFilter) invQ = invQ.eq('work_order.shop_id', shopFilter)
+      const { data: rawInvoices } = await invQ
+      const invoices = shopFilter
+        ? (rawInvoices || []).filter(inv => inv.work_order?.shop_id === shopFilter)
+        : (rawInvoices || []).filter(inv => inv.work_order !== null)
 
-      const { data: prevReceipts } = await supabase
-        .from('receipts')
-        .select('amount_paid, invoice:invoices!invoice_id(service_provider_id, work_order_id, work_order:work_orders!work_order_id(shop_id))')
-        .eq('invoice.service_provider_id', providerId)
-        .gte('paid_at', prevSince)
-        .lt('paid_at', since)
+      let prevInvQ = supabase
+        .from('invoices')
+        .select('id, total_amount, work_order:work_orders!work_order_id(shop_id, currency, currency_ref:currencies!currency_id(code))')
+        .eq('service_provider_id', providerId)
+        .gte('issued_at', prevSince)
+        .lt('issued_at', since)
+      if (shopFilter) prevInvQ = prevInvQ.eq('work_order.shop_id', shopFilter)
+      const { data: rawPrevInvoices } = await prevInvQ
+      const prevInvoices = shopFilter
+        ? (rawPrevInvoices || []).filter(inv => inv.work_order?.shop_id === shopFilter)
+        : (rawPrevInvoices || [])
 
-      const filteredReceipts = shopFilter
-        ? (receipts || []).filter(r => r.invoice?.work_order?.shop_id === shopFilter)
-        : (receipts || [])
-      const filteredPrevReceipts = shopFilter
-        ? (prevReceipts || []).filter(r => r.invoice?.work_order?.shop_id === shopFilter)
-        : (prevReceipts || [])
+      // ── Currency helper ─────────────────────────────────────────────────
+      const getCurrencyCode = (inv) => inv.work_order?.currency_ref?.code || inv.work_order?.currency || 'KES'
+      const getCurrencySymbol = (inv) => inv.work_order?.currency_ref?.symbol || ''
 
-      const revenue     = filteredReceipts.reduce((s, r) => s + Number(r.amount_paid || 0), 0)
-      const prevRevenue = filteredPrevReceipts.reduce((s, r) => s + Number(r.amount_paid || 0), 0)
-
-      // ── Service breakdown ─────────────────────────────────────────────────
-      const { data: woServices } = await supabase
-        .from('work_order_services')
-        .select(`
-          service:services(name),
-          actual_cost, estimated_cost,
-          work_order:work_orders!work_order_id(service_provider_id, opened_at, shop_id)
-        `)
-        .eq('work_order.service_provider_id', providerId)
-        .gte('work_order.opened_at', since)
-
-      const filteredWoServices = shopFilter
-        ? (woServices || []).filter(ws => ws.work_order?.shop_id === shopFilter)
-        : (woServices || [])
-
-      const serviceCounts = {}
-      filteredWoServices.forEach(ws => {
-        const name = ws.service?.name || 'Unknown'
-        if (!serviceCounts[name]) serviceCounts[name] = { count: 0, revenue: 0 }
-        serviceCounts[name].count++
-        serviceCounts[name].revenue += Number(ws.actual_cost || ws.estimated_cost || 0)
+      // ── Revenue by currency ─────────────────────────────────────────────
+      const revByCurrency = {}
+      invoices.forEach(inv => {
+        const cc = getCurrencyCode(inv)
+        const sym = getCurrencySymbol(inv)
+        if (!revByCurrency[cc]) revByCurrency[cc] = { code: cc, symbol: sym, total: 0, count: 0 }
+        revByCurrency[cc].total += Number(inv.total_amount || 0)
+        revByCurrency[cc].count++
       })
-      const topServices = Object.entries(serviceCounts)
-        .map(([name, v]) => ({ name, ...v }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 8)
+      const currencyList = Object.values(revByCurrency).sort((a, b) => b.total - a.total)
+      const revenue = currencyList.reduce((s, c) => s + c.total, 0)
+
+      const prevRevByCurrency = {}
+      ;(prevInvoices || []).forEach(inv => {
+        const cc = inv.work_order?.currency_ref?.code || inv.work_order?.currency || 'KES'
+        if (!prevRevByCurrency[cc]) prevRevByCurrency[cc] = { total: 0 }
+        prevRevByCurrency[cc].total += Number(inv.total_amount || 0)
+      })
+      const prevRevenue = Object.values(prevRevByCurrency).reduce((s, c) => s + c.total, 0)
+
+      // ── Daily revenue (by invoice issued_at date, per currency) ─────────
+      const dailyRevenue = {}
+      invoices.forEach(inv => {
+        const amt = Number(inv.total_amount || 0)
+        if (amt <= 0) return
+        const day = inv.issued_at?.slice(0, 10)
+        const cc = getCurrencyCode(inv)
+        if (day) {
+          if (!dailyRevenue[day]) dailyRevenue[day] = {}
+          dailyRevenue[day][cc] = (dailyRevenue[day][cc] || 0) + amt
+        }
+      })
+
+      // ── Service breakdown (from WO services for invoiced WOs in period) ─
+      const invoicedWoIds = invoices.map(inv => inv.work_order_id).filter(Boolean)
+      let topServices = []
+      if (invoicedWoIds.length > 0) {
+        const { data: woServices } = await supabase
+          .from('work_order_services')
+          .select('service:services(name), actual_cost, estimated_cost, work_order_id')
+          .in('work_order_id', invoicedWoIds)
+
+        const serviceCounts = {}
+        ;(woServices || []).forEach(ws => {
+          const name = ws.service?.name || 'Unknown'
+          if (!serviceCounts[name]) serviceCounts[name] = { count: 0, revenue: 0 }
+          serviceCounts[name].count++
+          serviceCounts[name].revenue += Number(ws.actual_cost || ws.estimated_cost || 0)
+        })
+        topServices = Object.entries(serviceCounts)
+          .map(([name, v]) => ({ name, ...v }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 8)
+      }
 
       // ── Reviews ───────────────────────────────────────────────────────────
       const { data: reviews } = await supabase
@@ -318,13 +346,6 @@ export default function MemberAnalyticsPage() {
         woStatusCounts[code].count++
       })
       const woStatuses = Object.values(woStatusCounts).sort((a, b) => b.count - a.count)
-
-      // ── Daily revenue ─────────────────────────────────────────────────────
-      const dailyRevenue = {}
-      filteredReceipts.forEach(r => {
-        const day = r.paid_at?.slice(0, 10)
-        if (day) dailyRevenue[day] = (dailyRevenue[day] || 0) + Number(r.amount_paid || 0)
-      })
 
       const doneWOs      = (workOrders || []).filter(w => ['completed','closed'].includes(w.status?.code)).length
       const cancelledWOs = (workOrders || []).filter(w => w.status?.code === 'cancelled').length
@@ -363,20 +384,16 @@ export default function MemberAnalyticsPage() {
         }))
       }
 
-      // ── Shop performance ──────────────────────────────────────────────────
+      // ── Shop performance (invoiced revenue per shop, by issued_at) ──────
       let shopPerformance = []
       if (!shopFilter) {
         const shopRevMap = {}
-        filteredReceipts.forEach(r => {
-          const sid = r.invoice?.work_order?.shop_id
+        invoices.forEach(inv => {
+          const sid = inv.work_order?.shop_id
           if (!sid) return
-          if (!shopRevMap[sid]) shopRevMap[sid] = { shopId: sid, revenue: 0, woCount: 0 }
-          shopRevMap[sid].revenue += Number(r.amount_paid || 0)
-        })
-        ;(workOrders || []).forEach(wo => {
-          const sid = wo.shop_id
-          if (!sid) return
-          if (!shopRevMap[sid]) shopRevMap[sid] = { shopId: sid, revenue: 0, woCount: 0 }
+          const cc = getCurrencyCode(inv)
+          if (!shopRevMap[sid]) shopRevMap[sid] = { shopId: sid, revenue: 0, woCount: 0, currency: cc }
+          shopRevMap[sid].revenue += Number(inv.total_amount || 0)
           shopRevMap[sid].woCount++
         })
         const shopIds = Object.keys(shopRevMap)
@@ -440,7 +457,7 @@ export default function MemberAnalyticsPage() {
 
       setData({
         totalBookings: bookings?.length || 0,
-        doneWOs, cancelledWOs, revenue, avgRating,
+        doneWOs, cancelledWOs, revenue, currencyList, avgRating,
         totalReviews: reviews?.length || 0,
         topServices, bookingStatuses, ratingDist, dailyRevenue,
         woStatuses, topCustomers, topCompanies, shopPerformance, mechanicPerformance,
@@ -457,11 +474,39 @@ export default function MemberAnalyticsPage() {
     }
   }
 
-  const fmt = (n) => `KES ${Number(n || 0).toLocaleString()}`
+  const fmt = (n, cc) => {
+    const code = cc || activeCurrency
+    return `${code} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+
+  const currencies = data?.currencyList || []
+  const hasMultipleCurrencies = currencies.length > 1
+  const activeCurrency = currencyFilter !== 'all' ? currencyFilter : (currencies[0]?.code || 'KES')
+
+  const displayRevenue = () => {
+    if (!data) return 0
+    if (currencyFilter !== 'all') {
+      const match = currencies.find(c => c.code === currencyFilter)
+      return match?.total || 0
+    }
+    return data.revenue
+  }
 
   const DailyRevenueChart = () => {
     if (!data?.dailyRevenue) return null
-    const entries = Object.entries(data.dailyRevenue).sort(([a],[b]) => a.localeCompare(b))
+    const raw = Object.entries(data.dailyRevenue).sort(([a],[b]) => a.localeCompare(b))
+    const entries = raw.map(([day, byCurrency]) => {
+      let val = 0
+      if (currencyFilter !== 'all') {
+        val = byCurrency[currencyFilter] || 0
+      } else if (currencies.length === 1) {
+        val = byCurrency[currencies[0].code] || 0
+      } else {
+        val = Object.values(byCurrency).reduce((s, v) => s + v, 0)
+      }
+      return [day, val]
+    }).filter(([, v]) => v > 0)
+
     if (entries.length < 2) return null
     const max = Math.max(...entries.map(([,v]) => v))
 
@@ -479,7 +524,7 @@ export default function MemberAnalyticsPage() {
             return (
               <div key={day} className="flex flex-col items-center flex-1" style={{ minWidth: '40px' }}>
                 <span className="text-[10px] text-gray-500 mb-1 font-medium">
-                  {fmt(val).replace('KES ', '')}
+                  {fmt(val).replace(/^[A-Z]{3}\s?/, '')}
                 </span>
                 <div className="w-full flex justify-center">
                   <div className="w-7 bg-blue-400 rounded-t hover:bg-blue-500 transition-colors cursor-default"
@@ -538,6 +583,17 @@ export default function MemberAnalyticsPage() {
               <Store size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
           )}
+          {/* Currency filter */}
+          {hasMultipleCurrencies && (
+            <div className="relative">
+              <select value={currencyFilter} onChange={e => setCurrencyFilter(e.target.value)}
+                className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 appearance-none bg-white">
+                <option value="all">All Currencies</option>
+                {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+              </select>
+              <Coins size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          )}
           <div className="relative">
             <select value={days} onChange={e => setDays(e.target.value)}
               className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 appearance-none bg-white">
@@ -546,6 +602,15 @@ export default function MemberAnalyticsPage() {
             <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
         </div>
+      </div>
+
+      {/* Info banner */}
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-sm">
+        <DollarSign className="text-amber-500 flex-shrink-0 mt-0.5" size={16} />
+        <p className="text-amber-800">
+          Revenue figures here reflect <span className="font-medium">invoiced amounts</span> (by invoice date), not actual payments received.
+          For paid receipt totals, visit the <a href={`/dashboard/my-teams/provider/${providerId}/revenue`} className="underline font-medium hover:text-amber-900">Revenue page</a>.
+        </p>
       </div>
 
       {error && (
@@ -567,7 +632,8 @@ export default function MemberAnalyticsPage() {
             <StatTile icon={Wrench} label="Work Orders" value={data.totalWOs}
               sub={`${data.doneWOs} completed/closed · ${data.cancelledWOs} cancelled`}
               color="bg-orange-100" iconColor="text-orange-600" />
-            <StatTile icon={DollarSign} label="Revenue" value={fmt(data.revenue)}
+            <StatTile icon={DollarSign} label="Invoiced Revenue" value={fmt(displayRevenue())}
+              sub={hasMultipleCurrencies && currencyFilter === 'all' ? currencies.map(c => `${c.code} ${c.total.toLocaleString()}`).join(' · ') : null}
               color="bg-green-100" iconColor="text-green-600" trend={data.trends.revenue} />
             <StatTile icon={Star} label="Avg Rating"
               value={data.avgRating ? `${data.avgRating} / 5` : 'No reviews'}
@@ -578,10 +644,12 @@ export default function MemberAnalyticsPage() {
           {Object.keys(data.dailyRevenue || {}).length > 1 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-semibold text-gray-900">Daily Revenue</p>
-                <p className="text-base font-bold text-blue-700">{fmt(data.revenue)}</p>
+                <p className="text-sm font-semibold text-gray-900">Daily Invoiced Revenue</p>
+                <p className="text-base font-bold text-blue-700">{fmt(displayRevenue())}</p>
               </div>
-              <p className="text-xs text-gray-400 mb-3">Total for selected period — scroll to see all days</p>
+              <p className="text-xs text-gray-400 mb-3">
+                Invoiced totals per day{currencyFilter !== 'all' ? ` (${currencyFilter})` : ''} — scroll to see all days
+              </p>
               <DailyRevenueChart />
             </div>
           )}
@@ -716,7 +784,7 @@ export default function MemberAnalyticsPage() {
               <div className="space-y-3">
                 {data.shopPerformance.map((s, i) => (
                   <Bar key={i} value={s.woCount} max={data.shopPerformance[0].woCount || 1}
-                    label={s.name} amount={fmt(s.revenue)}
+                    label={s.name} amount={fmt(s.revenue, s.currency)}
                     color={['bg-purple-500','bg-indigo-500','bg-violet-500','bg-fuchsia-500'][i] || 'bg-gray-400'}
                     sublabel={`${s.woCount} work order${s.woCount !== 1 ? 's' : ''}`} />
                 ))}
