@@ -968,6 +968,14 @@ export default function Sidebar({ user }) {
                           path:  `/dashboard/my-teams/provider/${m.providerId}/inventory`,
                         }} />
                       )}
+                      {/* Analytics — only visible to admin roles (owner, admin, accountant) */}
+                      {['service_provider_owner', 'admin', 'accountant'].includes(m.role) && (
+                        <NavItem key={`${m.providerId}-analytics`} compact item={{
+                          icon:  BarChart3,
+                          label: 'Analytics',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/analytics`,
+                        }} />
+                      )}
                       {/* Chat for this provider lives below Assigned Work Orders
                           in the shared block — keeps the provider-membership
                           quick-look (Overview only) tight, and groups all chat
