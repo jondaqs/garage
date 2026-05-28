@@ -316,37 +316,21 @@ export default function ProviderAnalyticsPage() {
       const doneWOs     = (workOrders || []).filter(w => ['completed','closed'].includes(w.status?.code)).length
       const cancelledWOs = (workOrders || []).filter(w => w.status?.code === 'cancelled').length
 
-      // ── Top Customers (personal users — via invoice.issued_to_user_id) ────
-      const customerMap = {}
-      ;(workOrders || []).forEach(wo => {
-        const uid = wo.invoice?.issued_to_user_id
-        if (!uid) return
-        if (!customerMap[uid]) customerMap[uid] = { userId: uid, woCount: 0, revenue: 0 }
-        customerMap[uid].woCount++
-        customerMap[uid].revenue += Number(wo.invoice?.total_amount || 0)
-      })
-
-      const allUserIds = Object.keys(customerMap)
+      // ── Top Customers (via RPC — bypasses RLS on vehicle_ownership) ───────
       let topCustomers = []
-
-      if (allUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('user_profiles')
-          .select('id, first_name, last_name')
-          .in('id', allUserIds)
-
-        const profileMap = {}
-        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
-
-        topCustomers = Object.values(customerMap)
-          .map(c => ({
-            ...c,
-            name: profileMap[c.userId]
-              ? `${profileMap[c.userId].first_name || ''} ${profileMap[c.userId].last_name || ''}`.trim() || 'Unnamed'
-              : 'Unknown',
-          }))
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 5)
+      const { data: customerResult } = await supabase.rpc('get_provider_top_customers', {
+        p_provider_id: providerId,
+        p_since: since,
+        p_shop_id: shopFilter || null,
+        p_limit: 5,
+      })
+      if (customerResult?.success && customerResult.customers) {
+        topCustomers = customerResult.customers.map(c => ({
+          userId: c.user_id,
+          name: c.customer_name,
+          woCount: c.wo_count,
+          revenue: Number(c.revenue || 0),
+        }))
       }
 
       // ── Top Companies (via RPC — bypasses RLS on vehicle_ownership) ───────
