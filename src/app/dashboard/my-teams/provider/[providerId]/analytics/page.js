@@ -17,16 +17,22 @@ const PERIODS = [
 ]
 
 const WO_STATUS_COLORS = {
-  open:              { bg: 'bg-blue-500',    text: 'text-blue-700',   light: 'bg-blue-50'    },
-  in_progress:       { bg: 'bg-amber-500',   text: 'text-amber-700',  light: 'bg-amber-50'   },
-  completed:         { bg: 'bg-green-500',   text: 'text-green-700',  light: 'bg-green-50'   },
-  cancelled:         { bg: 'bg-red-500',     text: 'text-red-700',    light: 'bg-red-50'     },
-  pending_approval:  { bg: 'bg-purple-500',  text: 'text-purple-700', light: 'bg-purple-50'  },
-  estimate_sent:     { bg: 'bg-indigo-500',  text: 'text-indigo-700', light: 'bg-indigo-50'  },
-  invoiced:          { bg: 'bg-teal-500',    text: 'text-teal-700',   light: 'bg-teal-50'    },
-  checked_in:        { bg: 'bg-cyan-500',    text: 'text-cyan-700',   light: 'bg-cyan-50'    },
-  qc_passed:         { bg: 'bg-emerald-500', text: 'text-emerald-700',light: 'bg-emerald-50' },
-  default:           { bg: 'bg-gray-500',    text: 'text-gray-700',   light: 'bg-gray-50'    },
+  intake:             { bg: 'bg-slate-400',   hex: '#94a3b8', text: 'text-slate-700',   light: 'bg-slate-50'   },
+  assigned:           { bg: 'bg-sky-500',     hex: '#0ea5e9', text: 'text-sky-700',     light: 'bg-sky-50'     },
+  diagnosing:         { bg: 'bg-violet-500',  hex: '#8b5cf6', text: 'text-violet-700',  light: 'bg-violet-50'  },
+  services_estimates: { bg: 'bg-blue-500',    hex: '#3b82f6', text: 'text-blue-700',    light: 'bg-blue-50'    },
+  internal_review:    { bg: 'bg-purple-500',  hex: '#a855f7', text: 'text-purple-700',  light: 'bg-purple-50'  },
+  awaiting_approval:  { bg: 'bg-yellow-500',  hex: '#eab308', text: 'text-yellow-700',  light: 'bg-yellow-50'  },
+  approved:           { bg: 'bg-cyan-500',    hex: '#06b6d4', text: 'text-cyan-700',    light: 'bg-cyan-50'    },
+  in_progress:        { bg: 'bg-orange-500',  hex: '#f97316', text: 'text-orange-700',  light: 'bg-orange-50'  },
+  quality_check:      { bg: 'bg-indigo-500',  hex: '#6366f1', text: 'text-indigo-700',  light: 'bg-indigo-50'  },
+  rework:             { bg: 'bg-rose-500',    hex: '#f43f5e', text: 'text-rose-700',    light: 'bg-rose-50'    },
+  completed:          { bg: 'bg-green-500',   hex: '#22c55e', text: 'text-green-700',   light: 'bg-green-50'   },
+  cancelled:          { bg: 'bg-red-500',     hex: '#ef4444', text: 'text-red-700',     light: 'bg-red-50'     },
+  closed:             { bg: 'bg-gray-500',    hex: '#6b7280', text: 'text-gray-700',    light: 'bg-gray-50'    },
+  invoiced:           { bg: 'bg-teal-500',    hex: '#14b8a6', text: 'text-teal-700',    light: 'bg-teal-50'    },
+  checked_in:         { bg: 'bg-lime-500',    hex: '#84cc16', text: 'text-lime-700',    light: 'bg-lime-50'    },
+  default:            { bg: 'bg-gray-400',    hex: '#9ca3af', text: 'text-gray-600',    light: 'bg-gray-50'    },
 }
 
 function getWOColor(code) {
@@ -93,16 +99,10 @@ function DonutChart({ statuses, total }) {
             const gap = circumference - dash
             const currentOffset = offset
             offset += dash
-            const colorClass = getWOColor(s.code)
-            const colorMap = {
-              'bg-blue-500': '#3b82f6', 'bg-amber-500': '#f59e0b', 'bg-green-500': '#22c55e',
-              'bg-red-500': '#ef4444', 'bg-purple-500': '#a855f7', 'bg-indigo-500': '#6366f1',
-              'bg-teal-500': '#14b8a6', 'bg-cyan-500': '#06b6d4', 'bg-emerald-500': '#10b981',
-              'bg-gray-500': '#6b7280',
-            }
+            const colorInfo = getWOColor(s.code)
             return (
               <circle key={i} cx={size/2} cy={size/2} r={radius} fill="none"
-                stroke={colorMap[colorClass.bg] || '#6b7280'}
+                stroke={colorInfo.hex}
                 strokeWidth={stroke}
                 strokeDasharray={`${dash} ${gap}`}
                 strokeDashoffset={-currentOffset}
@@ -121,13 +121,13 @@ function DonutChart({ statuses, total }) {
       <div className="flex-1 space-y-2 w-full">
         {statuses.map((s, i) => {
           const pct = Math.round((s.count / total) * 100)
-          const colorClass = getWOColor(s.code)
+          const colorInfo = getWOColor(s.code)
           return (
             <div key={i} className="flex items-center gap-2 text-sm">
-              <span className={`w-3 h-3 rounded-full ${colorClass.bg} flex-shrink-0`} />
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: colorInfo.hex }} />
               <span className="text-gray-600 truncate flex-1">{s.display_name}</span>
               <span className="font-semibold text-gray-900 flex-shrink-0">{s.count}</span>
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${colorClass.light} ${colorClass.text} flex-shrink-0`}>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${colorInfo.light} ${colorInfo.text} flex-shrink-0`}>
                 {pct}%
               </span>
             </div>
@@ -166,7 +166,6 @@ export default function MemberAnalyticsPage() {
         .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
       if (!profile) { setAccessDenied(true); setLoading(false); return }
 
-      // Check SPU membership and role
       const { data: spuRow } = await supabase
         .from('service_provider_users')
         .select('id, role')
@@ -180,12 +179,10 @@ export default function MemberAnalyticsPage() {
       const isAdmin = ['service_provider_owner', 'admin', 'accountant'].includes(spuRow.role)
       if (!isAdmin) { setAccessDenied(true); setLoading(false); return }
 
-      // Get provider name
       const { data: sp } = await supabase
         .from('service_providers').select('name').eq('id', providerId).single()
       setProviderName(sp?.name || 'Provider')
 
-      // Load shops
       const { data: shopList } = await supabase
         .from('shops').select('id, name').eq('service_provider_id', providerId).eq('is_active', true).order('name')
       setShops(shopList || [])
@@ -233,7 +230,7 @@ export default function MemberAnalyticsPage() {
       if (shopFilter) woQ = woQ.eq('shop_id', shopFilter)
       const { data: workOrders } = await woQ
 
-      // ── Revenue (paid receipts) ───────────────────────────────────────────
+      // ── Revenue ───────────────────────────────────────────────────────────
       const { data: receipts } = await supabase
         .from('receipts')
         .select(`
@@ -312,7 +309,7 @@ export default function MemberAnalyticsPage() {
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
 
-      // ── Work order status breakdown (for donut) ───────────────────────────
+      // ── Work order status breakdown (donut) ───────────────────────────────
       const woStatusCounts = {}
       ;(workOrders || []).forEach(wo => {
         const code = wo.status?.code || 'unknown'
@@ -329,38 +326,50 @@ export default function MemberAnalyticsPage() {
         if (day) dailyRevenue[day] = (dailyRevenue[day] || 0) + Number(r.amount_paid || 0)
       })
 
-      const completedWOs  = (workOrders || []).filter(w => w.status?.code === 'completed').length
-      const cancelledWOs  = (workOrders || []).filter(w => w.status?.code === 'cancelled').length
+      const doneWOs      = (workOrders || []).filter(w => ['completed','closed'].includes(w.status?.code)).length
+      const cancelledWOs = (workOrders || []).filter(w => w.status?.code === 'cancelled').length
 
-      // ── Top Customers ─────────────────────────────────────────────────────
-      const customerMap = {}
-      for (const wo of (workOrders || [])) {
-        const inv = wo.invoice
-        if (!inv?.issued_to_user_id) continue
-        const uid = inv.issued_to_user_id
-        if (!customerMap[uid]) customerMap[uid] = { userId: uid, woCount: 0, revenue: 0 }
-        customerMap[uid].woCount++
-        customerMap[uid].revenue += Number(inv.total_amount || 0)
-      }
-      const topCustomerIds = Object.values(customerMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-      let topCustomers = []
-      if (topCustomerIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('user_profiles')
-          .select('id, first_name, last_name, company_id')
-          .in('id', topCustomerIds.map(c => c.userId))
-        const profileMap = {}
-        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
-        topCustomers = topCustomerIds.map(c => ({
-          ...c,
-          name: profileMap[c.userId]
-            ? `${profileMap[c.userId].first_name || ''} ${profileMap[c.userId].last_name || ''}`.trim() || 'Unnamed'
-            : 'Unknown',
-        }))
-      }
-
-      // ── Top Companies ─────────────────────────────────────────────────────
+      // ── Top Customers (personal vehicle owners) ───────────────────────────
       const vehicleIdsFromWOs = [...new Set((workOrders || []).map(wo => wo.vehicle_id).filter(Boolean))]
+      let topCustomers = []
+      if (vehicleIdsFromWOs.length > 0) {
+        const { data: personalOwnerships } = await supabase
+          .from('vehicle_ownership')
+          .select('vehicle_id, owner_user_id')
+          .in('vehicle_id', vehicleIdsFromWOs)
+          .not('owner_user_id', 'is', null)
+
+        if (personalOwnerships && personalOwnerships.length > 0) {
+          const vehicleOwnerMap = {}
+          personalOwnerships.forEach(o => { vehicleOwnerMap[o.vehicle_id] = o.owner_user_id })
+
+          const customerMap = {}
+          ;(workOrders || []).forEach(wo => {
+            const ownerId = vehicleOwnerMap[wo.vehicle_id]
+            if (!ownerId) return
+            if (!customerMap[ownerId]) customerMap[ownerId] = { userId: ownerId, woCount: 0, revenue: 0 }
+            customerMap[ownerId].woCount++
+            customerMap[ownerId].revenue += Number(wo.invoice?.total_amount || 0)
+          })
+
+          const topCustomerIds = Object.values(customerMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
+          if (topCustomerIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('user_profiles').select('id, first_name, last_name')
+              .in('id', topCustomerIds.map(c => c.userId))
+            const profileMap = {}
+            ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+            topCustomers = topCustomerIds.map(c => ({
+              ...c,
+              name: profileMap[c.userId]
+                ? `${profileMap[c.userId].first_name || ''} ${profileMap[c.userId].last_name || ''}`.trim() || 'Unnamed'
+                : 'Unknown',
+            }))
+          }
+        }
+      }
+
+      // ── Top Companies (company-owned vehicles) ────────────────────────────
       let topCompanies = []
       if (vehicleIdsFromWOs.length > 0) {
         const { data: ownerships } = await supabase
@@ -425,7 +434,7 @@ export default function MemberAnalyticsPage() {
         if (!mid) return
         if (!mechMap[mid]) mechMap[mid] = { mechanicId: mid, totalWOs: 0, completed: 0 }
         mechMap[mid].totalWOs++
-        if (wo.status?.code === 'completed') mechMap[mid].completed++
+        if (['completed', 'closed'].includes(wo.status?.code)) mechMap[mid].completed++
       })
 
       const { data: mechanics } = await supabase
@@ -468,7 +477,7 @@ export default function MemberAnalyticsPage() {
 
       setData({
         totalBookings: bookings?.length || 0,
-        completedWOs, cancelledWOs, revenue, avgRating,
+        doneWOs, cancelledWOs, revenue, avgRating,
         totalReviews: reviews?.length || 0,
         topServices, bookingStatuses, ratingDist, dailyRevenue,
         woStatuses, topCustomers, topCompanies, shopPerformance, mechanicPerformance,
@@ -522,7 +531,6 @@ export default function MemberAnalyticsPage() {
     )
   }
 
-  // ── Access denied ─────────────────────────────────────────────────────────
   if (accessDenied) {
     return (
       <div className="max-w-2xl mx-auto p-6">
@@ -545,7 +553,6 @@ export default function MemberAnalyticsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header + Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <button onClick={() => router.push(`/dashboard/my-teams/provider/${providerId}`)}
@@ -591,12 +598,11 @@ export default function MemberAnalyticsPage() {
         </div>
       ) : data && (
         <>
-          {/* Summary tiles */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatTile icon={Calendar} label="Total Bookings" value={data.totalBookings}
               color="bg-blue-100" iconColor="text-blue-600" trend={data.trends.bookings} />
             <StatTile icon={Wrench} label="Work Orders" value={data.totalWOs}
-              sub={`${data.completedWOs} completed · ${data.cancelledWOs} cancelled`}
+              sub={`${data.doneWOs} completed/closed · ${data.cancelledWOs} cancelled`}
               color="bg-orange-100" iconColor="text-orange-600" />
             <StatTile icon={DollarSign} label="Revenue" value={fmt(data.revenue)}
               color="bg-green-100" iconColor="text-green-600" trend={data.trends.revenue} />
@@ -606,7 +612,6 @@ export default function MemberAnalyticsPage() {
               color="bg-yellow-100" iconColor="text-yellow-500" />
           </div>
 
-          {/* Daily Revenue */}
           {Object.keys(data.dailyRevenue || {}).length > 1 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-1">
@@ -618,7 +623,6 @@ export default function MemberAnalyticsPage() {
             </div>
           )}
 
-          {/* WO Status Donut + Booking statuses */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -645,7 +649,6 @@ export default function MemberAnalyticsPage() {
             </div>
           </div>
 
-          {/* Top Services + Reviews */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -693,7 +696,6 @@ export default function MemberAnalyticsPage() {
             </div>
           </div>
 
-          {/* Top Customers + Top Companies */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -743,7 +745,6 @@ export default function MemberAnalyticsPage() {
             </div>
           </div>
 
-          {/* Shop Performance */}
           {data.shopPerformance.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -760,7 +761,6 @@ export default function MemberAnalyticsPage() {
             </div>
           )}
 
-          {/* Mechanic Performance */}
           {data.mechanicPerformance.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -772,7 +772,7 @@ export default function MemberAnalyticsPage() {
                     <tr className="border-b border-gray-100">
                       <th className="text-left text-xs font-medium text-gray-500 py-2 px-2">Mechanic</th>
                       <th className="text-center text-xs font-medium text-gray-500 py-2 px-2">Work Orders</th>
-                      <th className="text-center text-xs font-medium text-gray-500 py-2 px-2">Completed</th>
+                      <th className="text-center text-xs font-medium text-gray-500 py-2 px-2">Done</th>
                       <th className="text-center text-xs font-medium text-gray-500 py-2 px-2">Completion Rate</th>
                       <th className="text-center text-xs font-medium text-gray-500 py-2 px-2">
                         <span className="flex items-center justify-center gap-1"><Car size={12} /> Assigned Vehicles</span>
@@ -810,26 +810,26 @@ export default function MemberAnalyticsPage() {
             </div>
           )}
 
-          {/* Completion rate */}
           {data.totalWOs > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Work Order Completion Rate</h2>
+              <p className="text-xs text-gray-400 mb-2">Includes completed and closed work orders</p>
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                    <span>Completed</span>
-                    <span>{Math.round((data.completedWOs / data.totalWOs) * 100)}%</span>
+                    <span>Completed / Closed</span>
+                    <span>{Math.round((data.doneWOs / data.totalWOs) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-3">
                     <div className="h-3 rounded-full bg-green-500 transition-all duration-500"
-                      style={{ width: `${Math.round((data.completedWOs / data.totalWOs) * 100)}%` }} />
+                      style={{ width: `${Math.round((data.doneWOs / data.totalWOs) * 100)}%` }} />
                   </div>
                 </div>
                 <div className="text-center flex-shrink-0">
                   <p className="text-2xl font-bold text-green-700">
-                    {Math.round((data.completedWOs / data.totalWOs) * 100)}%
+                    {Math.round((data.doneWOs / data.totalWOs) * 100)}%
                   </p>
-                  <p className="text-xs text-gray-400">{data.completedWOs}/{data.totalWOs} WOs</p>
+                  <p className="text-xs text-gray-400">{data.doneWOs}/{data.totalWOs} WOs</p>
                 </div>
               </div>
             </div>
