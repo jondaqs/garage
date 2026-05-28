@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   DollarSign, TrendingUp, Loader2, AlertCircle, ChevronDown,
   Store, Users, CreditCard, Building2, Receipt, Crown,
-  Calendar, ArrowUpRight, ArrowDownRight, ArrowLeft
+  ArrowUpRight, ArrowDownRight, ArrowLeft, Coins
 } from 'lucide-react'
 
 const PERIODS = [
@@ -103,12 +103,11 @@ function DonutChart({ items, total, formatAmount }) {
 }
 
 function BarChart({ entries, formatAmount, color = '#3b82f6', hoverColor = '#2563eb' }) {
-  const scrollRef = useRef(null)
   if (!entries || entries.length < 1) return null
   const max = Math.max(...entries.map(e => e.value), 1)
 
   return (
-    <div ref={scrollRef} className="overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'thin' }}>
+    <div className="overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'thin' }}>
       <div className="flex items-end gap-1.5"
         style={{ minWidth: entries.length > 15 ? `${entries.length * 44}px` : '100%', height: '170px' }}>
         {entries.map((e, i) => {
@@ -143,8 +142,8 @@ export default function MemberRevenuePage() {
   const [days, setDays] = useState('30')
   const [shopId, setShopId] = useState('all')
   const [customerId, setCustomerId] = useState('all')
+  const [currencyFilter, setCurrencyFilter] = useState('all')
   const [shops, setShops] = useState([])
-  const [customers, setCustomers] = useState([])
   const [data, setData] = useState(null)
   const [prevData, setPrevData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -207,8 +206,9 @@ export default function MemberRevenuePage() {
 
       if (current?.success) {
         setData(current)
-        if (current.top_customers?.length > 0 && customers.length === 0) {
-          setCustomers(current.top_customers.map(c => ({ id: c.user_id, name: c.customer_name })))
+        if (currencyFilter !== 'all') {
+          const codes = (current.by_currency || []).map(c => c.currency_code)
+          if (!codes.includes(currencyFilter)) setCurrencyFilter('all')
         }
       } else { setError(current?.error || 'Failed to load revenue data') }
       if (prev?.success) setPrevData(prev)
@@ -219,42 +219,86 @@ export default function MemberRevenuePage() {
   const fmt = (amount, cc = 'KES') =>
     `${cc} ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
-  const totalRevenue = (d) => (d?.by_currency || []).reduce((s, c) => s + Number(c.total_revenue || 0), 0)
-  const totalReceipts = (d) => (d?.by_currency || []).reduce((s, c) => s + Number(c.receipt_count || 0), 0)
-  const trend = (curr, prev) => prev === 0 ? null : Math.round(((curr - prev) / prev) * 100)
-  const primaryCurrency = data?.by_currency?.[0]?.currency_code || 'KES'
+  const currencies = data?.by_currency || []
+  const activeCurrency = currencyFilter !== 'all' ? currencyFilter : (currencies[0]?.currency_code || 'KES')
+  const hasMultipleCurrencies = currencies.length > 1
 
-  const formatDay = (ds) => { const d = new Date(ds + 'T00:00:00'); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) }
-  const formatMonth = (ms) => { const [y, m] = ms.split('-'); return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]} ${y.slice(2)}` }
+  const currencyRevenue = (d) => {
+    if (!d?.by_currency) return 0
+    if (currencyFilter !== 'all') {
+      const match = d.by_currency.find(c => c.currency_code === currencyFilter)
+      return Number(match?.total_revenue || 0)
+    }
+    if (d.by_currency.length === 1) return Number(d.by_currency[0].total_revenue || 0)
+    return d.by_currency.reduce((s, c) => s + Number(c.total_revenue || 0), 0)
+  }
+
+  const currencyReceipts = (d) => {
+    if (!d?.by_currency) return 0
+    if (currencyFilter !== 'all') {
+      const match = d.by_currency.find(c => c.currency_code === currencyFilter)
+      return Number(match?.receipt_count || 0)
+    }
+    return d.by_currency.reduce((s, c) => s + Number(c.receipt_count || 0), 0)
+  }
+
+  const trendPct = (curr, prev) => prev === 0 ? null : Math.round(((curr - prev) / prev) * 100)
+
+  const formatDay = (ds) => {
+    const d = new Date(ds + 'T00:00:00')
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  }
+  const formatMonth = (ms) => {
+    const [y, m] = ms.split('-')
+    return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]} ${y.slice(2)}`
+  }
+
+  const filterByCurrency = (rows) => {
+    if (!rows) return []
+    if (currencyFilter !== 'all') return rows.filter(r => r.currency_code === currencyFilter)
+    if (currencies.length === 1) return rows.filter(r => r.currency_code === currencies[0].currency_code)
+    return rows
+  }
 
   const dailyChartData = () => {
-    if (!data?.daily) return []
+    const filtered = filterByCurrency(data?.daily)
     const byDay = {}
-    data.daily.forEach(d => { byDay[d.day] = (byDay[d.day] || 0) + Number(d.amount || 0) })
-    return Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([day, value]) => ({ label: formatDay(day), value }))
+    filtered.forEach(d => { byDay[d.day] = (byDay[d.day] || 0) + Number(d.amount || 0) })
+    return Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b))
+      .map(([day, value]) => ({ label: formatDay(day), value }))
   }
 
   const monthlyChartData = () => {
-    if (!data?.monthly) return []
+    const filtered = filterByCurrency(data?.monthly)
     const byMonth = {}
-    data.monthly.forEach(d => { byMonth[d.month] = (byMonth[d.month] || 0) + Number(d.amount || 0) })
-    return Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).map(([month, value]) => ({ label: formatMonth(month), value }))
+    filtered.forEach(d => { byMonth[d.month] = (byMonth[d.month] || 0) + Number(d.amount || 0) })
+    return Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b))
+      .map(([month, value]) => ({ label: formatMonth(month), value }))
   }
 
   const paymentDonutData = () => {
     if (!data?.by_payment_method) return { items: [], total: 0 }
-    const items = data.by_payment_method.map(p => ({ label: getPaymentColor(p.method).label, value: Number(p.total || 0), color: getPaymentColor(p.method).hex }))
+    const items = data.by_payment_method.map(p => ({
+      label: getPaymentColor(p.method).label, value: Number(p.total || 0), color: getPaymentColor(p.method).hex,
+    }))
     return { items, total: items.reduce((s, i) => s + i.value, 0) }
   }
 
   const shopDonutData = () => {
     if (!data?.by_shop) return { items: [], total: 0 }
     const colors = ['#8b5cf6','#6366f1','#a855f7','#c084fc','#7c3aed','#4f46e5']
+    const filtered = currencyFilter !== 'all'
+      ? data.by_shop.filter(s => s.currency_code === currencyFilter)
+      : currencies.length === 1
+        ? data.by_shop.filter(s => s.currency_code === currencies[0].currency_code)
+        : data.by_shop
     const byShop = {}
-    data.by_shop.forEach(s => { const k = s.shop_id || 'x'; if (!byShop[k]) byShop[k] = { label: s.shop_name || 'No Shop', value: 0 }; byShop[k].value += Number(s.total || 0) })
+    filtered.forEach(s => { const k = s.shop_id || 'x'; if (!byShop[k]) byShop[k] = { label: s.shop_name || 'No Shop', value: 0 }; byShop[k].value += Number(s.total || 0) })
     const items = Object.values(byShop).sort((a, b) => b.value - a.value).map((s, i) => ({ ...s, color: colors[i % colors.length] }))
     return { items, total: items.reduce((s, i) => s + i.value, 0) }
   }
+
+  const customerList = data?.customer_list || []
 
   if (accessDenied) {
     return (
@@ -288,12 +332,12 @@ export default function MemberRevenuePage() {
           <p className="text-sm text-gray-500 mt-1">Paid receipts and revenue for {providerName}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {customers.length > 0 && (
+          {customerList.length > 0 && (
             <div className="relative">
               <select value={customerId} onChange={e => setCustomerId(e.target.value)}
                 className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 appearance-none bg-white">
                 <option value="all">All Customers</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {customerList.map(c => <option key={c.user_id} value={c.user_id}>{c.customer_name}</option>)}
               </select>
               <Users size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
@@ -306,6 +350,16 @@ export default function MemberRevenuePage() {
                 {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <Store size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          )}
+          {hasMultipleCurrencies && (
+            <div className="relative">
+              <select value={currencyFilter} onChange={e => setCurrencyFilter(e.target.value)}
+                className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 appearance-none bg-white">
+                <option value="all">All Currencies</option>
+                {currencies.map(c => <option key={c.currency_code} value={c.currency_code}>{c.currency_code}</option>)}
+              </select>
+              <Coins size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
           )}
           <div className="relative">
@@ -332,29 +386,34 @@ export default function MemberRevenuePage() {
       ) : data && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon={DollarSign} label="Total Revenue" value={fmt(totalRevenue(data), primaryCurrency)}
+            <StatCard icon={DollarSign} label="Total Revenue"
+              value={fmt(currencyRevenue(data), activeCurrency)}
               color="bg-green-100" iconColor="text-green-600"
-              trend={trend(totalRevenue(data), totalRevenue(prevData))} />
-            <StatCard icon={Receipt} label="Paid Receipts" value={totalReceipts(data)}
+              trend={trendPct(currencyRevenue(data), currencyRevenue(prevData))} />
+            <StatCard icon={Receipt} label="Paid Receipts"
+              value={currencyReceipts(data)}
               color="bg-blue-100" iconColor="text-blue-600"
-              trend={trend(totalReceipts(data), totalReceipts(prevData))} />
+              trend={trendPct(currencyReceipts(data), currencyReceipts(prevData))} />
             <StatCard icon={CreditCard} label="Avg per Receipt"
-              value={fmt(totalReceipts(data) > 0 ? totalRevenue(data) / totalReceipts(data) : 0, primaryCurrency)}
+              value={fmt(currencyReceipts(data) > 0 ? currencyRevenue(data) / currencyReceipts(data) : 0, activeCurrency)}
               color="bg-purple-100" iconColor="text-purple-600" />
             <StatCard icon={TrendingUp} label="Currencies"
-              value={data.by_currency?.length || 1}
-              sub={data.by_currency?.map(c => c.currency_code).join(', ')}
+              value={currencies.length || 1}
+              sub={currencies.map(c => c.currency_code).join(', ')}
               color="bg-amber-100" iconColor="text-amber-600" />
           </div>
 
-          {data.by_currency?.length > 1 && (
+          {hasMultipleCurrencies && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <DollarSign size={15} className="text-gray-400" /> Revenue by Currency
+                <Coins size={15} className="text-gray-400" /> Revenue by Currency
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {data.by_currency.map((c, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg p-4">
+                {currencies.map((c, i) => (
+                  <button key={i} onClick={() => setCurrencyFilter(currencyFilter === c.currency_code ? 'all' : c.currency_code)}
+                    className={`bg-gray-50 rounded-lg p-4 text-left transition-all ${
+                      currencyFilter === c.currency_code ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-100'
+                    }`}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-bold text-gray-900">{c.currency_code}</span>
                       <span className="text-xs text-gray-400">{c.receipt_count} receipt{c.receipt_count !== 1 ? 's' : ''}</span>
@@ -363,9 +422,14 @@ export default function MemberRevenuePage() {
                       {c.currency_symbol || c.currency_code} {Number(c.total_revenue).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">{c.wo_count} work order{c.wo_count !== 1 ? 's' : ''}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
+              {currencyFilter !== 'all' && (
+                <p className="text-xs text-blue-600 mt-3 text-center">
+                  Filtering charts by {currencyFilter} · <button onClick={() => setCurrencyFilter('all')} className="underline">Show all</button>
+                </p>
+              )}
             </div>
           )}
 
@@ -373,18 +437,22 @@ export default function MemberRevenuePage() {
             <div className="bg-white rounded-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-semibold text-gray-900">Daily Revenue</p>
-                <p className="text-base font-bold text-blue-700">{fmt(totalRevenue(data), primaryCurrency)}</p>
+                <p className="text-base font-bold text-blue-700">{fmt(currencyRevenue(data), activeCurrency)}</p>
               </div>
-              <p className="text-xs text-gray-400 mb-3">Paid receipts per day</p>
-              <BarChart entries={dailyChartData()} formatAmount={v => fmt(v, primaryCurrency)} />
+              <p className="text-xs text-gray-400 mb-3">
+                Paid receipts per day{currencyFilter !== 'all' ? ` (${currencyFilter})` : ''}
+              </p>
+              <BarChart entries={dailyChartData()} formatAmount={v => fmt(v, activeCurrency)} />
             </div>
           )}
 
           {monthlyChartData().length > 1 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <p className="text-sm font-semibold text-gray-900 mb-1">Monthly Revenue Trend</p>
-              <p className="text-xs text-gray-400 mb-3">Revenue aggregated by month</p>
-              <BarChart entries={monthlyChartData()} formatAmount={v => fmt(v, primaryCurrency)}
+              <p className="text-xs text-gray-400 mb-3">
+                Revenue by month{currencyFilter !== 'all' ? ` (${currencyFilter})` : ''}
+              </p>
+              <BarChart entries={monthlyChartData()} formatAmount={v => fmt(v, activeCurrency)}
                 color="#60a5fa" hoverColor="#3b82f6" />
             </div>
           )}
@@ -395,7 +463,7 @@ export default function MemberRevenuePage() {
                 <CreditCard size={15} className="text-gray-400" /> Payment Methods
               </h2>
               <DonutChart items={paymentDonutData().items} total={paymentDonutData().total}
-                formatAmount={v => fmt(v, primaryCurrency)} />
+                formatAmount={v => fmt(v, activeCurrency)} />
             </div>
             {shopDonutData().items.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm p-5">
@@ -403,7 +471,7 @@ export default function MemberRevenuePage() {
                   <Store size={15} className="text-purple-500" /> Revenue by Shop
                 </h2>
                 <DonutChart items={shopDonutData().items} total={shopDonutData().total}
-                  formatAmount={v => fmt(v, primaryCurrency)} />
+                  formatAmount={v => fmt(v, activeCurrency)} />
               </div>
             )}
           </div>
@@ -426,7 +494,7 @@ export default function MemberRevenuePage() {
                         <p className="text-sm font-medium text-gray-900 truncate">{c.customer_name}</p>
                         <p className="text-xs text-gray-400">{c.receipt_count} receipt{c.receipt_count !== 1 ? 's' : ''}</p>
                       </div>
-                      <p className="text-sm font-semibold text-green-700 flex-shrink-0">{fmt(c.total_paid, primaryCurrency)}</p>
+                      <p className="text-sm font-semibold text-green-700 flex-shrink-0">{fmt(c.total_paid, activeCurrency)}</p>
                     </div>
                   ))}
                 </div>
@@ -449,7 +517,7 @@ export default function MemberRevenuePage() {
                         <p className="text-sm font-medium text-gray-900 truncate">{c.company_name}</p>
                         <p className="text-xs text-gray-400">{c.receipt_count} receipt{c.receipt_count !== 1 ? 's' : ''}</p>
                       </div>
-                      <p className="text-sm font-semibold text-green-700 flex-shrink-0">{fmt(c.total_paid, primaryCurrency)}</p>
+                      <p className="text-sm font-semibold text-green-700 flex-shrink-0">{fmt(c.total_paid, activeCurrency)}</p>
                     </div>
                   ))}
                 </div>
