@@ -50,6 +50,7 @@ export default function ProviderWorkOrdersPage() {
   const supabase = createClient()
 
   const [workOrders, setWorkOrders]   = useState([])
+  const [customerMap, setCustomerMap] = useState({}) // wo.id → customer name
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState('')
   const [search, setSearch]           = useState('')
@@ -86,8 +87,7 @@ export default function ProviderWorkOrdersPage() {
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops(name, town),
           mechanic:mechanics(user:user_profiles(first_name, last_name)),
-          booking:bookings!booking_id(booking_number),
-          invoice:invoices(issued_to:user_profiles!issued_to_user_id(first_name, last_name))
+          booking:bookings!booking_id(booking_number)
         `)
         .eq('service_provider_id', provider.id)
         .order('opened_at', { ascending: false })
@@ -97,6 +97,12 @@ export default function ProviderWorkOrdersPage() {
       setCheckoutRequestCount((data || []).filter(w => w.checkout_requested && !w.checkout_request_satisfied).length)
       setCheckoutDeclinedCount((data || []).filter(w => w.checkout_declined).length)
       setEstimateApprovedCount((data || []).filter(w => w.estimate_approved && w.status?.code === 'approved').length)
+
+      // Fetch customer names via RPC (bypasses vehicle_ownership RLS)
+      const { data: custResult } = await supabase.rpc('get_provider_wo_customers', {
+        p_provider_id: provider.id,
+      })
+      if (custResult?.success) setCustomerMap(custResult.customers || {})
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
     } finally {
@@ -105,10 +111,7 @@ export default function ProviderWorkOrdersPage() {
   }
 
   const getCustomerName = (wo) => {
-    if (wo.invoice?.issued_to) {
-      return `${wo.invoice.issued_to.first_name || ''} ${wo.invoice.issued_to.last_name || ''}`.trim()
-    }
-    return wo.walk_in_owner_name || ''
+    return customerMap[wo.id] || wo.walk_in_owner_name || ''
   }
 
   const filtered = useMemo(() => {
@@ -139,7 +142,7 @@ export default function ProviderWorkOrdersPage() {
         || custName.includes(q)
       return matchStatus && matchSearch
     })
-  }, [workOrders, search, statusFilter, dateFrom, dateTo])
+  }, [workOrders, customerMap, search, statusFilter, dateFrom, dateTo])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize)
