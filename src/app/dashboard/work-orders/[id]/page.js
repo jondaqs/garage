@@ -755,7 +755,7 @@ export default function CustomerWorkOrderPage() {
 
       {/* ── Request Checkout banner ── */}
       {invoiceStatus && !checkoutSubmitted
-        && !['awaiting_customer_checkout', 'closed', 'cancelled'].includes(statusCode) && (
+        && !['closed', 'cancelled'].includes(statusCode) && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-100 flex-shrink-0 mt-0.5">
@@ -804,7 +804,7 @@ export default function CustomerWorkOrderPage() {
       )}
 
       {/* ── Checkout banner ── */}
-      {['awaiting_customer_checkout', 'closed'].includes(statusCode) && (
+      {checkoutSubmitted && ['awaiting_customer_checkout', 'closed'].includes(statusCode) && (
         <div className="rounded-xl shadow-sm overflow-hidden border border-purple-200 bg-purple-50">
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
