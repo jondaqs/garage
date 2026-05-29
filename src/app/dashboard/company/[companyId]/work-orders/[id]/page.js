@@ -52,6 +52,7 @@ export default function CompanyMemberWorkOrderDetailPage() {
   const [success,         setSuccess]         = useState('')
   const [canApprove,      setCanApprove]      = useState(false)
   const [invoiceStatus,   setInvoiceStatus]   = useState(null)
+  const [receiptConfirmed, setReceiptConfirmed] = useState(null)
   const [checkoutSubmitted,   setCheckoutSubmitted]   = useState(false)
   const [checkoutRequested,   setCheckoutRequested]   = useState(false)
   const [requestingCheckout,  setRequestingCheckout]  = useState(false)
@@ -100,8 +101,20 @@ export default function CompanyMemberWorkOrderDetailPage() {
 
       // Invoice status
       const { data: invRow } = await supabase
-        .from('invoices').select('status').eq('work_order_id', workOrderId).maybeSingle()
+        .from('invoices').select('id, status').eq('work_order_id', workOrderId).maybeSingle()
       setInvoiceStatus(invRow?.status || null)
+
+      // Check if receipt is confirmed by provider
+      if (invRow?.status === 'paid' && invRow?.id) {
+        const { data: receiptRow } = await supabase
+          .from('receipts')
+          .select('confirmed')
+          .eq('invoice_id', invRow.id)
+          .order('paid_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        setReceiptConfirmed(receiptRow?.confirmed ?? null)
+      }
 
       // Check if provider has submitted checkout
       const { data: checkoutRow } = await supabase
@@ -689,7 +702,7 @@ export default function CompanyMemberWorkOrderDetailPage() {
       )}
 
       {/* ── Request Checkout banner ── */}
-      {invoiceStatus && invoiceStatus !== 'paid' && !checkoutSubmitted
+      {invoiceStatus && !checkoutSubmitted
         && !['awaiting_customer_checkout', 'closed', 'cancelled'].includes(statusCode) && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
           <div className="flex items-start gap-3">
@@ -699,8 +712,9 @@ export default function CompanyMemberWorkOrderDetailPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900">Checkout not yet submitted</p>
               <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                The provider has sent an invoice but hasn't submitted the checkout form yet.
-                You can notify them to complete the checkout before your company makes payment.
+                {invoiceStatus === 'paid'
+                  ? 'Payment received — the provider hasn\'t submitted the checkout form yet. You can remind them.'
+                  : 'The provider has sent an invoice but hasn\'t submitted the checkout form yet. You can notify them to complete the checkout before your company makes payment.'}
               </p>
               {checkoutReqSuccess ? (
                 <p className="mt-2 text-xs font-medium text-green-700 flex items-center gap-1">
@@ -763,20 +777,28 @@ export default function CompanyMemberWorkOrderDetailPage() {
       )}
 
       {invoiceStatus === 'paid' && (
-        <div className="rounded-xl shadow-sm overflow-hidden border border-emerald-200 bg-emerald-50">
+        <div className={`rounded-xl shadow-sm overflow-hidden border ${
+          receiptConfirmed ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'
+        }`}>
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-100">
-                <Receipt size={16} className="text-emerald-600" />
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                receiptConfirmed ? 'bg-emerald-100' : 'bg-amber-100'
+              }`}>
+                <Receipt size={16} className={receiptConfirmed ? 'text-emerald-600' : 'text-amber-600'} />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-900">Payment Receipt</p>
-                <p className="text-xs font-medium text-emerald-600">✓ Payment Confirmed</p>
+                <p className={`text-xs font-medium ${receiptConfirmed ? 'text-emerald-600' : 'text-amber-700'}`}>
+                  {receiptConfirmed ? '✓ Payment Confirmed' : 'Payment done, awaiting provider confirmation'}
+                </p>
               </div>
             </div>
             <button
               onClick={() => router.push(`/dashboard/company/${companyId}/work-orders/${workOrderId}/receipt`)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                receiptConfirmed ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-amber-600 text-white hover:bg-amber-700'
+              }`}>
               View Receipt <ChevronRight size={14} />
             </button>
           </div>
