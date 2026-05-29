@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Wrench, CheckCircle, XCircle, AlertCircle, Loader2,
   RefreshCw, ClipboardList, Car, Send, FileText,
-  Clock, Filter, ChevronDown, Bell, Receipt, AlertTriangle, BellRing, ClipboardCheck, Search
+  Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Bell, Receipt, AlertTriangle, BellRing, ClipboardCheck, Search, Store
 } from 'lucide-react'
 
 // ── Status colours ────────────────────────────────────────────────────────────
@@ -88,6 +88,10 @@ export default function MemberWorkOrdersPage() {
   const [filter,          setFilter]          = useState('action')
   const [showFilter,      setShowFilter]      = useState(false)
   const [search,          setSearch]          = useState('')
+  const [dateFrom,        setDateFrom]        = useState('')
+  const [dateTo,          setDateTo]          = useState('')
+  const [page,            setPage]            = useState(1)
+  const [pageSize,        setPageSize]        = useState(25)
   const [acknowledging,   setAcknowledging]   = useState(null)
   const [declineReason,   setDeclineReason]   = useState('')
   const [showDeclineForm, setShowDeclineForm] = useState(null)
@@ -206,19 +210,40 @@ export default function MemberWorkOrdersPage() {
       ? terminalOrders
       : workOrders.filter(w => w.status?.code === filter)
 
-    if (!search.trim()) return byStatus
-    const q = search.toLowerCase()
-    return byStatus.filter(w =>
-      w.work_order_number?.toLowerCase().includes(q)
-      || w.vehicle?.plate_number?.toLowerCase().includes(q)
-      || w.vehicle?.make?.toLowerCase().includes(q)
-      || w.vehicle?.model?.toLowerCase().includes(q)
-      || w.provider?.name?.toLowerCase().includes(q)
-    )
+    return byStatus.filter(w => {
+      // Date filter
+      if (dateFrom) {
+        const woDate = (w.opened_at || '').slice(0, 10)
+        if (woDate < dateFrom) return false
+      }
+      if (dateTo) {
+        const woDate = (w.opened_at || '').slice(0, 10)
+        if (woDate > dateTo) return false
+      }
+
+      if (!search.trim()) return true
+      const q = search.toLowerCase()
+      return (
+        w.work_order_number?.toLowerCase().includes(q)
+        || w.vehicle?.plate_number?.toLowerCase().includes(q)
+        || w.vehicle?.make?.toLowerCase().includes(q)
+        || w.vehicle?.model?.toLowerCase().includes(q)
+        || w.provider?.name?.toLowerCase().includes(q)
+        || w.shop?.name?.toLowerCase().includes(q)
+        || w.customer_name?.toLowerCase().includes(q)
+      )
+    })
   })()
 
-  // ── Grouped by provider ───────────────────────────────────────────────────
-  const grouped = filtered.reduce((acc, wo) => {
+  // Reset page when filters change
+  const filterKey = `${search}|${filter}|${dateFrom}|${dateTo}|${pageSize}`
+  useEffect(() => { setPage(1) }, [filterKey])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  // ── Grouped by provider (paginated) ─────────────────────────────────
+  const grouped = paginated.reduce((acc, wo) => {
     const key = wo.provider?.name || 'Unknown Garage'
     if (!acc[key]) acc[key] = []
     acc[key].push(wo)
@@ -319,11 +344,25 @@ export default function MemberWorkOrdersPage() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by WO number, plate, make or garage…"
+              placeholder="Search WO#, plate, vehicle, shop, customer..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          {/* Date filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-xs text-gray-500 flex-shrink-0">From</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm" />
+            <label className="text-xs text-gray-500 flex-shrink-0">To</label>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm" />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(''); setDateTo('') }}
+                className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0">✕ Clear</button>
+            )}
           </div>
 
           {/* Action pill + counts + filter dropdown */}
@@ -387,10 +426,15 @@ export default function MemberWorkOrdersPage() {
               : search ? 'No work orders match your search or filter.'
               : 'No work orders match this filter.'}
           </p>
-          <button onClick={() => { setSearch(''); setFilter('all') }} className="mt-3 text-sm text-blue-600 hover:underline">
-            Clear search &amp; filter
+          <button onClick={() => { setSearch(''); setFilter('all'); setDateFrom(''); setDateTo('') }} className="mt-3 text-sm text-blue-600 hover:underline">
+            Clear search &amp; filters
           </button>
         </div>
+      )}
+
+      {/* Results count */}
+      {filtered.length > 0 && (search || filter !== 'all' || dateFrom || dateTo) && (
+        <p className="text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</p>
       )}
 
       {/* Work orders grouped by provider */}
@@ -475,6 +519,18 @@ export default function MemberWorkOrdersPage() {
                             <span className="font-medium">{wo.vehicle?.plate_number}</span>
                             {wo.vehicle?.make && (
                               <span className="text-gray-400">· {wo.vehicle.make} {wo.vehicle.model || ''}</span>
+                            )}
+                          </div>
+                          {/* Shop + Customer */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-gray-500">
+                            {wo.shop?.name && (
+                              <span className="flex items-center gap-1">
+                                <Store size={10} className="text-gray-400" />
+                                {wo.shop.name}{wo.shop.town ? ` · ${wo.shop.town}` : ''}
+                              </span>
+                            )}
+                            {wo.customer_name && (
+                              <span>Customer: <span className="font-medium text-gray-600">{wo.customer_name}</span></span>
                             )}
                           </div>
                           {wo.problem_description && (
@@ -583,6 +639,45 @@ export default function MemberWorkOrdersPage() {
           </div>
         )
       })}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Show</span>
+            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+              {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronLeft size={16} />
+            </button>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let p
+              if (totalPages <= 5) { p = i + 1 }
+              else if (page <= 3) { p = i + 1 }
+              else if (page >= totalPages - 2) { p = totalPages - 4 + i }
+              else { p = page - 2 + i }
+              return (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`w-8 h-8 rounded text-sm font-medium ${
+                    p === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}>{p}</button>
+              )
+            })}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
