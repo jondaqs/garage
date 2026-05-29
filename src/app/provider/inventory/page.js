@@ -4,6 +4,7 @@
 // This version has console.log statements to help diagnose the UUID error
 
 import { useState, useEffect } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import TabbedFormModal from './components/TabbedFormModal'
 import DetailsModal from './components/DetailsModal'
 import AdjustStockModal from './components/AdjustStockModal'
@@ -20,6 +21,8 @@ export default function ProviderInventoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
   const [readOnly, setReadOnly] = useState(false)
   const [shops, setShops] = useState([])
   const [currencies, setCurrencies] = useState([])
@@ -148,6 +151,10 @@ export default function ProviderInventoryPage() {
     return matchesSearch && matchesCategory && matchesStatus
   })
 
+  useEffect(() => { setPage(1) }, [searchTerm, filterCategory, filterStatus, pageSize])
+  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize))
+  const paginated  = filteredInventory.slice((page - 1) * pageSize, page * pageSize)
+
   if (loading) {
     return (
       <div className="p-8">
@@ -255,7 +262,7 @@ export default function ProviderInventoryPage() {
                   </td>
                 </tr>
               ) : (
-                filteredInventory.map(item => (
+                paginated.map(item => (
                   <InventoryRow
                     key={item.id}
                     item={item}
@@ -271,6 +278,30 @@ export default function ProviderInventoryPage() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between gap-4 bg-white rounded-lg shadow-sm px-5 py-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Show</span>
+            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+              {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let p; if (totalPages <= 5) p = i + 1; else if (page <= 3) p = i + 1; else if (page >= totalPages - 2) p = totalPages - 4 + i; else p = page - 2 + i
+              return <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded text-sm font-medium ${p === page ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+            })}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={16} /></button>
+          </div>
+          <p className="text-xs text-gray-400">{(page-1)*pageSize+1}–{Math.min(page*pageSize, filteredInventory.length)} of {filteredInventory.length}</p>
+        </div>
+      )}
 
       {/* Modals */}
       {showAddModal && (

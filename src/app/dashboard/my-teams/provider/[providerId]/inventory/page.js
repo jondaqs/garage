@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Package, Plus, Search, AlertCircle, Loader2, X, Check,
-  ChevronDown, Edit3, Trash2, Eye, ArrowUpDown, BarChart3
+  ChevronDown, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUpDown, BarChart3
 } from 'lucide-react'
 
 export default function MemberInventoryPage() {
@@ -26,6 +26,8 @@ export default function MemberInventoryPage() {
   const [searchTerm, setSearchTerm]         = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus]     = useState('all')
+  const [page, setPage]                     = useState(1)
+  const [pageSize, setPageSize]             = useState(5)
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [modalMode, setModalMode]     = useState(null) // 'add' | 'edit' | 'view' | 'adjust' | null
@@ -94,6 +96,10 @@ export default function MemberInventoryPage() {
     if (filterStatus === 'out_of_stock') items = items.filter(i => i.stock === 0)
     return items
   }, [inventory, searchTerm, filterCategory, filterStatus])
+
+  useEffect(() => { setPage(1) }, [searchTerm, filterCategory, filterStatus, pageSize])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const openAdd = () => {
@@ -328,7 +334,7 @@ export default function MemberInventoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map(item => {
+                {paginated.map(item => {
                   const sb = stockBadge(item)
                   return (
                     <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
@@ -384,7 +390,7 @@ export default function MemberInventoryPage() {
 
           {/* Mobile */}
           <div className="md:hidden divide-y divide-gray-100">
-            {filtered.map(item => {
+            {paginated.map(item => {
               const sb = stockBadge(item)
               return (
                 <div key={item.id} className="p-4 space-y-2">
@@ -412,6 +418,30 @@ export default function MemberInventoryPage() {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between gap-4 bg-white rounded-xl border border-gray-200 px-5 py-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Show</span>
+            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+              {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let p; if (totalPages <= 5) p = i + 1; else if (page <= 3) p = i + 1; else if (page >= totalPages - 2) p = totalPages - 4 + i; else p = page - 2 + i
+              return <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded text-sm font-medium ${p === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+            })}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={16} /></button>
+          </div>
+          <p className="text-xs text-gray-400">{(page-1)*pageSize+1}–{Math.min(page*pageSize, filtered.length)} of {filtered.length}</p>
         </div>
       )}
 
