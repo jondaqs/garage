@@ -1,7 +1,5 @@
 'use client'
 
-// FIXED VERSION with Debug Logging and Safety Checks
-// This version has console.log statements to help diagnose the UUID error
 
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -39,8 +37,6 @@ export default function ProviderInventoryPage() {
       const data = await response.json()
 
       if (response.ok) {
-        console.log('✅ Loaded inventory:', data.inventory?.length, 'items') // DEBUG
-        console.log('Sample item:', data.inventory?.[0]) // DEBUG - Check if ID exists
         setInventory(data.inventory || [])
         setStats(data.stats)
         setReadOnly(data.readOnly || false)
@@ -66,7 +62,6 @@ export default function ProviderInventoryPage() {
     }
 
     try {
-      console.log('🗑️ Deleting item with ID:', id) // DEBUG
       const response = await fetch(`/api/inventory/${id}`, { method: 'DELETE' })
       if (response.ok) {
         loadInventory()
@@ -82,8 +77,6 @@ export default function ProviderInventoryPage() {
 
   // Safe handlers with validation
   const handleView = (item) => {
-    console.log('👁️ View clicked, item:', item) // DEBUG
-    console.log('Item ID:', item?.id) // DEBUG
     if (!item || !item.id) {
       console.error('❌ Invalid item for view:', item)
       alert('Error: Invalid item data (missing ID)')
@@ -94,8 +87,6 @@ export default function ProviderInventoryPage() {
   }
 
   const handleEdit = (item) => {
-    console.log('✏️ Edit clicked, item:', item) // DEBUG
-    console.log('Item ID:', item?.id) // DEBUG
     if (!item || !item.id) {
       console.error('❌ Invalid item for edit:', item)
       alert('Error: Invalid item data (missing ID)')
@@ -106,8 +97,6 @@ export default function ProviderInventoryPage() {
   }
 
   const handleAdjust = (item) => {
-    console.log('📊 Adjust clicked, item:', item) // DEBUG
-    console.log('Item ID:', item?.id) // DEBUG
     if (!item || !item.id) {
       console.error('❌ Invalid item for adjust:', item)
       alert('Error: Invalid item data (missing ID)')
@@ -118,8 +107,6 @@ export default function ProviderInventoryPage() {
   }
 
   const handleDelete = (item) => {
-    console.log('🗑️ Delete clicked, item:', item) // DEBUG
-    console.log('Item ID:', item?.id) // DEBUG
     if (!item || !item.id) {
       console.error('❌ Invalid item for delete:', item)
       alert('Error: Invalid item data (missing ID)')

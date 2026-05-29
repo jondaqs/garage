@@ -3,13 +3,15 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Truck, Plus, Calendar, RotateCcw, ChevronDown, ChevronUp, AlertCircle
+  Truck, Plus, Calendar, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertCircle
 } from 'lucide-react'
 
 const supabase = createClient()
 
 export default function FleetPage() {
   const [fleet, setFleet] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
   // Set of vehicle_ids with a pending deletion request.
   const [pendingIds, setPendingIds] = useState(() => new Set())
   // Inactive (soft-deleted) vehicles for this company — only fetched if
@@ -170,8 +172,9 @@ export default function FleetPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {fleet.map((item) => {
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {fleet.slice((page - 1) * pageSize, page * pageSize).map((item) => {
             const isPending = pendingIds.has(item.vehicle_id)
             return (
               <Link
@@ -212,7 +215,34 @@ export default function FleetPage() {
               </Link>
             )
           })}
-        </div>
+          </div>
+
+          {Math.ceil(fleet.length / pageSize) > 1 && (() => {
+            const totalPages = Math.ceil(fleet.length / pageSize)
+            return (
+              <div className="mt-6 flex items-center justify-between gap-4 bg-white rounded-lg shadow-sm px-5 py-3">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <span>Show</span>
+                  <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                    {[5, 10, 25].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                    className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let p; if (totalPages <= 5) p = i + 1; else if (page <= 3) p = i + 1; else if (page >= totalPages - 2) p = totalPages - 4 + i; else p = page - 2 + i
+                    return <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded text-sm font-medium ${p === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+                  })}
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                    className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={16} /></button>
+                </div>
+                <p className="text-xs text-gray-400">{(page-1)*pageSize+1}–{Math.min(page*pageSize, fleet.length)} of {fleet.length}</p>
+              </div>
+            )
+          })()}
+        </>
       )}
 
       {/* ─── Inactive vehicles (collapsed by default) ─────────────────────
