@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Calendar, Truck, Wrench } from 'lucide-react'
+import { Plus, Calendar, Truck, Wrench, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Status code → display config
 // BUG 1.6 FIX: status is stored via status_id FK to booking_statuses.
@@ -21,6 +21,8 @@ export default function CompanyBookingsPage() {
   const [bookings, setBookings] = useState([])
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
 
   useEffect(() => {
     fetchBookings()
@@ -132,6 +134,10 @@ export default function CompanyBookingsPage() {
     return STATUS_CONFIG[code] || { label: code, color: 'gray' }
   }
 
+  useEffect(() => { setPage(1) }, [filter, pageSize])
+  const totalPages = Math.max(1, Math.ceil(bookings.length / pageSize))
+  const paginated  = bookings.slice((page - 1) * pageSize, page * pageSize)
+
   const formatDate = (dateString) => {
     if (!dateString) return '—'
     return new Date(dateString).toLocaleDateString('en-KE', {
@@ -204,14 +210,15 @@ export default function CompanyBookingsPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
-          {bookings.map((booking) => {
-            const statusCfg = getStatusCfg(booking)
-            const statusColorClass = `bg-${statusCfg.color}-100 text-${statusCfg.color}-800`
+        <>
+          <div className="space-y-4">
+            {paginated.map((booking) => {
+              const statusCfg = getStatusCfg(booking)
+              const statusColorClass = `bg-${statusCfg.color}-100 text-${statusCfg.color}-800`
 
-            return (
-              <Link
-                key={booking.id}
+              return (
+                <Link
+                  key={booking.id}
                 href={`/company/bookings/${booking.id}`}
                 className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6"
               >
@@ -278,7 +285,31 @@ export default function CompanyBookingsPage() {
               </Link>
             )
           })}
-        </div>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between gap-4 bg-white rounded-lg shadow-sm px-5 py-3">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>Show</span>
+                <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                  {[5, 10, 25].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let p; if (totalPages <= 5) p = i + 1; else if (page <= 3) p = i + 1; else if (page >= totalPages - 2) p = totalPages - 4 + i; else p = page - 2 + i
+                  return <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded text-sm font-medium ${p === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+                })}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={16} /></button>
+              </div>
+              <p className="text-xs text-gray-400">{(page-1)*pageSize+1}–{Math.min(page*pageSize, bookings.length)} of {bookings.length}</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Stats bar */}

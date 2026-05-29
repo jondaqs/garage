@@ -24,7 +24,7 @@ export default function MemberBookingsPage() {
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
   const [page,       setPage]       = useState(1)
-  const [perPage,    setPerPage]    = useState(10)
+  const [perPage,    setPerPage]    = useState(5)
   const [total,      setTotal]      = useState(0)
 
   useEffect(() => { setPage(1) }, [filter])
@@ -226,7 +226,7 @@ export default function MemberBookingsPage() {
             <select value={perPage}
               onChange={e => { setPerPage(Number(e.target.value)); setPage(1) }}
               className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 bg-white">
-              {[10, 20, 50, 100].map(n => (
+              {[5, 10, 20, 50].map(n => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>

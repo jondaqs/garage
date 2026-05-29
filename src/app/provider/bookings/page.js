@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Calendar, Filter, Search } from 'lucide-react'
+import { Calendar, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import BookingCard from '@/components/bookings/BookingCard'
 
 export default function ProviderBookingsPage() {
@@ -13,6 +13,8 @@ export default function ProviderBookingsPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
 
   useEffect(() => {
     loadBookings()
@@ -62,6 +64,10 @@ export default function ProviderBookingsPage() {
                          b.vehicle?.plate_number?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesStatus && matchesSearch
   })
+
+  useEffect(() => { setPage(1) }, [statusFilter, searchQuery, pageSize])
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / pageSize))
+  const paginated  = filteredBookings.slice((page - 1) * pageSize, page * pageSize)
 
   if (loading) {
     return (
@@ -115,16 +121,41 @@ export default function ProviderBookingsPage() {
           <p className="text-gray-500">Waiting for customer bookings</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredBookings.map((booking) => (
-            <BookingCard
-              key={booking.id}
-              booking={booking}
-              isProvider
-              onClick={() => router.push(`/provider/bookings/${booking.id}`)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-4">
+            {paginated.map((booking) => (
+              <BookingCard
+                key={booking.id}
+                booking={booking}
+                isProvider
+                onClick={() => router.push(`/provider/bookings/${booking.id}`)}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between gap-4 bg-white rounded-lg shadow-sm px-5 py-3">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>Show</span>
+                <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                  {[5, 10, 25].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let p; if (totalPages <= 5) p = i + 1; else if (page <= 3) p = i + 1; else if (page >= totalPages - 2) p = totalPages - 4 + i; else p = page - 2 + i
+                  return <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded text-sm font-medium ${p === page ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+                })}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={16} /></button>
+              </div>
+              <p className="text-xs text-gray-400">{(page-1)*pageSize+1}–{Math.min(page*pageSize, filteredBookings.length)} of {filteredBookings.length}</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
