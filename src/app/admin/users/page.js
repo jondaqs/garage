@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, Users, MoreVertical, ShieldOff, ShieldCheck, Power, PowerOff } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
+import { banUser, unbanUser } from '@/lib/admin/banUser'
 
 const PAGE_SIZE = 20
 
@@ -103,7 +104,7 @@ export default function AdminUsersPage() {
       let query = supabase
         .from('user_profiles')
         .select(`
-          id, first_name, last_name, email, phone,
+          id, auth_user_id, first_name, last_name, email, phone,
           is_active, is_suspended, created_at,
           user_roles(role:user_roles_lookup(code, display_name))
         `, { count: 'exact' })
@@ -148,6 +149,17 @@ export default function AdminUsersPage() {
       })
       if (error) throw error
       if (data && !data.success) throw new Error(data.error)
+
+      // Auth-level ban/unban — prevents JWT refresh (belt-and-suspenders)
+      const user = users.find(u => u.id === userId)
+      if (user?.auth_user_id) {
+        if (action === 'suspend' || action === 'deactivate') {
+          await banUser(user.auth_user_id)
+        } else {
+          await unbanUser(user.auth_user_id)
+        }
+      }
+
       await loadUsers()
     } catch (err) {
       console.error(`${action} failed:`, err)

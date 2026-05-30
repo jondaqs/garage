@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import Pagination from '@/components/admin/Pagination'
+import { banUser, unbanUser } from '@/lib/admin/banUser'
 
 const PAGE_SIZE = 20
 
@@ -127,7 +128,7 @@ export default function AllProvidersPage() {
         .from('service_providers')
         .select(`
           id, name, status, is_active, is_verified, created_at, submitted_at,
-          owner:user_profiles(id, first_name, last_name, email),
+          owner:user_profiles(id, auth_user_id, first_name, last_name, email),
           provider_type:service_provider_types(display_name),
           shops(id)
         `, { count: 'exact' })
@@ -172,6 +173,17 @@ export default function AllProvidersPage() {
       })
       if (error) throw error
       if (data && !data.success) throw new Error(data.error)
+
+      // Auth-level ban/unban for the provider owner
+      const provider = providers.find(p => p.id === providerId)
+      if (provider?.owner?.auth_user_id) {
+        if (action === 'suspend') {
+          await banUser(provider.owner.auth_user_id)
+        } else {
+          await unbanUser(provider.owner.auth_user_id)
+        }
+      }
+
       await loadProviders()
     } catch (err) {
       console.error(`${action} failed:`, err)

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
+import { banUser, unbanUser } from '@/lib/admin/banUser'
 
 const PAGE_SIZE = 20
 
@@ -93,7 +94,7 @@ export default function AdminCompaniesPage() {
 
     let query = supabase
       .from('company_profiles')
-      .select('id, name, registration_number, status, is_active, is_suspended, submitted_at, created_at, owner_user_id, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)', { count: 'exact' })
+      .select('id, name, registration_number, status, is_active, is_suspended, submitted_at, created_at, owner_user_id, owner:user_profiles!company_profiles_owner_user_id_fkey(auth_user_id, first_name, last_name, email)', { count: 'exact' })
       .order('submitted_at', { ascending: false, nullsFirst: false })
 
     if (filter !== 'all') {
@@ -184,6 +185,15 @@ export default function AdminCompaniesPage() {
           reference_id: companyId,
           title, message, is_read: false,
         })
+      }
+
+      // Auth-level ban/unban for the company owner
+      if (company?.owner?.auth_user_id) {
+        if (action === 'suspend') {
+          await banUser(company.owner.auth_user_id)
+        } else {
+          await unbanUser(company.owner.auth_user_id)
+        }
       }
 
       await fetchCompanies()
