@@ -109,11 +109,14 @@ export async function middleware(request) {
   else if (isCompanyMember) role = 'member'
 
   // ── Entity-level block checks ────────────────────────────────
-  // For company routes, verify the company itself isn't suspended.
-  // For provider routes, verify the provider isn't suspended.
-  // Only checked when entering the relevant portal, not on every
-  // page — the overhead is one extra query per navigation.
+  // Only OWNERS are locked out of their dedicated portals.
+  // Staff / members keep access to /dashboard as normal users —
+  // the cascade (is_active=false on membership tables) prevents
+  // them from seeing provider/company-specific features inside
+  // the dashboard, but they can still manage personal vehicles,
+  // bookings, etc.
 
+  // Company owner → blocked from /company/*
   if (role === 'company' && pathname.startsWith('/company')) {
     const { data: company } = await supabase
       .from('company_profiles')
@@ -128,21 +131,7 @@ export async function middleware(request) {
     }
   }
 
-  if (role === 'member' && pathname.startsWith('/dashboard')) {
-    const { data: membership } = await supabase
-      .from('company_users')
-      .select('company:company_profiles(status, is_suspended)')
-      .eq('user_id', profile.id)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (membership?.company?.is_suspended || membership?.company?.status === 'suspended' || membership?.company?.status === 'deactivated') {
-      const url = new URL('/account/suspended', request.url)
-      url.searchParams.set('reason', 'company_suspended')
-      return NextResponse.redirect(url)
-    }
-  }
-
+  // Provider owner → blocked from /provider/*
   if (role === 'provider' && pathname.startsWith('/provider')) {
     const { data: provider } = await supabase
       .from('service_providers')
@@ -154,41 +143,6 @@ export async function middleware(request) {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'provider_suspended')
       return NextResponse.redirect(url)
-    }
-  }
-
-  // Provider staff (mechanics / service_provider_users) access /dashboard,
-  // not /provider. Check if their provider is suspended or deactivated.
-  // Note: we do NOT filter on is_active because the suspend RPC already
-  // cascaded is_active=false on staff — filtering would skip the check.
-  if ((role === 'user' || role === 'member') && pathname.startsWith('/dashboard')) {
-    const { data: staffLink } = await supabase
-      .from('service_provider_users')
-      .select('service_provider_id, provider:service_providers(status)')
-      .eq('user_id', profile.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (staffLink?.provider?.status === 'suspended' || staffLink?.provider?.status === 'deactivated') {
-      const url = new URL('/account/suspended', request.url)
-      url.searchParams.set('reason', 'provider_suspended')
-      return NextResponse.redirect(url)
-    }
-
-    // Also check mechanics table (some staff are only in mechanics, not service_provider_users)
-    if (!staffLink) {
-      const { data: mechLink } = await supabase
-        .from('mechanics')
-        .select('service_provider_id, provider:service_providers(status)')
-        .eq('user_id', profile.id)
-        .limit(1)
-        .maybeSingle()
-
-      if (mechLink?.provider?.status === 'suspended' || mechLink?.provider?.status === 'deactivated') {
-        const url = new URL('/account/suspended', request.url)
-        url.searchParams.set('reason', 'provider_suspended')
-        return NextResponse.redirect(url)
-      }
     }
   }
 
