@@ -150,10 +150,45 @@ export async function middleware(request) {
       .eq('owner_user_id', profile.id)
       .single()
 
-    if (provider?.status === 'suspended') {
+    if (provider?.status === 'suspended' || provider?.is_active === false) {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'provider_suspended')
       return NextResponse.redirect(url)
+    }
+  }
+
+  // Provider staff (mechanics / service_provider_users) access /dashboard,
+  // not /provider. Check if their provider is suspended.
+  if ((role === 'user' || role === 'member') && pathname.startsWith('/dashboard')) {
+    const { data: staffLink } = await supabase
+      .from('service_provider_users')
+      .select('service_provider_id, provider:service_providers(status)')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+
+    if (staffLink?.provider?.status === 'suspended') {
+      const url = new URL('/account/suspended', request.url)
+      url.searchParams.set('reason', 'provider_suspended')
+      return NextResponse.redirect(url)
+    }
+
+    // Also check mechanics table (some staff are only in mechanics, not service_provider_users)
+    if (!staffLink) {
+      const { data: mechLink } = await supabase
+        .from('mechanics')
+        .select('service_provider_id, provider:service_providers(status)')
+        .eq('user_id', profile.id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+
+      if (mechLink?.provider?.status === 'suspended') {
+        const url = new URL('/account/suspended', request.url)
+        url.searchParams.set('reason', 'provider_suspended')
+        return NextResponse.redirect(url)
+      }
     }
   }
 

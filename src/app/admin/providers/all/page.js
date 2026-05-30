@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Search, CheckCircle, Clock, XCircle, AlertCircle, Store,
-  History, AlertTriangle, MoreVertical, ShieldOff, ShieldCheck,
+  History, AlertTriangle, MoreVertical, ShieldOff, ShieldCheck, PowerOff,
 } from 'lucide-react'
 import Link from 'next/link'
 import Pagination from '@/components/admin/Pagination'
@@ -160,8 +160,9 @@ export default function AllProvidersPage() {
   // ── Admin actions ─────────────────────────────────────────────────────────
   const handleAction = async (providerId, action, providerName) => {
     const labels = {
-      suspend:  `Suspend ${providerName}? They will no longer appear on the platform.`,
-      activate: `Activate ${providerName}? They will be live on the platform.`,
+      suspend:    `Suspend ${providerName}? All staff will be deactivated and the listing goes offline.`,
+      deactivate: `Deactivate ${providerName}? All staff will be deactivated.`,
+      activate:   `Activate ${providerName}? All staff will be reactivated.`,
     }
     if (!confirm(labels[action])) return
 
@@ -177,7 +178,7 @@ export default function AllProvidersPage() {
       // Auth-level ban/unban for the provider owner
       const provider = providers.find(p => p.id === providerId)
       if (provider?.owner?.auth_user_id) {
-        if (action === 'suspend') {
+        if (action === 'suspend' || action === 'deactivate') {
           await banUser(provider.owner.auth_user_id)
         } else {
           await unbanUser(provider.owner.auth_user_id)
@@ -195,8 +196,13 @@ export default function AllProvidersPage() {
 
   const getActions = (p) => {
     const actions = []
-    if (p.status === 'active')    actions.push({ key: 'suspend',  label: 'Suspend',  icon: ShieldOff,   cls: 'text-red-700 hover:bg-red-50' })
-    if (p.status === 'suspended') actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
+    if (p.status === 'active') {
+      actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff,   cls: 'text-red-700 hover:bg-red-50' })
+      actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,    cls: 'text-gray-700 hover:bg-gray-50' })
+    }
+    if (p.status === 'suspended' || (!p.is_active && p.status !== 'pending_verification' && p.status !== 'rejected')) {
+      actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
+    }
     return actions
   }
 
