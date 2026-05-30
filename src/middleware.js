@@ -121,7 +121,7 @@ export async function middleware(request) {
       .eq('owner_user_id', profile.id)
       .single()
 
-    if (company?.is_suspended || company?.status === 'suspended') {
+    if (company?.is_suspended || company?.status === 'suspended' || company?.status === 'deactivated') {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'company_suspended')
       return NextResponse.redirect(url)
@@ -136,7 +136,7 @@ export async function middleware(request) {
       .eq('is_active', true)
       .maybeSingle()
 
-    if (membership?.company?.is_suspended || membership?.company?.status === 'suspended') {
+    if (membership?.company?.is_suspended || membership?.company?.status === 'suspended' || membership?.company?.status === 'deactivated') {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'company_suspended')
       return NextResponse.redirect(url)

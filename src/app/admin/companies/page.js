@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck } from 'lucide-react'
+import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck, PowerOff } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 import { banUser, unbanUser } from '@/lib/admin/banUser'
 
@@ -136,8 +136,9 @@ export default function AdminCompaniesPage() {
   // ── Admin actions ─────────────────────────────────────────────────────────
   const handleAction = async (companyId, action, companyName) => {
     const labels = {
-      suspend:  `Suspend ${companyName}? All team members will be deactivated.`,
-      activate: `Activate ${companyName}? All team members will be reactivated.`,
+      suspend:    `Suspend ${companyName}? All team members will be deactivated.`,
+      deactivate: `Deactivate ${companyName}? The company and all team members will be deactivated.`,
+      activate:   `Activate ${companyName}? All team members will be reactivated.`,
     }
     if (!confirm(labels[action])) return
 
@@ -145,7 +146,7 @@ export default function AdminCompaniesPage() {
     const supabase = createClient()
 
     try {
-      const statusMap = { suspend: 'suspended', activate: 'active' }
+      const statusMap = { suspend: 'suspended', deactivate: 'deactivated', activate: 'active' }
       const { data: { user } } = await supabase.auth.getUser()
 
       const { data, error } = await supabase.rpc('admin_update_company_status', {
@@ -172,10 +173,12 @@ export default function AdminCompaniesPage() {
       // Notify company owner
       const company = companies.find(c => c.id === companyId)
       if (company?.owner_user_id) {
-        const title   = action === 'suspend' ? 'Company Suspended' : 'Company Activated'
-        const message = action === 'suspend'
-          ? `${companyName} has been suspended by an administrator. Contact support for more information.`
-          : `${companyName} has been activated and is now fully operational.`
+        const titles = { suspend: 'Company Suspended', deactivate: 'Company Deactivated', activate: 'Company Activated' }
+        const messages = {
+          suspend:    `${companyName} has been suspended by an administrator. Contact support for more information.`,
+          deactivate: `${companyName} has been deactivated by an administrator.`,
+          activate:   `${companyName} has been activated and is now fully operational.`,
+        }
         await supabase.from('notifications').insert({
           user_id: company.owner_user_id,
           recipient_user_id: company.owner_user_id,
@@ -183,13 +186,13 @@ export default function AdminCompaniesPage() {
           notification_type: 'company_' + action + 'd',
           reference_type: 'company',
           reference_id: companyId,
-          title, message, is_read: false,
+          title: titles[action], message: messages[action], is_read: false,
         })
       }
 
       // Auth-level ban/unban for the company owner
       if (company?.owner?.auth_user_id) {
-        if (action === 'suspend') {
+        if (action === 'suspend' || action === 'deactivate') {
           await banUser(company.owner.auth_user_id)
         } else {
           await unbanUser(company.owner.auth_user_id)
@@ -208,20 +211,22 @@ export default function AdminCompaniesPage() {
   const getActions = (c) => {
     const actions = []
     if (c.status === 'active') {
-      actions.push({ key: 'suspend', label: 'Suspend', icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
+      actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
+      actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,  cls: 'text-gray-700 hover:bg-gray-50' })
     }
-    if (c.status === 'suspended') {
+    if (c.status === 'suspended' || c.status === 'deactivated') {
       actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
     }
     return actions
   }
 
   const statusConfig = {
-    pending_verification: { label: 'Pending', classes: 'bg-yellow-100 text-yellow-800' },
-    active:               { label: 'Active',  classes: 'bg-green-100 text-green-800' },
-    rejected:             { label: 'Rejected', classes: 'bg-red-100 text-red-800' },
-    pending_info:         { label: 'Needs Info', classes: 'bg-orange-100 text-orange-800' },
-    suspended:            { label: 'Suspended', classes: 'bg-gray-100 text-gray-700' },
+    pending_verification: { label: 'Pending',     classes: 'bg-yellow-100 text-yellow-800' },
+    active:               { label: 'Active',      classes: 'bg-green-100 text-green-800' },
+    rejected:             { label: 'Rejected',    classes: 'bg-red-100 text-red-800' },
+    pending_info:         { label: 'Needs Info',   classes: 'bg-orange-100 text-orange-800' },
+    suspended:            { label: 'Suspended',   classes: 'bg-gray-100 text-gray-700' },
+    deactivated:          { label: 'Deactivated', classes: 'bg-gray-200 text-gray-600' },
   }
 
   const filters = [
@@ -230,6 +235,7 @@ export default function AdminCompaniesPage() {
     { key: 'pending_info',         label: 'Needs Info' },
     { key: 'active',               label: 'Active' },
     { key: 'suspended',            label: 'Suspended' },
+    { key: 'deactivated',          label: 'Deactivated' },
     { key: 'rejected',             label: 'Rejected' },
   ]
 
