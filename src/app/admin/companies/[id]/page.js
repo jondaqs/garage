@@ -6,11 +6,81 @@ import Link from 'next/link'
 import {
   CheckCircle, XCircle, FileText, Building2,
   Users, ArrowLeft, Truck, Clock, AlertCircle,
-  ExternalLink, Mail, Phone, Globe, MapPin, AlertTriangle
+  ExternalLink, Mail, Phone, Globe, MapPin, AlertTriangle,
+  History,
 } from 'lucide-react'
 import { sendCompanyApprovalEmail } from '@/lib/email/sendCompanyInviteEmail'
 
-const TABS = ['Overview', 'Documents', 'Team Members', 'Fleet']
+const TABS = ['Overview', 'Documents', 'Team Members', 'Fleet', 'Change History']
+
+// Human-readable labels for fields tracked in company_change_history.
+const FIELD_LABELS = {
+  name:                'Company Name',
+  bio:                 'Description',
+  phone:               'Phone',
+  website:             'Website',
+  registration_number: 'Registration Number',
+  tax_id:              'Tax ID (KRA PIN)',
+  industry:            'Industry',
+  company_size:        'Company Size',
+  physical_address:    'Physical Address',
+  city:                'City',
+  country:             'Country',
+  years_in_operation:  'Years in Operation',
+  opening_time:        'Opening Time',
+  closing_time:        'Closing Time',
+  working_days:        'Working Days',
+  documents:           'Documents',
+}
+
+// Document type labels — mirrors company settings Documents tab
+const DOC_TYPE_LABELS = {
+  certificate_of_incorporation: 'Certificate of Incorporation',
+  tax_compliance:               'KRA PIN / Tax Compliance',
+  cr12:                         'CR12 / CR2 — Company Registry Extract',
+  id_passport:                  'Director ID / Passport Copy',
+}
+
+const DOC_ACTION_STYLES = {
+  uploaded: { label: 'Uploaded', cls: 'bg-green-100  text-green-800' },
+  replaced: { label: 'Replaced', cls: 'bg-blue-100   text-blue-800'  },
+  deleted:  { label: 'Deleted',  cls: 'bg-red-100    text-red-800'   },
+}
+
+// Renders a single row in the diff table for the `documents` field.
+function DocumentsDiffRow({ entries, compact = false }) {
+  const list = Array.isArray(entries) ? entries : []
+  if (list.length === 0) return null
+
+  const pad = compact ? 'py-1.5 pr-3' : 'px-4 py-2'
+  return (
+    <tr>
+      <td className={`${pad} font-medium text-gray-900 align-top w-44`}>
+        Documents
+      </td>
+      <td className={`${pad} align-top`} colSpan={2}>
+        <ul className="space-y-1.5">
+          {list.map((entry, i) => {
+            const style = DOC_ACTION_STYLES[entry.action] || { label: entry.action, cls: 'bg-gray-100 text-gray-700' }
+            return (
+              <li key={i} className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded ${style.cls}`}>
+                  {style.label}
+                </span>
+                <span className="text-sm text-gray-900">
+                  {DOC_TYPE_LABELS[entry.doc_type] || entry.doc_type}
+                </span>
+                {entry.file_name && (
+                  <span className="text-xs text-gray-500 break-all">— {entry.file_name}</span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </td>
+    </tr>
+  )
+}
 
 export default function CompanyDetailPage({ params }) {
   const router = useRouter()
@@ -20,6 +90,8 @@ export default function CompanyDetailPage({ params }) {
   const [teamMembers, setTeamMembers] = useState([])
   const [activeMembers, setActiveMembers] = useState([])
   const [fleet, setFleet] = useState([])
+  const [history, setHistory] = useState([])
+  const [pendingDiff, setPendingDiff] = useState(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -51,7 +123,7 @@ export default function CompanyDetailPage({ params }) {
       // Owner is embedded in the company query above
       setOwner(companyData.owner || null)
 
-      // ── Documents — from uploaded_files (fix 0.6) ──
+      // ── Documents — from uploaded_files ──
       const { data: docsData } = await supabase
         .from('uploaded_files')
         .select('id, file_name, file_type, file_size, storage_path, storage_bucket, created_at, metadata')
@@ -59,7 +131,7 @@ export default function CompanyDetailPage({ params }) {
         .eq('reference_id', companyId)
         .order('created_at', { ascending: true })
 
-      // Build signed URLs — bucket is private, matches provider document pattern
+      // Build signed URLs
       const docsWithUrls = await Promise.all(
         (docsData || []).map(async (file) => {
           const { data: signedData, error: signedError } = await supabase
@@ -72,7 +144,6 @@ export default function CompanyDetailPage({ params }) {
       setDocuments(docsWithUrls)
 
       // ── Team members — two sources ──
-      // 1. company_invitations: all invites (pending, accepted, rejected)
       const { data: invitationsData } = await supabase
         .from('company_invitations')
         .select('id, first_name, last_name, email, phone, staff_role, is_admin, status, created_at')
@@ -80,7 +151,6 @@ export default function CompanyDetailPage({ params }) {
         .order('created_at', { ascending: true })
       setTeamMembers(invitationsData || [])
 
-      // 2. company_users: accepted members with their linked user profiles
       const { data: membersData } = await supabase
         .from('company_users')
         .select(`
@@ -100,12 +170,40 @@ export default function CompanyDetailPage({ params }) {
         .eq('owner_company_id', companyId)
       setFleet((ownershipData || []).map(o => o.vehicles).filter(Boolean))
 
+      // ── Change history ──
+      const { data: historyData } = await supabase
+        .from('company_change_history')
+        .select('id, changed_fields, previous_status, new_status, is_reverification, verified_at_snapshot, changed_at')
+        .eq('company_id', companyId)
+        .order('changed_at', { ascending: false })
+      setHistory(historyData || [])
+
+      // Most recent change as pending diff when status is pending_verification
+      const latest = (historyData && historyData[0]) || null
+      if (latest && companyData.status === 'pending_verification') {
+        setPendingDiff(latest)
+      }
+
     } catch (error) {
       console.error('Error fetching company details:', error)
       alert('Failed to load company details')
     } finally {
       setLoading(false)
     }
+  }
+
+  // ── Display value helper ──────────────────────────────────────────────────
+  const displayValue = (field, value) => {
+    if (value === null || value === undefined || value === '') {
+      return <span className="text-gray-300 italic">empty</span>
+    }
+    // working_days is an array — render as comma-separated
+    if (field === 'working_days' && Array.isArray(value)) {
+      return value.map(d => d.charAt(0).toUpperCase() + d.slice(1, 3)).join(', ') || <span className="text-gray-300 italic">none</span>
+    }
+    const s = String(value)
+    if (s.length > 100) return <span title={s}>{s.slice(0, 100)}…</span>
+    return s
   }
 
   // ── Approve ──────────────────────────────────────────────────────────────
@@ -116,8 +214,9 @@ export default function CompanyDetailPage({ params }) {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      const { data: adminProfile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
 
-      // Use SECURITY DEFINER rpc — bypasses RLS on company_profiles
       const { data: rpcResult, error: updateError } = await supabase.rpc(
         'admin_update_company_status',
         {
@@ -129,6 +228,14 @@ export default function CompanyDetailPage({ params }) {
 
       if (updateError) throw updateError
       if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
+
+      // Log admin action
+      await supabase.from('admin_action_logs').insert({
+        admin_user_id: adminProfile.id,
+        action_type:   'approve_company',
+        target_type:   'company',
+        target_id:     company.id,
+      })
 
       // Notification for owner
       await supabase.from('notifications').insert([{
@@ -143,7 +250,7 @@ export default function CompanyDetailPage({ params }) {
         is_read: false,
       }])
 
-      // 3.6 — Notify all pending invited team members that the company is now active
+      // Notify pending invited team members
       try {
         const { data: pendingInvites } = await supabase
           .from('company_invitations')
@@ -152,7 +259,6 @@ export default function CompanyDetailPage({ params }) {
           .eq('status', 'pending')
 
         if (pendingInvites && pendingInvites.length > 0) {
-          // Insert in-app notification for invitees who already have accounts
           const existingUserIds = pendingInvites
             .map(i => i.invitee_user_id)
             .filter(Boolean)
@@ -179,7 +285,7 @@ export default function CompanyDetailPage({ params }) {
         console.error('⚠️ Invitee notification error (non-fatal):', inviteNotifError)
       }
 
-      // Send approval email if owner email is available
+      // Send approval email
       if (owner?.email) {
         try {
           await sendCompanyApprovalEmail({
@@ -215,6 +321,8 @@ export default function CompanyDetailPage({ params }) {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      const { data: adminProfile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
 
       const { data: rpcResult, error: updateError } = await supabase.rpc(
         'admin_update_company_status',
@@ -228,6 +336,15 @@ export default function CompanyDetailPage({ params }) {
 
       if (updateError) throw updateError
       if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
+
+      // Log admin action
+      await supabase.from('admin_action_logs').insert({
+        admin_user_id: adminProfile.id,
+        action_type:   'reject_company',
+        target_type:   'company',
+        target_id:     company.id,
+        action_data:   { reason: rejectionReason },
+      })
 
       await supabase.from('notifications').insert([{
         user_id: company.owner_user_id,
@@ -263,6 +380,10 @@ export default function CompanyDetailPage({ params }) {
     const supabase = createClient()
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: adminProfile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+
       const { data: rpcResult, error: updateError } = await supabase.rpc(
         'admin_update_company_status',
         {
@@ -274,6 +395,15 @@ export default function CompanyDetailPage({ params }) {
 
       if (updateError) throw updateError
       if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error)
+
+      // Log admin action
+      await supabase.from('admin_action_logs').insert({
+        admin_user_id: adminProfile.id,
+        action_type:   'request_info_company',
+        target_type:   'company',
+        target_id:     company.id,
+        action_data:   { info_requested: additionalInfo },
+      })
 
       await supabase.from('notifications').insert([{
         user_id: company.owner_user_id,
@@ -334,8 +464,6 @@ export default function CompanyDetailPage({ params }) {
   if (!company) return null
 
   // ── Personal email detection ──────────────────────────────────────────────
-  // Companies should register with a corporate domain, not a free email provider.
-  // Flag these for the admin during review so they can ask for a business email.
   const PERSONAL_DOMAINS = new Set([
     'gmail.com', 'yahoo.com', 'yahoo.co.ke', 'hotmail.com', 'outlook.com',
     'live.com', 'icloud.com', 'me.com', 'mac.com', 'aol.com',
@@ -365,10 +493,15 @@ export default function CompanyDetailPage({ params }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
-            <div className="flex items-center gap-3 mt-2">
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
               <StatusBadge status={company.status} />
               {company.registration_number && (
                 <span className="text-sm text-gray-500">Reg: {company.registration_number}</span>
+              )}
+              {pendingDiff?.is_reverification && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                  Re-verification
+                </span>
               )}
             </div>
           </div>
@@ -402,7 +535,7 @@ export default function CompanyDetailPage({ params }) {
         </div>
       </div>
 
-      {/* Personal email warning — shown whenever owner used a free email provider */}
+      {/* Personal email warning */}
       {ownerUsesPersonalEmail && (
         <div className="flex items-start gap-3 px-4 py-3.5 mb-6 bg-red-50 border border-red-300 rounded-lg">
           <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -416,9 +549,67 @@ export default function CompanyDetailPage({ params }) {
         </div>
       )}
 
+      {/* ── Pending diff summary (like provider admin page) ── */}
+      {pendingDiff && isPending && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-yellow-900">
+              {pendingDiff.is_reverification ? (
+                <>
+                  {(() => {
+                    const f = pendingDiff.changed_fields || {}
+                    const scalarCount = Object.keys(f).filter(k => k !== 'documents').length
+                    const docCount    = Array.isArray(f.documents) ? f.documents.length : 0
+                    const parts = []
+                    if (scalarCount) parts.push(`${scalarCount} field${scalarCount === 1 ? '' : 's'}`)
+                    if (docCount)    parts.push(`${docCount} document${docCount === 1 ? '' : 's'}`)
+                    return parts.length ? `Owner updated ${parts.join(' + ')}` : 'Owner submitted changes'
+                  })()}
+                  {pendingDiff.verified_at_snapshot && (
+                    <> since last approval on {new Date(pendingDiff.verified_at_snapshot).toLocaleDateString()}</>
+                  )}
+                  . Review the changes below before approving.
+                </>
+              ) : (
+                <>Submitted {new Date(pendingDiff.changed_at).toLocaleString()}.</>
+              )}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-md border border-yellow-200 overflow-hidden mx-3 mb-3">
+            <table className="min-w-full divide-y divide-yellow-100 text-sm">
+              <thead className="bg-yellow-100/50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-yellow-900 uppercase tracking-wider">Field</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-yellow-900 uppercase tracking-wider" colSpan="2">Change</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-yellow-50">
+                {Object.entries(pendingDiff.changed_fields || {}).map(([field, value]) => (
+                  field === 'documents'
+                    ? <DocumentsDiffRow key={field} entries={value} />
+                    : (
+                      <tr key={field}>
+                        <td className="px-4 py-2 font-medium text-gray-900 align-top w-44">{FIELD_LABELS[field] || field}</td>
+                        <td className="px-4 py-2 text-gray-500 line-through decoration-red-300 align-top">
+                          {displayValue(field, value?.old)}
+                        </td>
+                        <td className="px-4 py-2 text-green-700 font-medium align-top">
+                          {displayValue(field, value?.new)}
+                        </td>
+                      </tr>
+                    )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-0">
+        <nav className="flex gap-0 flex-wrap">
           {TABS.map((tab) => (
             <button
               key={tab}
@@ -445,6 +636,11 @@ export default function CompanyDetailPage({ params }) {
                   {fleet.length}
                 </span>
               )}
+              {tab === 'Change History' && (
+                <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                  {history.length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -465,7 +661,6 @@ export default function CompanyDetailPage({ params }) {
                 { label: 'Legal Name', value: company.name },
                 { label: 'Registration Number', value: company.registration_number },
                 { label: 'Tax ID / KRA PIN', value: company.tax_id },
-                // fix 0.9: was company.industry_type — column is industry
                 { label: 'Industry', value: company.industry },
                 { label: 'Company Size', value: company.company_size },
                 { label: 'Years in Operation', value: company.years_in_operation },
@@ -523,7 +718,6 @@ export default function CompanyDetailPage({ params }) {
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                {/* fix 0.10: was company.address — column is physical_address */}
                 <dt className="flex items-center gap-1 text-gray-500 shrink-0"><MapPin className="w-3.5 h-3.5" /> Address</dt>
                 <dd className="font-medium text-gray-900 text-right">
                   {company.physical_address
@@ -628,7 +822,7 @@ export default function CompanyDetailPage({ params }) {
       {activeTab === 'Team Members' && (
         <div className="space-y-5">
 
-          {/* ── Active members (company_users with linked profiles) ── */}
+          {/* Active members */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
@@ -681,7 +875,7 @@ export default function CompanyDetailPage({ params }) {
             )}
           </div>
 
-          {/* ── Invitations (all statuses) ── */}
+          {/* Invitations */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
               <Users className="w-5 h-5 text-gray-400" />
@@ -773,6 +967,78 @@ export default function CompanyDetailPage({ params }) {
         </div>
       )}
 
+      {/* ── CHANGE HISTORY TAB ── */}
+      {activeTab === 'Change History' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+            <History className="w-5 h-5 text-blue-600" />
+            <h2 className="text-base font-semibold">Change History</h2>
+            <span className="text-xs text-gray-500">({history.length})</span>
+          </div>
+
+          {history.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 text-sm">
+              No recorded changes yet. Changes will appear here whenever the owner updates their company profile or documents.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {history.map((entry) => (
+                <div key={entry.id} className="px-6 py-4">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {new Date(entry.changed_at).toLocaleString()}
+                      </span>
+                      {entry.is_reverification && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                          Re-verification
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {(() => {
+                        const fields = entry.changed_fields || {}
+                        const scalarCount = Object.keys(fields).filter(k => k !== 'documents').length
+                        const docCount    = Array.isArray(fields.documents) ? fields.documents.length : 0
+                        const parts = []
+                        if (scalarCount) parts.push(`${scalarCount} field${scalarCount === 1 ? '' : 's'}`)
+                        if (docCount)    parts.push(`${docCount} document${docCount === 1 ? '' : 's'}`)
+                        return parts.length ? parts.join(' + ') + ' changed' : 'no field changes'
+                      })()}
+                      {entry.previous_status !== entry.new_status && (
+                        <> · status: {entry.previous_status?.replace(/_/g, ' ')} → {entry.new_status?.replace(/_/g, ' ')}</>
+                      )}
+                    </span>
+                  </div>
+                  <table className="min-w-full text-xs mt-2">
+                    <tbody className="divide-y divide-gray-50">
+                      {Object.entries(entry.changed_fields || {}).map(([field, value]) => (
+                        field === 'documents'
+                          ? <DocumentsDiffRow key={field} entries={value} compact />
+                          : (
+                            <tr key={field}>
+                              <td className="py-1.5 pr-3 font-medium text-gray-700 align-top w-40">
+                                {FIELD_LABELS[field] || field}
+                              </td>
+                              <td className="py-1.5 pr-3 text-gray-500 line-through decoration-red-300 align-top">
+                                {displayValue(field, value?.old)}
+                              </td>
+                              <td className="py-1.5 text-green-700 align-top">
+                                {displayValue(field, value?.new)}
+                              </td>
+                            </tr>
+                          )
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Reject Modal ── */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -838,7 +1104,7 @@ export default function CompanyDetailPage({ params }) {
               >
                 Cancel
               </button>
-            </div> 
+            </div>
           </div>
         </div>
       )}
