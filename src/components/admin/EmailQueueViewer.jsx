@@ -4,6 +4,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Pagination from '@/components/admin/Pagination'
+
+const PAGE_SIZE = 20
 
 export default function EmailQueueViewer() {
   const [emails, setEmails] = useState([])
@@ -11,21 +14,25 @@ export default function EmailQueueViewer() {
   const [counts, setCounts] = useState({ pending: 0, sent: 0, failed: 0 })
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    loadEmailQueue()
-  }, [filter])
+  // Reset page when filter changes
+  useEffect(() => { setPage(1) }, [filter])
+  useEffect(() => { loadEmailQueue() }, [filter, page])
 
   async function loadEmailQueue() {
     try {
       setLoading(true)
-      const response = await fetch(`/api/email-queue?status=${filter}&limit=50`)
+      const offset = (page - 1) * PAGE_SIZE
+      const response = await fetch(`/api/email-queue?status=${filter}&limit=${PAGE_SIZE}&offset=${offset}`)
       const data = await response.json()
 
       if (response.ok) {
         setEmails(data.emails || [])
         setStats(data.statistics)
         setCounts(data.counts || { pending: 0, sent: 0, failed: 0 })
+        setTotalCount(data.total || 0)
       }
     } catch (error) {
       console.error('Load email queue error:', error)
@@ -34,7 +41,7 @@ export default function EmailQueueViewer() {
     }
   }
 
-  if (loading) {
+  if (loading && page === 1 && !emails.length) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <div className="animate-pulse">
@@ -58,67 +65,20 @@ export default function EmailQueueViewer() {
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-gray-50">
-          <StatCard
-            title="Total Emails"
-            value={stats.total_emails}
-            icon="📊"
-            color="blue"
-          />
-          <StatCard
-            title="Sent"
-            value={stats.sent_emails}
-            icon="✅"
-            color="green"
-          />
-          <StatCard
-            title="Pending"
-            value={stats.pending_emails}
-            icon="⏳"
-            color="yellow"
-          />
-          <StatCard
-            title="Failed"
-            value={stats.failed_emails}
-            icon="❌"
-            color="red"
-          />
+          <StatCard title="Total Emails" value={stats.total_emails} icon="📊" color="blue" />
+          <StatCard title="Sent"         value={stats.sent_emails}  icon="✅" color="green" />
+          <StatCard title="Pending"      value={stats.pending_emails} icon="⏳" color="yellow" />
+          <StatCard title="Failed"       value={stats.failed_emails}  icon="❌" color="red" />
         </div>
       )}
 
       {/* Filters */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex gap-2">
-          <FilterButton
-            active={filter === 'all'}
-            onClick={() => setFilter('all')}
-            count={counts.pending + counts.sent + counts.failed}
-          >
-            All
-          </FilterButton>
-          <FilterButton
-            active={filter === 'pending'}
-            onClick={() => setFilter('pending')}
-            count={counts.pending}
-            color="yellow"
-          >
-            Pending
-          </FilterButton>
-          <FilterButton
-            active={filter === 'sent'}
-            onClick={() => setFilter('sent')}
-            count={counts.sent}
-            color="green"
-          >
-            Sent
-          </FilterButton>
-          <FilterButton
-            active={filter === 'failed'}
-            onClick={() => setFilter('failed')}
-            count={counts.failed}
-            color="red"
-          >
-            Failed
-          </FilterButton>
+          <FilterButton active={filter === 'all'}     onClick={() => setFilter('all')}     count={counts.pending + counts.sent + counts.failed}>All</FilterButton>
+          <FilterButton active={filter === 'pending'} onClick={() => setFilter('pending')} count={counts.pending} color="yellow">Pending</FilterButton>
+          <FilterButton active={filter === 'sent'}    onClick={() => setFilter('sent')}    count={counts.sent}    color="green">Sent</FilterButton>
+          <FilterButton active={filter === 'failed'}  onClick={() => setFilter('failed')}  count={counts.failed}  color="red">Failed</FilterButton>
         </div>
       </div>
 
@@ -134,6 +94,9 @@ export default function EmailQueueViewer() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
     </div>
   )
 }

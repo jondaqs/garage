@@ -3,31 +3,39 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Building2, Users, Truck, Clock } from 'lucide-react'
+import Pagination from '@/components/admin/Pagination'
+
+const PAGE_SIZE = 20
 
 export default function AdminCompaniesPage() {
-  const [companies, setCompanies] = useState([])
-  const [filter, setFilter] = useState('pending_verification')
-  const [loading, setLoading] = useState(true)
+  const [companies,  setCompanies]  = useState([])
+  const [filter,     setFilter]     = useState('pending_verification')
+  const [loading,    setLoading]    = useState(true)
+  const [page,       setPage]       = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    fetchCompanies()
-  }, [filter])
+  // Reset page when filter changes
+  useEffect(() => { setPage(1) }, [filter])
+  useEffect(() => { fetchCompanies() }, [filter, page])
 
   const fetchCompanies = async () => {
     setLoading(true)
     const supabase = createClient()
+    const from = (page - 1) * PAGE_SIZE
+    const to   = from + PAGE_SIZE - 1
 
-    // Base company query — email lives on user_profiles.email
     let query = supabase
       .from('company_profiles')
-      .select('id, name, registration_number, status, submitted_at, created_at, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)')
+      .select('id, name, registration_number, status, submitted_at, created_at, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)', { count: 'exact' })
       .order('submitted_at', { ascending: false, nullsFirst: false })
 
     if (filter !== 'all') {
       query = query.eq('status', filter)
     }
 
-    const { data, error } = await query
+    query = query.range(from, to)
+
+    const { data, error, count } = await query
 
     if (error) {
       console.error('Error fetching companies:', error)
@@ -35,7 +43,9 @@ export default function AdminCompaniesPage() {
       return
     }
 
-    // Fetch vehicle and team counts for each company in parallel
+    setTotalCount(count || 0)
+
+    // Fetch vehicle and team counts for current page only
     const companiesWithCounts = await Promise.all(
       (data || []).map(async (company) => {
         const [{ count: vehicleCount }, { count: teamCount }] = await Promise.all([
@@ -74,7 +84,6 @@ export default function AdminCompaniesPage() {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Company Registrations</h1>
@@ -82,11 +91,10 @@ export default function AdminCompaniesPage() {
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Building2 className="w-4 h-4" />
-          <span>{companies.length} shown</span>
+          <span>{totalCount} total</span>
         </div>
       </div>
 
-      {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
         {filters.map(({ key, label }) => (
           <button
@@ -103,7 +111,7 @@ export default function AdminCompaniesPage() {
         ))}
       </div>
 
-      {loading ? (
+      {loading && page === 1 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
           Loading companies...
         </div>
@@ -117,15 +125,9 @@ export default function AdminCompaniesPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Company
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Owner
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> Fleet</span>
                 </th>
@@ -135,9 +137,7 @@ export default function AdminCompaniesPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Submitted</span>
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -164,12 +164,8 @@ export default function AdminCompaniesPage() {
                         {cfg.label}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {company.vehicleCount}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {company.teamCount}
-                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{company.vehicleCount}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{company.teamCount}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {company.submitted_at
                         ? new Date(company.submitted_at).toLocaleDateString()
@@ -177,10 +173,7 @@ export default function AdminCompaniesPage() {
                       }
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link
-                        href={`/admin/companies/${company.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
+                      <Link href={`/admin/companies/${company.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
                         Review →
                       </Link>
                     </td>
@@ -189,6 +182,8 @@ export default function AdminCompaniesPage() {
               })}
             </tbody>
           </table>
+
+          <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
         </div>
       )}
     </div>

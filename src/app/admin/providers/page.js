@@ -8,8 +8,10 @@ import {
   Clock, CheckCircle, XCircle, Eye, History, AlertTriangle,
   ArrowRight, Store,
 } from 'lucide-react'
+import Pagination from '@/components/admin/Pagination'
 
-// Field labels used in the diff summary. Keep in sync with provider detail page.
+const PAGE_SIZE = 20
+
 const FIELD_LABELS = {
   name:                'Business Name',
   email:               'Business Email',
@@ -27,23 +29,28 @@ export default function PendingProvidersPage() {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [providers, setProviders] = useState([])
-  const [loading,   setLoading]   = useState(true)
+  const [providers,  setProviders]  = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [page,       setPage]       = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => { loadPendingProviders() }, [])
+  useEffect(() => { loadPendingProviders() }, [page])
 
   const loadPendingProviders = async () => {
+    setLoading(true)
     try {
-      // Join the pending-changes view to surface the latest diff per provider.
-      // The view filters to status='pending_verification' already.
-      const { data: pendingRows, error } = await supabase
+      const from = (page - 1) * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+
+      const { data: pendingRows, error, count } = await supabase
         .from('provider_pending_changes')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('changed_at', { ascending: false, nullsFirst: false })
+        .range(from, to)
 
       if (error) throw error
+      setTotalCount(count || 0)
 
-      // Hydrate with related provider info (owner, type, submission timestamps).
       const ids = (pendingRows || []).map(r => r.service_provider_id)
       let detailsById = {}
       if (ids.length > 0) {
@@ -67,10 +74,6 @@ export default function PendingProvidersPage() {
     }
   }
 
-  // ── Diff summary helpers ───────────────────────────────────────────────────
-  // Returns an array of short labels for the change badges. The `documents`
-  // field is special — it contains an array, so we surface each document
-  // change as its own label (e.g. "Replaced: Business Reg.").
   const DOC_TYPE_SHORT = {
     business_license: 'Business Reg.',
     tax_compliance:   'KRA PIN',
@@ -94,7 +97,7 @@ export default function PendingProvidersPage() {
     return labels
   }
 
-  if (loading) {
+  if (loading && page === 1) {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
@@ -107,7 +110,7 @@ export default function PendingProvidersPage() {
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pending Provider Registrations</h1>
-          <p className="text-gray-500 mt-1">{providers.length} application{providers.length === 1 ? '' : 's'} awaiting review</p>
+          <p className="text-gray-500 mt-1">{totalCount} application{totalCount === 1 ? '' : 's'} awaiting review</p>
         </div>
         <Link
           href="/admin/providers/all"
@@ -143,7 +146,6 @@ export default function PendingProvidersPage() {
                 const isRevet = p.is_reverification
                 return (
                   <tr key={p.service_provider_id} className="hover:bg-gray-50 align-top">
-                    {/* Provider */}
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{p.name}</p>
                       {p.registration_number && (
@@ -155,21 +157,15 @@ export default function PendingProvidersPage() {
                         </span>
                       )}
                     </td>
-
-                    {/* Owner */}
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-900">
                         {p.owner ? `${p.owner.first_name || ''} ${p.owner.last_name || ''}`.trim() || '—' : '—'}
                       </p>
                       <p className="text-xs text-gray-400">{p.owner?.email || ''}</p>
                     </td>
-
-                    {/* Type */}
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600">{p.provider_type?.display_name || '—'}</span>
                     </td>
-
-                    {/* Submitted */}
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {p.submitted_at
                         ? new Date(p.submitted_at).toLocaleDateString()
@@ -177,8 +173,6 @@ export default function PendingProvidersPage() {
                           ? new Date(p.changed_at).toLocaleDateString()
                           : '—'}
                     </td>
-
-                    {/* Changes Requested — diff summary inline */}
                     <td className="px-6 py-4 max-w-xs">
                       {changedLabels.length === 0 ? (
                         <span className="text-xs text-gray-400 italic">No tracked changes</span>
@@ -192,10 +186,7 @@ export default function PendingProvidersPage() {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {changedLabels.slice(0, 4).map((label) => (
-                              <span
-                                key={label}
-                                className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 rounded"
-                              >
+                              <span key={label} className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 rounded">
                                 {label}
                               </span>
                             ))}
@@ -213,8 +204,6 @@ export default function PendingProvidersPage() {
                         </div>
                       )}
                     </td>
-
-                    {/* Action */}
                     <td className="px-6 py-4">
                       <Link
                         href={`/admin/providers/${p.service_provider_id}`}
@@ -229,6 +218,8 @@ export default function PendingProvidersPage() {
             )}
           </tbody>
         </table>
+
+        <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
       </div>
     </div>
   )

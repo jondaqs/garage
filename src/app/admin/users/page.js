@@ -4,28 +4,58 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, User, Users, AlertCircle } from 'lucide-react'
+import Pagination from '@/components/admin/Pagination'
+
+const PAGE_SIZE = 20
 
 export default function AdminUsersPage() {
   const supabase = createClient()
-  const [users, setUsers]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
+  const [users,      setUsers]      = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [search,     setSearch]     = useState('')
+  const [page,       setPage]       = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalAll,   setTotalAll]   = useState(0)
 
-  useEffect(() => { loadUsers() }, [])
+  // Debounce search
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+  useEffect(() => { setPage(1) }, [debouncedSearch])
+
+  useEffect(() => { loadUsers() }, [page, debouncedSearch])
 
   const loadUsers = async () => {
+    setLoading(true)
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+
+      let query = supabase
         .from('user_profiles')
         .select(`
           id, first_name, last_name, email, phone,
           is_active, is_suspended, created_at,
           user_roles(role:user_roles_lookup(code, display_name))
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false })
 
+      if (debouncedSearch) {
+        query = query.or(
+          `first_name.ilike.%${debouncedSearch}%,last_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%`
+        )
+      }
+
+      query = query.range(from, to)
+
+      const { data, error, count } = await query
       if (error) throw error
       setUsers(data || [])
+      setTotalCount(count || 0)
+
+      if (page === 1 && !debouncedSearch) setTotalAll(count || 0)
     } catch (err) {
       console.error('Error loading users:', err)
     } finally {
@@ -33,21 +63,10 @@ export default function AdminUsersPage() {
     }
   }
 
-  const filtered = users.filter(u => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      u.first_name?.toLowerCase().includes(q) ||
-      u.last_name?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.phone?.includes(q)
-    )
-  })
-
   const getRoles = (u) =>
     u.user_roles?.map(ur => ur.role?.display_name).filter(Boolean).join(', ') || 'User'
 
-  if (loading) return (
+  if (loading && page === 1 && !users.length) return (
     <div className="flex justify-center py-12">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
     </div>
@@ -57,7 +76,7 @@ export default function AdminUsersPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-        <p className="text-gray-500 mt-1">{users.length} registered users</p>
+        <p className="text-gray-500 mt-1">{totalAll || totalCount} registered users</p>
       </div>
 
       <div className="relative max-w-sm mb-6">
@@ -84,7 +103,7 @@ export default function AdminUsersPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {filtered.length === 0 ? (
+            {users.length === 0 ? (
               <tr>
                 <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
                   <Users className="w-10 h-10 mx-auto mb-2 text-gray-200" />
@@ -92,7 +111,7 @@ export default function AdminUsersPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map(u => (
+              users.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -126,6 +145,8 @@ export default function AdminUsersPage() {
             )}
           </tbody>
         </table>
+
+        <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
       </div>
     </div>
   )

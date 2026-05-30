@@ -1,7 +1,7 @@
 // src/app/admin/providers/all/page.js
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -9,6 +9,9 @@ import {
   History, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
+import Pagination from '@/components/admin/Pagination'
+
+const PAGE_SIZE = 20
 
 const FIELD_LABELS = {
   name:                'Business Name',
@@ -28,28 +31,54 @@ export default function AllProvidersPage() {
   const supabase = createClient()
 
   const [providers,    setProviders]    = useState([])
-  const [pendingDiffs, setPendingDiffs] = useState({})   // service_provider_id -> latest change row
+  const [pendingDiffs, setPendingDiffs] = useState({})
   const [loading,      setLoading]      = useState(true)
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [page,         setPage]         = useState(1)
+  const [totalCount,   setTotalCount]   = useState(0)
+  const [totalAll,     setTotalAll]     = useState(0)
 
-  useEffect(() => { loadProviders() }, [])
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1) }, [search, statusFilter])
+  useEffect(() => { loadProviders() }, [page, search, statusFilter])
+
+  // Debounce search
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+  useEffect(() => { setPage(1) }, [debouncedSearch])
 
   const loadProviders = async () => {
+    setLoading(true)
     try {
-      const [{ data: provs, error }, { data: pending }] = await Promise.all([
-        supabase
-          .from('service_providers')
-          .select(`
-            id, name, status, is_active, is_verified, created_at, submitted_at,
-            owner:user_profiles(first_name, last_name, email),
-            provider_type:service_provider_types(display_name),
-            shops(id)
-          `)
-          .order('created_at', { ascending: false }),
+      const from = (page - 1) * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
 
-        // Pending diffs are only relevant for providers in pending_verification.
-        // The view filters that for us.
+      let query = supabase
+        .from('service_providers')
+        .select(`
+          id, name, status, is_active, is_verified, created_at, submitted_at,
+          owner:user_profiles(first_name, last_name, email),
+          provider_type:service_provider_types(display_name),
+          shops(id)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter)
+      }
+
+      if (debouncedSearch) {
+        query = query.or(`name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`)
+      }
+
+      query = query.range(from, to)
+
+      const [{ data: provs, error, count }, { data: pending }] = await Promise.all([
+        query,
         supabase
           .from('provider_pending_changes')
           .select('service_provider_id, changed_fields, change_count, is_reverification, verified_at_snapshot'),
@@ -57,23 +86,21 @@ export default function AllProvidersPage() {
 
       if (error) throw error
       setProviders(provs || [])
+      setTotalCount(count || 0)
       setPendingDiffs(
         Object.fromEntries((pending || []).map(r => [r.service_provider_id, r]))
       )
+
+      // Total count for header (all statuses, no search)
+      if (page === 1 && statusFilter === 'all' && !debouncedSearch) {
+        setTotalAll(count || 0)
+      }
     } catch (err) {
       console.error('Error loading providers:', err)
     } finally {
       setLoading(false)
     }
   }
-
-  const filtered = providers.filter(p => {
-    const matchSearch = !search ||
-      p.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.owner?.email?.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === 'all' || p.status === statusFilter
-    return matchSearch && matchStatus
-  })
 
   const statusBadge = (status) => {
     const map = {
@@ -92,7 +119,7 @@ export default function AllProvidersPage() {
     return <AlertCircle size={14} className="text-gray-400" />
   }
 
-  if (loading) return (
+  if (loading && page === 1 && !providers.length) return (
     <div className="flex justify-center py-12">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
     </div>
@@ -103,14 +130,13 @@ export default function AllProvidersPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">All Providers</h1>
-          <p className="text-gray-500 mt-1">{providers.length} total registered providers</p>
+          <p className="text-gray-500 mt-1">{totalAll || totalCount} total registered providers</p>
         </div>
         <Link
           href="/admin/providers"
           className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200"
         >
-          <Clock size={16} />
-          Pending Review ({providers.filter(p => p.status === 'pending_verification').length})
+          <Clock size={16} /> Pending Review
         </Link>
       </div>
 
@@ -154,7 +180,7 @@ export default function AllProvidersPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {filtered.length === 0 ? (
+            {providers.length === 0 ? (
               <tr>
                 <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
                   <Store className="w-10 h-10 mx-auto mb-2 text-gray-200" />
@@ -162,7 +188,7 @@ export default function AllProvidersPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map(p => {
+              providers.map(p => {
                 const diff = pendingDiffs[p.id]
                 const labels = []
                 if (diff?.changed_fields) {
@@ -222,10 +248,7 @@ export default function AllProvidersPage() {
                       {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/providers/${p.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
+                      <Link href={`/admin/providers/${p.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
                         View →
                       </Link>
                     </td>
@@ -235,6 +258,8 @@ export default function AllProvidersPage() {
             )}
           </tbody>
         </table>
+
+        <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
       </div>
     </div>
   )
