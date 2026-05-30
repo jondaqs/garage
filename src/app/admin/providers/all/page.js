@@ -196,11 +196,14 @@ export default function AllProvidersPage() {
 
   const getActions = (p) => {
     const actions = []
-    if (p.status === 'active') {
+    // Only show suspend/deactivate when truly active (both columns)
+    if (p.status === 'active' && p.is_active !== false) {
       actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff,   cls: 'text-red-700 hover:bg-red-50' })
       actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,    cls: 'text-gray-700 hover:bg-gray-50' })
     }
-    if (p.status === 'suspended' || (!p.is_active && p.status !== 'pending_verification' && p.status !== 'rejected')) {
+    // Show activate when suspended, deactivated, or is_active is false
+    if (p.status === 'suspended' || p.status === 'deactivated' ||
+        (p.is_active === false && p.status !== 'pending_verification' && p.status !== 'rejected')) {
       actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
     }
     return actions
@@ -211,12 +214,14 @@ export default function AllProvidersPage() {
     pending_verification: 'bg-yellow-100 text-yellow-800',
     rejected:             'bg-red-100 text-red-800',
     suspended:            'bg-gray-100 text-gray-700',
+    deactivated:          'bg-gray-200 text-gray-600',
   }[status] || 'bg-gray-100 text-gray-700')
 
   const statusIcon = (status) => {
     if (status === 'active')               return <CheckCircle size={14} className="text-green-600" />
     if (status === 'pending_verification') return <Clock size={14} className="text-yellow-600" />
     if (status === 'rejected')             return <XCircle size={14} className="text-red-600" />
+    if (status === 'deactivated')          return <PowerOff size={14} className="text-gray-500" />
     return <AlertCircle size={14} className="text-gray-400" />
   }
 
@@ -262,6 +267,7 @@ export default function AllProvidersPage() {
           <option value="active">Active</option>
           <option value="pending_verification">Pending</option>
           <option value="suspended">Suspended</option>
+          <option value="deactivated">Deactivated</option>
           <option value="rejected">Rejected</option>
         </select>
       </div>

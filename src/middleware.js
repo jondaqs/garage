@@ -150,7 +150,7 @@ export async function middleware(request) {
       .eq('owner_user_id', profile.id)
       .single()
 
-    if (provider?.status === 'suspended' || provider?.is_active === false) {
+    if (provider?.status === 'suspended' || provider?.status === 'deactivated' || provider?.is_active === false) {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'provider_suspended')
       return NextResponse.redirect(url)
@@ -158,17 +158,18 @@ export async function middleware(request) {
   }
 
   // Provider staff (mechanics / service_provider_users) access /dashboard,
-  // not /provider. Check if their provider is suspended.
+  // not /provider. Check if their provider is suspended or deactivated.
+  // Note: we do NOT filter on is_active because the suspend RPC already
+  // cascaded is_active=false on staff — filtering would skip the check.
   if ((role === 'user' || role === 'member') && pathname.startsWith('/dashboard')) {
     const { data: staffLink } = await supabase
       .from('service_provider_users')
       .select('service_provider_id, provider:service_providers(status)')
       .eq('user_id', profile.id)
-      .eq('is_active', true)
       .limit(1)
       .maybeSingle()
 
-    if (staffLink?.provider?.status === 'suspended') {
+    if (staffLink?.provider?.status === 'suspended' || staffLink?.provider?.status === 'deactivated') {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'provider_suspended')
       return NextResponse.redirect(url)
@@ -180,11 +181,10 @@ export async function middleware(request) {
         .from('mechanics')
         .select('service_provider_id, provider:service_providers(status)')
         .eq('user_id', profile.id)
-        .eq('is_active', true)
         .limit(1)
         .maybeSingle()
 
-      if (mechLink?.provider?.status === 'suspended') {
+      if (mechLink?.provider?.status === 'suspended' || mechLink?.provider?.status === 'deactivated') {
         const url = new URL('/account/suspended', request.url)
         url.searchParams.set('reason', 'provider_suspended')
         return NextResponse.redirect(url)

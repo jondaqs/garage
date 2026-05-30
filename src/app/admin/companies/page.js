@@ -210,11 +210,14 @@ export default function AdminCompaniesPage() {
 
   const getActions = (c) => {
     const actions = []
-    if (c.status === 'active') {
+    // Only show suspend/deactivate when truly active (both columns)
+    if (c.status === 'active' && c.is_active !== false) {
       actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
       actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,  cls: 'text-gray-700 hover:bg-gray-50' })
     }
-    if (c.status === 'suspended' || c.status === 'deactivated') {
+    // Show activate when suspended, deactivated, or is_active is false
+    if (c.status === 'suspended' || c.status === 'deactivated' ||
+        (c.is_active === false && c.status !== 'pending_verification' && c.status !== 'rejected')) {
       actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
     }
     return actions
