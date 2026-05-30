@@ -178,10 +178,45 @@ export default function CompanyDetailPage({ params }) {
         .order('changed_at', { ascending: false })
       setHistory(historyData || [])
 
-      // Most recent change as pending diff when status is pending_verification
-      const latest = (historyData && historyData[0]) || null
-      if (latest && companyData.status === 'pending_verification') {
-        setPendingDiff(latest)
+      // Aggregate ALL history entries since last approval into one merged diff
+      // so the banner shows every document + field change, not just the latest row.
+      if (companyData.status === 'pending_verification' && historyData?.length > 0) {
+        const verifiedAt = companyData.verified_at
+        const pendingEntries = verifiedAt
+          ? historyData.filter(h => new Date(h.changed_at) > new Date(verifiedAt))
+          : historyData
+
+        if (pendingEntries.length > 0) {
+          // Merge changed_fields — process chronologically (oldest first)
+          // so the earliest "old" and the latest "new" are preserved for scalars.
+          const mergedFields = {}
+          const chronological = [...pendingEntries].reverse()
+          for (const entry of chronological) {
+            const fields = entry.changed_fields || {}
+            for (const [field, value] of Object.entries(fields)) {
+              if (field === 'documents') {
+                // Accumulate all document changes into one array
+                mergedFields.documents = [
+                  ...(mergedFields.documents || []),
+                  ...(Array.isArray(value) ? value : []),
+                ]
+              } else {
+                // For scalar fields keep the oldest 'old' and latest 'new'
+                if (mergedFields[field]) {
+                  mergedFields[field] = { old: mergedFields[field].old, new: value.new }
+                } else {
+                  mergedFields[field] = value
+                }
+              }
+            }
+          }
+
+          setPendingDiff({
+            ...pendingEntries[0],                   // most recent entry's metadata
+            changed_fields:   mergedFields,
+            is_reverification: pendingEntries.some(e => e.is_reverification),
+          })
+        }
       }
 
     } catch (error) {
@@ -1006,9 +1041,18 @@ export default function CompanyDetailPage({ params }) {
                         if (docCount)    parts.push(`${docCount} document${docCount === 1 ? '' : 's'}`)
                         return parts.length ? parts.join(' + ') + ' changed' : 'no field changes'
                       })()}
-                      {entry.previous_status !== entry.new_status && (
-                        <> · status: {entry.previous_status?.replace(/_/g, ' ')} → {entry.new_status?.replace(/_/g, ' ')}</>
-                      )}
+                      {entry.previous_status !== entry.new_status && (() => {
+                        const prev = entry.previous_status
+                        const next = entry.new_status
+                        // Standard re-verification cycle — the "Re-verification" badge
+                        // already communicates this; suppress the raw status arrow.
+                        if (next === 'pending_verification' && (prev === 'active' || prev === 'pending_verification')) {
+                          return null
+                        }
+                        return (
+                          <> · status: {prev?.replace(/_/g, ' ')} → {next?.replace(/_/g, ' ')}</>
+                        )
+                      })()}
                     </span>
                   </div>
                   <table className="min-w-full text-xs mt-2">
