@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Building2, Users, Truck, Clock } from 'lucide-react'
+import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 
 const PAGE_SIZE = 20
@@ -13,8 +13,17 @@ export default function AdminCompaniesPage() {
   const [loading,    setLoading]    = useState(true)
   const [page,       setPage]       = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [openMenu,   setOpenMenu]   = useState(null)
+  const [processing, setProcessing] = useState(null)
 
-  // Reset page when filter changes
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenu(null) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   useEffect(() => { setPage(1) }, [filter])
   useEffect(() => { fetchCompanies() }, [filter, page])
 
@@ -26,7 +35,7 @@ export default function AdminCompaniesPage() {
 
     let query = supabase
       .from('company_profiles')
-      .select('id, name, registration_number, status, submitted_at, created_at, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)', { count: 'exact' })
+      .select('id, name, registration_number, status, is_active, is_suspended, submitted_at, created_at, owner_user_id, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)', { count: 'exact' })
       .order('submitted_at', { ascending: false, nullsFirst: false })
 
     if (filter !== 'all') {
@@ -45,7 +54,6 @@ export default function AdminCompaniesPage() {
 
     setTotalCount(count || 0)
 
-    // Fetch vehicle and team counts for current page only
     const companiesWithCounts = await Promise.all(
       (data || []).map(async (company) => {
         const [{ count: vehicleCount }, { count: teamCount }] = await Promise.all([
@@ -66,6 +74,81 @@ export default function AdminCompaniesPage() {
     setLoading(false)
   }
 
+  // ── Admin actions ─────────────────────────────────────────────────────────
+  const handleAction = async (companyId, action, companyName) => {
+    const labels = {
+      suspend:  `Suspend ${companyName}? All team members will be deactivated.`,
+      activate: `Activate ${companyName}? All team members will be reactivated.`,
+    }
+    if (!confirm(labels[action])) return
+
+    setProcessing(companyId)
+    setOpenMenu(null)
+    const supabase = createClient()
+
+    try {
+      const statusMap = { suspend: 'suspended', activate: 'active' }
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const { data, error } = await supabase.rpc('admin_update_company_status', {
+        p_company_id:  companyId,
+        p_status:      statusMap[action],
+        p_verified_by: user.id,
+      })
+      if (error) throw error
+      if (data && !data.success) throw new Error(data.error)
+
+      // Log admin action
+      const { data: adminProfile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      if (adminProfile) {
+        await supabase.from('admin_action_logs').insert({
+          admin_user_id: adminProfile.id,
+          action_type:   action + '_company',
+          target_type:   'company',
+          target_id:     companyId,
+          action_data:   { company_name: companyName },
+        })
+      }
+
+      // Notify company owner
+      const company = companies.find(c => c.id === companyId)
+      if (company?.owner_user_id) {
+        const title   = action === 'suspend' ? 'Company Suspended' : 'Company Activated'
+        const message = action === 'suspend'
+          ? `${companyName} has been suspended by an administrator. Contact support for more information.`
+          : `${companyName} has been activated and is now fully operational.`
+        await supabase.from('notifications').insert({
+          user_id: company.owner_user_id,
+          recipient_user_id: company.owner_user_id,
+          type: 'company_' + action + 'd',
+          notification_type: 'company_' + action + 'd',
+          reference_type: 'company',
+          reference_id: companyId,
+          title, message, is_read: false,
+        })
+      }
+
+      await fetchCompanies()
+    } catch (err) {
+      console.error(`${action} failed:`, err)
+      alert(`Failed to ${action} company: ${err.message}`)
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const getActions = (c) => {
+    const actions = []
+    if (c.status === 'active') {
+      actions.push({ key: 'suspend', label: 'Suspend', icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
+    }
+    if (c.status === 'suspended') {
+      actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
+    }
+    return actions
+  }
+
   const statusConfig = {
     pending_verification: { label: 'Pending', classes: 'bg-yellow-100 text-yellow-800' },
     active:               { label: 'Active',  classes: 'bg-green-100 text-green-800' },
@@ -79,6 +162,7 @@ export default function AdminCompaniesPage() {
     { key: 'pending_verification', label: 'Pending' },
     { key: 'pending_info',         label: 'Needs Info' },
     { key: 'active',               label: 'Active' },
+    { key: 'suspended',            label: 'Suspended' },
     { key: 'rejected',             label: 'Rejected' },
   ]
 
@@ -137,14 +221,16 @@ export default function AdminCompaniesPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Submitted</span>
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {companies.map((company) => {
-                const cfg = statusConfig[company.status] || { label: company.status, classes: 'bg-gray-100 text-gray-700' }
+                const cfg     = statusConfig[company.status] || { label: company.status, classes: 'bg-gray-100 text-gray-700' }
+                const actions = getActions(company)
+
                 return (
-                  <tr key={company.id} className="hover:bg-gray-50">
+                  <tr key={company.id} className={`hover:bg-gray-50 ${processing === company.id ? 'opacity-50' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{company.name}</div>
                       {company.registration_number && (
@@ -173,9 +259,40 @@ export default function AdminCompaniesPage() {
                       }
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link href={`/admin/companies/${company.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        Review →
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/admin/companies/${company.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                          Review
+                        </Link>
+
+                        {actions.length > 0 && (
+                          <div className="relative inline-block" ref={openMenu === company.id ? menuRef : null}>
+                            <button
+                              onClick={() => setOpenMenu(openMenu === company.id ? null : company.id)}
+                              disabled={processing === company.id}
+                              className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            {openMenu === company.id && (
+                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                                {actions.map(a => {
+                                  const Icon = a.icon
+                                  return (
+                                    <button
+                                      key={a.key}
+                                      onClick={() => handleAction(company.id, a.key, company.name)}
+                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
+                                    >
+                                      <Icon size={14} /> {a.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

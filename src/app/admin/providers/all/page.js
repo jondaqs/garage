@@ -1,12 +1,12 @@
 // src/app/admin/providers/all/page.js
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Search, CheckCircle, Clock, XCircle, AlertCircle, Store,
-  History, AlertTriangle,
+  History, AlertTriangle, MoreVertical, ShieldOff, ShieldCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import Pagination from '@/components/admin/Pagination'
@@ -38,10 +38,16 @@ export default function AllProvidersPage() {
   const [page,         setPage]         = useState(1)
   const [totalCount,   setTotalCount]   = useState(0)
   const [totalAll,     setTotalAll]     = useState(0)
+  const [openMenu,     setOpenMenu]     = useState(null)
+  const [processing,   setProcessing]   = useState(null)
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setPage(1) }, [search, statusFilter])
-  useEffect(() => { loadProviders() }, [page, search, statusFilter])
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenu(null) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -49,7 +55,9 @@ export default function AllProvidersPage() {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(t)
   }, [search])
-  useEffect(() => { setPage(1) }, [debouncedSearch])
+
+  useEffect(() => { setPage(1) }, [debouncedSearch, statusFilter])
+  useEffect(() => { loadProviders() }, [page, debouncedSearch, statusFilter])
 
   const loadProviders = async () => {
     setLoading(true)
@@ -61,7 +69,7 @@ export default function AllProvidersPage() {
         .from('service_providers')
         .select(`
           id, name, status, is_active, is_verified, created_at, submitted_at,
-          owner:user_profiles(first_name, last_name, email),
+          owner:user_profiles(id, first_name, last_name, email),
           provider_type:service_provider_types(display_name),
           shops(id)
         `, { count: 'exact' })
@@ -91,7 +99,6 @@ export default function AllProvidersPage() {
         Object.fromEntries((pending || []).map(r => [r.service_provider_id, r]))
       )
 
-      // Total count for header (all statuses, no search)
       if (page === 1 && statusFilter === 'all' && !debouncedSearch) {
         setTotalAll(count || 0)
       }
@@ -100,6 +107,43 @@ export default function AllProvidersPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // ── Admin actions ─────────────────────────────────────────────────────────
+  const handleAction = async (providerId, action, providerName) => {
+    const labels = {
+      suspend:  `Suspend ${providerName}? They will no longer appear on the platform.`,
+      activate: `Activate ${providerName}? They will be live on the platform.`,
+    }
+    if (!confirm(labels[action])) return
+
+    setProcessing(providerId)
+    setOpenMenu(null)
+    try {
+      const { data, error } = await supabase.rpc('admin_update_provider_status', {
+        p_provider_id: providerId,
+        p_action:      action,
+      })
+      if (error) throw error
+      if (data && !data.success) throw new Error(data.error)
+      await loadProviders()
+    } catch (err) {
+      console.error(`${action} failed:`, err)
+      alert(`Failed to ${action} provider: ${err.message}`)
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const getActions = (p) => {
+    const actions = []
+    if (p.status === 'active') {
+      actions.push({ key: 'suspend', label: 'Suspend', icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
+    }
+    if (p.status === 'suspended') {
+      actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
+    }
+    return actions
   }
 
   const statusBadge = (status) => {
@@ -160,8 +204,8 @@ export default function AllProvidersPage() {
           <option value="all">All Statuses</option>
           <option value="active">Active</option>
           <option value="pending_verification">Pending</option>
-          <option value="rejected">Rejected</option>
           <option value="suspended">Suspended</option>
+          <option value="rejected">Rejected</option>
         </select>
       </div>
 
@@ -176,7 +220,7 @@ export default function AllProvidersPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changes</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
@@ -203,8 +247,11 @@ export default function AllProvidersPage() {
                     }
                   }
                 }
+
+                const actions = getActions(p)
+
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 align-top">
+                  <tr key={p.id} className={`hover:bg-gray-50 align-top ${processing === p.id ? 'opacity-50' : ''}`}>
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{p.name}</p>
                     </td>
@@ -247,10 +294,41 @@ export default function AllProvidersPage() {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
                     </td>
-                    <td className="px-6 py-4">
-                      <Link href={`/admin/providers/${p.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        View →
-                      </Link>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/admin/providers/${p.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                          View
+                        </Link>
+
+                        {actions.length > 0 && (
+                          <div className="relative inline-block" ref={openMenu === p.id ? menuRef : null}>
+                            <button
+                              onClick={() => setOpenMenu(openMenu === p.id ? null : p.id)}
+                              disabled={processing === p.id}
+                              className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            {openMenu === p.id && (
+                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                                {actions.map(a => {
+                                  const Icon = a.icon
+                                  return (
+                                    <button
+                                      key={a.key}
+                                      onClick={() => handleAction(p.id, a.key, p.name)}
+                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
+                                    >
+                                      <Icon size={14} /> {a.label}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

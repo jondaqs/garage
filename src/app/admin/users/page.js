@@ -1,9 +1,9 @@
 // src/app/admin/users/page.js
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Search, User, Users, AlertCircle } from 'lucide-react'
+import { Search, Users, MoreVertical, ShieldOff, ShieldCheck, Power, PowerOff } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 
 const PAGE_SIZE = 20
@@ -16,6 +16,17 @@ export default function AdminUsersPage() {
   const [page,       setPage]       = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [totalAll,   setTotalAll]   = useState(0)
+  const [openMenu,   setOpenMenu]   = useState(null)   // user id whose menu is open
+  const [processing, setProcessing] = useState(null)    // user id being processed
+
+  const menuRef = useRef(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenu(null) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -54,7 +65,6 @@ export default function AdminUsersPage() {
       if (error) throw error
       setUsers(data || [])
       setTotalCount(count || 0)
-
       if (page === 1 && !debouncedSearch) setTotalAll(count || 0)
     } catch (err) {
       console.error('Error loading users:', err)
@@ -65,6 +75,47 @@ export default function AdminUsersPage() {
 
   const getRoles = (u) =>
     u.user_roles?.map(ur => ur.role?.display_name).filter(Boolean).join(', ') || 'User'
+
+  // ── Admin actions ─────────────────────────────────────────────────────────
+  const handleAction = async (userId, action, userName) => {
+    const labels = {
+      suspend:    `Suspend ${userName}?`,
+      unsuspend:  `Unsuspend ${userName}?`,
+      deactivate: `Deactivate ${userName}? They will no longer be able to log in.`,
+      activate:   `Activate ${userName}?`,
+    }
+    if (!confirm(labels[action])) return
+
+    setProcessing(userId)
+    setOpenMenu(null)
+    try {
+      const { data, error } = await supabase.rpc('admin_update_user_status', {
+        p_user_id: userId,
+        p_action:  action,
+      })
+      if (error) throw error
+      if (data && !data.success) throw new Error(data.error)
+      await loadUsers()
+    } catch (err) {
+      console.error(`${action} failed:`, err)
+      alert(`Failed to ${action} user: ${err.message}`)
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const getActions = (u) => {
+    const actions = []
+    if (u.is_suspended) {
+      actions.push({ key: 'unsuspend', label: 'Unsuspend', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
+    } else if (u.is_active) {
+      actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff, cls: 'text-yellow-700 hover:bg-yellow-50' })
+      actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,  cls: 'text-red-700 hover:bg-red-50' })
+    } else {
+      actions.push({ key: 'activate', label: 'Activate', icon: Power, cls: 'text-green-700 hover:bg-green-50' })
+    }
+    return actions
+  }
 
   if (loading && page === 1 && !users.length) return (
     <div className="flex justify-center py-12">
@@ -100,48 +151,80 @@ export default function AdminUsersPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
             {users.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
+                <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
                   <Users className="w-10 h-10 mx-auto mb-2 text-gray-200" />
                   No users found
                 </td>
               </tr>
             ) : (
-              users.map(u => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
-                        {(u.first_name?.[0] || u.email?.[0] || '?').toUpperCase()}
+              users.map(u => {
+                const name    = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—'
+                const actions = getActions(u)
+
+                return (
+                  <tr key={u.id} className={`hover:bg-gray-50 ${processing === u.id ? 'opacity-50' : ''}`}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
+                          {(u.first_name?.[0] || u.email?.[0] || '?').toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{name}</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{u.email || '—'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{u.phone || '—'}</td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs text-gray-500">{getRoles(u)}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    {u.is_suspended ? (
-                      <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">Suspended</span>
-                    ) : u.is_active ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">Active</span>
-                    ) : (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">Inactive</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{u.email || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{u.phone || '—'}</td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs text-gray-500">{getRoles(u)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {u.is_suspended ? (
+                        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">Suspended</span>
+                      ) : u.is_active ? (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">Active</span>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">Inactive</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="relative inline-block" ref={openMenu === u.id ? menuRef : null}>
+                        <button
+                          onClick={() => setOpenMenu(openMenu === u.id ? null : u.id)}
+                          disabled={processing === u.id}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+
+                        {openMenu === u.id && actions.length > 0 && (
+                          <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                            {actions.map(a => {
+                              const Icon = a.icon
+                              return (
+                                <button
+                                  key={a.key}
+                                  onClick={() => handleAction(u.id, a.key, name)}
+                                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
+                                >
+                                  <Icon size={14} /> {a.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
