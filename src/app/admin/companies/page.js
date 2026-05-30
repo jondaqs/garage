@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck } from 'lucide-react'
@@ -7,22 +7,80 @@ import Pagination from '@/components/admin/Pagination'
 
 const PAGE_SIZE = 20
 
+/* ── Fixed-position action menu ──────────────────────────────────────────── */
+function ActionMenu({ actions, onAction, entityId, entityName, processing }) {
+  const [open, setOpen]   = useState(false)
+  const [pos, setPos]     = useState({ top: 0, left: 0 })
+  const btnRef            = useRef(null)
+  const menuRef           = useRef(null)
+
+  const toggle = useCallback(() => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.right })
+    }
+    setOpen(o => !o)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) &&
+          btnRef.current && !btnRef.current.contains(e.target)) close()
+    }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', close, true)
+    }
+  }, [open])
+
+  if (actions.length === 0) return null
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        disabled={processing}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)' }}
+          className="w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] py-1"
+        >
+          {actions.map(a => {
+            const Icon = a.icon
+            return (
+              <button
+                key={a.key}
+                onClick={() => { setOpen(false); onAction(entityId, a.key, entityName) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
+              >
+                <Icon size={14} /> {a.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function AdminCompaniesPage() {
   const [companies,  setCompanies]  = useState([])
   const [filter,     setFilter]     = useState('pending_verification')
   const [loading,    setLoading]    = useState(true)
   const [page,       setPage]       = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [openMenu,   setOpenMenu]   = useState(null)
   const [processing, setProcessing] = useState(null)
-
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenu(null) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
 
   useEffect(() => { setPage(1) }, [filter])
   useEffect(() => { fetchCompanies() }, [filter, page])
@@ -43,7 +101,6 @@ export default function AdminCompaniesPage() {
     }
 
     query = query.range(from, to)
-
     const { data, error, count } = await query
 
     if (error) {
@@ -56,12 +113,13 @@ export default function AdminCompaniesPage() {
 
     const companiesWithCounts = await Promise.all(
       (data || []).map(async (company) => {
+        const supabase2 = createClient()
         const [{ count: vehicleCount }, { count: teamCount }] = await Promise.all([
-          supabase
+          supabase2
             .from('vehicle_ownership')
             .select('*', { count: 'exact', head: true })
             .eq('owner_company_id', company.id),
-          supabase
+          supabase2
             .from('company_users')
             .select('*', { count: 'exact', head: true })
             .eq('company_id', company.id),
@@ -83,7 +141,6 @@ export default function AdminCompaniesPage() {
     if (!confirm(labels[action])) return
 
     setProcessing(companyId)
-    setOpenMenu(null)
     const supabase = createClient()
 
     try {
@@ -168,7 +225,7 @@ export default function AdminCompaniesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Company Registrations</h1>
           <p className="text-gray-500 text-sm mt-1">Review and manage company accounts</p>
@@ -184,7 +241,7 @@ export default function AdminCompaniesPage() {
           <button
             key={key}
             onClick={() => setFilter(key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === key
                 ? 'bg-blue-600 text-white'
                 : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
@@ -205,100 +262,80 @@ export default function AdminCompaniesPage() {
           <p className="text-gray-500">No companies with status "{filter.replace(/_/g, ' ')}"</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> Fleet</span>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Team</span>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Submitted</span>
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {companies.map((company) => {
-                const cfg     = statusConfig[company.status] || { label: company.status, classes: 'bg-gray-100 text-gray-700' }
-                const actions = getActions(company)
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-[850px] w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> Fleet</span>
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Team</span>
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Submitted</span>
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {companies.map((company) => {
+                  const cfg     = statusConfig[company.status] || { label: company.status, classes: 'bg-gray-100 text-gray-700' }
+                  const actions = getActions(company)
 
-                return (
-                  <tr key={company.id} className={`hover:bg-gray-50 ${processing === company.id ? 'opacity-50' : ''}`}>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{company.name}</div>
-                      {company.registration_number && (
-                        <div className="text-xs text-gray-400 mt-0.5">{company.registration_number}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {company.owner?.first_name} {company.owner?.last_name}
-                      </div>
-                      {company.owner?.email && (
-                        <div className="text-xs text-gray-400 mt-0.5">{company.owner.email}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${cfg.classes}`}>
-                        {cfg.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{company.vehicleCount}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{company.teamCount}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {company.submitted_at
-                        ? new Date(company.submitted_at).toLocaleDateString()
-                        : <span className="text-gray-300">—</span>
-                      }
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link href={`/admin/companies/${company.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                          Review
-                        </Link>
-
-                        {actions.length > 0 && (
-                          <div className="relative inline-block" ref={openMenu === company.id ? menuRef : null}>
-                            <button
-                              onClick={() => setOpenMenu(openMenu === company.id ? null : company.id)}
-                              disabled={processing === company.id}
-                              className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
-                            >
-                              <MoreVertical size={16} />
-                            </button>
-
-                            {openMenu === company.id && (
-                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
-                                {actions.map(a => {
-                                  const Icon = a.icon
-                                  return (
-                                    <button
-                                      key={a.key}
-                                      onClick={() => handleAction(company.id, a.key, company.name)}
-                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
-                                    >
-                                      <Icon size={14} /> {a.label}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
+                  return (
+                    <tr key={company.id} className={`hover:bg-gray-50 ${processing === company.id ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <td className="px-4 sm:px-6 py-4">
+                        <div className="font-medium text-gray-900 truncate max-w-[200px]">{company.name}</div>
+                        {company.registration_number && (
+                          <div className="text-xs text-gray-400 mt-0.5">{company.registration_number}</div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {company.owner?.first_name} {company.owner?.last_name}
+                        </div>
+                        {company.owner?.email && (
+                          <div className="text-xs text-gray-400 mt-0.5 truncate max-w-[180px]">{company.owner.email}</div>
+                        )}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${cfg.classes}`}>
+                          {cfg.label}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-700">{company.vehicleCount}</td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-700">{company.teamCount}</td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
+                        {company.submitted_at
+                          ? new Date(company.submitted_at).toLocaleDateString()
+                          : <span className="text-gray-300">—</span>
+                        }
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/admin/companies/${company.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
+                            Review
+                          </Link>
+                          <ActionMenu
+                            actions={actions}
+                            onAction={handleAction}
+                            entityId={company.id}
+                            entityName={company.name}
+                            processing={processing === company.id}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
           <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
         </div>

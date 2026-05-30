@@ -1,7 +1,7 @@
 // src/app/admin/providers/all/page.js
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -26,6 +26,73 @@ const FIELD_LABELS = {
   years_in_operation:  'Years in Operation',
 }
 
+/* ── Fixed-position action menu ──────────────────────────────────────────── */
+function ActionMenu({ actions, onAction, entityId, entityName, processing }) {
+  const [open, setOpen]   = useState(false)
+  const [pos, setPos]     = useState({ top: 0, left: 0 })
+  const btnRef            = useRef(null)
+  const menuRef           = useRef(null)
+
+  const toggle = useCallback(() => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.right })
+    }
+    setOpen(o => !o)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) &&
+          btnRef.current && !btnRef.current.contains(e.target)) close()
+    }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', close, true)
+    }
+  }, [open])
+
+  if (actions.length === 0) return null
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        disabled={processing}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)' }}
+          className="w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] py-1"
+        >
+          {actions.map(a => {
+            const Icon = a.icon
+            return (
+              <button
+                key={a.key}
+                onClick={() => { setOpen(false); onAction(entityId, a.key, entityName) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
+              >
+                <Icon size={14} /> {a.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function AllProvidersPage() {
   const router   = useRouter()
   const supabase = createClient()
@@ -38,16 +105,7 @@ export default function AllProvidersPage() {
   const [page,         setPage]         = useState(1)
   const [totalCount,   setTotalCount]   = useState(0)
   const [totalAll,     setTotalAll]     = useState(0)
-  const [openMenu,     setOpenMenu]     = useState(null)
   const [processing,   setProcessing]   = useState(null)
-
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenu(null) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -75,14 +133,8 @@ export default function AllProvidersPage() {
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter)
-      }
-
-      if (debouncedSearch) {
-        query = query.or(`name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`)
-      }
-
+      if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+      if (debouncedSearch) query = query.or(`name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`)
       query = query.range(from, to)
 
       const [{ data: provs, error, count }, { data: pending }] = await Promise.all([
@@ -95,13 +147,8 @@ export default function AllProvidersPage() {
       if (error) throw error
       setProviders(provs || [])
       setTotalCount(count || 0)
-      setPendingDiffs(
-        Object.fromEntries((pending || []).map(r => [r.service_provider_id, r]))
-      )
-
-      if (page === 1 && statusFilter === 'all' && !debouncedSearch) {
-        setTotalAll(count || 0)
-      }
+      setPendingDiffs(Object.fromEntries((pending || []).map(r => [r.service_provider_id, r])))
+      if (page === 1 && statusFilter === 'all' && !debouncedSearch) setTotalAll(count || 0)
     } catch (err) {
       console.error('Error loading providers:', err)
     } finally {
@@ -118,7 +165,6 @@ export default function AllProvidersPage() {
     if (!confirm(labels[action])) return
 
     setProcessing(providerId)
-    setOpenMenu(null)
     try {
       const { data, error } = await supabase.rpc('admin_update_provider_status', {
         p_provider_id: providerId,
@@ -137,29 +183,22 @@ export default function AllProvidersPage() {
 
   const getActions = (p) => {
     const actions = []
-    if (p.status === 'active') {
-      actions.push({ key: 'suspend', label: 'Suspend', icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
-    }
-    if (p.status === 'suspended') {
-      actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
-    }
+    if (p.status === 'active')    actions.push({ key: 'suspend',  label: 'Suspend',  icon: ShieldOff,   cls: 'text-red-700 hover:bg-red-50' })
+    if (p.status === 'suspended') actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
     return actions
   }
 
-  const statusBadge = (status) => {
-    const map = {
-      active:               'bg-green-100 text-green-800',
-      pending_verification: 'bg-yellow-100 text-yellow-800',
-      rejected:             'bg-red-100 text-red-800',
-      suspended:            'bg-gray-100 text-gray-700',
-    }
-    return map[status] || 'bg-gray-100 text-gray-700'
-  }
+  const statusBadge = (status) => ({
+    active:               'bg-green-100 text-green-800',
+    pending_verification: 'bg-yellow-100 text-yellow-800',
+    rejected:             'bg-red-100 text-red-800',
+    suspended:            'bg-gray-100 text-gray-700',
+  }[status] || 'bg-gray-100 text-gray-700')
 
   const statusIcon = (status) => {
-    if (status === 'active') return <CheckCircle size={14} className="text-green-600" />
+    if (status === 'active')               return <CheckCircle size={14} className="text-green-600" />
     if (status === 'pending_verification') return <Clock size={14} className="text-yellow-600" />
-    if (status === 'rejected') return <XCircle size={14} className="text-red-600" />
+    if (status === 'rejected')             return <XCircle size={14} className="text-red-600" />
     return <AlertCircle size={14} className="text-gray-400" />
   }
 
@@ -171,21 +210,21 @@ export default function AllProvidersPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">All Providers</h1>
           <p className="text-gray-500 mt-1">{totalAll || totalCount} total registered providers</p>
         </div>
         <Link
           href="/admin/providers"
-          className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200 self-start sm:self-auto"
         >
           <Clock size={16} /> Pending Review
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -199,7 +238,7 @@ export default function AllProvidersPage() {
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent self-start"
         >
           <option value="all">All Statuses</option>
           <option value="active">Active</option>
@@ -209,133 +248,113 @@ export default function AllProvidersPage() {
         </select>
       </div>
 
-      <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changes</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
-            {providers.length === 0 ? (
+      <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-[900px] w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
-                  <Store className="w-10 h-10 mx-auto mb-2 text-gray-200" />
-                  No providers found
-                </td>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider</th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changes</th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Actions</th>
               </tr>
-            ) : (
-              providers.map(p => {
-                const diff = pendingDiffs[p.id]
-                const labels = []
-                if (diff?.changed_fields) {
-                  for (const [field, value] of Object.entries(diff.changed_fields)) {
-                    if (field === 'documents' && Array.isArray(value)) {
-                      for (const e of value) {
-                        const a = e.action?.replace(/^./, c => c.toUpperCase()) || 'Changed'
-                        labels.push(`${a}: ${e.doc_type || ''}`)
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-100">
+              {providers.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                    <Store className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+                    No providers found
+                  </td>
+                </tr>
+              ) : (
+                providers.map(p => {
+                  const diff = pendingDiffs[p.id]
+                  const labels = []
+                  if (diff?.changed_fields) {
+                    for (const [field, value] of Object.entries(diff.changed_fields)) {
+                      if (field === 'documents' && Array.isArray(value)) {
+                        for (const e of value) {
+                          const a = e.action?.replace(/^./, c => c.toUpperCase()) || 'Changed'
+                          labels.push(`${a}: ${e.doc_type || ''}`)
+                        }
+                      } else {
+                        labels.push(FIELD_LABELS[field] || field)
                       }
-                    } else {
-                      labels.push(FIELD_LABELS[field] || field)
                     }
                   }
-                }
 
-                const actions = getActions(p)
+                  const actions = getActions(p)
 
-                return (
-                  <tr key={p.id} className={`hover:bg-gray-50 align-top ${processing === p.id ? 'opacity-50' : ''}`}>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">{p.name}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">{p.owner?.first_name} {p.owner?.last_name}</p>
-                      <p className="text-xs text-gray-400">{p.owner?.email}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{p.provider_type?.display_name || '—'}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{p.shops?.length ?? 0}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusBadge(p.status)}`}>
-                        {statusIcon(p.status)}
-                        {p.status?.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {diff && labels.length > 0 ? (
-                        <div>
-                          <div className="flex items-center gap-1 text-xs font-medium text-gray-900 mb-1">
-                            <AlertTriangle className="w-3 h-3 text-yellow-600" />
-                            {diff.change_count} changed
-                          </div>
-                          {diff.is_reverification && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">
-                              <History className="w-2.5 h-2.5" /> Re-verify
-                            </span>
-                          )}
-                          <p className="text-[10px] text-gray-500 mt-1 line-clamp-1" title={labels.join(', ')}>
-                            {labels.slice(0, 2).join(', ')}{labels.length > 2 ? '…' : ''}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link href={`/admin/providers/${p.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                          View
-                        </Link>
-
-                        {actions.length > 0 && (
-                          <div className="relative inline-block" ref={openMenu === p.id ? menuRef : null}>
-                            <button
-                              onClick={() => setOpenMenu(openMenu === p.id ? null : p.id)}
-                              disabled={processing === p.id}
-                              className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
-                            >
-                              <MoreVertical size={16} />
-                            </button>
-
-                            {openMenu === p.id && (
-                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
-                                {actions.map(a => {
-                                  const Icon = a.icon
-                                  return (
-                                    <button
-                                      key={a.key}
-                                      onClick={() => handleAction(p.id, a.key, p.name)}
-                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${a.cls}`}
-                                    >
-                                      <Icon size={14} /> {a.label}
-                                    </button>
-                                  )
-                                })}
-                              </div>
+                  return (
+                    <tr key={p.id} className={`hover:bg-gray-50 align-top ${processing === p.id ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <td className="px-4 sm:px-6 py-4">
+                        <p className="font-medium text-gray-900 truncate max-w-[180px]">{p.name}</p>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <p className="text-sm text-gray-900">{p.owner?.first_name} {p.owner?.last_name}</p>
+                        <p className="text-xs text-gray-400 truncate max-w-[160px]">{p.owner?.email}</p>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <span className="text-sm text-gray-600">{p.provider_type?.display_name || '—'}</span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <span className="text-sm text-gray-600">{p.shops?.length ?? 0}</span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusBadge(p.status)}`}>
+                          {statusIcon(p.status)}
+                          {p.status?.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        {diff && labels.length > 0 ? (
+                          <div>
+                            <div className="flex items-center gap-1 text-xs font-medium text-gray-900 mb-1">
+                              <AlertTriangle className="w-3 h-3 text-yellow-600" />
+                              {diff.change_count} changed
+                            </div>
+                            {diff.is_reverification && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">
+                                <History className="w-2.5 h-2.5" /> Re-verify
+                              </span>
                             )}
+                            <p className="text-[10px] text-gray-500 mt-1 line-clamp-1" title={labels.join(', ')}>
+                              {labels.slice(0, 2).join(', ')}{labels.length > 2 ? '…' : ''}
+                            </p>
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
+                        {p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/admin/providers/${p.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
+                            View
+                          </Link>
+                          <ActionMenu
+                            actions={actions}
+                            onAction={handleAction}
+                            entityId={p.id}
+                            entityName={p.name}
+                            processing={processing === p.id}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
       </div>
