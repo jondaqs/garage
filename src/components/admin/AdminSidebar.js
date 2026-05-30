@@ -19,7 +19,7 @@ export default function AdminSidebar() {
 
   useEffect(() => {
     loadBadgeCounts()
-  }, [])
+  }, [pathname])
 
   const loadBadgeCounts = async () => {
     try {
