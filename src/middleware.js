@@ -97,7 +97,10 @@ export async function middleware(request) {
   const codes = profile.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
 
   // Priority order — highest wins
-  const isAdmin        = codes.includes('admin') || codes.includes('platform_admin')
+  // All admin sub-roles (platform_admin, admin, moderator, support, reviewer)
+  // get access to /admin/*. Permissions within are enforced at the UI/RPC level.
+  const ADMIN_CODES = ['admin', 'platform_admin', 'moderator', 'support', 'reviewer']
+  const isAdmin        = codes.some(c => ADMIN_CODES.includes(c))
   const isProvider     = codes.includes('service_provider_owner')
   const isCompanyOwner = codes.includes('company_owner')
   const isCompanyMember= codes.includes('company_member')

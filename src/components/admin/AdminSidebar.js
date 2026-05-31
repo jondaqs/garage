@@ -8,6 +8,7 @@ import {
   MailIcon, Building2, MessageCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ADMIN_ROLES, PERMISSIONS, ADMIN_ROLE_CODES, getHighestAdminRole } from '@/lib/admin/permissions'
 
 export default function AdminSidebar() {
   const pathname = usePathname()
@@ -16,10 +17,28 @@ export default function AdminSidebar() {
 
   const [pendingProviders, setPendingProviders] = useState(0)
   const [pendingCompanies, setPendingCompanies] = useState(0)
+  const [adminRole, setAdminRole]               = useState(null) // highest admin role code
 
   useEffect(() => {
     loadBadgeCounts()
+    loadMyRole()
   }, [pathname])
+
+  const loadMyRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('id, user_roles(role:user_roles_lookup(code))')
+        .eq('auth_user_id', user.id)
+        .single()
+      const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+      setAdminRole(getHighestAdminRole(codes))
+    } catch (err) {
+      console.error('Error loading admin role:', err)
+    }
+  }
 
   const loadBadgeCounts = async () => {
     try {
@@ -40,27 +59,29 @@ export default function AdminSidebar() {
     }
   }
 
+  // Permission helper
+  const can = (perm) => adminRole ? (PERMISSIONS[adminRole]?.[perm] === true) : false
+
+  // Build navigation based on permissions
   const navigation = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, show: true },
     {
-      name: 'Pending Providers',
-      href: '/admin/providers',
-      icon: Clock,
-      badge: pendingProviders > 0 ? pendingProviders : null
+      name: 'Pending Providers', href: '/admin/providers', icon: Clock,
+      badge: pendingProviders > 0 ? pendingProviders : null,
+      show: can('manage_providers'),
     },
-    { name: 'All Providers', href: '/admin/providers/all', icon: CheckCircle },
+    { name: 'All Providers', href: '/admin/providers/all', icon: CheckCircle, show: can('manage_providers') },
     {
-      name: 'Companies',
-      href: '/admin/companies',
-      icon: Building2,
-      badge: pendingCompanies > 0 ? pendingCompanies : null
+      name: 'Companies', href: '/admin/companies', icon: Building2,
+      badge: pendingCompanies > 0 ? pendingCompanies : null,
+      show: can('manage_companies'),
     },
-    { name: 'Users', href: '/admin/users', icon: Users },
-    { name: 'Email Queue', href: '/admin/email-queue', icon: MailIcon },
-    { name: 'Admin Management', href: '/admin/admins', icon: Shield },
-    { name: 'Reports', href: '/admin/reports', icon: FileText },
-    { name: 'Settings', href: '/admin/settings', icon: Settings },
-  ]
+    { name: 'Users',            href: '/admin/users',        icon: Users,          show: can('manage_users') },
+    { name: 'Email Queue',      href: '/admin/email-queue',  icon: MailIcon,       show: can('view_email_queue') },
+    { name: 'Admin Management', href: '/admin/admins',       icon: Shield,         show: can('manage_admins') || adminRole != null },
+    { name: 'Reports',          href: '/admin/reports',      icon: FileText,       show: can('view_reports') },
+    { name: 'Settings',         href: '/admin/settings',     icon: Settings,       show: can('system_settings') },
+  ].filter(item => item.show)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -116,8 +137,16 @@ export default function AdminSidebar() {
           })}
         </nav>
 
-        {/* Sign Out */}
-        <div className="flex-shrink-0 flex flex-col border-t border-gray-700 p-4 space-y-1">
+        {/* Role badge + Sign Out */}
+        <div className="flex-shrink-0 flex flex-col border-t border-gray-700 p-4 space-y-2">
+          {adminRole && ADMIN_ROLES[adminRole] && (
+            <div className="px-2 py-1.5 bg-gray-800 rounded-md">
+              <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Your role</p>
+              <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${ADMIN_ROLES[adminRole].color}`}>
+                {ADMIN_ROLES[adminRole].label}
+              </span>
+            </div>
+          )}
           <button
             onClick={() => router.push('/admin/feedback')}
             className="w-full group block"
