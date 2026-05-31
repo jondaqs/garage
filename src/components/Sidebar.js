@@ -634,6 +634,12 @@ export default function Sidebar({ user }) {
     return map[status] ?? map.suspended
   }
 
+  // ── Portal-aware path helper ──────────────────────────────────────────────
+  // When an admin is browsing the user dashboard (via ?portal=user),
+  // ALL sidebar links must carry the param or the middleware redirects back.
+  const inUserPortal = isAdminUser && pathname.startsWith('/dashboard')
+  const portalPath = (path) => inUserPortal ? `${path}?portal=user` : path
+
   // ── Nav item component ────────────────────────────────────────────────────
   const NavItem = ({ item, compact = false }) => {
     const Icon = item.icon
@@ -643,7 +649,7 @@ export default function Sidebar({ user }) {
     return (
       <button
         ref={isActive ? activeItemRef : null}
-        onClick={() => { router.push(item.path); setMobileOpen(false) }}
+        onClick={() => { router.push(portalPath(item.path)); setMobileOpen(false) }}
         className={`w-full flex items-center rounded-lg transition mb-0.5
           ${compact ? 'px-3 py-2 text-sm' : 'px-4 py-3'}
           ${isActive
@@ -1074,7 +1080,7 @@ export default function Sidebar({ user }) {
           </button>
         )}
         <button
-          onClick={() => { router.push('/dashboard/feedback'); setMobileOpen(false) }}
+          onClick={() => { router.push(portalPath('/dashboard/feedback')); setMobileOpen(false) }}
           className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-0.5"
         >
           <MessageCircle className="mr-2.5" size={16} />
