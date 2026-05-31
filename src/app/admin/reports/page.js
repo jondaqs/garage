@@ -222,9 +222,11 @@ export default function AdminReportsPage() {
 
   // ── 7. Revenue overview ───────────────────────────────────────────────
   const loadRevenueStats = async () => {
-    const { data: invoices } = await supabase
+    const { data: invoices, error } = await supabase
       .from('invoices')
-      .select('total_amount, status, paid_at, created_at')
+      .select('total_amount, status, paid_at, issued_at')
+
+    if (error) console.error('Invoices query failed:', error)
 
     if (!invoices || invoices.length === 0) {
       setRevenueStats({ total: 0, paid: 0, pending: 0, count: 0, paidCount: 0 })
