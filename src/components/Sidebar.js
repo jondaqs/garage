@@ -1063,28 +1063,28 @@ export default function Sidebar({ user }) {
       </nav>
 
       {/* Logout */}
-      <div className="flex-shrink-0 border-t border-gray-200 p-4">
+      <div className="flex-shrink-0 border-t border-gray-200 p-3">
         {isAdminUser && (
           <button
             onClick={() => { router.push('/admin/dashboard'); setMobileOpen(false) }}
-            className="w-full flex items-center px-4 py-3 rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 transition mb-1"
+            className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-purple-700 bg-purple-50 hover:bg-purple-100 transition mb-0.5"
           >
-            <Shield className="mr-3" size={20} />
+            <Shield className="mr-2.5" size={16} />
             <span className="font-medium">Admin Panel</span>
           </button>
         )}
         <button
           onClick={() => { router.push('/dashboard/feedback'); setMobileOpen(false) }}
-          className="w-full flex items-center px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-1"
+          className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-0.5"
         >
-          <MessageCircle className="mr-3" size={20} />
+          <MessageCircle className="mr-2.5" size={16} />
           <span className="font-medium">Feedback</span>
         </button>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition"
+          className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition"
         >
-          <LogOut className="mr-3" size={20} />
+          <LogOut className="mr-2.5" size={16} />
           <span className="font-medium">Logout</span>
         </button>
       </div>
