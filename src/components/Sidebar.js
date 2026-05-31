@@ -6,7 +6,7 @@ import {
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
   AlertCircle, Wrench, ClipboardList, Search, MessageSquare,
-  MessageCircle, UserCheck, Package
+  MessageCircle, UserCheck, Package, Shield
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -36,6 +36,7 @@ export default function Sidebar({ user }) {
   const [companyUnread, setCompanyUnread] = useState(0)
   const [woActionCount,        setWoActionCount]        = useState(0)
   const [companyWoActionCount,  setCompanyWoActionCount] = useState(0)
+  const [isAdminUser,           setIsAdminUser]          = useState(false)
   // Phase: per-provider upcoming-bookings count for the Calendar badge.
   // Keyed by providerId: { '<uuid>': <count>, ... }
   const [providerUpcomingByProvider, setProviderUpcomingByProvider] = useState({})
@@ -48,8 +49,16 @@ export default function Sidebar({ user }) {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
-      if (profile) setProfileId(profile.id)
+        .from('user_profiles')
+        .select('id, user_roles(role:user_roles_lookup(code))')
+        .eq('auth_user_id', authUser.id).single()
+      if (profile) {
+        setProfileId(profile.id)
+        // Check if this user also has an admin role
+        const codes = profile.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+        const adminCodes = ['platform_admin', 'admin', 'moderator', 'support', 'reviewer']
+        setIsAdminUser(codes.some(c => adminCodes.includes(c)))
+      }
     }
     resolve()
   }, [])
@@ -1055,6 +1064,15 @@ export default function Sidebar({ user }) {
 
       {/* Logout */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4">
+        {isAdminUser && (
+          <button
+            onClick={() => { router.push('/admin/dashboard'); setMobileOpen(false) }}
+            className="w-full flex items-center px-4 py-3 rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 transition mb-1"
+          >
+            <Shield className="mr-3" size={20} />
+            <span className="font-medium">Admin Panel</span>
+          </button>
+        )}
         <button
           onClick={() => { router.push('/dashboard/feedback'); setMobileOpen(false) }}
           className="w-full flex items-center px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-1"
