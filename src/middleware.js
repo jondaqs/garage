@@ -178,8 +178,12 @@ export async function middleware(request) {
   }
 
   // /dashboard — redirect away only if the user has a dedicated portal
+  // Exception: admins can access the user dashboard via ?portal=user
   if (pathname.startsWith('/dashboard')) {
-    if (role === 'admin')   return NextResponse.redirect(new URL('/admin/dashboard',    request.url))
+    if (role === 'admin') {
+      const wantsUserPortal = request.nextUrl.searchParams.get('portal') === 'user'
+      if (!wantsUserPortal) return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    }
     if (role === 'company') return NextResponse.redirect(new URL('/company/dashboard',  request.url))
     if (role === 'provider')return NextResponse.redirect(new URL('/provider/dashboard', request.url))
     return response

@@ -5,7 +5,10 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, Shield, Settings,
   FileText, Bell, LogOut, CheckCircle, Clock,
-  MailIcon, Building2, MessageCircle
+  MailIcon, Building2, MessageCircle,
+  ChevronDown, ChevronRight, Car, Search,
+  Calendar, ClipboardList, Wallet, History,
+  ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ADMIN_ROLES, PERMISSIONS, ADMIN_ROLE_CODES, getHighestAdminRole } from '@/lib/admin/permissions'
@@ -17,7 +20,8 @@ export default function AdminSidebar() {
 
   const [pendingProviders, setPendingProviders] = useState(0)
   const [pendingCompanies, setPendingCompanies] = useState(0)
-  const [adminRole, setAdminRole]               = useState(null) // highest admin role code
+  const [adminRole, setAdminRole]               = useState(null)
+  const [userPortalOpen, setUserPortalOpen]     = useState(false) // highest admin role code
 
   useEffect(() => {
     loadBadgeCounts()
@@ -136,6 +140,50 @@ export default function AdminSidebar() {
             )
           })}
         </nav>
+
+        {/* User Portal — collapsible */}
+        <div className="px-2 mt-2 border-t border-gray-700 pt-2">
+          <button
+            onClick={() => setUserPortalOpen(o => !o)}
+            className="w-full flex items-center justify-between px-2 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 rounded-md hover:bg-gray-700 transition-colors"
+          >
+            <div className="flex items-center">
+              <ExternalLink className="mr-3 flex-shrink-0 h-4 w-4 text-gray-500" />
+              My Account
+            </div>
+            {userPortalOpen
+              ? <ChevronDown size={14} className="text-gray-500" />
+              : <ChevronRight size={14} className="text-gray-500" />
+            }
+          </button>
+
+          {userPortalOpen && (
+            <div className="ml-2 mt-1 space-y-0.5 border-l border-gray-700 pl-3">
+              {[
+                { icon: Car,           label: 'Dashboard',        path: '/dashboard' },
+                { icon: Search,        label: 'Search Providers', path: '/dashboard/providers' },
+                { icon: Calendar,      label: 'Bookings',         path: '/dashboard/bookings' },
+                { icon: ClipboardList, label: 'Work Orders',      path: '/dashboard/work-orders' },
+                { icon: Wallet,        label: 'Budget',           path: '/dashboard/budget' },
+                { icon: History,       label: 'History',          path: '/dashboard/history' },
+                { icon: Settings,      label: 'Profile',          path: '/dashboard/profile' },
+              ].map(item => {
+                const Icon = item.icon
+                const href = `${item.path}?portal=user`
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => router.push(href)}
+                    className="w-full flex items-center px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  >
+                    <Icon className="mr-2.5 flex-shrink-0 h-3.5 w-3.5 text-gray-500" />
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Role badge + Sign Out */}
         <div className="flex-shrink-0 flex flex-col border-t border-gray-700 p-4 space-y-2">
