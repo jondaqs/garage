@@ -108,6 +108,14 @@ export default function ProviderDetailPage({ params }) {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [showInfoModal,   setShowInfoModal]   = useState(false)
 
+  // Verification checklist state
+  const [verChecks, setVerChecks] = useState({
+    kra_pin_verified:      false,
+    registration_verified: false,
+    location_verified:     false,
+  })
+  const [savingChecks,  setSavingChecks]  = useState(false)
+
   useEffect(() => { fetchProviderDetails() }, [])
 
   const fetchProviderDetails = async () => {
@@ -127,6 +135,10 @@ export default function ProviderDetailPage({ params }) {
           registration_number, tax_id, years_in_operation,
           status, is_active, is_verified,
           verified_at, verified_by, submitted_at, created_at, updated_at,
+          kra_pin_verified, kra_pin_verified_at,
+          registration_verified, registration_verified_at,
+          location_verified, location_verified_at,
+          verification_score,
           owner:user_profiles!service_providers_owner_user_id_fkey(
             id, first_name, last_name, email, phone
           ),
@@ -138,6 +150,13 @@ export default function ProviderDetailPage({ params }) {
 
       if (pErr) throw pErr
       setProvider(providerData)
+
+      // Initialize verification checklist from provider data
+      setVerChecks({
+        kra_pin_verified:      providerData.kra_pin_verified || false,
+        registration_verified: providerData.registration_verified || false,
+        location_verified:     providerData.location_verified || false,
+      })
       setOwner(providerData.owner || null)
 
       // ── Documents ──
@@ -295,6 +314,12 @@ export default function ProviderDetailPage({ params }) {
           is_verified: true,
           verified_at: new Date().toISOString(),
           verified_by: adminProfile.id,
+          kra_pin_verified:         verChecks.kra_pin_verified,
+          kra_pin_verified_at:      verChecks.kra_pin_verified ? new Date().toISOString() : null,
+          registration_verified:    verChecks.registration_verified,
+          registration_verified_at: verChecks.registration_verified ? new Date().toISOString() : null,
+          location_verified:        verChecks.location_verified,
+          location_verified_at:     verChecks.location_verified ? new Date().toISOString() : null,
         })
         .eq('id', provider.id)
       if (error) throw error
@@ -726,6 +751,148 @@ export default function ProviderDetailPage({ params }) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Verification Checklist */}
+          <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-semibold">Verification Checklist</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Review each item before approving. Checks and score are saved with approval.</p>
+              </div>
+              {provider.verification_score > 0 && (
+                <div className="text-right">
+                  <p className="text-xs text-gray-400">Current score</p>
+                  <p className="text-lg font-bold text-gray-900">{provider.verification_score}<span className="text-sm text-gray-400">/100</span></p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+              {[
+                {
+                  key: 'kra_pin_verified',
+                  label: 'KRA PIN / Tax Compliance',
+                  description: 'Valid KRA PIN certificate or tax compliance document verified',
+                  verifiedAt: provider.kra_pin_verified_at,
+                },
+                {
+                  key: 'registration_verified',
+                  label: 'Business Registration',
+                  description: 'Certificate of registration or business permit confirmed',
+                  verifiedAt: provider.registration_verified_at,
+                },
+                {
+                  key: 'location_verified',
+                  label: 'Location / Premises',
+                  description: 'Physical business location confirmed and operational',
+                  verifiedAt: provider.location_verified_at,
+                },
+              ].map(item => (
+                <label key={item.key}
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                    verChecks[item.key]
+                      ? 'border-green-300 bg-green-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}>
+                  <input
+                    type="checkbox"
+                    checked={verChecks[item.key]}
+                    onChange={() => setVerChecks(c => ({ ...c, [item.key]: !c[item.key] }))}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                    {item.verifiedAt && (
+                      <p className="text-[11px] text-green-600 mt-1">
+                        Last verified {new Date(item.verifiedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              {/* Computed score breakdown */}
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-2">
+                  Verification Score — auto-computed
+                </label>
+                {(() => {
+                  const breakdown = [
+                    { label: 'KRA PIN verified',      pts: 25, met: verChecks.kra_pin_verified },
+                    { label: 'Registration verified',  pts: 25, met: verChecks.registration_verified },
+                    { label: 'Location verified',      pts: 20, met: verChecks.location_verified },
+                    { label: 'Documents uploaded',     pts: 10, met: documents.length > 0 },
+                    { label: 'At least one shop',      pts: 10, met: shops.length > 0 },
+                    { label: 'Has description',        pts: 5,  met: provider.description && provider.description.trim().length > 10 },
+                    { label: 'Phone & email present',  pts: 5,  met: provider.phone && provider.email },
+                  ]
+                  const computedScore = breakdown.reduce((s, b) => s + (b.met ? b.pts : 0), 0)
+
+                  return (
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-500 ${
+                            computedScore >= 80 ? 'bg-green-500' :
+                            computedScore >= 50 ? 'bg-yellow-500' :
+                            'bg-gray-400'
+                          }`} style={{ width: `${computedScore}%` }} />
+                        </div>
+                        <span className={`text-lg font-bold min-w-[3rem] text-right ${
+                          computedScore >= 80 ? 'text-green-700' :
+                          computedScore >= 50 ? 'text-yellow-700' :
+                          'text-gray-500'
+                        }`}>{computedScore}<span className="text-sm text-gray-400">/100</span></span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        {breakdown.map(b => (
+                          <div key={b.label} className="flex items-center justify-between gap-2">
+                            <span className={b.met ? 'text-gray-700' : 'text-gray-400'}>{b.label}</span>
+                            <span className={`font-medium ${b.met ? 'text-green-600' : 'text-gray-300'}`}>
+                              {b.met ? `+${b.pts}` : `0/${b.pts}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <button
+                onClick={async () => {
+                  setSavingChecks(true)
+                  try {
+                    const { error } = await supabase
+                      .from('service_providers')
+                      .update({
+                        kra_pin_verified:         verChecks.kra_pin_verified,
+                        kra_pin_verified_at:      verChecks.kra_pin_verified ? new Date().toISOString() : provider.kra_pin_verified_at,
+                        registration_verified:    verChecks.registration_verified,
+                        registration_verified_at: verChecks.registration_verified ? new Date().toISOString() : provider.registration_verified_at,
+                        location_verified:        verChecks.location_verified,
+                        location_verified_at:     verChecks.location_verified ? new Date().toISOString() : provider.location_verified_at,
+                      })
+                      .eq('id', provider.id)
+                    if (error) throw error
+                    alert('Verification checks saved')
+                    fetchProviderDetails()
+                  } catch (err) {
+                    alert('Failed to save: ' + err.message)
+                  } finally {
+                    setSavingChecks(false)
+                  }
+                }}
+                disabled={savingChecks || processing}
+                className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm font-medium whitespace-nowrap self-end"
+              >
+                {savingChecks ? 'Saving…' : 'Save Checks Only'}
+              </button>
             </div>
           </div>
         </div>

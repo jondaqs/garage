@@ -40,6 +40,7 @@ export default function ProvidersPage() {
         .select(`
           id, name, description, is_verified, phone, email, website,
           years_in_operation, kra_pin_verified, registration_verified, location_verified,
+          verification_score,
           provider_type:service_provider_types(id, display_name, code, description),
           shops(id, name, town, county, latitude, longitude),
           provider_reviews(rating),
@@ -378,6 +379,15 @@ function ProviderCard({ provider: p, onClick, onChat }) {
               <h3 className="font-semibold text-gray-900 text-sm leading-tight">{p.name}</h3>
               {p.is_verified && (
                 <BadgeCheck size={14} className="text-blue-500 flex-shrink-0" />
+              )}
+              {p.verification_score > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                  p.verification_score >= 80 ? 'bg-green-100 text-green-700' :
+                  p.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {p.verification_score}%
+                </span>
               )}
             </div>
             <p className="text-xs text-blue-600 mt-0.5 font-medium">{p.provider_type?.display_name}</p>
