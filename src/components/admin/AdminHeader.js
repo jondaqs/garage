@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Menu } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import NotificationBell from '@/components/NotificationBell'
 
 export default function AdminHeader({ user }) {
@@ -12,25 +12,9 @@ export default function AdminHeader({ user }) {
             <Menu size={24} />
           </button>
 
-          <div className="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-start">
-            <div className="max-w-lg w-full">
-              <label htmlFor="admin-search" className="sr-only">Search</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="admin-search"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Search providers, users..."
-                  type="search"
-                />
-              </div>
-            </div>
-          </div>
+          <div className="flex-1" />
 
-          <div className="ml-4 flex items-center gap-3">
-            {/* Live notification bell — isAdmin fetches broadcast admin notifications */}
+          <div className="flex items-center gap-3">
             <NotificationBell isAdmin={true} />
 
             <div className="flex items-center gap-2">

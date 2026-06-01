@@ -12,7 +12,7 @@ import {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n) => (n ?? 0).toLocaleString()
 const pct = (a, b) => (b > 0 ? ((a / b) * 100).toFixed(1) : '0')
-const fmtCurrency = (n) => `KES ${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+const fmtCurrency = (n, symbol = '') => `${symbol || ''} ${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`.trim()
 
 function monthLabel(dateStr) {
   const d = new Date(dateStr + '-01')
@@ -220,25 +220,40 @@ export default function AdminReportsPage() {
     setRecentActions(data || [])
   }
 
-  // ── 7. Revenue overview ───────────────────────────────────────────────
+  // ── 7. Revenue overview — grouped by currency ──────────────────────────
   const loadRevenueStats = async () => {
     const { data: invoices, error } = await supabase
       .from('invoices')
-      .select('total_amount, status, paid_at, issued_at')
+      .select('total_amount, status, paid_at, issued_at, provider:service_providers(currency:currencies(code, symbol))')
 
     if (error) console.error('Invoices query failed:', error)
 
     if (!invoices || invoices.length === 0) {
-      setRevenueStats({ total: 0, paid: 0, pending: 0, count: 0, paidCount: 0 })
+      setRevenueStats([])
       return
     }
 
-    const total     = invoices.reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
-    const paid      = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
-    const pending   = invoices.filter(i => i.status === 'pending' || i.status === 'sent').reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
-    const paidCount = invoices.filter(i => i.status === 'paid').length
+    // Group by currency
+    const byCurrency = {}
+    for (const inv of invoices) {
+      const code   = inv.provider?.currency?.code || 'N/A'
+      const symbol = inv.provider?.currency?.symbol || ''
+      if (!byCurrency[code]) {
+        byCurrency[code] = { code, symbol, total: 0, paid: 0, pending: 0, count: 0, paidCount: 0 }
+      }
+      const amount = Number(inv.total_amount) || 0
+      byCurrency[code].total += amount
+      byCurrency[code].count += 1
+      if (inv.status === 'paid') {
+        byCurrency[code].paid += amount
+        byCurrency[code].paidCount += 1
+      }
+      if (inv.status === 'pending' || inv.status === 'sent') {
+        byCurrency[code].pending += amount
+      }
+    }
 
-    setRevenueStats({ total, paid, pending, count: invoices.length, paidCount })
+    setRevenueStats(Object.values(byCurrency).sort((a, b) => b.total - a.total))
   }
 
   // ── Status color helper ───────────────────────────────────────────────
@@ -360,33 +375,46 @@ export default function AdminReportsPage() {
         {/* ── Revenue Overview ───────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Revenue Overview</h2>
-          {revenueStats && revenueStats.count > 0 ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <p className="text-xs text-green-600 font-medium">Paid Revenue</p>
-                  <p className="text-xl font-bold text-green-800 mt-1">{fmtCurrency(revenueStats.paid)}</p>
-                  <p className="text-[11px] text-green-600 mt-0.5">{fmt(revenueStats.paidCount)} invoices</p>
+          {revenueStats && revenueStats.length > 0 ? (
+            <div className="space-y-5">
+              {revenueStats.map(cur => (
+                <div key={cur.code} className="space-y-3">
+                  {revenueStats.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">{cur.code}</span>
+                      <span className="text-xs text-gray-400">{cur.count} invoice{cur.count === 1 ? '' : 's'}</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <p className="text-xs text-green-600 font-medium">Paid</p>
+                      <p className="text-lg font-bold text-green-800 mt-1">{fmtCurrency(cur.paid, cur.symbol)}</p>
+                      <p className="text-[11px] text-green-600 mt-0.5">{fmt(cur.paidCount)} invoices</p>
+                    </div>
+                    <div className="p-3 bg-yellow-50 rounded-lg">
+                      <p className="text-xs text-yellow-600 font-medium">Pending</p>
+                      <p className="text-lg font-bold text-yellow-800 mt-1">{fmtCurrency(cur.pending, cur.symbol)}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <span>Total invoiced</span>
+                      <span className="font-medium text-gray-700">{fmtCurrency(cur.total, cur.symbol)}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                      <div className="h-full rounded-full bg-green-500 transition-all duration-500"
+                        style={{ width: `${pct(cur.paid, cur.total)}%` }} />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">{pct(cur.paid, cur.total)}% collected</p>
+                  </div>
+                  {revenueStats.length > 1 && revenueStats.indexOf(cur) < revenueStats.length - 1 && (
+                    <hr className="border-gray-100" />
+                  )}
                 </div>
-                <div className="p-3 bg-yellow-50 rounded-lg">
-                  <p className="text-xs text-yellow-600 font-medium">Pending / Outstanding</p>
-                  <p className="text-xl font-bold text-yellow-800 mt-1">{fmtCurrency(revenueStats.pending)}</p>
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                  <span>Total invoiced</span>
-                  <span className="font-medium text-gray-700">{fmtCurrency(revenueStats.total)}</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-                  <div className="h-full rounded-full bg-green-500 transition-all duration-500"
-                    style={{ width: `${pct(revenueStats.paid, revenueStats.total)}%` }} />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-1">{pct(revenueStats.paid, revenueStats.total)}% collected</p>
-              </div>
-              <div className="text-xs text-gray-500">
-                {fmt(revenueStats.count)} total invoices across all providers
-              </div>
+              ))}
+              {revenueStats.length === 1 && (
+                <p className="text-xs text-gray-500">{fmt(revenueStats[0].count)} total invoices across all providers</p>
+              )}
             </div>
           ) : (
             <div className="text-center py-6">
