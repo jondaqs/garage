@@ -8,7 +8,7 @@
 
 'use client'
 
-export default function VerificationScore({ score, size = 20, showLabel = false }) {
+export default function VerificationScore({ score, size = 14, showLabel = false }) {
   if (!score || score <= 0) return null
 
   const radius     = (size - 3) / 2

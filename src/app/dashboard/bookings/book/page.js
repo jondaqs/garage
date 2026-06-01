@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, MapPin, Search, Star, Filter, X, CalendarDays } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProviderDetailModal from '@/components/ProviderDetailModal'
 
@@ -263,6 +264,7 @@ export default function BookServicePage() {
                       Verified
                     </span>
                   )}
+                  <VerificationScore score={provider.verification_score} />
                 </div>
 
                 {/* Rating */}

@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, Star, MapPin, Truck, ArrowLeft, Calendar, CalendarDays, X, CheckCircle } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 import Link from 'next/link'
 import ProviderDetailModal from '@/components/ProviderDetailModal'
 
@@ -300,6 +301,7 @@ export default function MemberBookServicePage() {
                             <CheckCircle size={9} /> Verified
                           </span>
                         )}
+                        <VerificationScore score={provider.verification_score} />
                       </p>
                       <p className="text-xs text-gray-400">{provider.provider_type?.display_name}</p>
                     </div>
