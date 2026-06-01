@@ -55,19 +55,6 @@ export default function VerificationScore({ score, size = 20, showLabel = false 
           strokeLinecap="round"
           className="transition-all duration-500"
         />
-        {/* Center text */}
-        <text
-          x={size / 2}
-          y={size / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={color.stroke}
-          fontSize={size * 0.32}
-          fontWeight="700"
-          style={{ transform: 'rotate(90deg)', transformOrigin: 'center' }}
-        >
-          {score}
-        </text>
       </svg>
       {showLabel && (
         <span className={`text-[10px] font-medium ${color.text} leading-tight`}>
