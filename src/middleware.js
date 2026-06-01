@@ -153,10 +153,39 @@ export async function middleware(request) {
   // ROUTE PROTECTION (unchanged)
   // ============================================================
 
-  // /admin — admins only
+  // /dashboard — redirect away only if the user has a dedicated portal
+  // Portal mode: when admin enters via ?portal=user, a cookie is set so ALL
+  // subsequent /dashboard/* navigations work without the query param.
+  if (pathname.startsWith('/dashboard')) {
+    if (role === 'admin') {
+      const wantsUserPortal = request.nextUrl.searchParams.get('portal') === 'user'
+      const hasPortalCookie = request.cookies.get('portal_mode')?.value === 'user'
+
+      if (wantsUserPortal && !hasPortalCookie) {
+        // Set cookie and continue (strip query param via redirect for clean URLs)
+        const cleanUrl = new URL(pathname, request.url)
+        const res = NextResponse.redirect(cleanUrl)
+        res.cookies.set('portal_mode', 'user', { path: '/', maxAge: 60 * 60 * 4, sameSite: 'lax' })
+        return res
+      }
+
+      if (!wantsUserPortal && !hasPortalCookie) {
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+      }
+      // hasPortalCookie — allow through
+    }
+    if (role === 'company') return NextResponse.redirect(new URL('/company/dashboard',  request.url))
+    if (role === 'provider')return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+    return response
+  }
+
+  // /admin — admins only. Clear portal cookie when returning to admin panel.
   if (pathname.startsWith('/admin')) {
     if (role !== 'admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    if (request.cookies.get('portal_mode')?.value) {
+      response.cookies.set('portal_mode', '', { path: '/', maxAge: 0 })
     }
     return response
   }
@@ -174,18 +203,6 @@ export async function middleware(request) {
     if (role !== 'provider') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
-    return response
-  }
-
-  // /dashboard — redirect away only if the user has a dedicated portal
-  // Exception: admins can access the user dashboard via ?portal=user
-  if (pathname.startsWith('/dashboard')) {
-    if (role === 'admin') {
-      const wantsUserPortal = request.nextUrl.searchParams.get('portal') === 'user'
-      if (!wantsUserPortal) return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    }
-    if (role === 'company') return NextResponse.redirect(new URL('/company/dashboard',  request.url))
-    if (role === 'provider')return NextResponse.redirect(new URL('/provider/dashboard', request.url))
     return response
   }
 
