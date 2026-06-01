@@ -325,7 +325,7 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
         <p className="text-yellow-800 text-sm">
           <strong>Important:</strong> By submitting this registration, you confirm that all information 
-          provided is accurate and you agree to our terms and conditions. Your application will be 
+          provided is accurate and you agree to our <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-yellow-900 hover:text-yellow-700">terms and conditions</a>. Your application will be 
           reviewed within 2-5 business days.
         </p>
       </div>

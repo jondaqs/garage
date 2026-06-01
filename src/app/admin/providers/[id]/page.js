@@ -164,7 +164,6 @@ export default function ProviderDetailPage({ params }) {
       // uploaded_files.uploader_user_id, with reference_type='provider_document'.
       // (Pattern set in src/components/provider-registration/steps/DocumentsStep.js.)
       if (!providerData.owner_user_id) {
-        console.warn('[provider detail] no owner_user_id on provider, cannot fetch documents')
         setDocuments([])
       } else {
         const { data: docsData, error: docsErr } = await supabase
@@ -175,12 +174,8 @@ export default function ProviderDetailPage({ params }) {
           .order('created_at', { ascending: false })
 
         if (docsErr) {
-          console.error('[provider detail] documents query failed:', docsErr)
+          console.error('Documents query failed:', docsErr)
         }
-        console.log(
-          '[provider detail] documents lookup',
-          { owner_user_id: providerData.owner_user_id, count: docsData?.length ?? 0 }
-        )
 
         const docsWithUrls = await Promise.all(
           (docsData || []).map(async (file) => {
@@ -188,7 +183,7 @@ export default function ProviderDetailPage({ params }) {
               .storage
               .from(file.storage_bucket || 'documents')
               .createSignedUrl(file.storage_path, 3600)
-            if (sErr) console.error('[provider detail] signed URL failed for', file.storage_path, sErr)
+            if (sErr) console.error('Signed URL failed for', file.storage_path, sErr)
             return { ...file, publicUrl: sErr ? null : signed.signedUrl }
           })
         )

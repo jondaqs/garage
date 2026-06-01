@@ -178,7 +178,7 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       {/* Terms Notice */}
       <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-900">
-          By submitting, you agree to our terms and conditions. Your company registration
+          By submitting, you agree to our <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-blue-900 hover:text-blue-700">terms and conditions</a>. Your company registration
           will be reviewed by our team within 2-5 business days.
         </p>
       </div>
