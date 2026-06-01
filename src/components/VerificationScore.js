@@ -17,10 +17,10 @@ export default function VerificationScore({ score, size = 20, showLabel = false 
   const gap        = circumference - filled
 
   const color = score >= 80
-    ? { stroke: '#16a34a', bg: '#f0fdf4', text: 'text-green-700' }   // green
+    ? { stroke: '#059669', bg: '#d1fae5', text: 'text-emerald-700' }    // emerald green
     : score >= 50
-      ? { stroke: '#ca8a04', bg: '#fefce8', text: 'text-yellow-700' } // yellow
-      : { stroke: '#9ca3af', bg: '#f9fafb', text: 'text-gray-500' }   // gray
+      ? { stroke: '#2563eb', bg: '#dbeafe', text: 'text-blue-700' }     // blue
+      : { stroke: '#6366f1', bg: '#e0e7ff', text: 'text-indigo-600' }   // indigo
 
   return (
     <span
@@ -40,7 +40,7 @@ export default function VerificationScore({ score, size = 20, showLabel = false 
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#e5e7eb"
+          stroke="#cbd5e1"
           strokeWidth={2.5}
         />
         {/* Filled ring */}
