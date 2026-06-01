@@ -816,12 +816,13 @@ export default function ProviderDetailPage({ params }) {
             </div>
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
-              {/* Computed score breakdown */}
+              {/* Score breakdown */}
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-600 mb-2">
-                  Verification Score — auto-computed
+                  Verification Score
                 </label>
                 {(() => {
+                  const dbScore = provider.verification_score || 0
                   const breakdown = [
                     { label: 'KRA PIN verified',      pts: 25, met: verChecks.kra_pin_verified },
                     { label: 'Registration verified',  pts: 25, met: verChecks.registration_verified },
@@ -831,24 +832,24 @@ export default function ProviderDetailPage({ params }) {
                     { label: 'Has description',        pts: 5,  met: provider.description && provider.description.trim().length > 10 },
                     { label: 'Phone & email present',  pts: 5,  met: provider.phone && provider.email },
                   ]
-                  const computedScore = breakdown.reduce((s, b) => s + (b.met ? b.pts : 0), 0)
 
                   return (
                     <div>
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
                           <div className={`h-full rounded-full transition-all duration-500 ${
-                            computedScore >= 80 ? 'bg-green-500' :
-                            computedScore >= 50 ? 'bg-yellow-500' :
-                            'bg-gray-400'
-                          }`} style={{ width: `${computedScore}%` }} />
+                            dbScore >= 80 ? 'bg-emerald-500' :
+                            dbScore >= 50 ? 'bg-blue-500' :
+                            'bg-indigo-400'
+                          }`} style={{ width: `${dbScore}%` }} />
                         </div>
                         <span className={`text-lg font-bold min-w-[3rem] text-right ${
-                          computedScore >= 80 ? 'text-green-700' :
-                          computedScore >= 50 ? 'text-yellow-700' :
-                          'text-gray-500'
-                        }`}>{computedScore}<span className="text-sm text-gray-400">/100</span></span>
+                          dbScore >= 80 ? 'text-emerald-700' :
+                          dbScore >= 50 ? 'text-blue-700' :
+                          'text-indigo-600'
+                        }`}>{dbScore}<span className="text-sm text-gray-400">/100</span></span>
                       </div>
+                      <p className="text-[10px] text-gray-400 mb-2">Score computed by server on save. Breakdown below is a guide.</p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                         {breakdown.map(b => (
                           <div key={b.label} className="flex items-center justify-between gap-2">
