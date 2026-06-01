@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Calendar, Clock, MapPin, Search, Star, Filter, X, CalendarDays } from 'lucide-react'
+import { Calendar, Clock, MapPin, Search, Star, X, CalendarDays } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProviderDetailModal from '@/components/ProviderDetailModal'
@@ -225,12 +225,11 @@ export default function BookServicePage() {
           </div>
 
           {/* Type Filter */}
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+          <div>
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Types</option>
               {providerTypes.map(type => (
