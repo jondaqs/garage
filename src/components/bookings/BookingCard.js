@@ -1,4 +1,5 @@
 import { Calendar, MapPin, Car, User, BadgeCheck, Store } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 import StatusBadge from './StatusBadge'
 
 export default function BookingCard({ booking, isProvider, onClick }) {
@@ -35,13 +36,7 @@ export default function BookingCard({ booking, isProvider, onClick }) {
               <BadgeCheck size={14} className="ml-1 text-blue-500 flex-shrink-0" />
             )}
             {provider.verification_score > 0 && (
-              <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                provider.verification_score >= 80 ? 'bg-green-100 text-green-700' :
-                provider.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                {provider.verification_score}%
-              </span>
+              <VerificationScore score={provider.verification_score} />
             )}
           </div>
         )}

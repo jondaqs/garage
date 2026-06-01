@@ -9,6 +9,7 @@ import {
   Award, Clock, Wrench, MessageSquare, ChevronLeft,
   ChevronRight, CheckCircle, Building2, Loader2
 } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 
 function StarRow({ rating, size = 14 }) {
   return (

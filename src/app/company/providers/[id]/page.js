@@ -8,6 +8,7 @@ import {
   Award, Clock, Wrench, MessageSquare, Calendar, ChevronLeft,
   ChevronRight, CheckCircle, Building2, Loader2
 } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 
 function StarRow({ rating, size = 14 }) {
   return (
@@ -144,13 +145,7 @@ export default function ProviderDetailPage() {
                   <BadgeCheck size={22} className="text-blue-400 flex-shrink-0" />
                 )}
                 {provider.verification_score > 0 && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                    provider.verification_score >= 80 ? 'bg-green-500/20 text-green-300' :
-                    provider.verification_score >= 50 ? 'bg-yellow-500/20 text-yellow-300' :
-                    'bg-white/10 text-white/60'
-                  }`}>
-                    {provider.verification_score}% verified
-                  </span>
+                  <VerificationScore score={provider.verification_score} showLabel />
                 )}
               </div>
               <p className="text-blue-300 text-sm mt-1 font-medium">

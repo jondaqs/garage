@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Calendar, Truck, Wrench, ChevronLeft, ChevronRight, BadgeCheck } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 
 // Status code → display config
 // BUG 1.6 FIX: status is stored via status_id FK to booking_statuses.
@@ -248,11 +249,7 @@ export default function CompanyBookingsPage() {
                             <BadgeCheck size={12} className="text-blue-500 flex-shrink-0" />
                           )}
                           {booking.provider.verification_score > 0 && (
-                            <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${
-                              booking.provider.verification_score >= 80 ? 'bg-green-100 text-green-700' :
-                              booking.provider.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>{booking.provider.verification_score}%</span>
+                            <VerificationScore score={booking.provider.verification_score} size={16} />
                           )}
                         </p>
                       )}

@@ -8,6 +8,7 @@ import {
   Map, List, Loader2, Wrench, MessageSquare, SlidersHorizontal,
   Building2, ChevronDown, ChevronUp
 } from 'lucide-react'
+import VerificationScore from '@/components/VerificationScore'
 
 const ITEMS_PER_PAGE = 12
 
@@ -381,13 +382,7 @@ function ProviderCard({ provider: p, onClick, onChat }) {
                 <BadgeCheck size={14} className="text-blue-500 flex-shrink-0" />
               )}
               {p.verification_score > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                  p.verification_score >= 80 ? 'bg-green-100 text-green-700' :
-                  p.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-gray-100 text-gray-600'
-                }`}>
-                  {p.verification_score}%
-                </span>
+                <VerificationScore score={p.verification_score} />
               )}
             </div>
             <p className="text-xs text-blue-600 mt-0.5 font-medium">{p.provider_type?.display_name}</p>
