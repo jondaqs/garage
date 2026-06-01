@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Calendar, Truck, Wrench, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Truck, Wrench, ChevronLeft, ChevronRight, BadgeCheck } from 'lucide-react'
 
 // Status code → display config
 // BUG 1.6 FIX: status is stored via status_id FK to booking_statuses.
@@ -98,7 +98,7 @@ export default function CompanyBookingsPage() {
           final_cost,
           created_at,
           vehicle:vehicles(id, plate_number, make, model, color),
-          provider:service_providers(id, name),
+          provider:service_providers(id, name, is_verified, verification_score),
           status:booking_statuses(code, display_name, color_code)
         `)
         .in('vehicle_id', vehicleIds)
@@ -242,8 +242,18 @@ export default function CompanyBookingsPage() {
                       </div>
                       {/* BUG 1.6 FIX: provider is service_providers.name not provider_profiles.business_name */}
                       {booking.provider?.name && (
-                        <p className="text-sm text-gray-500 mt-0.5">
+                        <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1">
                           {booking.provider.name}
+                          {booking.provider.is_verified && (
+                            <BadgeCheck size={12} className="text-blue-500 flex-shrink-0" />
+                          )}
+                          {booking.provider.verification_score > 0 && (
+                            <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${
+                              booking.provider.verification_score >= 80 ? 'bg-green-100 text-green-700' :
+                              booking.provider.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>{booking.provider.verification_score}%</span>
+                          )}
                         </p>
                       )}
                     </div>

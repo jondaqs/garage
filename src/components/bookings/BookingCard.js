@@ -1,7 +1,8 @@
-import { Calendar, MapPin, Car, User } from 'lucide-react'
+import { Calendar, MapPin, Car, User, BadgeCheck, Store } from 'lucide-react'
 import StatusBadge from './StatusBadge'
 
 export default function BookingCard({ booking, isProvider, onClick }) {
+  const provider = booking.service_provider || booking.provider
   return (
     <div
       onClick={onClick}
@@ -24,6 +25,24 @@ export default function BookingCard({ booking, isProvider, onClick }) {
           <div className="flex items-center text-sm text-gray-600">
             <User size={16} className="mr-2" />
             <span>{booking.customer?.first_name} {booking.customer?.last_name}</span>
+          </div>
+        )}
+        {!isProvider && provider?.name && (
+          <div className="flex items-center text-sm text-gray-600 col-span-2">
+            <Store size={16} className="mr-2 flex-shrink-0" />
+            <span className="font-medium">{provider.name}</span>
+            {provider.is_verified && (
+              <BadgeCheck size={14} className="ml-1 text-blue-500 flex-shrink-0" />
+            )}
+            {provider.verification_score > 0 && (
+              <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                provider.verification_score >= 80 ? 'bg-green-100 text-green-700' :
+                provider.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {provider.verification_score}%
+              </span>
+            )}
           </div>
         )}
         <div className="flex items-center text-sm text-gray-600">

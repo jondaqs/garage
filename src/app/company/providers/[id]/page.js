@@ -143,6 +143,15 @@ export default function ProviderDetailPage() {
                 {provider.is_verified && (
                   <BadgeCheck size={22} className="text-blue-400 flex-shrink-0" />
                 )}
+                {provider.verification_score > 0 && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    provider.verification_score >= 80 ? 'bg-green-500/20 text-green-300' :
+                    provider.verification_score >= 50 ? 'bg-yellow-500/20 text-yellow-300' :
+                    'bg-white/10 text-white/60'
+                  }`}>
+                    {provider.verification_score}% verified
+                  </span>
+                )}
               </div>
               <p className="text-blue-300 text-sm mt-1 font-medium">
                 {provider.provider_type?.display_name}
@@ -249,9 +258,29 @@ export default function ProviderDetailPage() {
             </div>
 
             {/* Verifications */}
-            {(provider.is_verified || provider.kra_pin_verified || provider.registration_verified || provider.location_verified) && (
+            {(provider.is_verified || provider.kra_pin_verified || provider.registration_verified || provider.location_verified || provider.verification_score > 0) && (
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Verifications</h2>
+                {provider.verification_score > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-gray-500">Trust Score</span>
+                      <span className={`text-sm font-bold ${
+                        provider.verification_score >= 80 ? 'text-green-600' :
+                        provider.verification_score >= 50 ? 'text-yellow-600' :
+                        'text-gray-500'
+                      }`}>{provider.verification_score}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${
+                        provider.verification_score >= 80 ? 'bg-green-500' :
+                        provider.verification_score >= 50 ? 'bg-yellow-500' :
+                        'bg-gray-400'
+                      }`} style={{ width: `${provider.verification_score}%` }} />
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
                   {provider.is_verified && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-xs font-medium">

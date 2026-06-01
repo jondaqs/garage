@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Calendar, AlertCircle, Truck, Plus, ChevronRight, Loader2 } from 'lucide-react'
+import { Calendar, AlertCircle, Truck, Plus, ChevronRight, Loader2, BadgeCheck } from 'lucide-react'
 
 const STATUS_COLORS = {
   pending:     'bg-yellow-100 text-yellow-800',
@@ -95,7 +95,7 @@ export default function MemberBookingsPage() {
           created_at,
           status:booking_statuses(code, display_name, color_code),
           vehicle:vehicles(plate_number, make, model),
-          provider:service_providers(name),
+          provider:service_providers(name, is_verified, verification_score),
           bookedBy:user_profiles!bookings_customer_user_id_fkey(first_name, last_name)
         `)
         .in('vehicle_id', vehicleIds)
@@ -186,7 +186,21 @@ export default function MemberBookingsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{b.provider?.name || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    <span className="flex items-center gap-1">
+                      {b.provider?.name || '—'}
+                      {b.provider?.is_verified && (
+                        <BadgeCheck size={12} className="text-blue-500 flex-shrink-0" />
+                      )}
+                      {b.provider?.verification_score > 0 && (
+                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${
+                          b.provider.verification_score >= 80 ? 'bg-green-100 text-green-700' :
+                          b.provider.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>{b.provider.verification_score}%</span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {b.booking_date ? new Date(b.booking_date).toLocaleDateString() : '—'}
                     {b.booking_time_start && (

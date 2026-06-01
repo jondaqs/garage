@@ -360,6 +360,15 @@ function ProviderCard({ provider: p, starting, onClick, onChat }) {
             <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="font-semibold text-gray-900 text-sm leading-tight">{p.name}</h3>
               {p.is_verified && <BadgeCheck size={14} className="text-green-500 flex-shrink-0" />}
+              {p.verification_score > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                  p.verification_score >= 80 ? 'bg-green-100 text-green-700' :
+                  p.verification_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {p.verification_score}%
+                </span>
+              )}
             </div>
             <p className="text-xs text-green-700 mt-0.5 font-medium">{p.provider_type?.display_name}</p>
           </div>

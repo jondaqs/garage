@@ -33,7 +33,7 @@ export default function BookingsPage() {
         .from('bookings')
         .select(`
           *,
-          service_provider:service_providers(name, phone),
+          service_provider:service_providers(name, phone, is_verified, verification_score),
           shop:shops(name, town, county),
           vehicle:vehicles(plate_number, make, model),
           status:booking_statuses(code, display_name, color_code),
