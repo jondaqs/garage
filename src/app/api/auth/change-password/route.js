@@ -4,17 +4,17 @@
  * Handles both "change" (from settings — needs current password) and
  * "reset" (from forgot-password email link — session-only) flows.
  *
- * Before accepting a new password it checks the last 5 entries in
- * `password_history` via bcrypt.compare. If the new password matches
- * any of them, the request is rejected.
+ * Security layers (applied to BOTH modes):
+ *  1. Password history — rejects if the new password matches any of the
+ *     last 5 stored bcrypt hashes.
+ *  2. Cooldown — enforces a 24-hour gap between password changes.
+ *  3. Account lock — if 3+ changes are detected within 24 hours the
+ *     account is temporarily banned for 24 hours via Supabase admin API.
  *
  * The actual password update uses the CALLER'S session (not the
  * service role), so Supabase still enforces AAL2 when MFA is enrolled.
  * The service role client is only used for password_history table
- * operations (which are blocked from client access via RLS).
- *
- * After a successful change the new password's bcrypt hash is stored
- * in `password_history` so future changes are also checked.
+ * operations and the emergency account ban.
  *
  * Body:
  *   { mode: 'change' | 'reset', newPassword: string, currentPassword?: string }
@@ -108,12 +108,31 @@ export async function POST(request) {
       .order('created_at', { ascending: false })
       .limit(HISTORY_DEPTH)
 
-    // ── 4. Cooldown — prevent rapid cycling (change mode only) ─
-    //    Forgot-password resets are exempt so a compromised
-    //    account can always be recovered immediately.
-    if (mode === 'change' && history && history.length > 0) {
-      const lastChange  = new Date(history[0].created_at)
-      const hoursAgo    = (Date.now() - lastChange.getTime()) / (1000 * 60 * 60)
+    // ── 4. Suspicious-activity check & cooldown ───────────────
+    if (history && history.length > 0) {
+      const now       = Date.now()
+      const dayMs     = 24 * 60 * 60 * 1000
+      const changesIn24h = history.filter(
+        h => (now - new Date(h.created_at).getTime()) < dayMs,
+      ).length
+
+      // 3+ password changes in 24 hours → lock the account
+      if (changesIn24h >= 3) {
+        // Temporarily ban the user for 24 hours via Supabase admin API
+        await admin.auth.admin.updateUserById(user.id, {
+          ban_duration: '24h',
+        })
+        // Sign them out
+        try { await supabase.auth.signOut() } catch {}
+        return NextResponse.json(
+          { error: 'Your account has been temporarily locked due to unusual password activity. Please contact support or try again after 24 hours.' },
+            { status: 423 },
+        )
+      }
+
+      // Cooldown — at least COOLDOWN_HOURS between changes
+      const lastChange = new Date(history[0].created_at)
+      const hoursAgo   = (now - lastChange.getTime()) / (1000 * 60 * 60)
       if (hoursAgo < COOLDOWN_HOURS) {
         const remaining = Math.ceil(COOLDOWN_HOURS - hoursAgo)
         return NextResponse.json(
@@ -181,7 +200,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    
+    console.error('change-password error:', err)
     return NextResponse.json(
       { error: err.message || 'Failed to change password.' },
       { status: 500 },
