@@ -3,7 +3,7 @@
 import React, { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Car, Mail, Lock, Eye, EyeOff, Chrome } from 'lucide-react'
+import { Car, Mail, Lock, Eye, EyeOff, Chrome, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 /**
@@ -28,6 +28,7 @@ function LoginPageInner() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const message = searchParams.get('message')
 
   const handleEmailLogin = async (e) => {
     e.preventDefault()
@@ -173,6 +174,13 @@ function LoginPageInner() {
             <p className="text-gray-600 mt-2">Sign in to continue</p>
           </div>
 
+          {message === 'password_reset' && (
+            <div className="mb-6 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm flex items-center gap-2">
+              <CheckCircle size={16} className="flex-shrink-0" />
+              Password reset successful. Sign in with your new password.
+            </div>
+          )}
+
           <button
             onClick={handleGoogleSignIn}
             disabled={loading}
@@ -208,7 +216,12 @@ function LoginPageInner() {
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <Link href="/auth/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
