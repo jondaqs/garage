@@ -56,6 +56,8 @@ export default function ProviderSettingsPage() {
   const [showPw, setShowPw]     = useState(false)
   const [pwError, setPwError]   = useState('')
   const [pwSaving, setPwSaving] = useState(false)
+  const [hasMfa, setHasMfa]     = useState(false)
+  const [mfaCode, setMfaCode]   = useState('')
 
   // Documents state
   const [userProfileId, setUserProfileId] = useState(null)
@@ -69,6 +71,11 @@ export default function ProviderSettingsPage() {
   const load = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
+
+      // Check if user has MFA enrolled (for password change OTP gate)
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      setHasMfa(!!factors?.totp?.find(f => f.status === 'verified'))
+
       const { data: profile  } = await supabase
         .from('user_profiles')
         .select('id, first_name, last_name, phone, bio')
@@ -214,6 +221,7 @@ export default function ProviderSettingsPage() {
     if (!pw.current)             { setPwError('Enter your current password'); return }
     if (pw.newPw.length < 8)     { setPwError('New password must be at least 8 characters'); return }
     if (pw.newPw !== pw.confirm) { setPwError('New passwords do not match'); return }
+    if (hasMfa && mfaCode.length !== 6) { setPwError('Enter your 6-digit authenticator code'); return }
     setPwSaving(true)
     try {
       const res = await fetch('/api/auth/change-password', {
@@ -223,11 +231,13 @@ export default function ProviderSettingsPage() {
           mode: 'change',
           currentPassword: pw.current,
           newPassword: pw.newPw,
+          ...(hasMfa && { mfaCode }),
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to change password')
       setPw({ current: '', newPw: '', confirm: '' })
+      setMfaCode('')
       setSuccess('Password changed successfully.')
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) { setPwError(err.message) }
@@ -1058,6 +1068,17 @@ export default function ProviderSettingsPage() {
                 className={inp} placeholder="Repeat new password" />
             </div>
           </div>
+          {hasMfa && (
+            <div>
+              <label className={lbl}>Authenticator Code</label>
+              <input type="text" inputMode="numeric" maxLength={6}
+                value={mfaCode}
+                onChange={e => { setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPwError('') }}
+                className={inp + ' tracking-widest font-mono text-center'}
+                placeholder="6-digit code" />
+              <p className="text-[11px] text-gray-400 mt-1">Required to confirm password change</p>
+            </div>
+          )}
           <div className="pt-3 border-t border-gray-100 flex justify-end">
             <button onClick={savePassword} disabled={pwSaving}
               className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 text-sm font-medium">

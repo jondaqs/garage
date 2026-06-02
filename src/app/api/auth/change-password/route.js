@@ -58,7 +58,7 @@ async function getCallerClient() {
 
 export async function POST(request) {
   try {
-    const { mode, newPassword, currentPassword } = await request.json()
+    const { mode, newPassword, currentPassword, mfaCode } = await request.json()
 
     // Basic validation
     if (!newPassword || newPassword.length < 8) {
@@ -90,13 +90,49 @@ export async function POST(request) {
         email: user.email,
         password: currentPassword,
       })
-      // signInWithPassword on the admin client still validates creds
-      // but doesn't create a browser session.
       if (signInErr) {
         return NextResponse.json(
           { error: 'Current password is incorrect.' },
           { status: 403 },
         )
+      }
+
+      // ── 2b. Re-verify MFA if enrolled ─────────────────────
+      // Even though the session is already AAL2, we require a
+      // fresh TOTP code to prove the person at the keyboard has
+      // the authenticator device right now.
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const verifiedFactor = factors?.totp?.find(f => f.status === 'verified')
+
+      if (verifiedFactor) {
+        if (!mfaCode || mfaCode.length !== 6) {
+          return NextResponse.json(
+            { error: 'mfa_required', message: 'Enter your authenticator code to confirm this change.' },
+            { status: 403 },
+          )
+        }
+
+        const { data: challenge, error: chalErr } = await supabase.auth.mfa.challenge({
+          factorId: verifiedFactor.id,
+        })
+        if (chalErr) {
+          return NextResponse.json(
+            { error: 'Failed to create MFA challenge.' },
+            { status: 500 },
+          )
+        }
+
+        const { error: verErr } = await supabase.auth.mfa.verify({
+          factorId: verifiedFactor.id,
+          challengeId: challenge.id,
+          code: mfaCode,
+        })
+        if (verErr) {
+          return NextResponse.json(
+            { error: 'Invalid authenticator code. Please try again.' },
+            { status: 403 },
+          )
+        }
       }
     }
 
