@@ -13,6 +13,7 @@
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
+    "bcryptjs": "^2.4.3",
     "date-fns": "^4.1.0",
     "gapi-script": "^1.2.0",
     "html2canvas": "^1.4.1",

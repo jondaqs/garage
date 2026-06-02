@@ -127,11 +127,16 @@ export default function ResetPasswordPage() {
     setError('')
 
     try {
-      const { error: updateErr } = await supabase.auth.updateUser({
-        password,
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'reset',
+          newPassword: password,
+        }),
       })
-
-      if (updateErr) throw updateErr
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to reset password')
 
       setSuccess(true)
 

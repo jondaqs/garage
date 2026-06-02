@@ -216,13 +216,17 @@ export default function ProviderSettingsPage() {
     if (pw.newPw !== pw.confirm) { setPwError('New passwords do not match'); return }
     setPwSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: user.email, password: pw.current,
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'change',
+          currentPassword: pw.current,
+          newPassword: pw.newPw,
+        }),
       })
-      if (signInErr) throw new Error('Current password is incorrect')
-      const { error: updErr } = await supabase.auth.updateUser({ password: pw.newPw })
-      if (updErr) throw updErr
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to change password')
       setPw({ current: '', newPw: '', confirm: '' })
       setSuccess('Password changed successfully.')
       setTimeout(() => setSuccess(''), 4000)
