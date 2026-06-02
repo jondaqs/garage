@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Camera, ArrowLeft } from 'lucide-react'
+import { Camera, ArrowLeft, Shield } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import TwoFactorSetup from '@/components/TwoFactorSetup'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -173,6 +174,15 @@ export default function ProfilePage() {
             {loading ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
+      </div>
+
+      {/* ── Two-Factor Authentication ── */}
+      <div className="bg-white rounded-xl p-6 border border-gray-200 mt-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Shield size={20} className="text-blue-600" />
+          Account Security
+        </h3>
+        <TwoFactorSetup accentColor="blue" />
       </div>
     </div>
   )

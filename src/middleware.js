@@ -42,6 +42,13 @@ export async function middleware(request) {
   }
 
   // ============================================================
+  // Allow the MFA verify page to load without redirect loops.
+  // ============================================================
+  if (pathname.startsWith('/auth/mfa-verify')) {
+    return response
+  }
+
+  // ============================================================
   // NOT LOGGED IN — protect all app routes
   // ============================================================
   if (!session) {
@@ -57,6 +64,30 @@ export async function middleware(request) {
       return NextResponse.redirect(loginUrl)
     }
     return response
+  }
+
+  // ============================================================
+  // MFA ENFORCEMENT — if the user has enrolled TOTP factors but
+  // the current session is only AAL1, redirect to MFA verify.
+  // ============================================================
+  const isProtectedRoute =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/provider') ||
+    pathname.startsWith('/company') ||
+    pathname.startsWith('/admin')
+
+  if (isProtectedRoute) {
+    try {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+        const mfaUrl = new URL('/auth/mfa-verify', request.url)
+        const nextPath = pathname + (request.nextUrl.search || '')
+        mfaUrl.searchParams.set('next', nextPath)
+        return NextResponse.redirect(mfaUrl)
+      }
+    } catch {
+      // If AAL check fails, allow through — the page will handle it
+    }
   }
 
   // ============================================================

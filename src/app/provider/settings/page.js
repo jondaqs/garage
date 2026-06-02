@@ -7,6 +7,7 @@ import {
   Loader2, Save, Eye, EyeOff, Clock, Info, Wrench, Plus, X,
   FileText, Upload, Trash2, ExternalLink, RefreshCw,
 } from 'lucide-react'
+import TwoFactorSetup from '@/components/TwoFactorSetup'
 
 const TABS = [
   { id: 'business',  label: 'Business Profile', icon: Store    },
@@ -1060,6 +1061,13 @@ export default function ProviderSettingsPage() {
               Change Password
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Two-Factor Authentication (inside Security tab) ── */}
+      {tab === 'security' && (
+        <div className="bg-white rounded-xl shadow-sm p-6 mt-4">
+          <TwoFactorSetup accentColor="green" />
         </div>
       )}
     </div>

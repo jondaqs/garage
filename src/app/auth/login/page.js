@@ -43,6 +43,22 @@ function LoginPageInner() {
       if (signInError) throw signInError
 
       if (authData.user) {
+        // ── Check if user has 2FA enabled ─────────────────────────
+        const { data: factors } = await supabase.auth.mfa.listFactors()
+        const hasTotp = factors?.totp?.some(f => f.status === 'verified')
+
+        if (hasTotp) {
+          // Check current assurance level — if already AAL2, skip MFA page
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+          if (aal?.currentLevel !== 'aal2') {
+            const mfaUrl = nextParam
+              ? `/auth/mfa-verify?next=${encodeURIComponent(nextParam)}`
+              : '/auth/mfa-verify'
+            router.push(mfaUrl)
+            return
+          }
+        }
+
         // Single query — roles already include everything we need
         const { data: profile } = await supabase
           .from('user_profiles')
