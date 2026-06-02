@@ -4,8 +4,9 @@ import PendingInvitationsCard from '@/components/PendingInvitationsCard'
 import PendingCompanyInvitationsCard from '@/components/PendingCompanyInvitationsCard'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Car, Calendar, BarChart3, DollarSign, Plus, ChevronDown, ChevronUp, RotateCcw, AlertCircle, ArrowRight } from 'lucide-react'
+import { Car, Calendar, BarChart3, DollarSign, Plus, ChevronDown, ChevronUp, RotateCcw, AlertCircle, ArrowRight, ShieldAlert } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import MobileHeader from '../../components/MobileHeader'
 import MobileVehicleCard from '../../components/MobileVehicleCard'
 import MobileQuickActions from '../../components/MobileQuickActions'
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const [showInactive, setShowInactive]         = useState(false)
   const [loadingInactive, setLoadingInactive]   = useState(false)
   const [actionError, setActionError]           = useState(null)
+  const [show2faBanner, setShow2faBanner]       = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +43,13 @@ export default function DashboardPage() {
         }
 
         setUser(user)
+
+        // Check if user has 2FA enabled — show banner if not
+        try {
+          const { data: factors } = await supabase.auth.mfa.listFactors()
+          const has2fa = factors?.totp?.some(f => f.status === 'verified')
+          setShow2faBanner(!has2fa)
+        } catch { setShow2faBanner(false) }
 
         // Step 1: Get or create user profile
         let userProfile = null
@@ -222,6 +231,18 @@ export default function DashboardPage() {
 
       <main className="flex-1 overflow-y-auto px-6 py-5 pb-24 space-y-5">
 
+        {show2faBanner && (
+          <Link href="/dashboard/profile"
+            className="flex items-start gap-3 p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+            <ShieldAlert size={18} className="text-blue-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-blue-800">Secure your account</p>
+              <p className="text-xs text-blue-600 mt-0.5">Enable two-factor authentication for improved security.</p>
+            </div>
+            <ArrowRight size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
+          </Link>
+        )}
+
         {/* Vehicles */}
         <section>
           <div className="flex justify-between items-center mb-4">
@@ -327,6 +348,18 @@ export default function DashboardPage() {
         <h2 className="text-3xl font-bold text-gray-800 mb-8">
           Welcome back, {userName}! 👋
         </h2>
+
+        {show2faBanner && (
+          <Link href="/dashboard/profile"
+            className="flex items-center gap-3 p-4 mb-6 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors">
+            <ShieldAlert size={20} className="text-blue-500 flex-shrink-0" />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-blue-800">Secure your account — </span>
+              <span className="text-sm text-blue-600">Enable two-factor authentication for improved security.</span>
+            </div>
+            <ArrowRight size={16} className="text-blue-400 flex-shrink-0" />
+          </Link>
+        )}
 
         {/* Stats strip — 1 real stat + 3 navigation cards */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">

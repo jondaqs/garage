@@ -25,10 +25,14 @@ import { createServerClient }                from '@supabase/ssr'
 import { cookies }                           from 'next/headers'
 import { NextResponse }                      from 'next/server'
 import bcrypt                                from 'bcryptjs'
+import { rateLimit }                         from '@/lib/rateLimiter'
 
 const HISTORY_DEPTH  = 5
 const BCRYPT_ROUNDS  = 12
 const COOLDOWN_HOURS = 24
+
+// 5 attempts per 15 minutes per IP
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many password reset attempts. Please try again later.' })
 
 // ── Supabase clients ─────────────────────────────────────────
 
@@ -57,6 +61,10 @@ async function getCallerClient() {
 // ── Handler ──────────────────────────────────────────────────
 
 export async function POST(request) {
+  // Rate limit check
+  const limited = limiter.check(request)
+  if (limited) return limited
+
   try {
     const { newPassword } = await request.json()
 
@@ -171,7 +179,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('change-password error:', err)
+    
     return NextResponse.json(
       { error: err.message || 'Failed to reset password.' },
       { status: 500 },

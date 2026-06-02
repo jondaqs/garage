@@ -1,8 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rateLimiter'
+
+// Auth pages: 20 requests per minute per IP
+const authLimiter = rateLimit({ windowMs: 60_000, max: 20, message: 'Too many requests. Please slow down and try again.' })
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl
+
+  // ============================================================
+  // Rate-limit auth pages to deter brute-force / bot traffic
+  // ============================================================
+  const isAuthPage =
+    pathname.startsWith('/auth/login') ||
+    pathname.startsWith('/auth/forgot-password') ||
+    pathname.startsWith('/auth/mfa-verify') ||
+    pathname.startsWith('/auth/reset-password')
+
+  if (isAuthPage) {
+    const limited = authLimiter.check(request)
+    if (limited) return limited
+  }
 
   let response = NextResponse.next({
     request: { headers: request.headers },
