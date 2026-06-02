@@ -130,10 +130,7 @@ export default function ResetPasswordPage() {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'reset',
-          newPassword: password,
-        }),
+        body: JSON.stringify({ newPassword: password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to reset password')

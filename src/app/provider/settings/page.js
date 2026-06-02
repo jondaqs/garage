@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Settings, User, Store, Lock, CheckCircle, AlertCircle,
-  Loader2, Save, Eye, EyeOff, Clock, Info, Wrench, Plus, X,
+  Loader2, Save, Clock, Info, Wrench, Plus, X,
   FileText, Upload, Trash2, ExternalLink, RefreshCw,
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
@@ -52,13 +52,6 @@ export default function ProviderSettingsPage() {
     first_name: '', last_name: '', phone: '', bio: '',
   })
 
-  const [pw, setPw]             = useState({ current: '', newPw: '', confirm: '' })
-  const [showPw, setShowPw]     = useState(false)
-  const [pwError, setPwError]   = useState('')
-  const [pwSaving, setPwSaving] = useState(false)
-  const [hasMfa, setHasMfa]     = useState(false)
-  const [mfaCode, setMfaCode]   = useState('')
-
   // Documents state
   const [userProfileId, setUserProfileId] = useState(null)
   const [documents,     setDocuments]     = useState([])
@@ -71,10 +64,6 @@ export default function ProviderSettingsPage() {
   const load = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-
-      // Check if user has MFA enrolled (for password change OTP gate)
-      const { data: factors } = await supabase.auth.mfa.listFactors()
-      setHasMfa(!!factors?.totp?.find(f => f.status === 'verified'))
 
       const { data: profile  } = await supabase
         .from('user_profiles')
@@ -213,35 +202,6 @@ export default function ProviderSettingsPage() {
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) { setError(err.message) }
     finally { setSaving(false) }
-  }
-
-  // ── Change password ───────────────────────────────────────────────────────
-  const savePassword = async () => {
-    setPwError('')
-    if (!pw.current)             { setPwError('Enter your current password'); return }
-    if (pw.newPw.length < 8)     { setPwError('New password must be at least 8 characters'); return }
-    if (pw.newPw !== pw.confirm) { setPwError('New passwords do not match'); return }
-    if (hasMfa && mfaCode.length !== 6) { setPwError('Enter your 6-digit authenticator code'); return }
-    setPwSaving(true)
-    try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'change',
-          currentPassword: pw.current,
-          newPassword: pw.newPw,
-          ...(hasMfa && { mfaCode }),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to change password')
-      setPw({ current: '', newPw: '', confirm: '' })
-      setMfaCode('')
-      setSuccess('Password changed successfully.')
-      setTimeout(() => setSuccess(''), 4000)
-    } catch (err) { setPwError(err.message) }
-    finally { setPwSaving(false) }
   }
 
   // ─── DOCUMENTS ─────────────────────────────────────────────────────────
@@ -1037,61 +997,7 @@ export default function ProviderSettingsPage() {
 
       {/* ── Security ── */}
       {tab === 'security' && (
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-900">Change Password</h2>
-          {pwError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">{pwError}</div>
-          )}
-          <div>
-            <label className={lbl}>Current Password</label>
-            <div className="relative">
-              <input type={showPw ? 'text' : 'password'} value={pw.current}
-                onChange={e => setPw(p => ({ ...p, current: e.target.value }))}
-                className={inp + ' pr-9'} placeholder="••••••••" />
-              <button onClick={() => setShowPw(s => !s)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>New Password</label>
-              <input type={showPw ? 'text' : 'password'} value={pw.newPw}
-                onChange={e => setPw(p => ({ ...p, newPw: e.target.value }))}
-                className={inp} placeholder="Min 8 characters" />
-            </div>
-            <div>
-              <label className={lbl}>Confirm Password</label>
-              <input type={showPw ? 'text' : 'password'} value={pw.confirm}
-                onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))}
-                className={inp} placeholder="Repeat new password" />
-            </div>
-          </div>
-          {hasMfa && (
-            <div>
-              <label className={lbl}>Authenticator Code</label>
-              <input type="text" inputMode="numeric" maxLength={6}
-                value={mfaCode}
-                onChange={e => { setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPwError('') }}
-                className={inp + ' tracking-widest font-mono text-center'}
-                placeholder="6-digit code" />
-              <p className="text-[11px] text-gray-400 mt-1">Required to confirm password change</p>
-            </div>
-          )}
-          <div className="pt-3 border-t border-gray-100 flex justify-end">
-            <button onClick={savePassword} disabled={pwSaving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 text-sm font-medium">
-              {pwSaving ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-              Change Password
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Two-Factor Authentication (inside Security tab) ── */}
-      {tab === 'security' && (
-        <div className="bg-white rounded-xl shadow-sm p-6 mt-4">
+        <div className="bg-white rounded-xl shadow-sm p-6">
           <TwoFactorSetup accentColor="green" />
         </div>
       )}

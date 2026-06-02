@@ -1,10 +1,11 @@
 /**
  * POST /api/auth/change-password
  *
- * Handles both "change" (from settings — needs current password) and
- * "reset" (from forgot-password email link — session-only) flows.
+ * Handles the forgot-password reset flow. Called by the reset-password
+ * page after the user clicks the email link and (if MFA is enrolled)
+ * verifies their TOTP code.
  *
- * Security layers (applied to BOTH modes):
+ * Security layers:
  *  1. Password history — rejects if the new password matches any of the
  *     last 5 stored bcrypt hashes.
  *  2. Cooldown — enforces a 24-hour gap between password changes.
@@ -16,8 +17,7 @@
  * The service role client is only used for password_history table
  * operations and the emergency account ban.
  *
- * Body:
- *   { mode: 'change' | 'reset', newPassword: string, currentPassword?: string }
+ * Body: { newPassword: string }
  */
 
 import { createClient as createAdminClient } from '@supabase/supabase-js'
@@ -26,9 +26,9 @@ import { cookies }                           from 'next/headers'
 import { NextResponse }                      from 'next/server'
 import bcrypt                                from 'bcryptjs'
 
-const HISTORY_DEPTH    = 5
-const BCRYPT_ROUNDS    = 12
-const COOLDOWN_HOURS   = 24
+const HISTORY_DEPTH  = 5
+const BCRYPT_ROUNDS  = 12
+const COOLDOWN_HOURS = 24
 
 // ── Supabase clients ─────────────────────────────────────────
 
@@ -47,8 +47,8 @@ async function getCallerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
-        getAll()            { return cookieStore.getAll() },
-        setAll(toSet)       { try { toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {} },
+        getAll()      { return cookieStore.getAll() },
+        setAll(toSet) { try { toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {} },
       },
     },
   )
@@ -58,19 +58,12 @@ async function getCallerClient() {
 
 export async function POST(request) {
   try {
-    const { mode, newPassword, currentPassword, mfaCode } = await request.json()
+    const { newPassword } = await request.json()
 
     // Basic validation
     if (!newPassword || newPassword.length < 8) {
       return NextResponse.json(
         { error: 'New password must be at least 8 characters.' },
-        { status: 400 },
-      )
-    }
-
-    if (mode === 'change' && !currentPassword) {
-      return NextResponse.json(
-        { error: 'Current password is required.' },
         { status: 400 },
       )
     }
@@ -84,59 +77,7 @@ export async function POST(request) {
 
     const admin = getServiceClient()
 
-    // ── 2. For "change" mode, verify current password ───────
-    if (mode === 'change') {
-      const { error: signInErr } = await admin.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      })
-      if (signInErr) {
-        return NextResponse.json(
-          { error: 'Current password is incorrect.' },
-          { status: 403 },
-        )
-      }
-
-      // ── 2b. Re-verify MFA if enrolled ─────────────────────
-      // Even though the session is already AAL2, we require a
-      // fresh TOTP code to prove the person at the keyboard has
-      // the authenticator device right now.
-      const { data: factors } = await supabase.auth.mfa.listFactors()
-      const verifiedFactor = factors?.totp?.find(f => f.status === 'verified')
-
-      if (verifiedFactor) {
-        if (!mfaCode || mfaCode.length !== 6) {
-          return NextResponse.json(
-            { error: 'mfa_required', message: 'Enter your authenticator code to confirm this change.' },
-            { status: 403 },
-          )
-        }
-
-        const { data: challenge, error: chalErr } = await supabase.auth.mfa.challenge({
-          factorId: verifiedFactor.id,
-        })
-        if (chalErr) {
-          return NextResponse.json(
-            { error: 'Failed to create MFA challenge.' },
-            { status: 500 },
-          )
-        }
-
-        const { error: verErr } = await supabase.auth.mfa.verify({
-          factorId: verifiedFactor.id,
-          challengeId: challenge.id,
-          code: mfaCode,
-        })
-        if (verErr) {
-          return NextResponse.json(
-            { error: 'Invalid authenticator code. Please try again.' },
-            { status: 403 },
-          )
-        }
-      }
-    }
-
-    // ── 3. Fetch recent password hashes ─────────────────────
+    // ── 2. Fetch recent password hashes ─────────────────────
     const { data: history } = await admin
       .from('password_history')
       .select('password_hash, created_at')
@@ -144,25 +85,23 @@ export async function POST(request) {
       .order('created_at', { ascending: false })
       .limit(HISTORY_DEPTH)
 
-    // ── 4. Suspicious-activity check & cooldown ───────────────
+    // ── 3. Suspicious-activity check & cooldown ─────────────
     if (history && history.length > 0) {
-      const now       = Date.now()
-      const dayMs     = 24 * 60 * 60 * 1000
+      const now    = Date.now()
+      const dayMs  = 24 * 60 * 60 * 1000
       const changesIn24h = history.filter(
         h => (now - new Date(h.created_at).getTime()) < dayMs,
       ).length
 
       // 3+ password changes in 24 hours → lock the account
       if (changesIn24h >= 3) {
-        // Temporarily ban the user for 24 hours via Supabase admin API
         await admin.auth.admin.updateUserById(user.id, {
           ban_duration: '24h',
         })
-        // Sign them out
         try { await supabase.auth.signOut() } catch {}
         return NextResponse.json(
           { error: 'Your account has been temporarily locked due to unusual password activity. Please contact support or try again after 24 hours.' },
-            { status: 423 },
+          { status: 423 },
         )
       }
 
@@ -178,7 +117,7 @@ export async function POST(request) {
       }
     }
 
-    // ── 5. Compare against history ──────────────────────────
+    // ── 4. Compare against history ──────────────────────────
     if (history && history.length > 0) {
       for (const entry of history) {
         const isReused = await bcrypt.compare(newPassword, entry.password_hash)
@@ -191,15 +130,13 @@ export async function POST(request) {
       }
     }
 
-    // ── 6. Update password via the caller's session ────────
+    // ── 5. Update password via the caller's session ─────────
     // Uses the caller's own session (not the service role) so
-    // Supabase enforces AAL2 when MFA is enrolled. The caller
-    // must have already verified their TOTP before reaching here.
+    // Supabase still enforces AAL2 when MFA is enrolled.
     const { error: updateErr } = await supabase.auth.updateUser({
       password: newPassword,
     })
     if (updateErr) {
-      // Surface the AAL2 error clearly so the client can react
       if (updateErr.message?.includes('aal2')) {
         return NextResponse.json(
           { error: 'Two-factor verification is required before changing your password.' },
@@ -209,16 +146,14 @@ export async function POST(request) {
       throw updateErr
     }
 
-    // ── 7. Store the new hash in history ────────────────────
+    // ── 6. Store the new hash in history ────────────────────
     const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
     await admin
       .from('password_history')
       .insert({ auth_user_id: user.id, password_hash: hash })
 
-    // ── 8. Prune old entries beyond HISTORY_DEPTH ──────────
+    // ── 7. Prune old entries beyond HISTORY_DEPTH ───────────
     if (history && history.length >= HISTORY_DEPTH) {
-      // Keep only the newest HISTORY_DEPTH rows (the one we just inserted
-      // makes it HISTORY_DEPTH + 1, so delete the oldest).
       const { data: allRows } = await admin
         .from('password_history')
         .select('id, created_at')
@@ -238,7 +173,7 @@ export async function POST(request) {
   } catch (err) {
     console.error('change-password error:', err)
     return NextResponse.json(
-      { error: err.message || 'Failed to change password.' },
+      { error: err.message || 'Failed to reset password.' },
       { status: 500 },
     )
   }
