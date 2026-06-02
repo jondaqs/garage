@@ -67,11 +67,11 @@ export default function ForgotPasswordPage() {
                 <CheckCircle size={36} className="text-emerald-500" />
                 <div className="text-center">
                   <p className="text-sm font-medium text-emerald-800">
-                    Password reset email sent
+                    Check your inbox
                   </p>
                   <p className="text-xs text-emerald-600 mt-1">
-                    We've sent a password reset link to <span className="font-medium">{email}</span>. 
-                    Click the link in the email to set a new password.
+                    If an account exists with that email, we've sent a password reset link. 
+                    Check the inbox (and spam folder) for the email associated with this account.
                   </p>
                 </div>
               </div>
