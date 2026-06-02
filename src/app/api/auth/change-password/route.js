@@ -26,8 +26,9 @@ import { cookies }                           from 'next/headers'
 import { NextResponse }                      from 'next/server'
 import bcrypt                                from 'bcryptjs'
 
-const HISTORY_DEPTH = 5
-const BCRYPT_ROUNDS = 12
+const HISTORY_DEPTH    = 5
+const BCRYPT_ROUNDS    = 12
+const COOLDOWN_HOURS   = 24
 
 // ── Supabase clients ─────────────────────────────────────────
 
@@ -102,25 +103,40 @@ export async function POST(request) {
     // ── 3. Fetch recent password hashes ─────────────────────
     const { data: history } = await admin
       .from('password_history')
-      .select('password_hash')
+      .select('password_hash, created_at')
       .eq('auth_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(HISTORY_DEPTH)
 
-    // ── 4. Compare against history ──────────────────────────
+    // ── 4. Cooldown — prevent rapid cycling (change mode only) ─
+    //    Forgot-password resets are exempt so a compromised
+    //    account can always be recovered immediately.
+    if (mode === 'change' && history && history.length > 0) {
+      const lastChange  = new Date(history[0].created_at)
+      const hoursAgo    = (Date.now() - lastChange.getTime()) / (1000 * 60 * 60)
+      if (hoursAgo < COOLDOWN_HOURS) {
+        const remaining = Math.ceil(COOLDOWN_HOURS - hoursAgo)
+        return NextResponse.json(
+          { error: `For security, you can only change your password once every ${COOLDOWN_HOURS} hours. Please try again in about ${remaining} hour${remaining === 1 ? '' : 's'}.` },
+          { status: 429 },
+        )
+      }
+    }
+
+    // ── 5. Compare against history ──────────────────────────
     if (history && history.length > 0) {
       for (const entry of history) {
         const isReused = await bcrypt.compare(newPassword, entry.password_hash)
         if (isReused) {
           return NextResponse.json(
-            { error: `You cannot reuse any of your last ${HISTORY_DEPTH} passwords. Please choose a different password.` },
+            { error: 'This password has been used before. Please choose a different password.' },
             { status: 422 },
           )
         }
       }
     }
 
-    // ── 5. Update password via the caller's session ────────
+    // ── 6. Update password via the caller's session ────────
     // Uses the caller's own session (not the service role) so
     // Supabase enforces AAL2 when MFA is enrolled. The caller
     // must have already verified their TOTP before reaching here.
@@ -138,13 +154,13 @@ export async function POST(request) {
       throw updateErr
     }
 
-    // ── 6. Store the new hash in history ────────────────────
+    // ── 7. Store the new hash in history ────────────────────
     const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
     await admin
       .from('password_history')
       .insert({ auth_user_id: user.id, password_hash: hash })
 
-    // ── 7. Optional: prune old entries beyond HISTORY_DEPTH ─
+    // ── 8. Prune old entries beyond HISTORY_DEPTH ──────────
     if (history && history.length >= HISTORY_DEPTH) {
       // Keep only the newest HISTORY_DEPTH rows (the one we just inserted
       // makes it HISTORY_DEPTH + 1, so delete the oldest).
@@ -165,7 +181,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('change-password error:', err)
+    
     return NextResponse.json(
       { error: err.message || 'Failed to change password.' },
       { status: 500 },
