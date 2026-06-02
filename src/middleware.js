@@ -42,9 +42,9 @@ export async function middleware(request) {
   }
 
   // ============================================================
-  // Allow the MFA verify page to load without redirect loops.
+  // Allow MFA pages to load without redirect loops.
   // ============================================================
-  if (pathname.startsWith('/auth/mfa-verify')) {
+  if (pathname.startsWith('/auth/mfa-verify') || pathname.startsWith('/auth/mfa-setup-required')) {
     return response
   }
 
@@ -141,6 +141,41 @@ export async function middleware(request) {
   else if (isProvider)  role = 'provider'
   else if (isCompanyOwner)  role = 'company'
   else if (isCompanyMember) role = 'member'
+
+  // ============================================================
+  // MANDATORY 2FA — certain roles MUST have TOTP enrolled.
+  // If not enrolled, redirect to the setup-required page.
+  // ============================================================
+  const roleMust2FA = isAdmin || isProvider || isCompanyOwner || isCompanyMember
+
+  // Provider team members (mechanics, managers, etc.) don't have a
+  // dedicated role code — they're tracked via service_provider_users.
+  let isProviderTeamMember = false
+  if (!roleMust2FA && role === 'user' && isProtectedRoute) {
+    const { data: spu } = await supabase
+      .from('service_provider_users')
+      .select('id')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+    isProviderTeamMember = !!spu
+  }
+
+  if ((roleMust2FA || isProviderTeamMember) && isProtectedRoute) {
+    try {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal && aal.nextLevel === 'aal1') {
+        // No TOTP factor enrolled — force setup
+        const setupUrl = new URL('/auth/mfa-setup-required', request.url)
+        const nextPath = pathname + (request.nextUrl.search || '')
+        setupUrl.searchParams.set('next', nextPath)
+        return NextResponse.redirect(setupUrl)
+      }
+    } catch {
+      // If check fails, allow through
+    }
+  }
 
   // ── Entity-level block checks ────────────────────────────────
   // Only OWNERS are locked out of their dedicated portals.
