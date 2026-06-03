@@ -63,11 +63,13 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file
+    // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file')
       return
     }
+
+    // Validate file size (5 MB max)
     if (file.size > 5 * 1024 * 1024) {
       alert('Image must be under 5 MB')
       return
@@ -77,7 +79,7 @@ export default function ProfilePage() {
     setAvatarPreview(URL.createObjectURL(file))
   }
 
-  // Upload avatar to Supabase Storage and save URL to user_profiles
+  // Upload avatar to Supabase Storage (public bucket) and return the public URL
   const uploadAvatar = async () => {
     if (!avatarFile || !user) return null
 
@@ -94,6 +96,7 @@ export default function ProfilePage() {
       } catch {} // ignore cleanup errors
     }
 
+    // Upload the new file
     const { error: uploadErr } = await supabase.storage
       .from('avatars')
       .upload(filePath, avatarFile, {
@@ -103,6 +106,7 @@ export default function ProfilePage() {
 
     if (uploadErr) throw new Error('Failed to upload photo: ' + uploadErr.message)
 
+    // Get the public URL (bucket must be set to public)
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
       .getPublicUrl(filePath)
@@ -144,7 +148,7 @@ export default function ProfilePage() {
         if (profileErr) throw profileErr
       }
 
-      // Clean up
+      // Clean up state
       setAvatarUrl(newAvatarUrl)
       setAvatarFile(null)
       setAvatarPreview(null)
@@ -157,7 +161,7 @@ export default function ProfilePage() {
     }
   }
 
-  // Display: preview (if selecting new file) > saved URL > placeholder
+  // Display priority: local preview (new file) > saved URL > placeholder
   const displayImage = avatarPreview || avatarUrl
 
   return (
@@ -174,10 +178,15 @@ export default function ProfilePage() {
 
       <div className="bg-white rounded-xl p-6 border border-gray-200">
         <form onSubmit={handleUpdateProfile}>
+          {/* ── Avatar Section ── */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center mb-4 overflow-hidden relative">
               {displayImage ? (
-                <img src={displayImage} alt="Profile" className="w-full h-full object-cover" />
+                <img 
+                  src={displayImage} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover" 
+                />
               ) : (
                 <Camera size={48} className="text-gray-400" />
               )}
@@ -197,13 +206,18 @@ export default function ProfilePage() {
               {displayImage ? 'Change Photo' : 'Upload Photo'}
             </label>
             {avatarPreview && (
-              <p className="text-xs text-gray-400 mt-2">New photo will be saved when you click Save Changes</p>
+              <p className="text-xs text-gray-400 mt-2">
+                New photo will be saved when you click Save Changes
+              </p>
             )}
           </div>
 
+          {/* ── Name Fields ── */}
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Name
+              </label>
               <input 
                 type="text" 
                 value={profileForm.firstName} 
@@ -213,7 +227,9 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name
+              </label>
               <input 
                 type="text" 
                 value={profileForm.lastName} 
@@ -224,8 +240,11 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* ── Email (read-only) ── */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email
+            </label>
             <input 
               type="email" 
               value={user?.email || ''} 
@@ -235,8 +254,11 @@ export default function ProfilePage() {
             <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
           </div>
 
+          {/* ── Phone ── */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number
+            </label>
             <input 
               type="tel" 
               value={profileForm.phone} 
@@ -246,9 +268,12 @@ export default function ProfilePage() {
             />
           </div>
 
+          {/* ── Gender & Date of Birth ── */}
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Gender
+              </label>
               <select 
                 value={profileForm.gender} 
                 onChange={(e) => setProfileForm({...profileForm, gender: e.target.value})} 
@@ -261,7 +286,9 @@ export default function ProfilePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date of Birth
+              </label>
               <input 
                 type="date" 
                 value={profileForm.dateOfBirth} 
@@ -271,6 +298,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* ── Submit ── */}
           <button 
             type="submit" 
             disabled={loading} 
