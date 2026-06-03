@@ -79,12 +79,40 @@ export default function ProfilePage() {
     setAvatarPreview(URL.createObjectURL(file))
   }
 
+  // Convert an image File to WebP format using Canvas API
+  const convertToWebP = (file, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { reject(new Error('WebP conversion failed')); return }
+            const webpFile = new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), {
+              type: 'image/webp',
+            })
+            resolve(webpFile)
+          },
+          'image/webp',
+          quality
+        )
+      }
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
   // Upload avatar to Supabase Storage (public bucket) and return the public URL
   const uploadAvatar = async () => {
     if (!avatarFile || !user) return null
 
-    const fileExt = avatarFile.name.split('.').pop()
-    const filePath = `${user.id}/avatar-${Date.now()}.${fileExt}`
+    // Convert to WebP for smaller file size and faster loading
+    const webpFile = await convertToWebP(avatarFile)
+    const filePath = `${user.id}/avatar-${Date.now()}.webp`
 
     // Delete old avatar if it exists in storage
     if (avatarUrl) {
@@ -96,10 +124,10 @@ export default function ProfilePage() {
       } catch {} // ignore cleanup errors
     }
 
-    // Upload the new file
+    // Upload the converted WebP file
     const { error: uploadErr } = await supabase.storage
       .from('avatars')
-      .upload(filePath, avatarFile, {
+      .upload(filePath, webpFile, {
         cacheControl: '3600',
         upsert: true,
       })
