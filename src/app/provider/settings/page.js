@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Settings, User, Store, Lock, CheckCircle, AlertCircle,
-  Loader2, Save, Clock, Info, Wrench, Plus, X,
+  Loader2, Save, Clock, Info, Wrench, Plus, X, Camera,
   FileText, Upload, Trash2, ExternalLink, RefreshCw,
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
@@ -52,6 +52,12 @@ export default function ProviderSettingsPage() {
     first_name: '', last_name: '', phone: '', bio: '',
   })
 
+  // Avatar state
+  const [avatarUrl, setAvatarUrl]           = useState(null)
+  const [avatarPreview, setAvatarPreview]   = useState(null)
+  const [avatarFile, setAvatarFile]         = useState(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+
   // Documents state
   const [userProfileId, setUserProfileId] = useState(null)
   const [documents,     setDocuments]     = useState([])
@@ -67,7 +73,7 @@ export default function ProviderSettingsPage() {
 
       const { data: profile  } = await supabase
         .from('user_profiles')
-        .select('id, first_name, last_name, phone, bio')
+        .select('id, first_name, last_name, phone, bio, profile_picture_url')
         .eq('auth_user_id', user.id).single()
 
       if (profile) {
@@ -78,6 +84,7 @@ export default function ProviderSettingsPage() {
           phone:      profile.phone      || '',
           bio:        profile.bio        || '',
         })
+        if (profile.profile_picture_url) setAvatarUrl(profile.profile_picture_url)
 
         // Kick off documents load in parallel (non-blocking).
         loadDocuments(profile.id)
@@ -182,10 +189,64 @@ export default function ProviderSettingsPage() {
     })
   }
 
+  // ── Avatar helpers ───────────────────────────────────────────────────────
+  const convertToWebP = (file, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        canvas.getContext('2d').drawImage(img, 0, 0)
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { reject(new Error('WebP conversion failed')); return }
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
+          },
+          'image/webp', quality,
+        )
+      }
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Please select an image file'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be under 5 MB'); return }
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  const uploadAvatar = async () => {
+    if (!avatarFile) return null
+    const webpFile = await convertToWebP(avatarFile)
+    const formData = new FormData()
+    formData.append('file', webpFile)
+    const res = await fetch('/api/profile/avatar', { method: 'POST', body: formData })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to upload photo')
+    return data.url
+  }
+
   // ── Save personal profile ────────────────────────────────────────────────
   const savePersonal = async () => {
     setSaving(true); setError(''); setSuccess('')
     try {
+      // Upload avatar if a new file was selected
+      if (avatarFile) {
+        setAvatarUploading(true)
+        const newUrl = await uploadAvatar()
+        setAvatarUploading(false)
+        if (newUrl) {
+          setAvatarUrl(newUrl)
+          setAvatarFile(null)
+          setAvatarPreview(null)
+        }
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       const { error: err } = await supabase
         .from('user_profiles')
@@ -201,7 +262,7 @@ export default function ProviderSettingsPage() {
       setSuccess('Personal profile updated.')
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) { setError(err.message) }
-    finally { setSaving(false) }
+    finally { setSaving(false); setAvatarUploading(false) }
   }
 
   // ─── DOCUMENTS ─────────────────────────────────────────────────────────
@@ -959,6 +1020,33 @@ export default function ProviderSettingsPage() {
       {tab === 'personal' && (
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">My Profile</h2>
+
+          {/* ── Avatar ── */}
+          <div className="flex items-center gap-5">
+            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden relative flex-shrink-0">
+              {(avatarPreview || avatarUrl) ? (
+                <img src={avatarPreview || avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <Camera size={28} className="text-gray-400" />
+              )}
+              {avatarUploading && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-full">
+                  <Loader2 size={18} className="text-white animate-spin" />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition">
+                <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                <Camera size={14} />
+                {(avatarPreview || avatarUrl) ? 'Change Photo' : 'Upload Photo'}
+              </label>
+              {avatarPreview && (
+                <p className="text-[11px] text-gray-400 mt-1.5">Saved when you click Save Changes</p>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>First Name</label>

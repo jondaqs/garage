@@ -1,12 +1,11 @@
 // FILE LOCATION: src/components/provider/ProviderHeader.js
-// UPDATED: Added working NotificationBell component
 
 'use client'
 
 import { Search, Menu } from 'lucide-react'
 import NotificationBell from '@/components/NotificationBell'
 
-export default function ProviderHeader({ user, provider }) {
+export default function ProviderHeader({ user, provider, avatarUrl }) {
   return (
     <header className="bg-white shadow-sm">
       <div className="px-4 sm:px-6 lg:px-8 py-4">
@@ -37,14 +36,22 @@ export default function ProviderHeader({ user, provider }) {
 
           {/* Right side */}
           <div className="ml-4 flex items-center md:ml-6 gap-3">
-            {/* Notifications - Now functional! */}
+            {/* Notifications */}
             <NotificationBell isProvider={true} />
 
             {/* Profile */}
             <div className="relative">
               <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold">
-                  {user?.email?.charAt(0).toUpperCase()}
+                <div className="h-8 w-8 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold overflow-hidden flex-shrink-0">
+                  {avatarUrl ? (
+                    <img 
+                      src={avatarUrl} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    user?.email?.charAt(0).toUpperCase()
+                  )}
                 </div>
               </div>
             </div>

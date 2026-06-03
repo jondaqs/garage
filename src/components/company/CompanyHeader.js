@@ -31,7 +31,7 @@ export default function CompanyHeader({ company, user: authUser, userRole }) {
     if (!authUser) return
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, profile_picture_url')
       .eq('auth_user_id', authUser.id)
       .single()
     if (profile) setUserProfile(profile)
@@ -92,8 +92,16 @@ export default function CompanyHeader({ company, user: authUser, userRole }) {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                {initials}
+              <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0 overflow-hidden">
+                {userProfile?.profile_picture_url ? (
+                  <img 
+                    src={userProfile.profile_picture_url} 
+                    alt={displayName} 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  initials
+                )}
               </div>
               <div className="text-left hidden sm:block">
                 <p className="text-sm font-medium text-gray-900 leading-tight">{displayName}</p>

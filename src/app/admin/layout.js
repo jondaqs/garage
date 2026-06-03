@@ -11,6 +11,7 @@ export default function AdminLayout({ children }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState(null)
 
   useEffect(() => {
     checkAdmin()
@@ -34,6 +35,7 @@ export default function AdminLayout({ children }) {
         .single()
 
       const isAdmin = profile?.user_roles?.some(ur => ur.role?.code === 'admin')
+      if (profile?.profile_picture_url) setAvatarUrl(profile.profile_picture_url)
 
       if (!isAdmin) {
         const isProvider = profile?.user_roles?.some(ur => ur.role?.code === 'service_provider_owner')
@@ -60,7 +62,7 @@ export default function AdminLayout({ children }) {
     <div className="min-h-screen bg-gray-50">
       <AdminSidebar />
       <div className="lg:ml-64">
-        <AdminHeader user={user} />
+        <AdminHeader user={user} avatarUrl={avatarUrl} />
         <main className="p-6">{children}</main>
       </div>
     </div>

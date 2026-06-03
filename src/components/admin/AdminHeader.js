@@ -3,7 +3,7 @@
 import { Menu } from 'lucide-react'
 import NotificationBell from '@/components/NotificationBell'
 
-export default function AdminHeader({ user }) {
+export default function AdminHeader({ user, avatarUrl }) {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="px-4 sm:px-6 lg:px-8 py-4">
@@ -18,8 +18,16 @@ export default function AdminHeader({ user }) {
             <NotificationBell isAdmin={true} />
 
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
-                {user?.email?.charAt(0).toUpperCase()}
+              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm overflow-hidden flex-shrink-0">
+                {avatarUrl ? (
+                  <img 
+                    src={avatarUrl} 
+                    alt="Admin" 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  user?.email?.charAt(0).toUpperCase()
+                )}
               </div>
               <span className="text-sm font-medium text-gray-700 hidden md:block">Admin</span>
             </div>

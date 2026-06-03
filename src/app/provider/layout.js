@@ -13,6 +13,7 @@ export default function ProviderLayout({ children }) {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [provider, setProvider] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState(null)
 
   useEffect(() => {
     checkUser()
@@ -44,6 +45,7 @@ export default function ProviderLayout({ children }) {
       const isProvider = profile?.user_roles?.some(
         ur => ur.role?.code === 'service_provider_owner'
       )
+      if (profile?.profile_picture_url) setAvatarUrl(profile.profile_picture_url)
 
       if (!isProvider) {
         router.push('/dashboard')
@@ -87,7 +89,7 @@ export default function ProviderLayout({ children }) {
 
       {/* Main Content */}
       <div className="lg:ml-64 pt-14 lg:pt-0">
-        <ProviderHeader user={user} provider={provider} />
+        <ProviderHeader user={user} provider={provider} avatarUrl={avatarUrl} />
         <main className="p-6">
           {children}
         </main>
