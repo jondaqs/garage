@@ -60,28 +60,17 @@ function LoginPageInner() {
     setError('')
 
     try {
-      // Verify Turnstile CAPTCHA first
+      // Turnstile token is required — Supabase verifies it server-side
       if (!turnstileToken) {
         setError('Please complete the security check.')
         setLoading(false)
         return
       }
 
-      const captchaRes = await fetch('/api/auth/verify-turnstile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: turnstileToken }),
-      })
-
-      if (!captchaRes.ok) {
-        const captchaData = await captchaRes.json()
-        resetTurnstile()
-        throw new Error(captchaData.error || 'Security verification failed.')
-      }
-
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
+        options: { captchaToken: turnstileToken },
       })
 
       if (signInError) throw signInError
