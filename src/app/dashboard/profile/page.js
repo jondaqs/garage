@@ -106,40 +106,25 @@ export default function ProfilePage() {
     })
   }
 
-  // Upload avatar to Supabase Storage (public bucket) and return the public URL
+  // Upload avatar via API route (handles storage + DB update server-side)
   const uploadAvatar = async () => {
     if (!avatarFile || !user) return null
 
     // Convert to WebP for smaller file size and faster loading
     const webpFile = await convertToWebP(avatarFile)
-    const filePath = `${user.id}/avatar-${Date.now()}.webp`
 
-    // Delete old avatar if it exists in storage
-    if (avatarUrl) {
-      try {
-        const oldPath = avatarUrl.split('/avatars/')[1]
-        if (oldPath) {
-          await supabase.storage.from('avatars').remove([oldPath])
-        }
-      } catch {} // ignore cleanup errors
-    }
+    const formData = new FormData()
+    formData.append('file', webpFile)
 
-    // Upload the converted WebP file
-    const { error: uploadErr } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, webpFile, {
-        cacheControl: '3600',
-        upsert: true,
-      })
+    const res = await fetch('/api/profile/avatar', {
+      method: 'POST',
+      body: formData,
+    })
 
-    if (uploadErr) throw new Error('Failed to upload photo: ' + uploadErr.message)
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to upload photo')
 
-    // Get the public URL (bucket must be set to public)
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath)
-
-    return publicUrl
+    return data.url
   }
 
   const handleUpdateProfile = async (e) => {
@@ -166,15 +151,6 @@ export default function ProfilePage() {
         }
       })
       if (authErr) throw authErr
-
-      // 3. Update profile_picture_url in user_profiles
-      if (profileId && newAvatarUrl !== avatarUrl) {
-        const { error: profileErr } = await supabase
-          .from('user_profiles')
-          .update({ profile_picture_url: newAvatarUrl })
-          .eq('id', profileId)
-        if (profileErr) throw profileErr
-      }
 
       // Clean up state
       setAvatarUrl(newAvatarUrl)
