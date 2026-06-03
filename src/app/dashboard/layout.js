@@ -11,6 +11,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter()
   const supabase = createClient()
   const [user, setUser] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,6 +21,17 @@ export default function DashboardLayout({ children }) {
         router.push('/auth/login')
       } else {
         setUser(user)
+
+        // Fetch profile picture
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('profile_picture_url')
+          .eq('auth_user_id', user.id)
+          .single()
+
+        if (profile?.profile_picture_url) {
+          setAvatarUrl(profile.profile_picture_url)
+        }
       }
       setLoading(false)
     }
@@ -44,7 +56,7 @@ export default function DashboardLayout({ children }) {
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
       <div className="flex-1 flex flex-col">
-        <Header user={user} />
+        <Header user={user} avatarUrl={avatarUrl} />
         <main className="flex-1 p-4 lg:p-8">
           {children}
         </main>
