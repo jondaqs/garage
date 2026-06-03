@@ -1,10 +1,11 @@
 'use client'
 
-import React, { Suspense, useState } from 'react'
+import React, { Suspense, useState, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Car, Mail, Lock, Eye, EyeOff, Chrome, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import Script from 'next/script'
 
 /**
  * Only accept relative same-origin paths as a post-login destination —
@@ -30,12 +31,54 @@ function LoginPageInner() {
   const [error, setError] = useState('')
   const message = searchParams.get('message')
 
+  // Turnstile CAPTCHA
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef(null)
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken('')
+    if (window.turnstile && turnstileRef.current) {
+      window.turnstile.reset(turnstileRef.current)
+    }
+  }, [])
+
+  // Sync Turnstile token from window events to React state
+  React.useEffect(() => {
+    const onSuccess = (e) => setTurnstileToken(e.detail)
+    const onExpired = () => setTurnstileToken('')
+    window.addEventListener('turnstile-success', onSuccess)
+    window.addEventListener('turnstile-expired', onExpired)
+    return () => {
+      window.removeEventListener('turnstile-success', onSuccess)
+      window.removeEventListener('turnstile-expired', onExpired)
+    }
+  }, [])
+
   const handleEmailLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     try {
+      // Verify Turnstile CAPTCHA first
+      if (!turnstileToken) {
+        setError('Please complete the security check.')
+        setLoading(false)
+        return
+      }
+
+      const captchaRes = await fetch('/api/auth/verify-turnstile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: turnstileToken }),
+      })
+
+      if (!captchaRes.ok) {
+        const captchaData = await captchaRes.json()
+        resetTurnstile()
+        throw new Error(captchaData.error || 'Security verification failed.')
+      }
+
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -132,6 +175,7 @@ function LoginPageInner() {
       }
     } catch (err) {
       setError(err.message)
+      resetTurnstile()
       setLoading(false)
     }
   }
@@ -247,6 +291,35 @@ function LoginPageInner() {
                 {error}
               </div>
             )}
+
+            {/* Cloudflare Turnstile CAPTCHA */}
+            <div className="mb-4 flex justify-center">
+              <div
+                ref={turnstileRef}
+                className="cf-turnstile"
+                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                data-callback="onTurnstileSuccess"
+                data-expired-callback="onTurnstileExpired"
+                data-theme="light"
+              />
+            </div>
+
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              strategy="afterInteractive"
+            />
+            <Script id="turnstile-callbacks" strategy="afterInteractive">
+              {`
+                window.onTurnstileSuccess = function(token) {
+                  window.__turnstileToken = token;
+                  window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }));
+                };
+                window.onTurnstileExpired = function() {
+                  window.__turnstileToken = '';
+                  window.dispatchEvent(new CustomEvent('turnstile-expired'));
+                };
+              `}
+            </Script>
 
             <button
               type="submit"
