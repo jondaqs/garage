@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Car, Mail, ArrowLeft, Loader2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import Script from 'next/script'
 
 export default function ForgotPasswordPage() {
   const supabase = createClient()
@@ -13,9 +14,36 @@ export default function ForgotPasswordPage() {
   const [error, setError]       = useState('')
   const [sent, setSent]         = useState(false)
 
+  // Turnstile CAPTCHA
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef(null)
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken('')
+    if (window.turnstile && turnstileRef.current) {
+      window.turnstile.reset(turnstileRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onSuccess = (e) => setTurnstileToken(e.detail)
+    const onExpired = () => setTurnstileToken('')
+    window.addEventListener('turnstile-success', onSuccess)
+    window.addEventListener('turnstile-expired', onExpired)
+    return () => {
+      window.removeEventListener('turnstile-success', onSuccess)
+      window.removeEventListener('turnstile-expired', onExpired)
+    }
+  }, [])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email.trim()) return
+
+    if (!turnstileToken) {
+      setError('Please complete the security check.')
+      return
+    }
 
     setLoading(true)
     setError('')
@@ -24,13 +52,16 @@ export default function ForgotPasswordPage() {
       const origin = window.location.origin
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${origin}/auth/callback?next=/auth/reset-password`,
+        captchaToken: turnstileToken,
       })
 
       if (resetErr) throw resetErr
 
       setSent(true)
+      resetTurnstile()
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.')
+      resetTurnstile()
     } finally {
       setLoading(false)
     }
@@ -122,6 +153,35 @@ export default function ForgotPasswordPage() {
                   {error}
                 </div>
               )}
+
+              {/* Cloudflare Turnstile CAPTCHA */}
+              <div className="flex justify-center">
+                <div
+                  ref={turnstileRef}
+                  className="cf-turnstile"
+                  data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                  data-callback="onTurnstileSuccess"
+                  data-expired-callback="onTurnstileExpired"
+                  data-theme="light"
+                />
+              </div>
+
+              <Script
+                src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+                strategy="afterInteractive"
+              />
+              <Script id="turnstile-callbacks-forgot" strategy="afterInteractive">
+                {`
+                  window.onTurnstileSuccess = function(token) {
+                    window.__turnstileToken = token;
+                    window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }));
+                  };
+                  window.onTurnstileExpired = function() {
+                    window.__turnstileToken = '';
+                    window.dispatchEvent(new CustomEvent('turnstile-expired'));
+                  };
+                `}
+              </Script>
 
               <button
                 type="submit"

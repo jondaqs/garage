@@ -3,12 +3,13 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Car, Mail, Lock, Eye, EyeOff, Chrome, User, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import Script from 'next/script'
 
 // Separate component for search params logic
 function SignupForm() {
@@ -28,15 +29,44 @@ function SignupForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Turnstile CAPTCHA
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef(null)
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken('')
+    if (window.turnstile && turnstileRef.current) {
+      window.turnstile.reset(turnstileRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onSuccess = (e) => setTurnstileToken(e.detail)
+    const onExpired = () => setTurnstileToken('')
+    window.addEventListener('turnstile-success', onSuccess)
+    window.addEventListener('turnstile-expired', onExpired)
+    return () => {
+      window.removeEventListener('turnstile-success', onSuccess)
+      window.removeEventListener('turnstile-expired', onExpired)
+    }
+  }, [])
+
   const handleSignup = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
+    if (!turnstileToken) {
+      setError('Please complete the security check.')
+      setLoading(false)
+      return
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
+        captchaToken: turnstileToken,
         data: {
           first_name: formData.firstName,
           last_name: formData.lastName,
@@ -49,6 +79,7 @@ function SignupForm() {
 
     if (error) {
       setError(error.message)
+      resetTurnstile()
       setLoading(false)
     } else {
       // Check if email confirmation is required
@@ -203,6 +234,35 @@ function SignupForm() {
                 {error}
               </div>
             )}
+
+            {/* Cloudflare Turnstile CAPTCHA */}
+            <div className="mb-4 flex justify-center">
+              <div
+                ref={turnstileRef}
+                className="cf-turnstile"
+                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                data-callback="onTurnstileSuccess"
+                data-expired-callback="onTurnstileExpired"
+                data-theme="light"
+              />
+            </div>
+
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              strategy="afterInteractive"
+            />
+            <Script id="turnstile-callbacks-signup" strategy="afterInteractive">
+              {`
+                window.onTurnstileSuccess = function(token) {
+                  window.__turnstileToken = token;
+                  window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }));
+                };
+                window.onTurnstileExpired = function() {
+                  window.__turnstileToken = '';
+                  window.dispatchEvent(new CustomEvent('turnstile-expired'));
+                };
+              `}
+            </Script>
 
             <button
               type="submit"
