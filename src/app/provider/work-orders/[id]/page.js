@@ -1071,6 +1071,15 @@ export default function WorkOrderDetailPage() {
                         </button>
                       )}
                     </div>
+                  ) : wo.owner?.first_name ? (
+                    <div className="space-y-1 text-sm">
+                      <p className="font-semibold text-gray-900">{wo.owner.first_name} {wo.owner.last_name}</p>
+                      {wo.owner.phone && <p className="text-gray-600">{wo.owner.phone}</p>}
+                      {wo.owner.email && <p className="text-gray-500">{wo.owner.email}</p>}
+                      {wo.owner.owner_type === 'company' && wo.owner.company_name && (
+                        <p className="text-xs text-blue-600">{wo.owner.company_name} · Fleet</p>
+                      )}
+                    </div>
                   ) : wo.walk_in_owner_name ? (
                     <div className="space-y-1 text-sm">
                       <p className="font-semibold text-gray-900">{wo.walk_in_owner_name}</p>
