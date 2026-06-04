@@ -16,6 +16,7 @@ import { createClient as createServiceClient }   from '@supabase/supabase-js'
 import { NextResponse }                          from 'next/server'
 import { sendWalkInCreatedEmail, sendWalkInOwnerEmail, sendWalkInFleetEmail } from '@/lib/email/walkInEmails'
 import { sendWalkInCreatedSms, sendWalkInInviteSms, sendWalkInOwnerSms, sendWalkInFleetSms } from '@/lib/sms/walkInSms'
+import { piiHmacRaw } from '@/lib/pii'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -202,6 +203,7 @@ async function notifyOwnerAndAdminsBackground({
   const sc = getServiceClient()
 
   // 1. Resolve provider + initiator + owner + admins + shop + vehicle ───
+  const plateIdx = await piiHmacRaw(sc, plateNumber)
   const [
     { data: provider },
     { data: initiator },
@@ -230,7 +232,7 @@ async function notifyOwnerAndAdminsBackground({
       .in('role', ADMIN_ROLES),
     shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle()
            : Promise.resolve({ data: null }),
-    sc.from('vehicles').select('plate_number, make, model').eq('plate_number', plateNumber).maybeSingle(),
+    sc.from('vehicles').select('plate_number, make, model').eq('plate_number_idx', plateIdx).maybeSingle(),
   ])
 
   // Look up the owner profile separately
@@ -407,6 +409,7 @@ async function notifyCustomerBackground({
   const workOrderId     = result.work_order_id
 
   // Common context: provider name + shop + vehicle
+  const plateIdx2 = await piiHmacRaw(sc, plateNumber)
   const [
     { data: provider },
     { data: shop },
@@ -417,7 +420,7 @@ async function notifyCustomerBackground({
     shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle()
            : Promise.resolve({ data: null }),
     sc.from('vehicles').select('plate_number, make, model')
-      .eq('plate_number', plateNumber).maybeSingle(),
+      .eq('plate_number_idx', plateIdx2).maybeSingle(),
   ])
 
   const sharedArgs = {

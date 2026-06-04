@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { piiHmacRaw } from '@/lib/pii'
 
 // Get company fleet
 export async function GET(request) {
@@ -151,11 +152,12 @@ export async function POST(request) {
 
     const plateNumber = body.plateNumber || body.licensePlate
 
-    // Check if plate already exists
+    // Check if plate already exists (PII: search by blind index)
+    const plateIdx = await piiHmacRaw(supabase, plateNumber)
     const { data: existingVehicle } = await supabase
       .from('vehicles')
       .select('id')
-      .eq('plate_number', plateNumber)  // was license_plate ❌
+      .eq('plate_number_idx', plateIdx)
       .maybeSingle()
 
     if (existingVehicle) {

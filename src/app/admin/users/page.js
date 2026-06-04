@@ -99,29 +99,50 @@ export default function AdminUsersPage() {
     setLoading(true)
     try {
       const from = (page - 1) * PAGE_SIZE
-      const to   = from + PAGE_SIZE - 1
 
-      let query = supabase
-        .from('user_profiles')
-        .select(`
-          id, auth_user_id, first_name, last_name, email, phone,
-          is_active, is_suspended, created_at,
-          user_roles(role:user_roles_lookup(code, display_name))
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false })
+      // PII-safe search via server-side RPC (decrypts + filters on server)
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc(
+        'admin_search_users',
+        {
+          p_search: debouncedSearch || null,
+          p_limit: PAGE_SIZE,
+          p_offset: from,
+        }
+      )
 
-      if (debouncedSearch) {
-        query = query.or(
-          `first_name.ilike.%${debouncedSearch}%,last_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%`
-        )
+      if (rpcErr) throw rpcErr
+      if (!rpcResult?.success) throw new Error(rpcResult?.error || 'Search failed')
+
+      const userRows = rpcResult.rows || []
+      const count = rpcResult.total || 0
+
+      // Fetch roles for the returned user IDs
+      const userIds = userRows.map(u => u.id)
+      let rolesMap = {}
+      if (userIds.length > 0) {
+        const { data: rolesData } = await supabase
+          .from('user_roles')
+          .select('user_id, role:user_roles_lookup(code, display_name)')
+          .in('user_id', userIds)
+
+        if (rolesData) {
+          rolesMap = rolesData.reduce((acc, r) => {
+            if (!acc[r.user_id]) acc[r.user_id] = []
+            acc[r.user_id].push(r.role)
+            return acc
+          }, {})
+        }
       }
 
-      query = query.range(from, to)
-      const { data, error, count } = await query
-      if (error) throw error
-      setUsers(data || [])
-      setTotalCount(count || 0)
-      if (page === 1 && !debouncedSearch) setTotalAll(count || 0)
+      // Merge roles into user rows (matches the shape the UI expects)
+      const data = userRows.map(u => ({
+        ...u,
+        user_roles: (rolesMap[u.id] || []).map(r => ({ role: r }))
+      }))
+
+      setUsers(data)
+      setTotalCount(count)
+      if (page === 1 && !debouncedSearch) setTotalAll(count)
     } catch (err) {
       console.error('Error loading users:', err)
     } finally {

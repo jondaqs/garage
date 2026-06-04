@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { piiHmac } from '@/lib/pii'
 import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin, ClipboardList, Wrench, ChevronRight, Shield } from 'lucide-react'
 
 export default function MyTeamsPage() {
@@ -111,13 +112,14 @@ export default function MyTeamsPage() {
   const loadPendingInvitations = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      const inviteEmailIdx = await piiHmac(supabase, user.email)
       const { data } = await supabase
         .from('team_invitations')
         .select(`
           id, role, specialization, experience_years, invited_at, expires_at,
           service_provider:service_providers(id, name, email, phone)
         `)
-        .eq('invited_email', user.email)
+        .eq('invited_email_idx', inviteEmailIdx)
         .eq('status', 'pending')
         .gt('expires_at', new Date().toISOString())
         .order('invited_at', { ascending: false })

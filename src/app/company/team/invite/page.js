@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import { piiHmac } from '@/lib/pii';
 
 export default function InviteTeamMemberPage() {
   const router = useRouter();
@@ -50,11 +51,12 @@ export default function InviteTeamMemberPage() {
         throw new Error('You are not associated with a company');
       }
       
-      // Check if user already exists
+      // Check if user already exists (PII: search by blind index)
+      const phoneIdx = await piiHmac(supabase, singleInvite.phone);
       const { data: existingUser } = await supabase
         .from('user_profiles')
         .select('id, auth_user_id')
-        .eq('phone', singleInvite.phone)
+        .eq('phone_idx', phoneIdx)
         .maybeSingle();
       
       // Check if already a team member

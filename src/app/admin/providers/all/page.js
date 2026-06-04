@@ -124,32 +124,55 @@ export default function AllProvidersPage() {
       const from = (page - 1) * PAGE_SIZE
       const to   = from + PAGE_SIZE - 1
 
-      let query = supabase
-        .from('service_providers')
-        .select(`
-          id, name, status, is_active, is_verified, created_at, submitted_at,
-          owner:user_profiles(id, auth_user_id, first_name, last_name, email),
-          provider_type:service_provider_types(display_name),
-          shops(id)
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false })
+      let provs, count
 
-      if (statusFilter !== 'all') query = query.eq('status', statusFilter)
-      if (debouncedSearch) query = query.or(`name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`)
-      query = query.range(from, to)
+      if (debouncedSearch) {
+        // PII-safe fuzzy search via server-side RPC
+        const { data: rpcResult, error: rpcErr } = await supabase.rpc(
+          'admin_search_providers',
+          { p_search: debouncedSearch, p_limit: PAGE_SIZE, p_offset: from }
+        )
+        if (rpcErr) throw rpcErr
+        if (!rpcResult?.success) throw new Error(rpcResult?.error || 'Search failed')
 
-      const [{ data: provs, error, count }, { data: pending }] = await Promise.all([
-        query,
-        supabase
-          .from('provider_pending_changes')
-          .select('service_provider_id, changed_fields, change_count, is_reverification, verified_at_snapshot'),
-      ])
+        // Map RPC rows to the shape the UI expects
+        provs = (rpcResult.rows || [])
+          .filter(r => statusFilter === 'all' || r.status === statusFilter)
+          .map(r => ({
+            ...r,
+            owner: { first_name: r.owner_first_name, last_name: r.owner_last_name, email: r.email },
+            provider_type: r.provider_type ? { display_name: r.provider_type } : null,
+            shops: []
+          }))
+        count = rpcResult.total || 0
+      } else {
+        // No search term — direct query (plaintext columns still exist during transition)
+        let query = supabase
+          .from('service_providers')
+          .select(`
+            id, name, status, is_active, is_verified, created_at, submitted_at,
+            owner:user_profiles(id, auth_user_id, first_name, last_name, email),
+            provider_type:service_provider_types(display_name),
+            shops(id)
+          `, { count: 'exact' })
+          .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setProviders(provs || [])
-      setTotalCount(count || 0)
+        if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+        query = query.range(from, to)
+        const { data, error, count: c } = await query
+        if (error) throw error
+        provs = data || []
+        count = c || 0
+      }
+
+      const { data: pending } = await supabase
+        .from('provider_pending_changes')
+        .select('service_provider_id, changed_fields, change_count, is_reverification, verified_at_snapshot')
+
+      setProviders(provs)
+      setTotalCount(count)
       setPendingDiffs(Object.fromEntries((pending || []).map(r => [r.service_provider_id, r])))
-      if (page === 1 && statusFilter === 'all' && !debouncedSearch) setTotalAll(count || 0)
+      if (page === 1 && statusFilter === 'all' && !debouncedSearch) setTotalAll(count)
     } catch (err) {
       console.error('Error loading providers:', err)
     } finally {

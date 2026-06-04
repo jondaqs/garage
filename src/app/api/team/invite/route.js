@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sendInvitationEmail } from '@/lib/email/sendInvitationEmail'
+import { piiHmac } from '@/lib/pii'
 
 export async function POST(request) {
     try {
@@ -56,12 +57,13 @@ export async function POST(request) {
             )
         }
 
-        // Check for duplicate pending invitation
+        // Check for duplicate pending invitation (PII: search by blind index)
+        const emailIdx = await piiHmac(supabase, email)
         const { data: existing } = await supabase
             .from('team_invitations')
             .select('id')
             .eq('service_provider_id', provider.id)
-            .eq('invited_email', email.toLowerCase())
+            .eq('invited_email_idx', emailIdx)
             .eq('status', 'pending')
             .maybeSingle()
 
