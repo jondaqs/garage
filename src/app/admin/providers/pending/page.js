@@ -100,6 +100,12 @@ export default function PendingProvidersPage() {
     if (!reason) return
 
     try {
+      // Resolve admin profile id
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: adminProfile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      if (!adminProfile) throw new Error('Admin profile not found')
+
       // Update provider status
       const { error: updateError } = await supabase
         .from('service_providers')
@@ -116,7 +122,7 @@ export default function PendingProvidersPage() {
         .from('provider_rejections')
         .insert({
           service_provider_id: providerId,
-          rejected_by: (await supabase.auth.getUser()).data.user.id,
+          rejected_by: adminProfile.id,
           rejection_reason: reason
         })
 

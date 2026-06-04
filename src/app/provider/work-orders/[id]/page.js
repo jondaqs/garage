@@ -134,22 +134,22 @@ export default function WorkOrderDetailPage() {
         return
       }
 
-      // Fallback direct query
+      // Fallback direct query — use _secure views for PII-decrypted fields
       const { data, error: fetchErr } = await supabase
         .from('work_orders_secure')
         .select(`
           *,
           status:work_order_statuses(code, display_name, sort_order),
-          vehicle:vehicles(plate_number, make, model, year_of_manufacture, color, vin),
-          service_provider:service_providers(id, name),
-          shop:shops(name, town, county, street, phone),
+          vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture, color, vin),
+          service_provider:service_providers_secure(id, name, phone, email),
+          shop:shops_secure(name, town, county, street, phone),
           mechanic:mechanics(
             id, user_id, specialization,
-            user:user_profiles(first_name, last_name, phone)
+            user:user_profiles_secure(first_name, last_name, phone)
           ),
           booking:bookings!booking_id(
             booking_number, customer_user_id,
-            customer:user_profiles!customer_user_id(first_name, last_name, phone, email),
+            customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
             booking_services(service:services(name), estimated_cost, notes)
           )
         `)

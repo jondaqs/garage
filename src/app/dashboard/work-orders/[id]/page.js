@@ -11,7 +11,7 @@ import {
   Loader2, DollarSign, ThumbsUp, ThumbsDown, Edit3,
   ChevronDown, ChevronUp, Star, FileText, ChevronRight, Receipt, ClipboardCheck,
   AlertTriangle, ShieldAlert,
-  Bell, Calendar, Gauge, RefreshCw} from 'lucide-react'
+  Bell, Calendar, Gauge, RefreshCw, User} from 'lucide-react'
 
 // Severity → colour mapping for the diagnostic-findings card.
 const SEVERITY_STYLES = {
@@ -374,9 +374,10 @@ export default function CustomerWorkOrderPage() {
           <div className="flex items-start gap-2">
             <Car size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-medium text-gray-900">{wo.vehicle?.plate_number}</p>
+              <p className="font-medium text-gray-900">{wo.vehicle?.plate_number || '—'}</p>
               <p className="text-xs text-gray-500">
-                {[wo.vehicle?.make, wo.vehicle?.model].filter(Boolean).join(' ')}
+                {[wo.vehicle?.make, wo.vehicle?.model, wo.vehicle?.year_of_manufacture].filter(Boolean).join(' ')}
+                {wo.vehicle?.color && <span className="text-gray-400"> · {wo.vehicle.color}</span>}
               </p>
             </div>
           </div>
@@ -387,6 +388,35 @@ export default function CustomerWorkOrderPage() {
               {wo.shop?.town && <p className="text-xs text-gray-500">{wo.shop.town}</p>}
             </div>
           </div>
+          {/* Vehicle owner */}
+          {wo.owner && (wo.owner.first_name || wo.owner.company_name) && (
+            <div className="flex items-start gap-2">
+              <User size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-gray-900">
+                  {wo.owner.owner_type === 'company'
+                    ? wo.owner.company_name
+                    : [wo.owner.first_name, wo.owner.last_name].filter(Boolean).join(' ')}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {wo.owner.owner_type === 'company' ? 'Fleet vehicle' : 'Owner'}
+                </p>
+              </div>
+            </div>
+          )}
+          {/* Mileage */}
+          {(wo.initial_mileage || wo.final_mileage) && (
+            <div className="flex items-start gap-2">
+              <Gauge size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-gray-900">
+                  {wo.initial_mileage ? `${Number(wo.initial_mileage).toLocaleString()} km` : '—'}
+                  {wo.final_mileage && ` → ${Number(wo.final_mileage).toLocaleString()} km`}
+                </p>
+                <p className="text-xs text-gray-500">Mileage</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {wo.problem_description && (
