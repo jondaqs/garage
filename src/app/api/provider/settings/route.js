@@ -57,7 +57,7 @@ export async function POST(request) {
 
     // ── 2. Get owner details for emails ─────────────────────────────────────
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('first_name, last_name, auth_user_id')
       .eq('auth_user_id', user.id)
       .single()

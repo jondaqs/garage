@@ -15,14 +15,14 @@ export async function GET(request) {
 
     // Get user profile
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
     // Get service provider
     const { data: provider } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id')
       .eq('owner_user_id', profile.id)
       .single()
@@ -93,7 +93,7 @@ export async function PATCH(request) {
 
     // Get user profile
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -164,7 +164,7 @@ export async function DELETE(request) {
 
     // Get user profile
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()

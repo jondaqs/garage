@@ -30,7 +30,7 @@ export default function CompanyHeader({ company, user: authUser, userRole }) {
   const fetchProfile = async () => {
     if (!authUser) return
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, first_name, last_name, email, profile_picture_url')
       .eq('auth_user_id', authUser.id)
       .single()

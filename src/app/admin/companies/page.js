@@ -93,7 +93,7 @@ export default function AdminCompaniesPage() {
     const to   = from + PAGE_SIZE - 1
 
     let query = supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id, name, registration_number, status, is_active, is_suspended, submitted_at, created_at, owner_user_id, owner:user_profiles!company_profiles_owner_user_id_fkey(auth_user_id, first_name, last_name, email)', { count: 'exact' })
       .order('submitted_at', { ascending: false, nullsFirst: false })
 

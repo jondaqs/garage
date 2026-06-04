@@ -118,11 +118,11 @@ export default function CompanyBudgetPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data: profile } = await supabase
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
     if (!profile) return null
 
     const { data: owned } = await supabase
-      .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
+      .from('company_profiles_secure').select('id').eq('owner_user_id', profile.id).maybeSingle()
     if (owned) return owned.id
 
     const { data: mem } = await supabase

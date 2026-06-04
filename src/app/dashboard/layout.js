@@ -24,7 +24,7 @@ export default function DashboardLayout({ children }) {
 
         // Fetch profile picture
         const { data: profile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('profile_picture_url')
           .eq('auth_user_id', user.id)
           .single()

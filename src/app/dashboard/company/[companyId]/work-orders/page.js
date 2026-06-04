@@ -76,12 +76,12 @@ export default function CompanyDashboardWorkOrdersPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
       // Verify membership (owner or active member)
       const { data: owned } = await supabase
-        .from('company_profiles').select('id, name')
+        .from('company_profiles_secure').select('id, name')
         .eq('id', companyId).eq('owner_user_id', profile.id).maybeSingle()
 
       const { data: mem } = await supabase
@@ -95,7 +95,7 @@ export default function CompanyDashboardWorkOrdersPage() {
         setCompanyName(owned.name)
       } else {
         const { data: co } = await supabase
-          .from('company_profiles').select('name').eq('id', companyId).maybeSingle()
+          .from('company_profiles_secure').select('name').eq('id', companyId).maybeSingle()
         setCompanyName(co?.name || '')
       }
 
@@ -107,7 +107,7 @@ export default function CompanyDashboardWorkOrdersPage() {
 
       // Build query
       let query = supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, work_order_number, priority, opened_at, total_amount,
           estimate_sent_at, is_walk_in,

@@ -112,7 +112,7 @@ export default function CompanyDetailPage({ params }) {
 
       // ── Company profile ──
       const { data: companyData, error: companyError } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('*, owner:user_profiles!company_profiles_owner_user_id_fkey(id, first_name, last_name, phone, email)')
         .eq('id', companyId)
         .single()
@@ -145,7 +145,7 @@ export default function CompanyDetailPage({ params }) {
 
       // ── Team members — two sources ──
       const { data: invitationsData } = await supabase
-        .from('company_invitations')
+        .from('company_invitations_secure')
         .select('id, first_name, last_name, email, phone, staff_role, is_admin, status, created_at')
         .eq('company_id', companyId)
         .order('created_at', { ascending: true })
@@ -250,7 +250,7 @@ export default function CompanyDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data: rpcResult, error: updateError } = await supabase.rpc(
         'admin_update_company_status',
@@ -288,7 +288,7 @@ export default function CompanyDetailPage({ params }) {
       // Notify pending invited team members
       try {
         const { data: pendingInvites } = await supabase
-          .from('company_invitations')
+          .from('company_invitations_secure')
           .select('id, email, first_name, last_name, invitation_token, invitee_user_id')
           .eq('company_id', company.id)
           .eq('status', 'pending')
@@ -357,7 +357,7 @@ export default function CompanyDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data: rpcResult, error: updateError } = await supabase.rpc(
         'admin_update_company_status',
@@ -417,7 +417,7 @@ export default function CompanyDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data: rpcResult, error: updateError } = await supabase.rpc(
         'admin_update_company_status',

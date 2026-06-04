@@ -47,7 +47,7 @@ export default function CompanyMemberProvidersPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) { router.push('/auth/login'); return }
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', authUser.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', authUser.id).single()
       if (!profile) { setAuthState('denied'); setDenyReason('Profile not found'); return }
       const { data: cu } = await supabase
         .from('company_users')
@@ -92,7 +92,7 @@ export default function CompanyMemberProvidersPage() {
     setLoading(true)
     try {
       let q = supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           id, name, description, is_verified, phone, email, website,
           years_in_operation, kra_pin_verified, registration_verified, location_verified,

@@ -11,14 +11,14 @@
 //   // Search user by email (case-insensitive)
 //   const hash = await piiHmac(supabase, 'user@example.com')
 //   const { data } = await supabase
-//     .from('user_profiles')
+//     .from('user_profiles_secure')
 //     .select('id')
 //     .eq('email_idx', hash)
 //
 //   // Search vehicle by plate (case-sensitive)
 //   const plateHash = await piiHmacRaw(supabase, 'KAA 123A')
 //   const { data } = await supabase
-//     .from('vehicles')
+//     .from('vehicles_secure')
 //     .select('id, make, model')
 //     .eq('plate_number_idx', plateHash)
 // ============================================================================

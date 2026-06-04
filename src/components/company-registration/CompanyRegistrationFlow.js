@@ -92,7 +92,7 @@ export default function CompanyRegistrationFlow() {
         
         // Check if user profile exists
         const { data: profile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('*')
           .eq('auth_user_id', user.id)
           .single()

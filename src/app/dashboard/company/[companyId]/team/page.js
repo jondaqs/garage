@@ -61,7 +61,7 @@ export default function MemberTeamPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
       // Verify membership — fetch caller's own row

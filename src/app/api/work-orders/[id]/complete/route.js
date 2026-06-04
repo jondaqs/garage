@@ -38,12 +38,12 @@ export async function POST(request, { params }) {
 
     // ── 2. Resolve vehicle plate ──────────────────────────────────────────
     const { data: vehicle } = await supabase
-      .from('vehicles').select('plate_number').eq('id', vehicle_id).single()
+      .from('vehicles_secure').select('plate_number').eq('id', vehicle_id).single()
     const vehiclePlate = vehicle?.plate_number || ''
 
     // ── 3. Resolve provider phone ─────────────────────────────────────────
     const { data: wo } = await supabase
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('service_provider_id, provider:service_providers(phone)')
       .eq('id', workOrderId).single()
     const providerPhone = wo?.provider?.phone || null
@@ -56,7 +56,7 @@ export async function POST(request, { params }) {
     if (owner?.id) {
       // Get email from auth.users via profile link
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('first_name, last_name, phone, auth_user_id')
         .eq('id', owner.id).single()
 
@@ -65,12 +65,12 @@ export async function POST(request, { params }) {
 
       if (profile?.auth_user_id) {
         const { data: authUsers } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('auth_user_id')
           .eq('id', owner.id).single()
         // Fetch email via a workaround — check bookings for customer email
         const { data: booking } = await supabase
-          .from('bookings')
+          .from('bookings_secure')
           .select('customer_email')
           .eq('work_order_id', workOrderId)
           .maybeSingle()

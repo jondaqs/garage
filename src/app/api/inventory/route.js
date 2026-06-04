@@ -17,7 +17,7 @@ export async function GET() {
 
     // Get user profile
     const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -28,7 +28,7 @@ export async function GET() {
 
     // Get service provider
     const { data: provider, error: providerError } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id, name, currency_id')
       .eq('owner_user_id', profile.id)
       .single()
@@ -74,7 +74,7 @@ export async function GET() {
     // its Shop dropdown without a separate round trip. We include each shop's
     // currency_id so the pricing tab can cascade-resolve the active currency.
     const { data: shops } = await supabase
-      .from('shops')
+      .from('shops_secure')
       .select('id, name, town, currency_id')
       .eq('service_provider_id', provider.id)
       .order('name', { ascending: true })
@@ -150,7 +150,7 @@ export async function POST(request) {
 
     // Get user profile
     const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -161,7 +161,7 @@ export async function POST(request) {
 
     // Get service provider
     const { data: provider, error: providerError } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id')
       .eq('owner_user_id', profile.id)
       .single()

@@ -105,7 +105,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -117,7 +117,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       // Members get edit if is_admin OR can_manage_fleet; delete only if
       // is_admin (Phase 1).
       const { data: owned } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('id, name')
         .eq('owner_user_id', profile.id)
         .maybeSingle()
@@ -156,7 +156,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       // can still reach those rows via the vehicles_select_history RLS
       // policy, so we must render an inactive state explicitly.
       const { data: v, error: vErr } = await supabase
-        .from('vehicles')
+        .from('vehicles_secure')
         .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at, updated_at, is_active, deactivated_at')
         .eq('id', vehicleId)
         .single()

@@ -38,7 +38,7 @@ export async function POST(request, { params }) {
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data: callerProfile } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, first_name, last_name')
       .eq('auth_user_id', user.id)
       .maybeSingle()
@@ -46,7 +46,7 @@ export async function POST(request, { params }) {
 
     // Load work order
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, work_order_number, vehicle_id, service_provider_id')
       .eq('id', workOrderId)
       .maybeSingle()
@@ -73,8 +73,8 @@ export async function POST(request, { params }) {
     if (!hasAccess) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
     // Load provider + vehicle info for notification content
-    const { data: sp }  = await sc.from('service_providers').select('name, phone').eq('id', wo.service_provider_id).maybeSingle()
-    const { data: veh } = await sc.from('vehicles').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
+    const { data: sp }  = await sc.from('service_providers_secure').select('name, phone').eq('id', wo.service_provider_id).maybeSingle()
+    const { data: veh } = await sc.from('vehicles_secure').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
 
     const callerName  = `${callerProfile.first_name || ''} ${callerProfile.last_name || ''}`.trim() || 'The customer'
     const plate       = veh?.plate_number || 'vehicle'
@@ -93,7 +93,7 @@ export async function POST(request, { params }) {
 
     // Provider owner
     const { data: spOwner } = await sc
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('owner_user_id, user_profiles!owner_user_id(first_name, last_name, email, phone, auth_user_id)')
       .eq('id', wo.service_provider_id)
       .maybeSingle()

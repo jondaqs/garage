@@ -69,7 +69,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         // Fall back to fetching the work order to pick up currency_id (the
         // caller may not have included it in the prop).
         const { data } = await supabase
-          .from('work_orders')
+          .from('work_orders_secure')
           .select('currency:currencies(id, code, symbol, display_name)')
           .eq('id', workOrder.id)
           .maybeSingle()
@@ -125,14 +125,14 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       // 4. Vehicle
       if (inv.vehicle_id) {
         const { data: veh } = await supabase
-          .from('vehicles').select('plate_number, make, model, year_of_manufacture').eq('id', inv.vehicle_id).maybeSingle()
+          .from('vehicles_secure').select('plate_number, make, model, year_of_manufacture').eq('id', inv.vehicle_id).maybeSingle()
         setVehicle(veh)
       }
 
       // 5. Provider
       if (inv.service_provider_id) {
         const { data: sp } = await supabase
-          .from('service_providers').select('name, phone, email').eq('id', inv.service_provider_id).maybeSingle()
+          .from('service_providers_secure').select('name, phone, email').eq('id', inv.service_provider_id).maybeSingle()
         setProvider(sp)
       }
 
@@ -141,7 +141,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
 
       if (inv.issued_to_user_id) {
         const { data: cust } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('first_name, last_name, email, phone')
           .eq('id', inv.issued_to_user_id)
           .maybeSingle()

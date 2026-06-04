@@ -54,7 +54,7 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
       const { data: profile } = await supabase
-        .from('user_profiles').select('id')
+        .from('user_profiles_secure').select('id')
         .eq('auth_user_id', user.id).maybeSingle()
       if (!profile) {
         return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
@@ -62,7 +62,7 @@ export async function POST(request) {
       // Restrict scope to the caller's provider (owner OR active staff/mechanic)
       const sc = getServiceClient()
       const { data: ownedProv } = await sc
-        .from('service_providers').select('id')
+        .from('service_providers_secure').select('id')
         .eq('owner_user_id', profile.id).maybeSingle()
       if (ownedProv) {
         scopeProviderId = ownedProv.id
@@ -102,7 +102,7 @@ export async function POST(request) {
     const todayStr = now.toISOString().slice(0, 10)
     const tomorrowStr = in24.toISOString().slice(0, 10)
 
-    let q = sc.from('bookings')
+    let q = sc.from('bookings_secure')
       .select('id, booking_number, booking_date, booking_time_start, status_id, service_provider_id, reminder_sent_at')
       .in('status_id', liveStatusIds)
       .is('reminder_sent_at', null)

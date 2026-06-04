@@ -20,7 +20,7 @@ export default function PendingInvitationsCard() {
       if (!user) return
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, email')
         .eq('auth_user_id', user.id)
         .single()
@@ -29,7 +29,7 @@ export default function PendingInvitationsCard() {
 
       // Get pending invitations - don't join user_profiles to avoid RLS issues
       const { data, error } = await supabase
-        .from('team_invitations')
+        .from('team_invitations_secure')
         .select('*')
         .or(`invited_user_id.eq.${profile.id},invited_email.eq.${profile.email || user.email}`)
         .eq('status', 'pending')
@@ -49,7 +49,7 @@ export default function PendingInvitationsCard() {
       if (validInvitations.length > 0) {
         const providerIds = [...new Set(validInvitations.map(inv => inv.service_provider_id))]
         const { data: providers } = await supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select('id, name, phone')
           .in('id', providerIds)
 

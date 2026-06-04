@@ -57,11 +57,11 @@ export default function CompanyWorkOrderInvoicePage() {
       // Check pay permission (company owner or admin)
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       if (profile) {
         const { data: owned } = await supabase
-          .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
+          .from('company_profiles_secure').select('id').eq('owner_user_id', profile.id).maybeSingle()
         const { data: mem } = await supabase
           .from('company_users').select('is_admin, can_approve_payment')
           .eq('user_id', profile.id).eq('is_active', true).maybeSingle()

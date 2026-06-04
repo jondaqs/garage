@@ -52,12 +52,12 @@ export default function CompanyCalendarPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile  } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       // Resolve company
       let companyId = null
       const { data: owned } = await supabase
-        .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
+        .from('company_profiles_secure').select('id').eq('owner_user_id', profile.id).maybeSingle()
       if (owned) {
         companyId = owned.id
       } else {
@@ -77,13 +77,13 @@ export default function CompanyCalendarPage() {
 
       // Load fleet vehicle details for filter
       const { data: vData } = await supabase
-        .from('vehicles').select('id, plate_number, make, model')
+        .from('vehicles_secure').select('id, plate_number, make, model')
         .in('id', vehicleIds).order('plate_number')
       setVehicles(vData || [])
 
       // Bookings
       const { data: bData } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id, booking_date, booking_time_start, booking_time_end,
           problem_description,
@@ -103,7 +103,7 @@ export default function CompanyCalendarPage() {
       const termIds = termStatuses?.map(s => s.id) || []
 
       const { data: woData } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, work_order_number, opened_at, updated_at,
           vehicle:vehicles(id, plate_number, make, model),

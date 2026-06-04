@@ -72,10 +72,10 @@ export default function CompanyWorkOrderDetailPage() {
 
       // Check if current user has approval authority (owner or admin)
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data: owned } = await supabase
-        .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
+        .from('company_profiles_secure').select('id').eq('owner_user_id', profile.id).maybeSingle()
       const { data: mem } = await supabase
         .from('company_users').select('is_admin, can_approve_estimates')
         .eq('user_id', profile.id).eq('is_active', true).maybeSingle()

@@ -30,13 +30,13 @@ export default function BookingsCalendarPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
       const { data, error } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           *,
           service_provider:service_providers(name),

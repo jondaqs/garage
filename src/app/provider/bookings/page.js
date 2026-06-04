@@ -24,19 +24,19 @@ export default function ProviderBookingsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
       const { data: provider } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id')
         .eq('owner_user_id', profile.id)
         .single()
 
       const { data, error } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           *,
           customer:user_profiles!customer_user_id(first_name, last_name, phone),

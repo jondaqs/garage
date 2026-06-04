@@ -49,7 +49,7 @@ export default function MemberCompanyCalendarPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       // Verify membership
       const { data: mem } = await supabase
@@ -62,7 +62,7 @@ export default function MemberCompanyCalendarPage() {
 
       // Company name
       const { data: co } = await supabase
-        .from('company_profiles').select('name').eq('id', companyId).maybeSingle()
+        .from('company_profiles_secure').select('name').eq('id', companyId).maybeSingle()
       setCompanyName(co?.name || '')
 
       // Fleet vehicles
@@ -73,13 +73,13 @@ export default function MemberCompanyCalendarPage() {
 
       // Vehicle details for filter
       const { data: vData } = await supabase
-        .from('vehicles').select('id, plate_number, make, model')
+        .from('vehicles_secure').select('id, plate_number, make, model')
         .in('id', vehicleIds).order('plate_number')
       setVehicles(vData || [])
 
       // Bookings
       const { data: bData } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id, booking_date, booking_time_start, booking_time_end,
           problem_description,
@@ -94,7 +94,7 @@ export default function MemberCompanyCalendarPage() {
 
       // Work orders — fetch all, filter terminal client-side to avoid 400
       const { data: woData } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, work_order_number, opened_at, updated_at,
           vehicle:vehicles(id, plate_number, make, model),

@@ -70,7 +70,7 @@ export default function MemberNewBookingPage() {
       if (!user) { router.push('/auth/login'); return }
 
       // Verify fleet management permission
-      const { data: profCheck } = await supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      const { data: profCheck } = await supabase.from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: memCheck } = await supabase.from('company_users')
         .select('can_manage_fleet, is_admin').eq('user_id', profCheck.id).eq('company_id', companyId).eq('is_active', true).maybeSingle()
       if (!memCheck?.can_manage_fleet && !memCheck?.is_admin) {
@@ -79,7 +79,7 @@ export default function MemberNewBookingPage() {
       }
 
       const { data: profileData } = await supabase
-        .from('user_profiles').select('id, first_name, last_name, email, phone')
+        .from('user_profiles_secure').select('id, first_name, last_name, email, phone')
         .eq('auth_user_id', user.id).single()
 
       setProfile(profileData)
@@ -91,14 +91,14 @@ export default function MemberNewBookingPage() {
 
       // Load provider
       const { data: providerData } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id, name, owner_user_id, provider_type:service_provider_types(display_name)')
         .eq('id', providerId).single()
       setProvider(providerData)
 
       // Load provider shops
       const { data: shopsData } = await supabase
-        .from('shops').select('*')
+        .from('shops_secure').select('*')
         .eq('service_provider_id', providerId).eq('is_active', true)
       setShops(shopsData || [])
 
@@ -115,7 +115,7 @@ export default function MemberNewBookingPage() {
 
       // Load vehicle
       const { data: vehicleData } = await supabase
-        .from('vehicles')
+        .from('vehicles_secure')
         .select('id, plate_number, make, model, year_of_manufacture, color')
         .eq('id', vehicleId).single()
       setVehicle(vehicleData)

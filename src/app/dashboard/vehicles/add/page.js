@@ -87,7 +87,7 @@ export default function AddVehiclePage() {
 
       // Get user profile id first
       const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()

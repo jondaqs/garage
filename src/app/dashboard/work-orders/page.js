@@ -78,7 +78,7 @@ export default function CustomerWorkOrdersPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile }  = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       // Get vehicles directly owned by this user (individual ownership)
       const { data: owned } = await supabase
@@ -105,7 +105,7 @@ export default function CustomerWorkOrdersPage() {
       }
 
       const { data, error: fetchErr } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, work_order_number, priority, opened_at, total_amount,
           estimate_sent_at,

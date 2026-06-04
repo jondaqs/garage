@@ -39,7 +39,7 @@ export async function POST(request, { params }) {
 
     // Fetch provider contact
     const { data: wo } = await supabase
-      .from('work_orders')
+      .from('work_orders_secure')
       .select(`
         service_provider_id,
         vehicle:vehicles(plate_number),

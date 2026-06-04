@@ -32,7 +32,7 @@ export default function ProviderLayout({ children }) {
 
       // Get user profile and check if they're a service provider
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select(`
           *,
           user_roles(
@@ -54,7 +54,7 @@ export default function ProviderLayout({ children }) {
 
       // Get provider details
       const { data: providerData } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('*')
         .eq('owner_user_id', profile.id)
         .single()

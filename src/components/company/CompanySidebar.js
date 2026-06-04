@@ -73,7 +73,7 @@ export default function CompanySidebar({ company, userRole }) {
       if (!statusId) return
 
       const { count } = await supabase
-        .from('work_orders').select('id', { count: 'exact', head: true })
+        .from('work_orders_secure').select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds).eq('status_id', statusId)
       setPendingApprovalCount(count || 0)
     } catch {}

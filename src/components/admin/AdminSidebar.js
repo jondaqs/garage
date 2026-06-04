@@ -33,7 +33,7 @@ export default function AdminSidebar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, user_roles(role:user_roles_lookup(code))')
         .eq('auth_user_id', user.id)
         .single()
@@ -48,11 +48,11 @@ export default function AdminSidebar() {
     try {
       const [{ count: providerCount }, { count: companyCount }] = await Promise.all([
         supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending_verification'),
         supabase
-          .from('company_profiles')
+          .from('company_profiles_secure')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending_verification')
       ])

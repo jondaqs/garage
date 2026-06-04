@@ -74,14 +74,14 @@ export default function CompanyReportsPage() {
       if (!user) return
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
       // Resolve the owner's company. Middleware already restricts
       // /company/* to actual owners, so we don't run a membership
       // check here.
       const { data: owned } = await supabase
-        .from('company_profiles').select('id')
+        .from('company_profiles_secure').select('id')
         .eq('owner_user_id', profile.id).maybeSingle()
       const companyId = owned?.id
       if (!companyId) { setError('No company found'); setLoading(false); return }
@@ -109,7 +109,7 @@ export default function CompanyReportsPage() {
 
       // ── Bookings ───────────────────────────────────────────────────────
       const { data: bookings } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select('id, status:booking_statuses(code, display_name)')
         .in('vehicle_id', vehicleIds)
       const bStatusMap = {}
@@ -123,7 +123,7 @@ export default function CompanyReportsPage() {
 
       // ── Work orders (used by 4 panels below — single query) ────────────
       const { data: workOrders } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, vehicle_id, service_provider_id, total_amount,
           opened_at, closed_at,
@@ -233,7 +233,7 @@ export default function CompanyReportsPage() {
 
       // ── Action items ───────────────────────────────────────────────────
       const [estimatesRes, invoicesRes, checkoutsRes] = await Promise.all([
-        supabase.from('work_orders')
+        supabase.from('work_orders_secure')
           .select('id', { count: 'exact', head: true })
           .in('vehicle_id', vehicleIds)
           .not('estimate_sent_at', 'is', null)

@@ -47,12 +47,12 @@ export async function GET(_request, { params }) {
 
     // Resolve caller profile.
     const { data: profile } = await sc
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 401 })
 
     // Load work order — need vehicle, provider, and the WO number.
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, work_order_number, vehicle_id, service_provider_id')
       .eq('id', workOrderId).maybeSingle()
     if (!wo) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
@@ -80,7 +80,7 @@ export async function GET(_request, { params }) {
     // 3. Provider owner
     if (!canRead) {
       const { data: sp } = await sc
-        .from('service_providers').select('owner_user_id')
+        .from('service_providers_secure').select('owner_user_id')
         .eq('id', wo.service_provider_id).maybeSingle()
       if (sp?.owner_user_id === profile.id) canRead = true
     }
@@ -124,12 +124,12 @@ export async function GET(_request, { params }) {
 
     // Provider name (for the "From" block).
     const { data: provRow } = await sc
-      .from('service_providers').select('name')
+      .from('service_providers_secure').select('name')
       .eq('id', wo.service_provider_id).maybeSingle()
 
     // Vehicle plate (for the "Bill To" block).
     const { data: veh } = await sc
-      .from('vehicles').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
+      .from('vehicles_secure').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
 
     // Owner name — same resolution chain as send-invoice so the document
     // matches what was emailed.
@@ -140,20 +140,20 @@ export async function GET(_request, { params }) {
         ownerId = vo.owner_user_id
       } else if (vo?.owner_company_id) {
         const { data: co } = await sc
-          .from('company_profiles').select('owner_user_id').eq('id', vo.owner_company_id).maybeSingle()
+          .from('company_profiles_secure').select('owner_user_id').eq('id', vo.owner_company_id).maybeSingle()
         ownerId = co?.owner_user_id || null
       }
     }
     if (ownerId) {
       const { data: op } = await sc
-        .from('user_profiles').select('first_name, last_name')
+        .from('user_profiles_secure').select('first_name, last_name')
         .eq('id', ownerId).maybeSingle()
       if (op) ownerName = `${op.first_name || ''} ${op.last_name || ''}`.trim() || null
     }
     // Walk-in / booking fallbacks (same order as send-invoice route).
     if (!ownerName) {
       const { data: booking } = await sc
-        .from('bookings')
+        .from('bookings_secure')
         .select('customer:user_profiles!customer_user_id(first_name, last_name)')
         .eq('work_order_id', workOrderId).maybeSingle()
       if (booking?.customer) {
@@ -162,7 +162,7 @@ export async function GET(_request, { params }) {
     }
     if (!ownerName) {
       const { data: woWalkin } = await sc
-        .from('work_orders').select('walk_in_owner_name').eq('id', workOrderId).maybeSingle()
+        .from('work_orders_secure').select('walk_in_owner_name').eq('id', workOrderId).maybeSingle()
       ownerName = woWalkin?.walk_in_owner_name || null
     }
 

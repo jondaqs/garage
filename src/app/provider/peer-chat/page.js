@@ -50,7 +50,7 @@ export default function ProviderPeerChatPage() {
       if (!user) return
 
       const { data: prof } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name')
         .eq('auth_user_id', user.id)
         .single()
@@ -58,7 +58,7 @@ export default function ProviderPeerChatPage() {
       if (!prof) return
 
       const { data: owned } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id, name')
         .eq('owner_user_id', prof.id)
         .maybeSingle()
@@ -251,7 +251,7 @@ export default function ProviderPeerChatPage() {
         let sender = null
         if (msg.sender_id) {
           const { data: s } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id, first_name, last_name')
             .eq('id', msg.sender_id)
             .maybeSingle()

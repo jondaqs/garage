@@ -78,12 +78,12 @@ export default function CompanyMemberWorkOrderDetailPage() {
 
       // Resolve profile
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) throw new Error('Profile not found')
 
       // Check if this user can approve (company owner or admin member)
       const { data: owned } = await supabase
-        .from('company_profiles').select('id')
+        .from('company_profiles_secure').select('id')
         .eq('id', companyId).eq('owner_user_id', profile.id).maybeSingle()
       const { data: mem } = await supabase
         .from('company_users').select('is_admin, can_approve_estimates')

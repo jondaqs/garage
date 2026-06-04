@@ -100,20 +100,20 @@ export default function AdminReportsPage() {
       { count: activeProviders },
       { count: activeCompanies },
     ] = await Promise.all([
-      supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('service_providers').select('*', { count: 'exact', head: true }),
-      supabase.from('company_profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('vehicles').select('*', { count: 'exact', head: true }),
-      supabase.from('bookings').select('*', { count: 'exact', head: true }),
-      supabase.from('work_orders').select('*', { count: 'exact', head: true }),
-      supabase.from('user_profiles').select('*', { count: 'exact', head: true }).gte('created_at', thisMonthStart),
-      supabase.from('user_profiles').select('*', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lte('created_at', lastMonthEnd),
-      supabase.from('service_providers').select('*', { count: 'exact', head: true }).gte('created_at', thisMonthStart),
-      supabase.from('service_providers').select('*', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lte('created_at', lastMonthEnd),
-      supabase.from('company_profiles').select('*', { count: 'exact', head: true }).gte('created_at', thisMonthStart),
-      supabase.from('company_profiles').select('*', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lte('created_at', lastMonthEnd),
-      supabase.from('service_providers').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('company_profiles').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('user_profiles_secure').select('*', { count: 'exact', head: true }),
+      supabase.from('service_providers_secure').select('*', { count: 'exact', head: true }),
+      supabase.from('company_profiles_secure').select('*', { count: 'exact', head: true }),
+      supabase.from('vehicles_secure').select('*', { count: 'exact', head: true }),
+      supabase.from('bookings_secure').select('*', { count: 'exact', head: true }),
+      supabase.from('work_orders_secure').select('*', { count: 'exact', head: true }),
+      supabase.from('user_profiles_secure').select('*', { count: 'exact', head: true }).gte('created_at', thisMonthStart),
+      supabase.from('user_profiles_secure').select('*', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lte('created_at', lastMonthEnd),
+      supabase.from('service_providers_secure').select('*', { count: 'exact', head: true }).gte('created_at', thisMonthStart),
+      supabase.from('service_providers_secure').select('*', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lte('created_at', lastMonthEnd),
+      supabase.from('company_profiles_secure').select('*', { count: 'exact', head: true }).gte('created_at', thisMonthStart),
+      supabase.from('company_profiles_secure').select('*', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lte('created_at', lastMonthEnd),
+      supabase.from('service_providers_secure').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('company_profiles_secure').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     ])
 
     setSummary({
@@ -138,9 +138,9 @@ export default function AdminReportsPage() {
     const results = await Promise.all(
       months.map(async (m) => {
         const [{ count: users }, { count: providers }, { count: companies }] = await Promise.all([
-          supabase.from('user_profiles').select('*', { count: 'exact', head: true }).gte('created_at', m.start).lte('created_at', m.end),
-          supabase.from('service_providers').select('*', { count: 'exact', head: true }).gte('created_at', m.start).lte('created_at', m.end),
-          supabase.from('company_profiles').select('*', { count: 'exact', head: true }).gte('created_at', m.start).lte('created_at', m.end),
+          supabase.from('user_profiles_secure').select('*', { count: 'exact', head: true }).gte('created_at', m.start).lte('created_at', m.end),
+          supabase.from('service_providers_secure').select('*', { count: 'exact', head: true }).gte('created_at', m.start).lte('created_at', m.end),
+          supabase.from('company_profiles_secure').select('*', { count: 'exact', head: true }).gte('created_at', m.start).lte('created_at', m.end),
         ])
         return { label: m.label, users: users || 0, providers: providers || 0, companies: companies || 0 }
       })
@@ -158,7 +158,7 @@ export default function AdminReportsPage() {
     const counts = await Promise.all(
       statuses.map(async (s) => {
         const { count } = await supabase
-          .from('bookings').select('*', { count: 'exact', head: true }).eq('status_id', s.id)
+          .from('bookings_secure').select('*', { count: 'exact', head: true }).eq('status_id', s.id)
         return { ...s, count: count || 0 }
       })
     )
@@ -175,7 +175,7 @@ export default function AdminReportsPage() {
     const counts = await Promise.all(
       statuses.map(async (s) => {
         const { count } = await supabase
-          .from('work_orders').select('*', { count: 'exact', head: true }).eq('status_id', s.id)
+          .from('work_orders_secure').select('*', { count: 'exact', head: true }).eq('status_id', s.id)
         return { ...s, count: count || 0 }
       })
     )
@@ -185,7 +185,7 @@ export default function AdminReportsPage() {
   // ── 5. Top providers ──────────────────────────────────────────────────
   const loadTopProviders = async () => {
     const { data } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id, name, status, shops(id), provider_reviews(rating)')
       .eq('status', 'active')
       .limit(10)

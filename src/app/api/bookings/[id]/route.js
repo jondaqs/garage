@@ -133,12 +133,12 @@ export async function PATCH(request, { params }) {
     console.log(`${t} [3] auth OK user=${user.id}`)
 
     const { data: profile } = await supabase
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
     console.log(`${t} [4] provider profile id=${profile?.id}`)
 
     // ── 3. Load booking ───────────────────────────────────────────────────────
     const { data: booking, error: fetchErr } = await supabase
-      .from('bookings')
+      .from('bookings_secure')
       .select(`
         id, booking_number, booking_date, booking_time_start,
         customer_user_id, customer_email, customer_phone,
@@ -213,7 +213,7 @@ export async function PATCH(request, { params }) {
     // ── 8. Resolve customer profile (service client bypasses RLS) ─────────────
     console.log(`${t} [9] resolving customer profile via service client…`)
     const { data: custProfile, error: custErr } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('first_name, last_name, phone, email, auth_user_id')
       .eq('id', booking.customer_user_id)
       .maybeSingle()
@@ -259,7 +259,7 @@ export async function PATCH(request, { params }) {
 
         // Get company owner profile
         const { data: company } = await sc
-          .from('company_profiles')
+          .from('company_profiles_secure')
           .select('owner_user_id, name')
           .eq('id', companyId)
           .maybeSingle()
@@ -289,7 +289,7 @@ export async function PATCH(request, { params }) {
         if (notifyUserIds.size > 0) {
           // Fetch their profiles
           const { data: profiles } = await sc
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id, first_name, last_name, email, phone, auth_user_id')
             .in('id', [...notifyUserIds])
 

@@ -48,19 +48,19 @@ export async function POST(request, { params }) {
 
     // ── 1. Resolve caller profile ─────────────────────────────────────────
     const { data: profile } = await sc
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 401 })
 
     // ── 2. Load work order ────────────────────────────────────────────────
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, work_order_number, service_provider_id, vehicle_id')
       .eq('id', workOrderId).single()
     if (!wo) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
 
     // ── 3. Authorisation ──────────────────────────────────────────────────
     const { data: provRow } = await sc
-      .from('service_providers').select('id, name, owner_user_id').eq('id', wo.service_provider_id).maybeSingle()
+      .from('service_providers_secure').select('id, name, owner_user_id').eq('id', wo.service_provider_id).maybeSingle()
     const { data: spuRow } = await sc
       .from('service_provider_users').select('role, can_send_invoice')
       .eq('user_id', profile.id).eq('service_provider_id', wo.service_provider_id).eq('is_active', true).maybeSingle()
@@ -130,7 +130,7 @@ export async function POST(request, { params }) {
       // Skip if already added.
       if (recipients.some(r => r.user_id === profileId)) return
       const { data: op } = await sc
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('first_name, last_name, phone, email, auth_user_id')
         .eq('id', profileId).maybeSingle()
       if (!op) return
@@ -158,7 +158,7 @@ export async function POST(request, { params }) {
       // ── Company-owned vehicle ─────────────────────────────────────────
       companyId = vo.owner_company_id
       const { data: co } = await sc
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('name, owner_user_id')
         .eq('id', companyId).maybeSingle()
       companyName    = co?.name || null
@@ -203,7 +203,7 @@ export async function POST(request, { params }) {
     // (Booking customer, then walk-in.) These produce a single recipient.
     if (recipients.length === 0) {
       const { data: booking } = await sc
-        .from('bookings')
+        .from('bookings_secure')
         .select('customer_user_id, customer_email, customer_phone, customer:user_profiles!customer_user_id(first_name, last_name, phone, email, auth_user_id)')
         .eq('work_order_id', workOrderId).maybeSingle()
 
@@ -229,7 +229,7 @@ export async function POST(request, { params }) {
     if (recipients.length === 0) {
       // Walk-in (no booking, no ownership row).
       const { data: woWalkin } = await sc
-        .from('work_orders').select('walk_in_owner_name, walk_in_owner_email, walk_in_owner_phone')
+        .from('work_orders_secure').select('walk_in_owner_name, walk_in_owner_email, walk_in_owner_phone')
         .eq('id', workOrderId).maybeSingle()
       if (woWalkin && (woWalkin.walk_in_owner_email || woWalkin.walk_in_owner_phone)) {
         recipients.push({

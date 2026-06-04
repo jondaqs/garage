@@ -37,7 +37,7 @@ export default function ProvidersPage() {
     setLoading(true)
     try {
       let q = supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           id, name, description, is_verified, phone, email, website,
           years_in_operation, kra_pin_verified, registration_verified, location_verified,

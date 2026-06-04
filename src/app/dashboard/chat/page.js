@@ -36,7 +36,7 @@ export default function ChatPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from('user_profiles').select('id, first_name, last_name')
+      supabase.from('user_profiles_secure').select('id, first_name, last_name')
         .eq('auth_user_id', user.id).single()
         .then(({ data }) => setProfile(data))
     })
@@ -223,7 +223,7 @@ export default function ChatPage() {
         let sender = null
         if (msg.sender_id) {
           const { data: s } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id, first_name, last_name')
             .eq('id', msg.sender_id)
             .maybeSingle()

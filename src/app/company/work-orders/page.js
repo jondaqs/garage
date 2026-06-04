@@ -66,12 +66,12 @@ export default function CompanyWorkOrdersPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile  } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       // Resolve company
       let companyId = null
       const { data: owned } = await supabase
-        .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
+        .from('company_profiles_secure').select('id').eq('owner_user_id', profile.id).maybeSingle()
       if (owned) {
         companyId = owned.id
       } else {
@@ -91,7 +91,7 @@ export default function CompanyWorkOrdersPage() {
       if (vehicleIds.length === 0) { setWorkOrders([]); return }
 
       const { data, error: fetchErr } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, work_order_number, priority, opened_at, total_amount,
           estimate_sent_at, is_walk_in,

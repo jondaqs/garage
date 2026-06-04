@@ -54,14 +54,14 @@ export default function BookServicePage() {
 
       // Get user profile
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
       // Load user's vehicles
       const { data: vehicleData } = await supabase
-        .from('vehicles')
+        .from('vehicles_secure')
         .select(`
           *,
           vehicle_ownership(owner_user_id)
@@ -72,7 +72,7 @@ export default function BookServicePage() {
 
       // Load active service providers with reviews
       const { data: providerData } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           *,
           provider_type:service_provider_types(display_name, code),

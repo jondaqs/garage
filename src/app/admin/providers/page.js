@@ -55,7 +55,7 @@ export default function PendingProvidersPage() {
       let detailsById = {}
       if (ids.length > 0) {
         const { data: details } = await supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select(`
             id, registration_number, submitted_at, created_at, owner_user_id,
             owner:user_profiles(first_name, last_name, email, phone),

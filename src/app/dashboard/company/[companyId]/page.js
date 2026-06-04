@@ -28,7 +28,7 @@ export default function MemberCompanyOverviewPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -72,7 +72,7 @@ export default function MemberCompanyOverviewPage() {
           .eq('company_id', companyId)
           .eq('is_active', true),
         supabase
-          .from('bookings')
+          .from('bookings_secure')
           .select('*, vehicle_ownership!inner(owner_company_id)', { count: 'exact', head: true })
           .eq('vehicle_ownership.owner_company_id', companyId)
           .gte('created_at', monthStart),

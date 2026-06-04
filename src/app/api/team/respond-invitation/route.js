@@ -31,7 +31,7 @@ export async function POST(request) {
     }
 
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, first_name, last_name, is_active, is_suspended')
       .eq('auth_user_id', user.id)
       .single()
@@ -43,7 +43,7 @@ export async function POST(request) {
 
     // Load invitation
     const { data: invitation, error: inviteError } = await supabase
-      .from('team_invitations')
+      .from('team_invitations_secure')
       .select('*')
       .eq('id', invitation_id)
       .single()

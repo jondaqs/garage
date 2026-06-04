@@ -32,7 +32,7 @@ export default function MemberFleetAssignmentsPage() {
         if (!user) { router.push('/auth/login'); return }
 
         const { data: profile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('id')
           .eq('auth_user_id', user.id)
           .single()
@@ -40,7 +40,7 @@ export default function MemberFleetAssignmentsPage() {
 
         // Check if owner
         const { data: owned } = await supabase
-          .from('company_profiles')
+          .from('company_profiles_secure')
           .select('id')
           .eq('id', companyId)
           .eq('owner_user_id', profile.id)

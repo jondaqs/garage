@@ -31,7 +31,7 @@ function AcceptInvitationContent() {
 
       // Load invitation details (readable by invitee via RLS policy)
       const { data: inv, error: invErr } = await supabase
-        .from('company_invitations')
+        .from('company_invitations_secure')
         .select('id, email, first_name, last_name, staff_role, is_admin, status, expires_at, company:company_profiles(id, name, bio, city, country)')
         .eq('invitation_token', token)
         .maybeSingle()

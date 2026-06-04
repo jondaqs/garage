@@ -13,7 +13,7 @@ export async function GET(request) {
     }
 
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -26,7 +26,7 @@ export async function GET(request) {
     let companyId = null
 
     const { data: ownedCompany } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id')
       .eq('owner_user_id', userProfile.id)
       .maybeSingle()
@@ -106,7 +106,7 @@ export async function POST(request) {
     }
 
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -120,7 +120,7 @@ export async function POST(request) {
     let isAdmin = false
 
     const { data: ownedCompany } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id')
       .eq('owner_user_id', userProfile.id)
       .maybeSingle()
@@ -155,7 +155,7 @@ export async function POST(request) {
     // Check if plate already exists (PII: search by blind index)
     const plateIdx = await piiHmacRaw(supabase, plateNumber)
     const { data: existingVehicle } = await supabase
-      .from('vehicles')
+      .from('vehicles_secure')
       .select('id')
       .eq('plate_number_idx', plateIdx)
       .maybeSingle()

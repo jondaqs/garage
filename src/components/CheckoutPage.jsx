@@ -132,7 +132,7 @@ export function CheckoutPageInner({ backPath, canAcceptDecline = false }) {
 
       // Fetch WO status
       const { data: wo } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select('status:work_order_statuses(code, display_name)')
         .eq('id', workOrderId)
         .maybeSingle()

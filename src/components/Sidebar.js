@@ -49,7 +49,7 @@ export default function Sidebar({ user }) {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, user_roles(role:user_roles_lookup(code))')
         .eq('auth_user_id', authUser.id).single()
       if (profile) {
@@ -113,14 +113,14 @@ export default function Sidebar({ user }) {
       let count = 0
       if (awaitingId) {
         const { count: c } = await supabase
-          .from('work_orders').select('id', { count: 'exact', head: true })
+          .from('work_orders_secure').select('id', { count: 'exact', head: true })
           .in('vehicle_id', vehicleIds).eq('status_id', awaitingId)
         count += (c || 0)
       }
 
       // checkout submitted but not accepted
       const { count: checkoutCount } = await supabase
-        .from('work_orders').select('id', { count: 'exact', head: true })
+        .from('work_orders_secure').select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds)
         .eq('checkout_requested', true)
         .not('checkout_request_satisfied', 'eq', true)
@@ -129,7 +129,7 @@ export default function Sidebar({ user }) {
 
       // invoices sent/overdue and unpaid
       const { data: woIds } = await supabase
-        .from('work_orders').select('id').in('vehicle_id', vehicleIds)
+        .from('work_orders_secure').select('id').in('vehicle_id', vehicleIds)
       if (woIds?.length) {
         const { count: invCount } = await supabase
           .from('invoices').select('id', { count: 'exact', head: true })
@@ -161,13 +161,13 @@ export default function Sidebar({ user }) {
       let count = 0
       if (awaitingId) {
         const { count: c } = await supabase
-          .from('work_orders').select('id', { count: 'exact', head: true })
+          .from('work_orders_secure').select('id', { count: 'exact', head: true })
           .in('vehicle_id', vehicleIds).eq('status_id', awaitingId)
         count += (c || 0)
       }
 
       const { count: checkoutCount } = await supabase
-        .from('work_orders').select('id', { count: 'exact', head: true })
+        .from('work_orders_secure').select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds)
         .eq('checkout_requested', true)
         .not('checkout_request_satisfied', 'eq', true)
@@ -175,7 +175,7 @@ export default function Sidebar({ user }) {
       count += (checkoutCount || 0)
 
       const { data: woIds } = await supabase
-        .from('work_orders').select('id').in('vehicle_id', vehicleIds)
+        .from('work_orders_secure').select('id').in('vehicle_id', vehicleIds)
       if (woIds?.length) {
         const { count: invCount } = await supabase
           .from('invoices').select('id', { count: 'exact', head: true })
@@ -384,7 +384,7 @@ export default function Sidebar({ user }) {
   const fetchMembership = async () => {
     try {
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -436,7 +436,7 @@ export default function Sidebar({ user }) {
     // ── Fetch mechanic (service provider team) memberships ─────────────────
     try {
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
       // 1. Fetch service_provider_users (all roles)
@@ -507,7 +507,7 @@ export default function Sidebar({ user }) {
           if (liveIds.length > 0 && providerIds.length > 0) {
             // Single query covers both badges — we'll partition the rows in JS.
             const { data: liveBookings } = await supabase
-              .from('bookings')
+              .from('bookings_secure')
               .select('id, service_provider_id, status_id, booking_date')
               .in('service_provider_id', providerIds)
               .in('status_id', liveIds)

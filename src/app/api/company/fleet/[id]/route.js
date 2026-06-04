@@ -48,7 +48,7 @@ export async function PUT(request, { params }) {
 
     // Get user profile and verify admin
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -119,7 +119,7 @@ export async function DELETE(request, { params }) {
 
     // Get user profile and verify admin
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()

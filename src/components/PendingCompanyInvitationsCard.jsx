@@ -21,7 +21,7 @@ export default function PendingCompanyInvitationsCard() {
       // invitees_read_own_invitations policy allows reading rows
       // where email matches auth.users.email — no extra profile join needed
       const { data, error: fetchErr } = await supabase
-        .from('company_invitations')
+        .from('company_invitations_secure')
         .select(`
           id, email, first_name, last_name, staff_role,
           is_admin, status, expires_at, invitation_token,

@@ -136,7 +136,7 @@ export default function WorkOrderDetailPage() {
 
       // Fallback direct query
       const { data, error: fetchErr } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           *,
           status:work_order_statuses(code, display_name, sort_order),
@@ -174,11 +174,11 @@ export default function WorkOrderDetailPage() {
         .catch(() => {})
 
       // Is current user the provider owner?
-      supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      supabase.from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
         .then(async ({ data: prof }) => {
           if (!prof) return
           // Check if owner
-          const { data: provRow } = await supabase.from('service_providers')
+          const { data: provRow } = await supabase.from('service_providers_secure')
             .select('id').eq('owner_user_id', prof.id)
             .eq('id', data.service_provider?.id).maybeSingle()
           setIsOwner(!!provRow?.id)
@@ -252,9 +252,9 @@ export default function WorkOrderDetailPage() {
 
       // Fetch mechanics for this provider
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: provider } = await supabase
-        .from('service_providers').select('id').eq('owner_user_id', profile.id).single()
+        .from('service_providers_secure').select('id').eq('owner_user_id', profile.id).single()
       if (!provider) return
 
       const { data: mechanicsData } = await supabase
@@ -312,7 +312,7 @@ export default function WorkOrderDetailPage() {
 
       // 1. Shops for this provider — for the inline shop dropdown.
       const shopsP = providerId
-        ? supabase.from('shops')
+        ? supabase.from('shops_secure')
             .select('id, name, town, currency_id')
             .eq('service_provider_id', providerId)
             .order('name')
@@ -329,7 +329,7 @@ export default function WorkOrderDetailPage() {
       const provCurP = providerCurId
         ? supabase.from('currencies').select('id, code, display_name, symbol').eq('id', providerCurId).single()
         : (providerId
-            ? supabase.from('service_providers')
+            ? supabase.from('service_providers_secure')
                 .select('currency:currencies(id, code, display_name, symbol)')
                 .eq('id', providerId).single()
             : Promise.resolve({ data: null }))

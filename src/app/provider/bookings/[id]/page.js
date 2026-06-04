@@ -36,7 +36,7 @@ export default function ManageBookingPage() {
     try {
       setError('')
       const { data, error: fetchError } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           *,
           customer:user_profiles!customer_user_id(first_name, last_name, phone, email),

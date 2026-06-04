@@ -52,14 +52,14 @@ export default function AddShopPage() {
       }
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
       const [{ data: providerData }, { data: currs }] = await Promise.all([
         supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select('*')
           .eq('owner_user_id', profile.id)
           .single(),

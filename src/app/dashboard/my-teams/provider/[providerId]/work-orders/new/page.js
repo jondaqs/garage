@@ -88,7 +88,7 @@ export default function MemberNewWalkInWorkOrderPage() {
         if (!user) { router.push('/auth/login'); return }
 
         const { data: profile } = await supabase
-          .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+          .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
         if (!profile) {
           setAuthError('Profile not found')
           setAuthChecked(true)
@@ -132,7 +132,7 @@ export default function MemberNewWalkInWorkOrderPage() {
         setMembership(merged)
 
         const { data: prov } = await supabase
-          .from('service_providers').select('id, name')
+          .from('service_providers_secure').select('id, name')
           .eq('id', providerId).maybeSingle()
         setProvider(prov)
 
@@ -149,7 +149,7 @@ export default function MemberNewWalkInWorkOrderPage() {
     if (!providerId) return
     try {
       const { data } = await supabase
-        .from('shops').select('id, name, town')
+        .from('shops_secure').select('id, name, town')
         .eq('service_provider_id', providerId)
         .eq('is_active', true)
         .order('name')

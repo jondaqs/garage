@@ -159,12 +159,12 @@ export default function ProviderAnalyticsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: sp } = await supabase
-        .from('service_providers').select('id').eq('owner_user_id', profile.id).single()
+        .from('service_providers_secure').select('id').eq('owner_user_id', profile.id).single()
       if (!sp) return
       const { data: shopList } = await supabase
-        .from('shops').select('id, name').eq('service_provider_id', sp.id).eq('is_active', true).order('name')
+        .from('shops_secure').select('id, name').eq('service_provider_id', sp.id).eq('is_active', true).order('name')
       setShops(shopList || [])
     } catch (_) {}
   }
@@ -174,10 +174,10 @@ export default function ProviderAnalyticsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile  } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data: sp } = await supabase
-        .from('service_providers').select('id').eq('owner_user_id', profile.id).single()
+        .from('service_providers_secure').select('id').eq('owner_user_id', profile.id).single()
       if (!sp) throw new Error('Provider not found')
 
       const providerId = sp.id
@@ -187,7 +187,7 @@ export default function ProviderAnalyticsPage() {
 
       // ── Bookings ──────────────────────────────────────────────────────────
       let bookingsQ = supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select('id, created_at, status:booking_statuses(code, display_name), vehicle_id')
         .eq('service_provider_id', providerId)
         .gte('created_at', since)
@@ -195,7 +195,7 @@ export default function ProviderAnalyticsPage() {
       const { data: bookings } = await bookingsQ
 
       let prevBookingsQ = supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select('id', { count: 'exact', head: true })
         .eq('service_provider_id', providerId)
         .gte('created_at', prevSince)
@@ -205,7 +205,7 @@ export default function ProviderAnalyticsPage() {
 
       // ── Work orders (opened_at — for WO statuses, completion, mechanics) ─
       let woQ = supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, opened_at, assigned_mechanic_id, vehicle_id, shop_id,
           status:work_order_statuses(code, display_name)
@@ -387,7 +387,7 @@ export default function ProviderAnalyticsPage() {
         const shopIds = Object.keys(shopRevMap)
         if (shopIds.length > 0) {
           const { data: shopNames } = await supabase
-            .from('shops').select('id, name').in('id', shopIds)
+            .from('shops_secure').select('id, name').in('id', shopIds)
           const nameMap = {}
           ;(shopNames || []).forEach(s => { nameMap[s.id] = s.name })
           shopPerformance = Object.values(shopRevMap)
@@ -414,7 +414,7 @@ export default function ProviderAnalyticsPage() {
 
       // Count currently assigned vehicles per mechanic (active WOs)
       const { data: activeWOs } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select('assigned_mechanic_id, vehicle_id, status:work_order_statuses(code)')
         .eq('service_provider_id', providerId)
         .not('assigned_mechanic_id', 'is', null)

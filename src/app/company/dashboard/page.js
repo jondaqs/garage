@@ -37,7 +37,7 @@ export default function CompanyDashboard() {
       if (!user) { setError('Not authenticated'); setLoading(false); return }
 
       const { data: userProfile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -48,7 +48,7 @@ export default function CompanyDashboard() {
       let cId = null
 
       const { data: ownedCompany } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('id, name, status')
         .eq('owner_user_id', userProfile.id)
         .maybeSingle()
@@ -116,12 +116,12 @@ export default function CompanyDashboard() {
 
         const [{ count: pending }, { data: recent }] = await Promise.all([
           supabase
-            .from('bookings')
+            .from('bookings_secure')
             .select('*', { count: 'exact', head: true })
             .in('vehicle_id', vehicleIds)
             .in('status_id', await getPendingStatusIds(supabase)),
           supabase
-            .from('bookings')
+            .from('bookings_secure')
             .select(`
               id, booking_date, booking_time_start, created_at,
               vehicle:vehicles(plate_number, make, model),
@@ -150,7 +150,7 @@ export default function CompanyDashboard() {
         const terminalIds = woStatuses?.filter(s => terminalCodes.includes(s.code)).map(s => s.id) || []
 
         const { count: allWOs } = await supabase
-          .from('work_orders')
+          .from('work_orders_secure')
           .select('id', { count: 'exact', head: true })
           .in('vehicle_id', vehicleIds2)
           .not('status_id', 'in', `(${terminalIds.join(',')})`)
@@ -158,7 +158,7 @@ export default function CompanyDashboard() {
 
         if (awaitingId) {
           const { count: awaitingWOs } = await supabase
-            .from('work_orders')
+            .from('work_orders_secure')
             .select('id', { count: 'exact', head: true })
             .in('vehicle_id', vehicleIds2)
             .eq('status_id', awaitingId)

@@ -38,7 +38,7 @@ export default function BookingDetailPage() {
       setError('')
       
       const { data, error: fetchError } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           *,
           service_provider:service_providers(name, phone, email),

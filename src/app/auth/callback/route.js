@@ -39,7 +39,7 @@ export async function GET(request) {
     if (user) {
       // Check if user profile exists
       const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -71,7 +71,7 @@ export async function GET(request) {
         
         // Get the profile (either existing or just created)
         const { data: userProfile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('id')
           .eq('auth_user_id', user.id)
           .single()
@@ -79,7 +79,7 @@ export async function GET(request) {
         if (userProfile) {
           // Check if user already has a company account
           const { data: existingCompany } = await supabase
-            .from('company_profiles')
+            .from('company_profiles_secure')
             .select('id, name, status')
             .eq('owner_user_id', userProfile.id)
             .single()
@@ -110,7 +110,7 @@ export async function GET(request) {
         
         // Get the profile (either existing or just created)
         const { data: userProfile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('id')
           .eq('auth_user_id', user.id)
           .single()
@@ -118,7 +118,7 @@ export async function GET(request) {
         if (userProfile) {
           // Check if user already has a service provider account
           const { data: existingProvider } = await supabase
-            .from('service_providers')
+            .from('service_providers_secure')
             .select('id, status')
             .eq('owner_user_id', userProfile.id)
             .single()
@@ -159,7 +159,7 @@ export async function GET(request) {
 
       // Check user role and redirect appropriately for non-provider/non-company flows
       const { data: userProfile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select(`
           id,
           user_roles(

@@ -39,15 +39,15 @@ export async function POST(request, { params }) {
 
     // Load work order
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, work_order_number, vehicle_id, service_provider_id')
       .eq('id', workOrderId)
       .maybeSingle()
     if (!wo) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
 
     // Load vehicle + provider names
-    const { data: veh } = await sc.from('vehicles').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
-    const { data: sp }  = await sc.from('service_providers').select('name').eq('id', wo.service_provider_id).maybeSingle()
+    const { data: veh } = await sc.from('vehicles_secure').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
+    const { data: sp }  = await sc.from('service_providers_secure').select('name').eq('id', wo.service_provider_id).maybeSingle()
 
     const plate       = veh?.plate_number || 'vehicle'
     const vehicleDesc = [veh?.plate_number, veh?.make, veh?.model].filter(Boolean).join(' ')
@@ -65,7 +65,7 @@ export async function POST(request, { params }) {
 
     // Provider owner
     const { data: spOwner } = await sc
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('owner_user_id, user_profiles!owner_user_id(first_name, last_name, email, phone)')
       .eq('id', wo.service_provider_id)
       .maybeSingle()

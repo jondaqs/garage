@@ -127,7 +127,7 @@ export async function POST(request, { params }) {
       if (!email) {
         // Try auth lookup via user_profiles
         const { data: up } = await sc
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('email, auth_user_id')
           .eq('id', recipient.user_id)
           .maybeSingle()

@@ -76,7 +76,7 @@ export default function MemberBookingDetailPage() {
                     if (!user) { router.push('/auth/login'); return }
 
                     const { data: profile } = await supabase
-                        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+                        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
                     if (!profile) {
                         setAuthError('Profile not found')
                         setAuthChecked(true)
@@ -114,7 +114,7 @@ export default function MemberBookingDetailPage() {
                     setMyMechanicId(mech?.id || null)
 
                     const { data: prov } = await supabase
-                        .from('service_providers').select('id, name')
+                        .from('service_providers_secure').select('id, name')
                         .eq('id', providerId).maybeSingle()
                     setProvider(prov)
 
@@ -133,7 +133,7 @@ export default function MemberBookingDetailPage() {
         try {
             setError('')
             const { data, error: fetchError } = await supabase
-                .from('bookings')
+                .from('bookings_secure')
                 .select(`
           *,
           customer:user_profiles!customer_user_id(first_name, last_name, phone, email),
@@ -153,7 +153,7 @@ export default function MemberBookingDetailPage() {
             // If linked to a WO, fetch its assigned_mechanic_id for the manage gate
             if (data.work_order_id) {
                 const { data: wo } = await supabase
-                    .from('work_orders')
+                    .from('work_orders_secure')
                     .select('id, assigned_mechanic_id, work_order_number, status:work_order_statuses(code, display_name)')
                     .eq('id', data.work_order_id)
                     .maybeSingle()

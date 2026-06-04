@@ -55,7 +55,7 @@ export async function POST(request) {
     }
 
     const { data: callerProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, user_roles(role:user_roles_lookup(code))')
       .eq('auth_user_id', session.user.id)
       .single()

@@ -14,7 +14,7 @@ export async function POST(request) {
 
     // Get user profile
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, first_name, last_name')
       .eq('auth_user_id', user.id)
       .single()
@@ -30,7 +30,7 @@ export async function POST(request) {
 
     // 1. Owner check — owners can always invite
     const { data: ownedCompany } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id')
       .eq('owner_user_id', userProfile.id)
       .maybeSingle()
@@ -87,7 +87,7 @@ export async function POST(request) {
 
     // Get company details for the email
     const { data: company } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('name')
       .eq('id', companyId)
       .single()

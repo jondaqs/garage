@@ -26,7 +26,7 @@ export async function POST(request) {
 
     // Get user profile
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, email')
       .eq('auth_user_id', user.id)
       .single()
@@ -37,7 +37,7 @@ export async function POST(request) {
 
     // Look up invitation by invitation_token (NOT 'token' — that column doesn't exist)
     const { data: invitation, error: invitationError } = await supabase
-      .from('company_invitations')
+      .from('company_invitations_secure')
       .select('*, company:company_profiles(id, name)')
       .eq('invitation_token', body.token)
       .maybeSingle()

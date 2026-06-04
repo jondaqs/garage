@@ -40,29 +40,29 @@ export default function AdminDashboard() {
       ] = await Promise.all([
         // All providers for counts
         supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select('id, status'),
 
         // Total user count
         supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('*', { count: 'exact', head: true }),
 
         // Recent providers for the activity feed
         supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select('id, name, status, created_at, owner:user_profiles(first_name, last_name, email), provider_type:service_provider_types(display_name)')
           .order('created_at', { ascending: false })
           .limit(5),
 
         // All companies for counts
         supabase
-          .from('company_profiles')
+          .from('company_profiles_secure')
           .select('id, status'),
 
         // 5 most recent pending companies
         supabase
-          .from('company_profiles')
+          .from('company_profiles_secure')
           .select('id, name, registration_number, status, submitted_at, owner:user_profiles!company_profiles_owner_user_id_fkey(first_name, last_name, email)')
           .eq('status', 'pending_verification')
           .order('submitted_at', { ascending: false })

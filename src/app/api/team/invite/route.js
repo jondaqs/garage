@@ -31,7 +31,7 @@ export async function POST(request) {
 
         // Get user profile
         const { data: profile, error: profileError } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id')
             .eq('auth_user_id', user.id)
             .single()
@@ -45,7 +45,7 @@ export async function POST(request) {
 
         // Get service provider
         const { data: provider, error: providerError } = await supabase
-            .from('service_providers')
+            .from('service_providers_secure')
             .select('id, name')
             .eq('owner_user_id', profile.id)
             .single()
@@ -60,7 +60,7 @@ export async function POST(request) {
         // Check for duplicate pending invitation (PII: search by blind index)
         const emailIdx = await piiHmac(supabase, email)
         const { data: existing } = await supabase
-            .from('team_invitations')
+            .from('team_invitations_secure')
             .select('id')
             .eq('service_provider_id', provider.id)
             .eq('invited_email_idx', emailIdx)

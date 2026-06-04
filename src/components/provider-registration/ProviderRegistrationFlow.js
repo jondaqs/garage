@@ -101,7 +101,7 @@ export default function ProviderRegistrationFlow() {
         
         // Check if user profile exists
         const { data: profile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('*')
           .eq('auth_user_id', user.id)
           .single()

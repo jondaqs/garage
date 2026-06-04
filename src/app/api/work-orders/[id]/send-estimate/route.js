@@ -51,7 +51,7 @@ export async function POST(request, { params }) {
     // Helper: resolve contact from a user_profiles.id
     const resolveProfile = async (profileId) => {
       const { data: p } = await sc
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('first_name, last_name, phone, email, auth_user_id')
         .eq('id', profileId)
         .maybeSingle()
@@ -87,7 +87,7 @@ export async function POST(request, { params }) {
     // Case C: look up vehicle ownership directly (covers company fleet)
     if (!ownerEmail && !ownerPhone) {
       const { data: wo } = await sc
-        .from('work_orders')
+        .from('work_orders_secure')
         .select('vehicle_id')
         .eq('id', workOrderId)
         .maybeSingle()
@@ -108,7 +108,7 @@ export async function POST(request, { params }) {
         } else if (ownership?.owner_company_id) {
           // Company fleet — get company owner
           const { data: company } = await sc
-            .from('company_profiles')
+            .from('company_profiles_secure')
             .select('owner_user_id')
             .eq('id', ownership.owner_company_id)
             .maybeSingle()
@@ -125,7 +125,7 @@ export async function POST(request, { params }) {
     // Case D: fallback — booking customer
     if (!ownerEmail && !ownerPhone) {
       const { data: booking } = await sc
-        .from('bookings')
+        .from('bookings_secure')
         .select('customer_user_id, customer_email, customer_phone')
         .eq('work_order_id', workOrderId)
         .maybeSingle()
@@ -143,7 +143,7 @@ export async function POST(request, { params }) {
 
     // ── 3. Resolve vehicle plate ──────────────────────────────────────────────
     const { data: woData } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('vehicle:vehicles!vehicle_id(plate_number)')
       .eq('id', workOrderId)
       .maybeSingle()
@@ -195,7 +195,7 @@ export async function POST(request, { params }) {
     try {
       // Re-fetch vehicle_id → ownership if not already known
       const { data: woForFleet } = await sc
-        .from('work_orders')
+        .from('work_orders_secure')
         .select('vehicle_id')
         .eq('id', workOrderId)
         .maybeSingle()
@@ -211,7 +211,7 @@ export async function POST(request, { params }) {
 
           // Get company owner profile id so we can skip them (already notified)
           const { data: companyOwnerRow } = await sc
-            .from('company_profiles')
+            .from('company_profiles_secure')
             .select('owner_user_id')
             .eq('id', companyId)
             .maybeSingle()

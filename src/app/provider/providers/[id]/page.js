@@ -45,7 +45,7 @@ export default function ProviderPeerDetailPage() {
     setLoading(true)
     try {
       const { data: p } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           *,
           provider_type:service_provider_types(id, display_name, code, description),
@@ -63,11 +63,11 @@ export default function ProviderPeerDetailPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: prof } = await supabase
-          .from('user_profiles').select('id')
+          .from('user_profiles_secure').select('id')
           .eq('auth_user_id', user.id).maybeSingle()
         if (prof?.id) {
           const [{ data: ownAsOwner }, { data: ownAsSpu }, { data: ownAsMech }] = await Promise.all([
-            supabase.from('service_providers').select('id')
+            supabase.from('service_providers_secure').select('id')
               .eq('id', id).eq('owner_user_id', prof.id).maybeSingle(),
             supabase.from('service_provider_users').select('service_provider_id')
               .eq('service_provider_id', id).eq('user_id', prof.id).eq('is_active', true).maybeSingle(),

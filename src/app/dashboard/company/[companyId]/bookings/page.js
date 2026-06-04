@@ -38,7 +38,7 @@ export default function MemberBookingsPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -80,7 +80,7 @@ export default function MemberBookingsPage() {
       }
 
       // Count total matching rows
-      let countQ = supabase.from('bookings').select('id', { count: 'exact', head: true })
+      let countQ = supabase.from('bookings_secure').select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds)
       if (statusId) countQ = countQ.eq('status_id', statusId)
       const { count } = await countQ
@@ -90,7 +90,7 @@ export default function MemberBookingsPage() {
       const from = (page - 1) * perPage
       const to   = from + perPage - 1
       let query = supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id, booking_number, booking_date, booking_time_start,
           created_at,

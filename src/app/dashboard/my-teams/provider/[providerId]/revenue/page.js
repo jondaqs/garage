@@ -160,7 +160,7 @@ export default function MemberRevenuePage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) { setAccessDenied(true); setLoading(false); return }
 
       const { data: spuRow } = await supabase
@@ -176,11 +176,11 @@ export default function MemberRevenuePage() {
       }
 
       const { data: sp } = await supabase
-        .from('service_providers').select('name').eq('id', providerId).single()
+        .from('service_providers_secure').select('name').eq('id', providerId).single()
       setProviderName(sp?.name || 'Provider')
 
       const { data: shopList } = await supabase
-        .from('shops').select('id, name').eq('service_provider_id', providerId).eq('is_active', true).order('name')
+        .from('shops_secure').select('id, name').eq('service_provider_id', providerId).eq('is_active', true).order('name')
       setShops(shopList || [])
     } catch (err) { setError(err.message); setLoading(false) }
   }

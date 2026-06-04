@@ -58,7 +58,7 @@ export default function HistoryPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile  } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data, error: err } = await supabase
         .from('vehicle_ownership')

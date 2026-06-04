@@ -77,7 +77,7 @@ export default function ProviderSidebar({ provider }) {
       if (ids.length === 0) { setUpcomingCount(0); return }
 
       const { count } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select('id', { count: 'exact', head: true })
         .eq('service_provider_id', provider.id)
         .in('status_id', ids)
@@ -145,7 +145,7 @@ export default function ProviderSidebar({ provider }) {
       if (ids.length === 0) return
 
       const { count } = await supabase
-        .from('work_orders').select('id', { count: 'exact', head: true })
+        .from('work_orders_secure').select('id', { count: 'exact', head: true })
         .eq('service_provider_id', providerId)
         .in('status_id', ids)
       setActiveWoCount(count || 0)

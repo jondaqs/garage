@@ -119,10 +119,10 @@ export async function POST(request) {
       { data: customer },
       { data: services },
     ] = await Promise.all([
-      sc.from('service_providers').select('name').eq('id', providerId).maybeSingle(),
-      sc.from('vehicles').select('plate_number, make, model').eq('id', vehicleId).maybeSingle(),
-      shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle() : Promise.resolve({ data: null }),
-      sc.from('user_profiles').select('first_name, last_name, phone, email').eq('id', customerUserId).maybeSingle(),
+      sc.from('service_providers_secure').select('name').eq('id', providerId).maybeSingle(),
+      sc.from('vehicles_secure').select('plate_number, make, model').eq('id', vehicleId).maybeSingle(),
+      shopId ? sc.from('shops_secure').select('name, town').eq('id', shopId).maybeSingle() : Promise.resolve({ data: null }),
+      sc.from('user_profiles_secure').select('first_name, last_name, phone, email').eq('id', customerUserId).maybeSingle(),
       requestedServices.length > 0
         ? sc.from('services').select('name').in('id', requestedServices)
         : Promise.resolve({ data: [] }),

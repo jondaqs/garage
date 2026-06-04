@@ -28,7 +28,7 @@ export default function MyTeamsPage() {
       if (!user) return
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -86,7 +86,7 @@ export default function MyTeamsPage() {
         (data || []).map(async (mechanic) => {
           // Get primary shop details (first active shop)
           const { data: shop } = await supabase
-            .from('shops')
+            .from('shops_secure')
             .select('id, name, phone, email, town, county, street, country')
             .eq('service_provider_id', mechanic.service_provider_id)
             .eq('is_active', true)
@@ -114,7 +114,7 @@ export default function MyTeamsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       const inviteEmailIdx = await piiHmac(supabase, user.email)
       const { data } = await supabase
-        .from('team_invitations')
+        .from('team_invitations_secure')
         .select(`
           id, role, specialization, experience_years, invited_at, expires_at,
           service_provider:service_providers(id, name, email, phone)

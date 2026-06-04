@@ -115,7 +115,7 @@ export default function UserBudgetPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: profile } = await supabase
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
     if (profile) setProfileId(profile.id)
   }, [supabase])
 

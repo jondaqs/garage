@@ -69,7 +69,7 @@ export async function POST(request) {
       }
     } else {
       const { data: userProfile } = await db
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name, email, phone')
         .eq('id', conv.user_id)
         .maybeSingle()

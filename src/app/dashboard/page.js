@@ -54,7 +54,7 @@ export default function DashboardPage() {
         // Step 1: Get or create user profile
         let userProfile = null
         const { data: existingProfile, error: profileFetchError } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('id')
           .eq('auth_user_id', user.id)
           .maybeSingle()
@@ -113,7 +113,7 @@ export default function DashboardPage() {
         // Step 3: Get vehicle details
         const vehicleIds = ownerships.map(o => o.vehicle_id)
         const { data: vehiclesData, error: vehiclesError } = await supabase
-          .from('vehicles')
+          .from('vehicles_secure')
           .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at')
           .in('id', vehicleIds)
           .order('created_at', { ascending: false })
@@ -191,7 +191,7 @@ export default function DashboardPage() {
       if (ownerships && ownerships.length) {
         const ids = ownerships.map(o => o.vehicle_id)
         const { data: vs } = await supabase
-          .from('vehicles')
+          .from('vehicles_secure')
           .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at')
           .in('id', ids)
           .order('created_at', { ascending: false })

@@ -31,7 +31,7 @@ export default function CompanyLayout({ children }) {
 
             // Get user profile
             const { data: profile } = await supabase
-                .from('user_profiles')
+                .from('user_profiles_secure')
                 .select('id')
                 .eq('auth_user_id', user.id)
                 .single()
@@ -43,7 +43,7 @@ export default function CompanyLayout({ children }) {
 
             // Check if user owns a company
             const { data: ownedCompany } = await supabase
-                .from('company_profiles')
+                .from('company_profiles_secure')
                 .select('*')
                 .eq('owner_user_id', profile.id)
                 .maybeSingle()

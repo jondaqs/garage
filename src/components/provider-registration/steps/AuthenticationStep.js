@@ -64,7 +64,7 @@ export default function AuthenticationStep({
         await new Promise(resolve => setTimeout(resolve, 500))
 
         const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('*')
           .eq('auth_user_id', authData.user.id)
           .single()
@@ -106,7 +106,7 @@ export default function AuthenticationStep({
       if (data.user) {
         // Get user profile
         const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('*')
           .eq('auth_user_id', data.user.id)
           .single()

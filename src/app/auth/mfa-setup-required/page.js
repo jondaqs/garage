@@ -69,7 +69,7 @@ function MfaSetupRequiredInner() {
     if (!user) { router.replace('/auth/login'); return }
 
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select(`id, user_roles(role:user_roles_lookup(code))`)
       .eq('auth_user_id', user.id)
       .single()

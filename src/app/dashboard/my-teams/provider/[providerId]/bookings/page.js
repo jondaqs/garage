@@ -35,7 +35,7 @@ export default function MemberProviderBookingsPage() {
         if (!user) { router.push('/auth/login'); return }
 
         const { data: profile } = await supabase
-          .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+          .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
         if (!profile) {
           setAuthError('Profile not found')
           setAuthChecked(true)
@@ -70,7 +70,7 @@ export default function MemberProviderBookingsPage() {
         })
 
         const { data: prov } = await supabase
-          .from('service_providers').select('id, name')
+          .from('service_providers_secure').select('id, name')
           .eq('id', providerId).maybeSingle()
         setProvider(prov)
 
@@ -88,7 +88,7 @@ export default function MemberProviderBookingsPage() {
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           *,
           customer:user_profiles!customer_user_id(first_name, last_name, phone),

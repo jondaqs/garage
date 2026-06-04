@@ -91,7 +91,7 @@ export default function AdminManagementPage() {
       // Get current user's role
       const { data: { user } } = await supabase.auth.getUser()
       const { data: myProfile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, user_roles(role:user_roles_lookup(code))')
         .eq('auth_user_id', user.id)
         .single()
@@ -101,7 +101,7 @@ export default function AdminManagementPage() {
 
       // Get all admin users
       const { data, error: fetchErr } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select(`
           id, first_name, last_name, email, phone, created_at, is_active, is_suspended,
           user_roles(role:user_roles_lookup(code, display_name))

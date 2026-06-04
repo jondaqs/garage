@@ -72,7 +72,7 @@ export default function ProviderSettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       const { data: profile  } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name, phone, bio, profile_picture_url')
         .eq('auth_user_id', user.id).single()
 
@@ -92,7 +92,7 @@ export default function ProviderSettingsPage() {
 
       // Load provider
       const { data: sp } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id, name, email, phone, description, website, provider_type_id, currency_id, status')
         .eq('owner_user_id', profile.id).single()
 

@@ -62,7 +62,7 @@ export async function POST(request, context) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const { data: profile } = await supabase
-      .from('user_profiles').select('id')
+      .from('user_profiles_secure').select('id')
       .eq('auth_user_id', user.id).maybeSingle()
     if (!profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
@@ -76,7 +76,7 @@ export async function POST(request, context) {
 
   // ── Load booking ───────────────────────────────────────────────────────
   const { data: booking, error: bErr } = await sc
-    .from('bookings')
+    .from('bookings_secure')
     .select(`
       id, booking_number, booking_date, booking_time_start, booking_time_end,
       reminder_sent_at, customer_user_id, service_provider_id, customer_phone,
@@ -177,7 +177,7 @@ export async function POST(request, context) {
   let provOwnerEmail = null, provOwnerPhone = null, provOwnerName = 'Provider'
   if (booking.provider?.owner_user_id) {
     const { data: po } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('first_name, last_name, email, phone')
       .eq('id', booking.provider.owner_user_id).maybeSingle()
     if (po) {

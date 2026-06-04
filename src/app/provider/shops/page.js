@@ -27,14 +27,14 @@ export default function ProviderShopsPage() {
 
       // Get user profile
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
       // Get provider
       const { data: providerData, error: providerError } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('*')
         .eq('owner_user_id', profile.id)
         .single()
@@ -44,7 +44,7 @@ export default function ProviderShopsPage() {
 
       // Load shops
       const { data: shopsData, error: shopsError } = await supabase
-        .from('shops')
+        .from('shops_secure')
         .select(`
           *,
           currency:currencies(code, symbol, display_name)

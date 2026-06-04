@@ -45,14 +45,14 @@ export default function ProviderTeamPage() {
 
       // Get user profile
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
       // Get service provider
       const { data: providerData } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('*')
         .eq('owner_user_id', profile.id)
         .single()
@@ -179,13 +179,13 @@ export default function ProviderTeamPage() {
   const getProviderId = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
     
     const { data: providerData } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id')
       .eq('owner_user_id', profile.id)
       .single()
@@ -195,7 +195,7 @@ export default function ProviderTeamPage() {
 
   const loadInvitations = async (providerId) => {
     const { data, error } = await supabase
-      .from('team_invitations')
+      .from('team_invitations_secure')
       .select('*')
       .eq('service_provider_id', providerId)
       .in('status', ['pending', 'accepted', 'rejected'])

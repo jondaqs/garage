@@ -80,14 +80,14 @@ export default function NewBookingPage() {
       
       // Get user profile
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('*')
         .eq('auth_user_id', user.id)
         .single()
 
       // Load provider
       const { data: providerData } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('*, provider_type:service_provider_types(display_name)')
         .eq('id', providerId)
         .single()
@@ -96,7 +96,7 @@ export default function NewBookingPage() {
 
       // Load provider shops
       const { data: shopsData } = await supabase
-        .from('shops')
+        .from('shops_secure')
         .select('*')
         .eq('service_provider_id', providerId)
         .eq('is_active', true)
@@ -114,7 +114,7 @@ export default function NewBookingPage() {
 
       // Load vehicle
       const { data: vehicleData } = await supabase
-        .from('vehicles')
+        .from('vehicles_secure')
         .select('*')
         .eq('id', vehicleId)
         .single()
@@ -168,7 +168,7 @@ export default function NewBookingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()

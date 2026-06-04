@@ -293,7 +293,7 @@ export default function ProviderOverviewPage() {
 
       // ── 1. Profile ────────────────────────────────────────────────────────
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name')
         .eq('auth_user_id', user.id)
         .single()
@@ -336,7 +336,7 @@ export default function ProviderOverviewPage() {
 
       // ── 4. Provider details ───────────────────────────────────────────────
       const { data: provider, error: provErr } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id, name, phone, email, description, years_in_operation, is_verified, status, owner_user_id')
         .eq('id', params.providerId)
         .single()
@@ -353,7 +353,7 @@ export default function ProviderOverviewPage() {
       let ownerName = 'Unknown'
       if (provider.owner_user_id) {
         const { data: op } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('first_name, last_name')
           .eq('id', provider.owner_user_id)
           .maybeSingle()
@@ -386,7 +386,7 @@ export default function ProviderOverviewPage() {
 
       // ── 9. Shops ──────────────────────────────────────────────────────────
       const { data: shops } = await supabase
-        .from('shops')
+        .from('shops_secure')
         .select('id, name, town, county, street, phone')
         .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
@@ -412,7 +412,7 @@ export default function ProviderOverviewPage() {
 
         if (liveIds.length > 0) {
           const { data: liveBookings } = await supabase
-            .from('bookings')
+            .from('bookings_secure')
             .select('id, booking_date')
             .eq('service_provider_id', params.providerId)
             .in('status_id', liveIds)

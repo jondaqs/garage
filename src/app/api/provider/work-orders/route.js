@@ -212,10 +212,10 @@ async function notifyOwnerAndAdminsBackground({
     { data: shop },
     { data: vehicle },
   ] = await Promise.all([
-    sc.from('service_providers')
+    sc.from('service_providers_secure')
       .select('id, name, owner_user_id')
       .eq('id', providerId).maybeSingle(),
-    sc.from('user_profiles')
+    sc.from('user_profiles_secure')
       .select('id, first_name, last_name')
       .eq('id', initiatorProfileId).maybeSingle(),
     // owner profile — we'll look it up via provider.owner_user_id below
@@ -230,14 +230,14 @@ async function notifyOwnerAndAdminsBackground({
       .eq('service_provider_id', providerId)
       .eq('is_active', true)
       .in('role', ADMIN_ROLES),
-    shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle()
+    shopId ? sc.from('shops_secure').select('name, town').eq('id', shopId).maybeSingle()
            : Promise.resolve({ data: null }),
-    sc.from('vehicles').select('plate_number, make, model').eq('plate_number_idx', plateIdx).maybeSingle(),
+    sc.from('vehicles_secure').select('plate_number, make, model').eq('plate_number_idx', plateIdx).maybeSingle(),
   ])
 
   // Look up the owner profile separately
   const { data: ownerProf } = provider?.owner_user_id
-    ? await sc.from('user_profiles')
+    ? await sc.from('user_profiles_secure')
         .select('id, first_name, last_name, email, phone')
         .eq('id', provider.owner_user_id).maybeSingle()
     : { data: null }
@@ -265,13 +265,13 @@ async function notifyOwnerAndAdminsBackground({
       ? `Walk-in: ${walkInOwner.phone}`
       : null
   if (!ownerInfo && registeredOwner?.userId) {
-    const { data: u } = await sc.from('user_profiles')
+    const { data: u } = await sc.from('user_profiles_secure')
       .select('first_name, last_name')
       .eq('id', registeredOwner.userId).maybeSingle()
     if (u) ownerInfo = `Registered: ${[u.first_name, u.last_name].filter(Boolean).join(' ')}`
   }
   if (!ownerInfo && registeredOwner?.companyId) {
-    const { data: c } = await sc.from('company_profiles')
+    const { data: c } = await sc.from('company_profiles_secure')
       .select('name').eq('id', registeredOwner.companyId).maybeSingle()
     if (c) ownerInfo = `Fleet: ${c.name}`
   }
@@ -415,11 +415,11 @@ async function notifyCustomerBackground({
     { data: shop },
     { data: vehicle },
   ] = await Promise.all([
-    sc.from('service_providers').select('name')
+    sc.from('service_providers_secure').select('name')
       .eq('id', result.service_provider_id).maybeSingle(),
-    shopId ? sc.from('shops').select('name, town').eq('id', shopId).maybeSingle()
+    shopId ? sc.from('shops_secure').select('name, town').eq('id', shopId).maybeSingle()
            : Promise.resolve({ data: null }),
-    sc.from('vehicles').select('plate_number, make, model')
+    sc.from('vehicles_secure').select('plate_number, make, model')
       .eq('plate_number_idx', plateIdx2).maybeSingle(),
   ])
 
@@ -439,7 +439,7 @@ async function notifyCustomerBackground({
 
   // ── Path A: Registered owner (has a user account) ────────────────────
   if (registeredOwnerUserId) {
-    const { data: customer } = await sc.from('user_profiles')
+    const { data: customer } = await sc.from('user_profiles_secure')
       .select('id, first_name, last_name, email, phone')
       .eq('id', registeredOwnerUserId).maybeSingle()
 
@@ -508,7 +508,7 @@ async function notifyCustomerBackground({
       { data: company },
       { data: fleetMembers },
     ] = await Promise.all([
-      sc.from('company_profiles')
+      sc.from('company_profiles_secure')
         .select('id, name, owner_user_id')
         .eq('id', registeredOwnerCompanyId).maybeSingle(),
       sc.from('company_users')
@@ -534,7 +534,7 @@ async function notifyCustomerBackground({
     }
 
     // Fetch profile rows for the contact channels in one query
-    const { data: profiles } = await sc.from('user_profiles')
+    const { data: profiles } = await sc.from('user_profiles_secure')
       .select('id, first_name, last_name, email, phone')
       .in('id', Array.from(recipientIds))
 

@@ -61,11 +61,11 @@ export default function MemberSearchProvidersPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/auth/login'); return }
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile || cancelled) return
 
       const [{ data: owner }, { data: spu }, { data: mech }] = await Promise.all([
-        supabase.from('service_providers').select('id')
+        supabase.from('service_providers_secure').select('id')
           .eq('id', ownProviderId).eq('owner_user_id', profile.id).maybeSingle(),
         supabase.from('service_provider_users').select('can_chat')
           .eq('service_provider_id', ownProviderId).eq('user_id', profile.id)

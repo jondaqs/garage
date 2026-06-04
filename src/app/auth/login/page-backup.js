@@ -31,7 +31,7 @@ export default function LoginPage() {
       if (authData.user) {
         // Single query — roles already include everything we need
         const { data: profile } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select(`
             id,
             user_roles(
@@ -62,7 +62,7 @@ export default function LoginPage() {
         if (codes.includes('service_provider_owner')) {
           // Verify registration is complete
           const { data: provider } = await supabase
-            .from('service_providers')
+            .from('service_providers_secure')
             .select('id')
             .eq('owner_user_id', profile.id)
             .maybeSingle()

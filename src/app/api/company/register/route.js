@@ -17,7 +17,7 @@ export async function POST(request) {
 
         // Get user profile
         const { data: userProfile, error: profileError } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('*')
             .eq('auth_user_id', user.id)
             .single()
@@ -29,7 +29,7 @@ export async function POST(request) {
 
         // Check if user already owns a company
         const { data: existingCompany } = await supabase
-            .from('company_profiles')
+            .from('company_profiles_secure')
             .select('id, name')
             .eq('owner_user_id', userProfile.id)
             .maybeSingle()

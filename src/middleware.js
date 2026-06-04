@@ -112,7 +112,7 @@ export async function middleware(request) {
   // LOGGED IN — resolve role + account status in one query.
   // ============================================================
   const { data: profile } = await supabase
-    .from('user_profiles')
+    .from('user_profiles_secure')
     .select(`
       id,
       is_active,
@@ -206,7 +206,7 @@ export async function middleware(request) {
   // Company owner → blocked from /company/*
   if (role === 'company' && pathname.startsWith('/company')) {
     const { data: company } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('status, is_suspended')
       .eq('owner_user_id', profile.id)
       .single()
@@ -221,7 +221,7 @@ export async function middleware(request) {
   // Provider owner → blocked from /provider/*
   if (role === 'provider' && pathname.startsWith('/provider')) {
     const { data: provider } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('status, is_active')
       .eq('owner_user_id', profile.id)
       .single()

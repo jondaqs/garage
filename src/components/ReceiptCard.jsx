@@ -66,7 +66,7 @@ export default function ReceiptCard({ receipt, canConfirm = false, onConfirmed, 
     let cancelled = false
     ;(async () => {
       const { data } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select('currency:currencies(id, code, symbol, display_name)')
         .eq('id', workOrderId)
         .maybeSingle()

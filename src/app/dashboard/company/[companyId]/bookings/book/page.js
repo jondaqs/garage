@@ -53,7 +53,7 @@ export default function MemberBookServicePage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -64,7 +64,7 @@ export default function MemberBookServicePage() {
       let companyId = null
 
       const { data: owned } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('id')
         .eq('owner_user_id', profile.id)
         .maybeSingle()
@@ -96,7 +96,7 @@ export default function MemberBookServicePage() {
 
       // Load active service providers
       const { data: providerData } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           *,
           provider_type:service_provider_types(display_name, code),

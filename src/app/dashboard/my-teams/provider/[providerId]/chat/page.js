@@ -65,7 +65,7 @@ export default function ProviderMemberChatPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: prof } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name')
         .eq('auth_user_id', user.id)
         .single()
@@ -74,7 +74,7 @@ export default function ProviderMemberChatPage() {
 
       // Load the provider record (also validates the id exists)
       const { data: sp } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id, name, owner_user_id')
         .eq('id', providerId)
         .maybeSingle()
@@ -264,7 +264,7 @@ export default function ProviderMemberChatPage() {
         let sender = null
         if (msg.sender_id) {
           const { data: s } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id, first_name, last_name')
             .eq('id', msg.sender_id)
             .maybeSingle()

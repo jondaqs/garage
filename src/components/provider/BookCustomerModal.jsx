@@ -103,7 +103,7 @@ export default function BookCustomerModal({
     ;(async () => {
       const [{ data: shopRows }, { data: svcRows }] = await Promise.all([
         supabase
-          .from('shops').select('id, name, town')
+          .from('shops_secure').select('id, name, town')
           .eq('service_provider_id', providerId)
           .eq('is_active', true)
           .order('name'),

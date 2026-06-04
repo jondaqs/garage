@@ -25,7 +25,7 @@ export default function PendingVerificationPage() {
     }
 
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('company:company_profiles(*)')
       .eq('auth_user_id', user.id)
       .single();

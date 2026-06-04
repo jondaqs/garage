@@ -66,7 +66,7 @@ export async function POST(request, { params }) {
     // ── Load booking (service client — avoids RLS cross-user issues) ──────────
     console.log(`${t} [4] loading booking ${id}…`)
     const { data: booking, error: bookingErr } = await sc
-      .from('bookings')
+      .from('bookings_secure')
       .select(`
         id, booking_number, booking_date, booking_time_start,
         customer_user_id, customer_email, customer_phone,
@@ -87,7 +87,7 @@ export async function POST(request, { params }) {
     // ── Resolve customer profile ──────────────────────────────────────────────
     console.log(`${t} [5] fetching customer profile…`)
     const { data: custProfile, error: profErr } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('first_name, last_name, phone, email, auth_user_id')
       .eq('id', booking.customer_user_id)
       .maybeSingle()

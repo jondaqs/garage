@@ -67,7 +67,7 @@ export async function POST(request, { params }) {
 
     // ── Resolve mechanic contact details via service client (bypasses RLS) ────
     const { data: mechProfile } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('first_name, last_name, phone, email, auth_user_id')
       .eq('id', mechanic_user_id)
       .maybeSingle()
@@ -84,7 +84,7 @@ export async function POST(request, { params }) {
 
     // Get scheduled date from WO
     const { data: wo } = await supabase
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('scheduled_start, problem_description')
       .eq('id', woId).single()
 

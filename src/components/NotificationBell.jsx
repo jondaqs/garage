@@ -178,7 +178,7 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (profile) {
         setProfileId(profile.id)
         // ── FIX: pass the id directly so load doesn't wait for state update ──

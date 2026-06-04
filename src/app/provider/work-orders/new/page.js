@@ -69,12 +69,12 @@ export default function NewWalkInWorkOrderPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile }  = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: provider } = await supabase
-        .from('service_providers').select('id').eq('owner_user_id', profile.id).single()
+        .from('service_providers_secure').select('id').eq('owner_user_id', profile.id).single()
       if (!provider) return
       const { data } = await supabase
-        .from('shops').select('id, name, town').eq('service_provider_id', provider.id).eq('is_active', true)
+        .from('shops_secure').select('id, name, town').eq('service_provider_id', provider.id).eq('is_active', true)
       setShops(data || [])
     } catch {}
   }

@@ -44,9 +44,9 @@ export default function FleetPage() {
       // company_profiles.owner_user_id is the cleanest path.
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: owned } = await supabase
-        .from('company_profiles').select('id').eq('owner_user_id', profile.id).maybeSingle()
+        .from('company_profiles_secure').select('id').eq('owner_user_id', profile.id).maybeSingle()
       if (owned?.id) setCompanyId(owned.id)
 
       // Pending deletion requests — used for the badge on active cards.

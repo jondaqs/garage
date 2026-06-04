@@ -54,7 +54,7 @@ export default function ProviderDetailPage() {
     setLoading(true)
     try {
       const { data: p } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           *,
           provider_type:service_provider_types(id, display_name, code, description),

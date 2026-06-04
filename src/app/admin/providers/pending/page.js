@@ -23,7 +23,7 @@ export default function PendingProvidersPage() {
   const loadPendingProviders = async () => {
     try {
       let query = supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           *,
           owner:user_profiles(

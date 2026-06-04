@@ -29,13 +29,13 @@ export default function MemberBookingDetailPage() {
     try {
       // Verify membership
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      const { data: profile } = await supabase.from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: mem } = await supabase.from('company_users')
         .select('can_manage_fleet, is_admin').eq('user_id', profile.id).eq('company_id', companyId).eq('is_active', true).maybeSingle()
       if (!mem) { setError('Access denied'); setLoading(false); return }
 
       const { data, error: fetchError } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id, booking_number, booking_date, booking_time_start, booking_time_end,
           problem_description, special_instructions, customer_phone, customer_email,

@@ -36,7 +36,7 @@ export async function POST(request, { params }) {
 
     // ── 2. Get customer name for notification ─────────────────────────────
     const { data: customerProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('first_name, last_name')
       .eq('auth_user_id', user.id)
       .single()
@@ -56,7 +56,7 @@ export async function POST(request, { params }) {
 
     // Get work order details for vehicle plate + total
     const { data: wo } = await supabase
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('total_amount, vehicle:vehicles(plate_number)')
       .eq('id', workOrderId)
       .maybeSingle()
@@ -70,7 +70,7 @@ export async function POST(request, { params }) {
     const addR = (r) => { if (r?.user_id && !seenIds.has(r.user_id)) { seenIds.add(r.user_id); recipients.push(r) } }
 
     const { data: spOwner } = await sc
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('owner_user_id, email, user_profiles!owner_user_id(first_name, last_name, email, phone)')
       .eq('id', provider_id).maybeSingle()
     if (spOwner?.owner_user_id) {

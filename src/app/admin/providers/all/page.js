@@ -148,7 +148,7 @@ export default function AllProvidersPage() {
       } else {
         // No search term — direct query (plaintext columns still exist during transition)
         let query = supabase
-          .from('service_providers')
+          .from('service_providers_secure')
           .select(`
             id, name, status, is_active, is_verified, created_at, submitted_at,
             owner:user_profiles(id, auth_user_id, first_name, last_name, email),

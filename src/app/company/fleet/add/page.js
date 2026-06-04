@@ -40,7 +40,7 @@ export default function AddFleetVehiclePage() {
       setUser(user)
 
       const { data: profile, error: pErr } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -54,7 +54,7 @@ export default function AddFleetVehiclePage() {
 
       // Company owner?
       const { data: owned } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('id')
         .eq('owner_user_id', profile.id)
         .maybeSingle()

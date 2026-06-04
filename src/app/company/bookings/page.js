@@ -38,7 +38,7 @@ export default function CompanyBookingsPage() {
       if (!user) return
 
       const { data: userProfile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
@@ -49,7 +49,7 @@ export default function CompanyBookingsPage() {
       let companyId = null
 
       const { data: ownedCompany } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('id')
         .eq('owner_user_id', userProfile.id)
         .maybeSingle()
@@ -88,7 +88,7 @@ export default function CompanyBookingsPage() {
       // - status is via status_id → booking_statuses (not a direct string column)
       // - vehicle column is plate_number (not license_plate)
       let query = supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id,
           booking_date,

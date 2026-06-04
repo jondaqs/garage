@@ -90,7 +90,7 @@ function ReceiptPageInner({ backPath }) {
       // Customer
       if (data.invoice.issued_to_user_id) {
         const { data: cust } = await supabase
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('first_name, last_name, email, phone')
           .eq('id', data.invoice.issued_to_user_id)
           .maybeSingle()

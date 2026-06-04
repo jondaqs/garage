@@ -78,10 +78,10 @@ export default function PendingInfoPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { data: co } = await supabase
-        .from('company_profiles').select('*')
+        .from('company_profiles_secure').select('*')
         .eq('owner_user_id', profile.id).maybeSingle()
 
       if (!co || co.status !== 'pending_info') { router.push('/company/dashboard'); return }
@@ -137,7 +137,7 @@ export default function PendingInfoPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const ext = file.name.split('.').pop()
       const path = `company-docs/${company.id}/${docType}-${Date.now()}.${ext}`

@@ -62,7 +62,7 @@ export default function VehicleDetailPage() {
       // Resolve the caller's profile id — needed to detect whether the
       // current ownership row still ties this vehicle to this user.
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .maybeSingle()
@@ -73,7 +73,7 @@ export default function VehicleDetailPage() {
       // active case; vehicles_select_history covers the soft-deleted
       // one, so a previous owner can still view the detail page.
       const { data: v, error: vErr } = await supabase
-        .from('vehicles')
+        .from('vehicles_secure')
         .select('id, plate_number, make, model, year_of_manufacture, color, vin, created_at, updated_at, is_active, deactivated_at')
         .eq('id', vehicleId)
         .single()

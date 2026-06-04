@@ -119,7 +119,7 @@ export async function POST(request, { params }) {
 
     // Load work order and invoice
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, work_order_number, service_provider_id, vehicle_id')
       .eq('id', workOrderId).maybeSingle()
     if (!wo) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
@@ -131,12 +131,12 @@ export async function POST(request, { params }) {
 
     // Vehicle plate
     const { data: veh } = await sc
-      .from('vehicles').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
+      .from('vehicles_secure').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
     const vehiclePlate = veh?.plate_number || ''
 
     // Payer name
     const { data: payerProfile } = await sc
-      .from('user_profiles').select('first_name, last_name')
+      .from('user_profiles_secure').select('first_name, last_name')
       .eq('auth_user_id', user.id).maybeSingle()
     const payerName = payerProfile
       ? `${payerProfile.first_name || ''} ${payerProfile.last_name || ''}`.trim() || null
@@ -144,7 +144,7 @@ export async function POST(request, { params }) {
 
     // Provider info
     const { data: provider } = await sc
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id, name, owner_user_id, email, phone')
       .eq('id', wo.service_provider_id).maybeSingle()
     if (!provider) return NextResponse.json({ error: 'Provider not found' }, { status: 404 })
@@ -200,7 +200,7 @@ export async function POST(request, { params }) {
 
     // Load contact details for all recipients
     const { data: profiles } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, first_name, last_name, email, phone, auth_user_id')
       .in('id', [...recipientUserIds])
 

@@ -54,7 +54,7 @@ export async function middleware(request) {
   // Roles are assigned at registration and kept in sync by DB functions.
   // ============================================================
   const { data: profile } = await supabase
-    .from('user_profiles')
+    .from('user_profiles_secure')
     .select(`
       id,
       user_roles(

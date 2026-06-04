@@ -26,7 +26,7 @@ export async function GET(request) {
 
     // Build query
     let query = supabase
-      .from('email_queue')
+      .from('email_queue_secure')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -52,7 +52,7 @@ export async function GET(request) {
 
     // Get counts by status
     const { data: statusCounts } = await supabase
-      .from('email_queue')
+      .from('email_queue_secure')
       .select('status')
 
     const countsByStatus = {

@@ -54,7 +54,7 @@ export async function POST(request) {
 
     // Provider owner
     const { data: sp } = await sc
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('owner_user_id, name, user_profiles!owner_user_id(first_name, last_name, email, phone)')
       .eq('id', providerId).maybeSingle()
 

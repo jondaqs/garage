@@ -29,7 +29,7 @@ export async function DELETE(request, { params }) {
     }
 
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -42,7 +42,7 @@ export async function DELETE(request, { params }) {
     let companyId = null
 
     const { data: owned } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id')
       .eq('owner_user_id', profile.id)
       .maybeSingle()
@@ -71,7 +71,7 @@ export async function DELETE(request, { params }) {
     const serviceClient = getServiceClient()
 
     const { data: invitation, error: fetchErr } = await serviceClient
-      .from('company_invitations')
+      .from('company_invitations_secure')
       .select('id, email, status, company_id')
       .eq('id', inviteId)
       .single()

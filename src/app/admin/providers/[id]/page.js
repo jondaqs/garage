@@ -128,7 +128,7 @@ export default function ProviderDetailPage({ params }) {
       // aliased nested selects has bitten us before (owner_user_id sometimes
       // gets hidden by the `owner:user_profiles(...)` alias on the same row).
       const { data: providerData, error: pErr } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select(`
           id, owner_user_id, provider_type_id, currency_id,
           name, email, phone, description, website,
@@ -192,7 +192,7 @@ export default function ProviderDetailPage({ params }) {
 
       // ── Shops ──
       const { data: shopsData } = await supabase
-        .from('shops')
+        .from('shops_secure')
         .select(`
           id, name, description, phone, email,
           county, town, street, latitude, longitude,

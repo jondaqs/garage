@@ -38,7 +38,7 @@ export default function CommentsTab({ workOrder }) {
     loadComments()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from('user_profiles').select('id')
+      supabase.from('user_profiles_secure').select('id')
         .eq('auth_user_id', user.id).single()
         .then(({ data }) => setCurrentProfileId(data?.id))
     })

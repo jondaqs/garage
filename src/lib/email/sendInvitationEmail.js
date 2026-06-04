@@ -25,7 +25,7 @@ export async function sendInvitationEmail(invitation_id) {
 
     // Get invitation details
     const { data: invitation, error: inviteError } = await supabase
-      .from('team_invitations')
+      .from('team_invitations_secure')
       .select(`
         *,
         service_provider:service_providers(name, phone, email)

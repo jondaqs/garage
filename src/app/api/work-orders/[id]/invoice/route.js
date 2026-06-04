@@ -31,13 +31,13 @@ export async function GET(request, { params }) {
 
     // Resolve profile
     const { data: profile } = await sc
-      .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 401 })
 
     // Load work order (to get vehicle_id and service_provider_id; also surface
     // currency so the downstream invoice/receipt pages can render properly).
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, vehicle_id, service_provider_id, currency_id, currency:currencies(id, code, symbol, display_name)')
       .eq('id', workOrderId).maybeSingle()
     if (!wo) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
@@ -66,7 +66,7 @@ export async function GET(request, { params }) {
     // 3. Provider staff / owner
     if (!canRead) {
       const { data: sp } = await sc
-        .from('service_providers').select('owner_user_id').eq('id', wo.service_provider_id).maybeSingle()
+        .from('service_providers_secure').select('owner_user_id').eq('id', wo.service_provider_id).maybeSingle()
       if (sp?.owner_user_id === profile.id) canRead = true
     }
     if (!canRead) {
@@ -113,9 +113,9 @@ export async function GET(request, { params }) {
       .maybeSingle()
 
     // Load vehicle & provider names
-    const { data: vehicle }  = await sc.from('vehicles').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
-    const { data: provider } = await sc.from('service_providers').select('name, phone, email').eq('id', wo.service_provider_id).maybeSingle()
-    const { data: woDetails } = await sc.from('work_orders').select('work_order_number').eq('id', workOrderId).maybeSingle()
+    const { data: vehicle }  = await sc.from('vehicles_secure').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
+    const { data: provider } = await sc.from('service_providers_secure').select('name, phone, email').eq('id', wo.service_provider_id).maybeSingle()
+    const { data: woDetails } = await sc.from('work_orders_secure').select('work_order_number').eq('id', workOrderId).maybeSingle()
 
     return NextResponse.json({
       success:    true,

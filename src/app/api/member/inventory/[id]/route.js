@@ -16,7 +16,7 @@ async function resolveAndAuthorise(supabase, itemId) {
   if (authError || !user) return { error: 'Unauthorized', status: 401 }
 
   const { data: profile } = await supabase
-    .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+    .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
   if (!profile) return { error: 'Profile not found', status: 404 }
 
   // Find the item and its provider
@@ -28,7 +28,7 @@ async function resolveAndAuthorise(supabase, itemId) {
 
   // Owner check
   const { data: owned } = await supabase
-    .from('service_providers').select('id')
+    .from('service_providers_secure').select('id')
     .eq('id', providerId).eq('owner_user_id', profile.id).maybeSingle()
   if (owned) return { authId: user.id, providerId, itemId }
 

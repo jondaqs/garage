@@ -156,14 +156,14 @@ export default function ProviderRevenuePage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: sp } = await supabase
-        .from('service_providers').select('id').eq('owner_user_id', profile.id).single()
+        .from('service_providers_secure').select('id').eq('owner_user_id', profile.id).single()
       if (!sp) { setError('Provider not found'); setLoading(false); return }
       setProviderId(sp.id)
 
       const { data: shopList } = await supabase
-        .from('shops').select('id, name').eq('service_provider_id', sp.id).eq('is_active', true).order('name')
+        .from('shops_secure').select('id, name').eq('service_provider_id', sp.id).eq('is_active', true).order('name')
       setShops(shopList || [])
     } catch (err) { setError(err.message); setLoading(false) }
   }

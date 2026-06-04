@@ -63,14 +63,14 @@ export default function MemberPeerChatPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/auth/login'); return }
       const { data: prof } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name')
         .eq('auth_user_id', user.id).single()
       if (!prof || cancelled) return
       setProfile(prof)
 
       const [{ data: owner }, { data: spu }, { data: mech }] = await Promise.all([
-        supabase.from('service_providers').select('id, name')
+        supabase.from('service_providers_secure').select('id, name')
           .eq('id', ownProviderId).eq('owner_user_id', prof.id).maybeSingle(),
         supabase.from('service_provider_users')
           .select('can_chat, service_providers(id, name)')
@@ -261,7 +261,7 @@ export default function MemberPeerChatPage() {
         let sender = null
         if (msg.sender_id) {
           const { data: s } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id, first_name, last_name')
             .eq('id', msg.sender_id)
             .maybeSingle()

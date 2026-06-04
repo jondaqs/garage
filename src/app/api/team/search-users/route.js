@@ -23,13 +23,13 @@ export async function GET(request) {
 
     // Verify user owns a service provider
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
     const { data: provider } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id')
       .eq('owner_user_id', profile.id)
       .single()
@@ -59,7 +59,7 @@ export async function GET(request) {
 
     // Get user profiles for matched users
     const { data: userProfiles, error: profileError } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, auth_user_id, first_name, last_name, is_active, is_suspended')
       .in('auth_user_id', matchedAuthUsers.map(u => u.id))
 
@@ -96,7 +96,7 @@ export async function GET(request) {
 
     // Check for pending invitations
     const { data: pendingInvites } = await supabase
-      .from('team_invitations')
+      .from('team_invitations_secure')
       .select('invited_user_id, invited_email')
       .eq('service_provider_id', provider.id)
       .eq('status', 'pending')

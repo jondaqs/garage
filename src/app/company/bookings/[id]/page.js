@@ -27,7 +27,7 @@ export default function CompanyBookingDetailPage() {
   const loadBooking = async () => {
     try {
       const { data, error: fetchError } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id, booking_number, booking_date, booking_time_start, booking_time_end,
           problem_description, special_instructions, customer_phone, customer_email,

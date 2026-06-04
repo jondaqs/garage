@@ -22,7 +22,7 @@ export async function GET(request) {
     }
 
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -35,7 +35,7 @@ export async function GET(request) {
     let companyId = null
 
     const { data: ownedCompany } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id')
       .eq('owner_user_id', userProfile.id)
       .maybeSingle()
@@ -75,7 +75,7 @@ export async function GET(request) {
     if (userIds.length > 0) {
       const serviceClient = getServiceClient()
       const { data: profiles } = await serviceClient
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name, email, phone')
         .in('id', userIds)
 
@@ -92,7 +92,7 @@ export async function GET(request) {
 
     // Pending invitations
     const { data: invitations } = await supabase
-      .from('company_invitations')
+      .from('company_invitations_secure')
       .select('id, email, first_name, last_name, staff_role, is_admin, status, created_at')
       .eq('company_id', companyId)
       .eq('status', 'pending')
@@ -123,7 +123,7 @@ export async function PUT(request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data: userProfile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
@@ -132,7 +132,7 @@ export async function PUT(request) {
     let companyId = null
 
     const { data: ownedCompany } = await supabase
-      .from('company_profiles')
+      .from('company_profiles_secure')
       .select('id')
       .eq('owner_user_id', userProfile.id)
       .maybeSingle()

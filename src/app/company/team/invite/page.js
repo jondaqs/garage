@@ -42,7 +42,7 @@ export default function InviteTeamMemberPage() {
       
       // Get user's company
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, company_id')
         .eq('auth_user_id', user.id)
         .single();
@@ -54,7 +54,7 @@ export default function InviteTeamMemberPage() {
       // Check if user already exists (PII: search by blind index)
       const phoneIdx = await piiHmac(supabase, singleInvite.phone);
       const { data: existingUser } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, auth_user_id')
         .eq('phone_idx', phoneIdx)
         .maybeSingle();
@@ -137,7 +137,7 @@ export default function InviteTeamMemberPage() {
       
       // Get user's company
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, company_id')
         .eq('auth_user_id', user.id)
         .single();

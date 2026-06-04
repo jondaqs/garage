@@ -63,7 +63,7 @@ export default function CompanyMemberChatPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: prof } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name')
         .eq('auth_user_id', user.id)
         .single()
@@ -72,7 +72,7 @@ export default function CompanyMemberChatPage() {
 
       // Validate the company exists and the caller is an active member with can_chat
       const { data: comp } = await supabase
-        .from('company_profiles')
+        .from('company_profiles_secure')
         .select('id, name')
         .eq('id', companyId)
         .maybeSingle()
@@ -281,7 +281,7 @@ export default function CompanyMemberChatPage() {
         let sender = null
         if (msg.sender_id) {
           const { data: s } = await supabase
-            .from('user_profiles')
+            .from('user_profiles_secure')
             .select('id, first_name, last_name')
             .eq('id', msg.sender_id)
             .maybeSingle()

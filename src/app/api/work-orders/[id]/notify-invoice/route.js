@@ -110,7 +110,7 @@ export async function POST(request, { params }) {
       }
       if (!email) {
         const { data: up } = await sc
-          .from('user_profiles').select('email, auth_user_id').eq('id', recipient.user_id).maybeSingle()
+          .from('user_profiles_secure').select('email, auth_user_id').eq('id', recipient.user_id).maybeSingle()
         email = up?.email || null
         if (!email && up?.auth_user_id) {
           const { data: au } = await sc.auth.admin.getUserById(up.auth_user_id)

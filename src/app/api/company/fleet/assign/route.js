@@ -16,7 +16,7 @@ async function resolveCompanyId(supabase) {
   if (authError || !user) return { error: 'Unauthorized', status: 401 }
 
   const { data: profile } = await supabase
-    .from('user_profiles')
+    .from('user_profiles_secure')
     .select('id')
     .eq('auth_user_id', user.id)
     .single()
@@ -24,7 +24,7 @@ async function resolveCompanyId(supabase) {
 
   // Owner?
   const { data: owned } = await supabase
-    .from('company_profiles')
+    .from('company_profiles_secure')
     .select('id')
     .eq('owner_user_id', profile.id)
     .maybeSingle()

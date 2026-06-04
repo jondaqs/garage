@@ -33,7 +33,7 @@ async function resolveEmail(profileId) {
     const sc = getServiceClient()
     // user_profiles.email is synced from auth.users by handle_new_user trigger
     const { data } = await sc
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('email, auth_user_id')
       .eq('id', profileId)
       .single()
@@ -94,7 +94,7 @@ export async function POST(request) {
 
     // ── Load customer profile ─────────────────────────────────────────────────
     const { data: profile } = await supabase
-      .from('user_profiles')
+      .from('user_profiles_secure')
       .select('id, first_name, last_name, phone, email')
       .eq('auth_user_id', user.id)
       .single()
@@ -109,10 +109,10 @@ export async function POST(request) {
       { data: vehicle  },
       { data: statuses },
     ] = await Promise.all([
-      supabase.from('service_providers')
+      supabase.from('service_providers_secure')
         .select('id, name, owner_user_id')
         .eq('id', providerId).single(),
-      supabase.from('vehicles')
+      supabase.from('vehicles_secure')
         .select('id, plate_number, make, model')
         .eq('id', vehicleId).single(),
       supabase.from('booking_statuses')
@@ -129,7 +129,7 @@ export async function POST(request) {
     let shop = null
     if (shopId) {
       const { data: s } = await supabase
-        .from('shops').select('id, name, town').eq('id', shopId).single()
+        .from('shops_secure').select('id, name, town').eq('id', shopId).single()
       shop = s
     }
 
@@ -204,7 +204,7 @@ export async function POST(request) {
       try {
         const sc = getServiceClient()
         const { data: provProfile } = await sc
-          .from('user_profiles')
+          .from('user_profiles_secure')
           .select('id, first_name, last_name, phone, email, auth_user_id')
           .eq('id', provider.owner_user_id)
           .maybeSingle()

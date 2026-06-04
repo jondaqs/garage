@@ -50,7 +50,7 @@ export default function EditShopPage() {
     try {
       const [{ data, error: fetchError }, { data: currs }] = await Promise.all([
         supabase
-          .from('shops')
+          .from('shops_secure')
           .select('*')
           .eq('id', params.id)
           .single(),

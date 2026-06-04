@@ -114,7 +114,7 @@ export default function CompanySettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       const { data: profile  } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, first_name, last_name, phone, bio, profile_picture_url')
         .eq('auth_user_id', user.id).single()
 
@@ -131,7 +131,7 @@ export default function CompanySettingsPage() {
 
       // Owner?
       const { data: owned } = await supabase
-        .from('company_profiles').select('*')
+        .from('company_profiles_secure').select('*')
         .eq('owner_user_id', profile.id).maybeSingle()
 
       if (owned) {

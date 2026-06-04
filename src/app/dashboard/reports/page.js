@@ -70,7 +70,7 @@ export default function UserReportsPage() {
       if (!user) return
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!profile) return
 
       // ── Personal vehicles ──────────────────────────────────────────────
@@ -85,7 +85,7 @@ export default function UserReportsPage() {
 
       // ── Bookings ───────────────────────────────────────────────────────
       const { data: bookings } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select('id, status:booking_statuses(code, display_name)')
         .in('vehicle_id', vehicleIds)
       const bStatusMap = {}
@@ -99,7 +99,7 @@ export default function UserReportsPage() {
 
       // ── Work orders (powers 4 panels — single query) ───────────────────
       const { data: workOrders } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, vehicle_id, service_provider_id, total_amount,
           opened_at, closed_at,
@@ -201,7 +201,7 @@ export default function UserReportsPage() {
 
       // ── Action items ───────────────────────────────────────────────────
       const [estimatesRes, invoicesRes, checkoutsRes] = await Promise.all([
-        supabase.from('work_orders')
+        supabase.from('work_orders_secure')
           .select('id', { count: 'exact', head: true })
           .in('vehicle_id', vehicleIds)
           .not('estimate_sent_at', 'is', null)

@@ -32,13 +32,13 @@ export async function POST(request, { params }) {
 
     // Load WO
     const { data: wo } = await sc
-      .from('work_orders')
+      .from('work_orders_secure')
       .select('id, work_order_number, vehicle_id, service_provider_id')
       .eq('id', workOrderId).maybeSingle()
     if (!wo) return NextResponse.json({ error: 'WO not found' }, { status: 404 })
 
-    const { data: sp }  = await sc.from('service_providers').select('name, phone').eq('id', wo.service_provider_id).maybeSingle()
-    const { data: veh } = await sc.from('vehicles').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
+    const { data: sp }  = await sc.from('service_providers_secure').select('name, phone').eq('id', wo.service_provider_id).maybeSingle()
+    const { data: veh } = await sc.from('vehicles_secure').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
 
     // Find owner
     const { data: vo } = await sc
@@ -50,14 +50,14 @@ export async function POST(request, { params }) {
     if (!ownerProfileId && vo?.owner_company_id) {
       // Company fleet — resolve the actual company owner, not an arbitrary member
       const { data: companyRow } = await sc
-        .from('company_profiles').select('owner_user_id')
+        .from('company_profiles_secure').select('owner_user_id')
         .eq('id', vo.owner_company_id).maybeSingle()
       ownerProfileId = companyRow?.owner_user_id || null
     }
     if (!ownerProfileId) return NextResponse.json({ success: true, skipped: 'no owner' })
 
     const { data: profile } = await sc
-      .from('user_profiles').select('first_name, last_name, email, phone, auth_user_id').eq('id', ownerProfileId).maybeSingle()
+      .from('user_profiles_secure').select('first_name, last_name, email, phone, auth_user_id').eq('id', ownerProfileId).maybeSingle()
     if (!profile) return NextResponse.json({ success: true, skipped: 'no profile' })
 
     // Resolve email — fall back to auth.users if not on profile

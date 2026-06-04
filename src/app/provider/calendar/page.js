@@ -65,11 +65,11 @@ export default function ProviderCalendarPage() {
       if (!user) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('user_profiles').select('id')
+        .from('user_profiles_secure').select('id')
         .eq('auth_user_id', user.id).single()
 
       const { data: prov } = await supabase
-        .from('service_providers')
+        .from('service_providers_secure')
         .select('id, name')
         .eq('owner_user_id', profile.id)
         .single()
@@ -77,13 +77,13 @@ export default function ProviderCalendarPage() {
       setProvider(prov)
 
       const { data: shopRows } = await supabase
-        .from('shops').select('id, name, town')
+        .from('shops_secure').select('id, name, town')
         .eq('service_provider_id', prov.id)
         .order('name')
       setShops(shopRows || [])
 
       const { data: bData } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           id, booking_number, booking_date, booking_time_start, booking_time_end,
           problem_description, work_order_id, reminder_sent_at, customer_phone,
@@ -112,7 +112,7 @@ export default function ProviderCalendarPage() {
       const termIds = termStatuses?.map(s => s.id) || []
       const linkedWoIds = new Set((bData || []).map(b => b.work_order_id).filter(Boolean))
       const { data: woData } = await supabase
-        .from('work_orders')
+        .from('work_orders_secure')
         .select(`
           id, work_order_number, opened_at, updated_at, scheduled_start,
           vehicle:vehicles(id, plate_number, make, model),

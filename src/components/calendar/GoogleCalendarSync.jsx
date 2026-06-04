@@ -22,7 +22,7 @@ export default function GoogleCalendarSync() {
       
       // Check if user has Google Calendar token stored
       const { data } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('google_calendar_token')
         .eq('auth_user_id', user.id)
         .single()
@@ -97,7 +97,7 @@ export default function GoogleCalendarSync() {
       const { data: { user } } = await supabase.auth.getUser()
       
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id, google_calendar_token')
         .eq('auth_user_id', user.id)
         .single()
@@ -109,7 +109,7 @@ export default function GoogleCalendarSync() {
 
       // Get all upcoming bookings
       const { data: bookings } = await supabase
-        .from('bookings')
+        .from('bookings_secure')
         .select(`
           *,
           service_provider:service_providers(name),

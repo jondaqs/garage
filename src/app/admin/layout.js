@@ -29,7 +29,7 @@ export default function AdminLayout({ children }) {
       setUser(user)
 
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select(`*, user_roles(role:user_roles_lookup(code))`)
         .eq('auth_user_id', user.id)
         .single()

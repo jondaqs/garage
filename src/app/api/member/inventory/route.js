@@ -18,7 +18,7 @@ async function resolveContext(supabase, providerId) {
   if (authError || !user) return { error: 'Unauthorized', status: 401 }
 
   const { data: profile } = await supabase
-    .from('user_profiles')
+    .from('user_profiles_secure')
     .select('id')
     .eq('auth_user_id', user.id)
     .single()
@@ -26,7 +26,7 @@ async function resolveContext(supabase, providerId) {
 
   // Check if user is the provider owner
   const { data: ownedProvider } = await supabase
-    .from('service_providers')
+    .from('service_providers_secure')
     .select('id')
     .eq('id', providerId)
     .eq('owner_user_id', profile.id)
@@ -88,7 +88,7 @@ export async function GET(request) {
 
     // Fetch shops for this provider
     const { data: shops } = await supabase
-      .from('shops')
+      .from('shops_secure')
       .select('id, name, town, currency_id')
       .eq('service_provider_id', ctx.providerId)
       .order('name', { ascending: true })
@@ -103,7 +103,7 @@ export async function GET(request) {
 
     // Provider info
     const { data: providerInfo } = await supabase
-      .from('service_providers')
+      .from('service_providers_secure')
       .select('id, name, currency_id')
       .eq('id', ctx.providerId)
       .single()
