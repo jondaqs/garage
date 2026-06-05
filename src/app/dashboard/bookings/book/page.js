@@ -59,16 +59,20 @@ export default function BookServicePage() {
         .eq('auth_user_id', user.id)
         .single()
 
-      // Load user's vehicles
-      const { data: vehicleData } = await supabase
-        .from('vehicles_secure')
+      // Load user's vehicles — query from ownership table (reliable FK)
+      const { data: ownershipData } = await supabase
+        .from('vehicle_ownership')
         .select(`
-          *,
-          vehicle_ownership(owner_user_id)
+          vehicle_id,
+          vehicle:vehicles_secure(id, plate_number, make, model, year_of_manufacture, color, vin, is_active)
         `)
-        .eq('vehicle_ownership.owner_user_id', profile.id)
+        .eq('owner_user_id', profile.id)
 
-      setVehicles(vehicleData || [])
+      setVehicles(
+        (ownershipData || [])
+          .filter(row => row.vehicle && row.vehicle.is_active !== false)
+          .map(row => ({ ...row.vehicle }))
+      )
 
       // Load active service providers with reviews
       const { data: providerData } = await supabase
