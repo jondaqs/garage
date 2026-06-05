@@ -134,14 +134,14 @@ export default function WorkOrderDetailPage() {
         return
       }
 
-      // Fallback direct query
+      // Fallback direct query — use _secure views for PII-decrypted fields
       const { data, error: fetchErr } = await supabase
         .from('work_orders_secure')
         .select(`
           *,
           status:work_order_statuses(code, display_name, sort_order),
           vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture, color, vin),
-          service_provider:service_providers_secure(id, name),
+          service_provider:service_providers_secure(id, name, phone, email),
           shop:shops_secure(name, town, county, street, phone),
           mechanic:mechanics(
             id, user_id, specialization,
@@ -149,7 +149,7 @@ export default function WorkOrderDetailPage() {
           ),
           booking:bookings!booking_id(
             booking_number, customer_user_id,
-            customer:user_profiles!customer_user_id(first_name, last_name, phone, email),
+            customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
             booking_services(service:services(name), estimated_cost, notes)
           )
         `)
@@ -1071,12 +1071,19 @@ export default function WorkOrderDetailPage() {
                         </button>
                       )}
                     </div>
-                  ) : wo.walk_in_owner_name ? (
+                  ) : wo.owner?.first_name ? (
                     <div className="space-y-1 text-sm">
-                      <p className="font-semibold text-gray-900">{wo.walk_in_owner_name}</p>
-                      {wo.walk_in_owner_phone && <p className="text-gray-600">{wo.walk_in_owner_phone}</p>}
-                      {wo.walk_in_owner_email && <p className="text-gray-500">{wo.walk_in_owner_email}</p>}
-                      <p className="text-xs text-amber-600">Walk-in · not linked to account</p>
+                      <p className="font-semibold text-gray-900">
+                        {wo.owner.first_name}{wo.owner.last_name ? ` ${wo.owner.last_name}` : ''}
+                      </p>
+                      {wo.owner.phone && <p className="text-gray-600">{wo.owner.phone}</p>}
+                      {wo.owner.email && <p className="text-gray-500">{wo.owner.email}</p>}
+                      {wo.owner.owner_type === 'company' && (
+                        <p className="text-xs text-blue-600">Company fleet</p>
+                      )}
+                      {wo.owner.owner_type === 'walk_in' && (
+                        <p className="text-xs text-amber-600">Walk-in · not linked to account</p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-gray-400 text-sm">No owner data</p>

@@ -115,6 +115,7 @@ export default function ProviderDetailPage({ params }) {
     location_verified:     false,
   })
   const [savingChecks,  setSavingChecks]  = useState(false)
+  const [verifierNames, setVerifierNames] = useState({})   // { kra_pin_verified_by: 'Jane Doe', ... }
 
   useEffect(() => { fetchProviderDetails() }, [])
 
@@ -126,7 +127,7 @@ export default function ProviderDetailPage({ params }) {
       // ── Provider profile ──
       // Be explicit about the columns — relying on `select(*)` together with
       // aliased nested selects has bitten us before (owner_user_id sometimes
-      // gets hidden by the `owner:user_profiles_secure(...)` alias on the same row).
+      // gets hidden by the `owner:user_profiles(...)` alias on the same row).
       const { data: providerData, error: pErr } = await supabase
         .from('service_providers_secure')
         .select(`
@@ -135,9 +136,9 @@ export default function ProviderDetailPage({ params }) {
           registration_number, tax_id, years_in_operation,
           status, is_active, is_verified,
           verified_at, verified_by, submitted_at, created_at, updated_at,
-          kra_pin_verified, kra_pin_verified_at,
-          registration_verified, registration_verified_at,
-          location_verified, location_verified_at,
+          kra_pin_verified, kra_pin_verified_at, kra_pin_verified_by,
+          registration_verified, registration_verified_at, registration_verified_by,
+          location_verified, location_verified_at, location_verified_by,
           verification_score,
           owner:user_profiles!service_providers_owner_user_id_fkey(
             id, first_name, last_name, email, phone
@@ -158,6 +159,31 @@ export default function ProviderDetailPage({ params }) {
         location_verified:     providerData.location_verified || false,
       })
       setOwner(providerData.owner || null)
+
+      // ── Resolve verifier admin names ──
+      const verByIds = [
+        providerData.kra_pin_verified_by,
+        providerData.registration_verified_by,
+        providerData.location_verified_by,
+      ].filter(Boolean)
+      if (verByIds.length > 0) {
+        const uniqueIds = [...new Set(verByIds)]
+        const { data: verProfiles } = await supabase
+          .from('user_profiles_secure')
+          .select('id, first_name, last_name')
+          .in('id', uniqueIds)
+        const nameMap = {}
+        ;(verProfiles || []).forEach(p => {
+          nameMap[p.id] = [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Admin'
+        })
+        setVerifierNames({
+          kra_pin_verified_by:      nameMap[providerData.kra_pin_verified_by] || null,
+          registration_verified_by: nameMap[providerData.registration_verified_by] || null,
+          location_verified_by:     nameMap[providerData.location_verified_by] || null,
+        })
+      } else {
+        setVerifierNames({})
+      }
 
       // ── Documents ──
       // Documents are linked to the OWNER's user_profiles.id via
@@ -309,15 +335,19 @@ export default function ProviderDetailPage({ params }) {
           is_verified: true,
           verified_at: new Date().toISOString(),
           verified_by: adminProfile.id,
-          kra_pin_verified:         verChecks.kra_pin_verified,
-          kra_pin_verified_at:      verChecks.kra_pin_verified ? new Date().toISOString() : null,
-          registration_verified:    verChecks.registration_verified,
-          registration_verified_at: verChecks.registration_verified ? new Date().toISOString() : null,
-          location_verified:        verChecks.location_verified,
-          location_verified_at:     verChecks.location_verified ? new Date().toISOString() : null,
         })
         .eq('id', provider.id)
       if (error) throw error
+
+      // Save verification checks via RPC (stamps verified_by on each flag)
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc('admin_save_provider_verification', {
+        p_provider_id:           provider.id,
+        p_kra_pin_verified:      verChecks.kra_pin_verified,
+        p_registration_verified: verChecks.registration_verified,
+        p_location_verified:     verChecks.location_verified,
+      })
+      if (rpcErr) console.error('Verification RPC error (non-blocking):', rpcErr)
+      if (rpcResult && !rpcResult.success) console.error('Verification RPC failure:', rpcResult.error)
 
       await supabase.from('admin_action_logs').insert({
         admin_user_id: adminProfile.id,
@@ -771,18 +801,21 @@ export default function ProviderDetailPage({ params }) {
                   label: 'KRA PIN / Tax Compliance',
                   description: 'Valid KRA PIN certificate or tax compliance document verified',
                   verifiedAt: provider.kra_pin_verified_at,
+                  verifiedBy: verifierNames.kra_pin_verified_by,
                 },
                 {
                   key: 'registration_verified',
                   label: 'Business Registration',
                   description: 'Certificate of registration or business permit confirmed',
                   verifiedAt: provider.registration_verified_at,
+                  verifiedBy: verifierNames.registration_verified_by,
                 },
                 {
                   key: 'location_verified',
                   label: 'Location / Premises',
                   description: 'Physical business location confirmed and operational',
                   verifiedAt: provider.location_verified_at,
+                  verifiedBy: verifierNames.location_verified_by,
                 },
               ].map(item => (
                 <label key={item.key}
@@ -802,7 +835,8 @@ export default function ProviderDetailPage({ params }) {
                     <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
                     {item.verifiedAt && (
                       <p className="text-[11px] text-green-600 mt-1">
-                        Last verified {new Date(item.verifiedAt).toLocaleDateString()}
+                        Verified {new Date(item.verifiedAt).toLocaleDateString()}
+                        {item.verifiedBy && <> by <span className="font-medium">{item.verifiedBy}</span></>}
                       </p>
                     )}
                   </div>
@@ -864,18 +898,14 @@ export default function ProviderDetailPage({ params }) {
                 onClick={async () => {
                   setSavingChecks(true)
                   try {
-                    const { error } = await supabase
-                      .from('service_providers')
-                      .update({
-                        kra_pin_verified:         verChecks.kra_pin_verified,
-                        kra_pin_verified_at:      verChecks.kra_pin_verified ? new Date().toISOString() : provider.kra_pin_verified_at,
-                        registration_verified:    verChecks.registration_verified,
-                        registration_verified_at: verChecks.registration_verified ? new Date().toISOString() : provider.registration_verified_at,
-                        location_verified:        verChecks.location_verified,
-                        location_verified_at:     verChecks.location_verified ? new Date().toISOString() : provider.location_verified_at,
-                      })
-                      .eq('id', provider.id)
+                    const { data, error } = await supabase.rpc('admin_save_provider_verification', {
+                      p_provider_id:           provider.id,
+                      p_kra_pin_verified:      verChecks.kra_pin_verified,
+                      p_registration_verified: verChecks.registration_verified,
+                      p_location_verified:     verChecks.location_verified,
+                    })
                     if (error) throw error
+                    if (data && !data.success) throw new Error(data.error || 'RPC returned failure')
                     alert('Verification checks saved')
                     fetchProviderDetails()
                   } catch (err) {
