@@ -25,11 +25,21 @@ export default function BookingsPage() {
       
       const { data: profile } = await supabase
         .from('user_profiles_secure')
-        .select('id')
+        .select('id, company_id')
         .eq('auth_user_id', user.id)
         .single()
 
-      const { data, error } = await supabase
+      // If user belongs to a company, get fleet vehicle IDs to exclude
+      let fleetVehicleIds = []
+      if (profile.company_id) {
+        const { data: fleet } = await supabase
+          .from('vehicle_ownership')
+          .select('vehicle_id')
+          .eq('owner_company_id', profile.company_id)
+        fleetVehicleIds = (fleet || []).map(v => v.vehicle_id)
+      }
+
+      let query = supabase
         .from('bookings_secure')
         .select(`
           *,
@@ -44,6 +54,12 @@ export default function BookingsPage() {
         .eq('customer_user_id', profile.id)
         .order('created_at', { ascending: false })
 
+      // Exclude company fleet vehicle bookings (those belong on the company dashboard)
+      if (fleetVehicleIds.length > 0) {
+        query = query.not('vehicle_id', 'in', `(${fleetVehicleIds.join(',')})`)
+      }
+
+      const { data, error } = await query
       if (error) throw error
       setBookings(data || [])
     } catch (error) {
