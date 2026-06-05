@@ -88,7 +88,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
           id, estimated_cost, actual_cost, notes, started_at, completed_at, sequence_order,
           status:work_order_services_statuses(code, display_name),
           service:services(id, name, description),
-          mechanic:mechanics(user:user_profiles(first_name, last_name))
+          mechanic:mechanics(user:user_profiles_secure(first_name, last_name))
         `)
         .eq('work_order_id', workOrder.id)
         .order('sequence_order', { ascending: true })

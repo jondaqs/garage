@@ -134,14 +134,14 @@ export default function WorkOrderDetailPage() {
         return
       }
 
-      // Fallback direct query — use _secure views for PII-decrypted fields
+      // Fallback direct query
       const { data, error: fetchErr } = await supabase
         .from('work_orders_secure')
         .select(`
           *,
           status:work_order_statuses(code, display_name, sort_order),
           vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture, color, vin),
-          service_provider:service_providers_secure(id, name, phone, email),
+          service_provider:service_providers_secure(id, name),
           shop:shops_secure(name, town, county, street, phone),
           mechanic:mechanics(
             id, user_id, specialization,
@@ -149,7 +149,7 @@ export default function WorkOrderDetailPage() {
           ),
           booking:bookings!booking_id(
             booking_number, customer_user_id,
-            customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
+            customer:user_profiles!customer_user_id(first_name, last_name, phone, email),
             booking_services(service:services(name), estimated_cost, notes)
           )
         `)
@@ -1069,15 +1069,6 @@ export default function WorkOrderDetailPage() {
                           className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs mt-1">
                           <Hash size={11} /> Booking #{booking.booking_number} <ExternalLink size={10} />
                         </button>
-                      )}
-                    </div>
-                  ) : wo.owner?.first_name ? (
-                    <div className="space-y-1 text-sm">
-                      <p className="font-semibold text-gray-900">{wo.owner.first_name} {wo.owner.last_name}</p>
-                      {wo.owner.phone && <p className="text-gray-600">{wo.owner.phone}</p>}
-                      {wo.owner.email && <p className="text-gray-500">{wo.owner.email}</p>}
-                      {wo.owner.owner_type === 'company' && wo.owner.company_name && (
-                        <p className="text-xs text-blue-600">{wo.owner.company_name} · Fleet</p>
                       )}
                     </div>
                   ) : wo.walk_in_owner_name ? (

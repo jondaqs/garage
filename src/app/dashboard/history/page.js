@@ -64,7 +64,7 @@ export default function HistoryPage() {
         .from('vehicle_ownership')
         .select(`
           vehicle_id,
-          vehicle:vehicles(id, plate_number, make, model, year_of_manufacture, color)
+          vehicle:vehicles_secure(id, plate_number, make, model, year_of_manufacture, color)
         `)
         .eq('owner_user_id', profile.id)
 

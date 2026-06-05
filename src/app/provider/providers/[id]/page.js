@@ -49,7 +49,7 @@ export default function ProviderPeerDetailPage() {
         .select(`
           *,
           provider_type:service_provider_types(id, display_name, code, description),
-          shops(id, name, town, county, latitude, longitude),
+          shops_secure(id, name, town, county, latitude, longitude),
           provider_reviews(rating)
         `)
         .eq('id', id)

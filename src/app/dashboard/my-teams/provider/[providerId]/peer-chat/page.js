@@ -73,11 +73,11 @@ export default function MemberPeerChatPage() {
         supabase.from('service_providers_secure').select('id, name')
           .eq('id', ownProviderId).eq('owner_user_id', prof.id).maybeSingle(),
         supabase.from('service_provider_users')
-          .select('can_chat, service_providers(id, name)')
+          .select('can_chat, service_providers_secure(id, name)')
           .eq('service_provider_id', ownProviderId).eq('user_id', prof.id)
           .eq('is_active', true).maybeSingle(),
         supabase.from('mechanics')
-          .select('can_chat, service_providers(id, name)')
+          .select('can_chat, service_providers_secure(id, name)')
           .eq('service_provider_id', ownProviderId).eq('user_id', prof.id)
           .eq('is_active', true).maybeSingle(),
       ])

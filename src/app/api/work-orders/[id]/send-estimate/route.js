@@ -222,7 +222,7 @@ export async function POST(request, { params }) {
             .from('company_users')
             .select(`
               user_id,
-              user:user_profiles(id, first_name, last_name, phone, email, auth_user_id)
+              user:user_profiles_secure(id, first_name, last_name, phone, email, auth_user_id)
             `)
             .eq('company_id', companyId)
             .eq('is_active', true)

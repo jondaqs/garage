@@ -98,8 +98,8 @@ export default function CompanyBookingsPage() {
           estimated_cost,
           final_cost,
           created_at,
-          vehicle:vehicles(id, plate_number, make, model, color),
-          provider:service_providers(id, name, is_verified, verification_score),
+          vehicle:vehicles_secure(id, plate_number, make, model, color),
+          provider:service_providers_secure(id, name, is_verified, verification_score),
           status:booking_statuses(code, display_name, color_code)
         `)
         .in('vehicle_id', vehicleIds)

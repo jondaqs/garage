@@ -40,8 +40,8 @@ export default function ProviderBookingsPage() {
         .select(`
           *,
           customer:user_profiles!customer_user_id(first_name, last_name, phone),
-          shop:shops(name),
-          vehicle:vehicles(plate_number, make, model),
+          shop:shops_secure(name),
+          vehicle:vehicles_secure(plate_number, make, model),
           status:booking_statuses(code, display_name, color_code),
           booking_services(service:services(name))
         `)

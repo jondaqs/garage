@@ -56,7 +56,7 @@ export default function ChatPage() {
       .select(`
         id, updated_at, last_message_at, last_message_preview, user_unread_count, status,
         closed_at, closed_by:user_profiles!closed_by_id(id, first_name, last_name),
-        provider:service_providers(id, name, is_verified)
+        provider:service_providers_secure(id, name, is_verified)
       `)
       .eq('user_id', profile.id)
       .is('company_id', null)
@@ -156,7 +156,7 @@ export default function ChatPage() {
         .from('conversations')
         .insert({ user_id: profile.id, service_provider_id: providerId })
         .select(`id, updated_at, last_message_at, last_message_preview, user_unread_count,
-          provider:service_providers(id, name, is_verified)`)
+          provider:service_providers_secure(id, name, is_verified)`)
         .single()
       if (!error && newConv) {
         setConversations(prev => [newConv, ...prev])

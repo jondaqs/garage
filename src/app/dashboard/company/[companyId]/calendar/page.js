@@ -83,9 +83,9 @@ export default function MemberCompanyCalendarPage() {
         .select(`
           id, booking_date, booking_time_start, booking_time_end,
           problem_description,
-          vehicle:vehicles(id, plate_number, make, model),
-          provider:service_providers(id, name),
-          shop:shops(name, town),
+          vehicle:vehicles_secure(id, plate_number, make, model),
+          provider:service_providers_secure(id, name),
+          shop:shops_secure(name, town),
           status:booking_statuses(code, display_name, color_code)
         `)
         .in('vehicle_id', vehicleIds)
@@ -97,8 +97,8 @@ export default function MemberCompanyCalendarPage() {
         .from('work_orders_secure')
         .select(`
           id, work_order_number, opened_at, updated_at,
-          vehicle:vehicles(id, plate_number, make, model),
-          provider:service_providers(name),
+          vehicle:vehicles_secure(id, plate_number, make, model),
+          provider:service_providers_secure(name),
           status:work_order_statuses(code, display_name)
         `)
         .in('vehicle_id', vehicleIds)

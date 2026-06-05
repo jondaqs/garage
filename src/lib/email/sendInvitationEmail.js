@@ -28,7 +28,7 @@ export async function sendInvitationEmail(invitation_id) {
       .from('team_invitations_secure')
       .select(`
         *,
-        service_provider:service_providers(name, phone, email)
+        service_provider:service_providers_secure(name, phone, email)
       `)
       .eq('id', invitation_id)
       .single()

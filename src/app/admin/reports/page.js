@@ -186,7 +186,7 @@ export default function AdminReportsPage() {
   const loadTopProviders = async () => {
     const { data } = await supabase
       .from('service_providers_secure')
-      .select('id, name, status, shops(id), provider_reviews(rating)')
+      .select('id, name, status, shops_secure(id), provider_reviews(rating)')
       .eq('status', 'active')
       .limit(10)
 
@@ -224,7 +224,7 @@ export default function AdminReportsPage() {
   const loadRevenueStats = async () => {
     const { data: invoices, error } = await supabase
       .from('invoices')
-      .select('total_amount, status, paid_at, issued_at, provider:service_providers(currency:currencies(code, symbol))')
+      .select('total_amount, status, paid_at, issued_at, provider:service_providers_secure(currency:currencies(code, symbol))')
 
     if (error) console.error('Invoices query failed:', error)
 

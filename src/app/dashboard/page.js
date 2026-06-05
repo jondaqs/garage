@@ -149,7 +149,7 @@ export default function DashboardPage() {
         .from('vehicle_ownership_history')
         .select(`
           vehicle_id, owned_until,
-          vehicle:vehicles(
+          vehicle:vehicles_secure(
             id, plate_number, make, model, year_of_manufacture, color,
             is_active, deactivated_at
           )

@@ -401,7 +401,7 @@ export default function Sidebar({ user }) {
           is_active,
           can_approve_work, can_manage_team, can_manage_fleet,
           can_approve_estimates, can_approve_checkout, can_approve_payment, can_chat,
-          company:company_profiles(id, name, status)
+          company:company_profiles_secure(id, name, status)
         `)
         .eq('user_id', profile.id)
         .eq('is_active', true)
@@ -442,7 +442,7 @@ export default function Sidebar({ user }) {
       // 1. Fetch service_provider_users (all roles)
       const { data: spuRows, error: spuErr } = await supabase
         .from('service_provider_users')
-        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat, service_provider:service_providers(id, name)')
+        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat, service_provider:service_providers_secure(id, name)')
         .eq('user_id', profile.id)
         .eq('is_active', true)
 

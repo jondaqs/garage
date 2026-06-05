@@ -166,7 +166,7 @@ export default function CompanyDetailPage({ params }) {
       // ── Fleet ──
       const { data: ownershipData } = await supabase
         .from('vehicle_ownership')
-        .select('vehicle_id, vehicles(id, plate_number, make, model, year_of_manufacture, color, vin)')
+        .select('vehicle_id, vehicles_secure(id, plate_number, make, model, year_of_manufacture, color, vin)')
         .eq('owner_company_id', companyId)
       setFleet((ownershipData || []).map(o => o.vehicles).filter(Boolean))
 

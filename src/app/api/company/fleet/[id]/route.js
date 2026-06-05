@@ -17,7 +17,7 @@ export async function GET(request, { params }) {
       .from('vehicle_ownership')
       .select(`
         *,
-        vehicle:vehicles(*)
+        vehicle:vehicles_secure(*)
       `)
       .eq('id', id)
       .single()

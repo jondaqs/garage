@@ -40,8 +40,8 @@ export default function ManageBookingPage() {
         .select(`
           *,
           customer:user_profiles!customer_user_id(first_name, last_name, phone, email),
-          shop:shops(name, town, county, street),
-          vehicle:vehicles(plate_number, make, model, year_of_manufacture),
+          shop:shops_secure(name, town, county, street),
+          vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture),
           status:booking_statuses(code, display_name, color_code),
           booking_services(service:services(name))
         `)
@@ -62,7 +62,7 @@ export default function ManageBookingPage() {
     try {
       const { data } = await supabase
         .from('booking_messages')
-        .select('*, sender:user_profiles(first_name, last_name)')
+        .select('*, sender:user_profiles_secure(first_name, last_name)')
         .eq('booking_id', params.id)
         .order('created_at', { ascending: true })
       setMessages(data || [])

@@ -57,7 +57,7 @@ export async function POST(request, { params }) {
     // Get work order details for vehicle plate + total
     const { data: wo } = await supabase
       .from('work_orders_secure')
-      .select('total_amount, vehicle:vehicles(plate_number)')
+      .select('total_amount, vehicle:vehicles_secure(plate_number)')
       .eq('id', workOrderId)
       .maybeSingle()
 

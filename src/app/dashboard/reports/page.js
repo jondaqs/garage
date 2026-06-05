@@ -76,7 +76,7 @@ export default function UserReportsPage() {
       // ── Personal vehicles ──────────────────────────────────────────────
       const { data: ownership } = await supabase
         .from('vehicle_ownership')
-        .select('vehicle_id, vehicle:vehicles(id, plate_number, make, model)')
+        .select('vehicle_id, vehicle:vehicles_secure(id, plate_number, make, model)')
         .eq('owner_user_id', profile.id)
       const fleet      = (ownership || []).map(r => r.vehicle).filter(Boolean)
       const vehicleIds = fleet.map(v => v.id)
@@ -105,7 +105,7 @@ export default function UserReportsPage() {
           opened_at, closed_at,
           vehicle_checked_in_at, vehicle_checked_out_at, completed_at,
           status:work_order_statuses(code, display_name, is_terminal),
-          service_provider:service_providers(name),
+          service_provider:service_providers_secure(name),
           currency:currencies(id, code, symbol)
         `)
         .in('vehicle_id', vehicleIds)

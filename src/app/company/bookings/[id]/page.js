@@ -32,9 +32,9 @@ export default function CompanyBookingDetailPage() {
           id, booking_number, booking_date, booking_time_start, booking_time_end,
           problem_description, special_instructions, customer_phone, customer_email,
           priority, created_at, estimated_cost, final_cost,
-          vehicle:vehicles(id, plate_number, make, model, year_of_manufacture, color),
-          provider:service_providers(id, name, phone, email),
-          shop:shops(id, name, town, county, street),
+          vehicle:vehicles_secure(id, plate_number, make, model, year_of_manufacture, color),
+          provider:service_providers_secure(id, name, phone, email),
+          shop:shops_secure(id, name, town, county, street),
           status:booking_statuses(code, display_name, color_code),
           booking_services(service:services(id, name, category))
         `)

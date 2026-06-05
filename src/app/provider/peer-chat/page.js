@@ -70,7 +70,7 @@ export default function ProviderPeerChatPage() {
 
       const { data: spu } = await supabase
         .from('service_provider_users')
-        .select('service_provider_id, can_chat, service_providers(id, name)')
+        .select('service_provider_id, can_chat, service_providers_secure(id, name)')
         .eq('user_id', prof.id)
         .eq('is_active', true)
         .maybeSingle()
@@ -82,7 +82,7 @@ export default function ProviderPeerChatPage() {
 
       const { data: mech } = await supabase
         .from('mechanics')
-        .select('service_provider_id, can_chat, service_providers(id, name)')
+        .select('service_provider_id, can_chat, service_providers_secure(id, name)')
         .eq('user_id', prof.id)
         .eq('is_active', true)
         .maybeSingle()

@@ -43,7 +43,7 @@ export default function ProvidersPage() {
           years_in_operation, kra_pin_verified, registration_verified, location_verified,
           verification_score,
           provider_type:service_provider_types(id, display_name, code, description),
-          shops(id, name, town, county, latitude, longitude),
+          shops_secure(id, name, town, county, latitude, longitude),
           provider_reviews(rating),
           service_provider_services(service:services(id, name))
         `, { count: 'exact' })

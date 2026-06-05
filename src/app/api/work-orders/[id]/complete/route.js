@@ -44,7 +44,7 @@ export async function POST(request, { params }) {
     // ── 3. Resolve provider phone ─────────────────────────────────────────
     const { data: wo } = await supabase
       .from('work_orders_secure')
-      .select('service_provider_id, provider:service_providers(phone)')
+      .select('service_provider_id, provider:service_providers_secure(phone)')
       .eq('id', workOrderId).single()
     const providerPhone = wo?.provider?.phone || null
 

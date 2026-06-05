@@ -160,7 +160,7 @@ export default function CompanySettingsPage() {
       } else {
         const { data: mem } = await supabase
           .from('company_users')
-          .select('company_id, is_admin, company:company_profiles(*)')
+          .select('company_id, is_admin, company:company_profiles_secure(*)')
           .eq('user_id', profile.id).eq('is_active', true).maybeSingle()
         if (mem?.company) {
           setCompanyId(mem.company_id)

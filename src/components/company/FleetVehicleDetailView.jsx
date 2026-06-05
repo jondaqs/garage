@@ -206,10 +206,10 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
           .from('vehicle_history')
           .select(`
             id, mileage, recorded_at, event_type, description,
-            work_order:work_orders(id, work_order_number, problem_description,
+            work_order:work_orders_secure(id, work_order_number, problem_description,
               status:work_order_statuses(display_name)
             ),
-            service_provider:service_providers(name)
+            service_provider:service_providers_secure(name)
           `)
           .eq('vehicle_id', vehicleId)
           .order('recorded_at', { ascending: false })

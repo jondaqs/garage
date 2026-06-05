@@ -111,8 +111,8 @@ export default function CustomerWorkOrdersPage() {
           estimate_sent_at,
           checkout_requested, checkout_request_satisfied, checkout_declined,
           status:work_order_statuses(code, display_name),
-          vehicle:vehicles(plate_number, make, model),
-          provider:service_providers(name),
+          vehicle:vehicles_secure(plate_number, make, model),
+          provider:service_providers_secure(name),
           invoice:invoices(status, paid_at, total_amount)
         `)
         .in('vehicle_id', vehicleIds)

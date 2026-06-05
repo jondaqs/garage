@@ -56,7 +56,7 @@ export async function GET(request) {
         vehicle_id,
         owner_user_id,
         owner_company_id,
-        vehicle:vehicles(
+        vehicle:vehicles_secure(
           id,
           plate_number,
           make,

@@ -41,9 +41,9 @@ export default function BookingDetailPage() {
         .from('bookings_secure')
         .select(`
           *,
-          service_provider:service_providers(name, phone, email),
-          shop:shops(name, town, county, street),
-          vehicle:vehicles(plate_number, make, model, year_of_manufacture),
+          service_provider:service_providers_secure(name, phone, email),
+          shop:shops_secure(name, town, county, street),
+          vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture),
           status:booking_statuses(code, display_name, color_code),
           booking_services(service:services(name))
         `)
@@ -74,7 +74,7 @@ export default function BookingDetailPage() {
     try {
       const { data } = await supabase
         .from('booking_messages')
-        .select('*, sender:user_profiles(first_name, last_name)')
+        .select('*, sender:user_profiles_secure(first_name, last_name)')
         .eq('booking_id', params.id)
         .order('created_at', { ascending: true })
 

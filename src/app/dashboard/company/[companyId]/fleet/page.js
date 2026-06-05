@@ -55,7 +55,7 @@ export default function MemberFleetPage() {
         .from('vehicle_ownership')
         .select(`
           vehicle_id,
-          vehicle:vehicles(id, plate_number, make, model, year_of_manufacture, color, created_at)
+          vehicle:vehicles_secure(id, plate_number, make, model, year_of_manufacture, color, created_at)
         `)
         .eq('owner_company_id', companyId)
 

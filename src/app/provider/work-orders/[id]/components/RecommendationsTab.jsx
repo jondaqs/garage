@@ -51,7 +51,7 @@ export default function RecommendationsTab({ workOrder, canAdd = false }) {
           id, note, recommended_mileage, recommended_date,
           priority, is_acknowledged, created_at,
           service:services(id, name),
-          mechanic:mechanics(user:user_profiles(first_name, last_name))
+          mechanic:mechanics(user:user_profiles_secure(first_name, last_name))
         `)
         .eq('work_order_id', workOrder.id)
         .order('created_at', { ascending: false })

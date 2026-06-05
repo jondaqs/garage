@@ -97,9 +97,9 @@ export default function CompanyWorkOrdersPage() {
           estimate_sent_at, is_walk_in,
           checkout_requested, checkout_request_satisfied, checkout_declined,
           status:work_order_statuses(code, display_name),
-          vehicle:vehicles(plate_number, make, model),
-          provider:service_providers(name),
-          shop:shops(name, town),
+          vehicle:vehicles_secure(plate_number, make, model),
+          provider:service_providers_secure(name),
+          shop:shops_secure(name, town),
           invoice:invoices(status, paid_at, total_amount)
         `)
         .in('vehicle_id', vehicleIds)

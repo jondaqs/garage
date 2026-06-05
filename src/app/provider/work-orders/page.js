@@ -83,10 +83,10 @@ export default function ProviderWorkOrdersPage() {
           id, work_order_number, priority, opened_at, scheduled_start,
           checkout_requested, checkout_request_satisfied, checkout_declined, estimate_approved,
           walk_in_owner_name,
-          vehicle:vehicles(plate_number, make, model),
+          vehicle:vehicles_secure(plate_number, make, model),
           status:work_order_statuses(code, display_name, sort_order),
-          shop:shops(name, town),
-          mechanic:mechanics(user:user_profiles(first_name, last_name)),
+          shop:shops_secure(name, town),
+          mechanic:mechanics(user:user_profiles_secure(first_name, last_name)),
           booking:bookings!booking_id(booking_number)
         `)
         .eq('service_provider_id', provider.id)

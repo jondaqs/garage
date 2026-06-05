@@ -172,7 +172,7 @@ export default function UserBudgetPage() {
     try {
       const { data: ownership } = await supabase
         .from('vehicle_ownership')
-        .select('vehicle_id, vehicle:vehicles(id, plate_number, make, model)')
+        .select('vehicle_id, vehicle:vehicles_secure(id, plate_number, make, model)')
         .eq('owner_user_id', profileId)
       const vehicles = (ownership || []).map(r => r.vehicle).filter(Boolean)
       if (vehicles.length === 0) {

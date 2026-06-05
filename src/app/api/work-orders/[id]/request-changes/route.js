@@ -42,8 +42,8 @@ export async function POST(request, { params }) {
       .from('work_orders_secure')
       .select(`
         service_provider_id,
-        vehicle:vehicles(plate_number),
-        provider:service_providers(email, name, owner_user_id,
+        vehicle:vehicles_secure(plate_number),
+        provider:service_providers_secure(email, name, owner_user_id,
           owner:user_profiles!owner_user_id(phone)
         )
       `)

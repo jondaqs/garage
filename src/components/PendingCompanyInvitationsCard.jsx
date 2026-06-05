@@ -25,7 +25,7 @@ export default function PendingCompanyInvitationsCard() {
         .select(`
           id, email, first_name, last_name, staff_role,
           is_admin, status, expires_at, invitation_token,
-          company:company_profiles(id, name, city, country, status)
+          company:company_profiles_secure(id, name, city, country, status)
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })

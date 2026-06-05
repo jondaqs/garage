@@ -83,9 +83,9 @@ export async function POST(request, context) {
       customer_email,
       status:booking_statuses(code, display_name),
       customer:user_profiles!customer_user_id(id, first_name, last_name, phone, email),
-      vehicle:vehicles(plate_number, make, model),
-      shop:shops(name, town),
-      provider:service_providers(id, name, owner_user_id),
+      vehicle:vehicles_secure(plate_number, make, model),
+      shop:shops_secure(name, town),
+      provider:service_providers_secure(id, name, owner_user_id),
       booking_services(service:services(name))
     `)
     .eq('id', bookingId)

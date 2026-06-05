@@ -91,9 +91,9 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
           id, note, priority, recommended_mileage, recommended_date,
           is_acknowledged, acknowledged_at, created_at,
           service:services(id, name),
-          vehicle:vehicles(id, plate_number, make, model),
-          mechanic:mechanics(user:user_profiles(first_name, last_name)),
-          work_order:work_orders(id, work_order_number)
+          vehicle:vehicles_secure(id, plate_number, make, model),
+          mechanic:mechanics(user:user_profiles_secure(first_name, last_name)),
+          work_order:work_orders_secure(id, work_order_number)
         `)
         .in('vehicle_id', vehicleIds)
         .order('created_at', { ascending: false })

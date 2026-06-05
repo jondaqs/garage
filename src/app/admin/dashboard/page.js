@@ -51,7 +51,7 @@ export default function AdminDashboard() {
         // Recent providers for the activity feed
         supabase
           .from('service_providers_secure')
-          .select('id, name, status, created_at, owner:user_profiles(first_name, last_name, email), provider_type:service_provider_types(display_name)')
+          .select('id, name, status, created_at, owner:user_profiles_secure(first_name, last_name, email), provider_type:service_provider_types(display_name)')
           .order('created_at', { ascending: false })
           .limit(5),
 

@@ -142,9 +142,9 @@ export async function PATCH(request, { params }) {
       .select(`
         id, booking_number, booking_date, booking_time_start,
         customer_user_id, customer_email, customer_phone,
-        vehicle:vehicles(plate_number, make, model),
-        service_provider:service_providers(id, name),
-        shop:shops(name, town)
+        vehicle:vehicles_secure(plate_number, make, model),
+        service_provider:service_providers_secure(id, name),
+        shop:shops_secure(name, town)
       `)
       .eq('id', id)
       .single()

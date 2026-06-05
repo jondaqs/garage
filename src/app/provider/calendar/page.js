@@ -89,8 +89,8 @@ export default function ProviderCalendarPage() {
           problem_description, work_order_id, reminder_sent_at, customer_phone,
           customer_email,
           customer:user_profiles!customer_user_id(id, first_name, last_name, phone),
-          vehicle:vehicles(id, plate_number, make, model),
-          shop:shops(id, name, town),
+          vehicle:vehicles_secure(id, plate_number, make, model),
+          shop:shops_secure(id, name, town),
           status:booking_statuses(code, display_name, color_code),
           work_order:work_orders!bookings_work_order_id_fkey(
             id, status:work_order_statuses(code, display_name)
@@ -115,7 +115,7 @@ export default function ProviderCalendarPage() {
         .from('work_orders_secure')
         .select(`
           id, work_order_number, opened_at, updated_at, scheduled_start,
-          vehicle:vehicles(id, plate_number, make, model),
+          vehicle:vehicles_secure(id, plate_number, make, model),
           status:work_order_statuses(code, display_name)
         `)
         .eq('service_provider_id', prov.id)

@@ -33,9 +33,9 @@ export default function BookingsPage() {
         .from('bookings_secure')
         .select(`
           *,
-          service_provider:service_providers(name, phone, is_verified, verification_score),
-          shop:shops(name, town, county),
-          vehicle:vehicles(plate_number, make, model),
+          service_provider:service_providers_secure(name, phone, is_verified, verification_score),
+          shop:shops_secure(name, town, county),
+          vehicle:vehicles_secure(plate_number, make, model),
           status:booking_statuses(code, display_name, color_code),
           booking_services(
             service:services(name)

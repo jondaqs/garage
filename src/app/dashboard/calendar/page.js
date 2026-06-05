@@ -39,9 +39,9 @@ export default function BookingsCalendarPage() {
         .from('bookings_secure')
         .select(`
           *,
-          service_provider:service_providers(name),
-          shop:shops(name, town),
-          vehicle:vehicles(plate_number, make, model),
+          service_provider:service_providers_secure(name),
+          shop:shops_secure(name, town),
+          vehicle:vehicles_secure(plate_number, make, model),
           status:booking_statuses(code, display_name, color_code)
         `)
         .eq('customer_user_id', profile.id)

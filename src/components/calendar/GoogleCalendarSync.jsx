@@ -112,9 +112,9 @@ export default function GoogleCalendarSync() {
         .from('bookings_secure')
         .select(`
           *,
-          service_provider:service_providers(name),
-          shop:shops(name, town, county, street),
-          vehicle:vehicles(plate_number, make, model),
+          service_provider:service_providers_secure(name),
+          shop:shops_secure(name, town, county, street),
+          vehicle:vehicles_secure(plate_number, make, model),
           status:booking_statuses(code, display_name),
           booking_services(service:services(name))
         `)

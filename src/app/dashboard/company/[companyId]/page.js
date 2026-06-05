@@ -38,7 +38,7 @@ export default function MemberCompanyOverviewPage() {
       // Verify membership — user must be an active member of this specific company
       const { data: mem } = await supabase
         .from('company_users')
-        .select('is_admin, staff_role, company:company_profiles(id, name, status, bio, phone, website, city, country, opening_time, closing_time)')
+        .select('is_admin, staff_role, company:company_profiles_secure(id, name, status, bio, phone, website, city, country, opening_time, closing_time)')
         .eq('user_id', profile.id)
         .eq('company_id', companyId)
         .eq('is_active', true)

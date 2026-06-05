@@ -107,7 +107,7 @@ export default function CompanyReportsDashboardPage() {
       // ── Fleet vehicles ─────────────────────────────────────────────────
       const { data: fleetRows } = await supabase
         .from('vehicle_ownership')
-        .select('vehicle_id, vehicle:vehicles(id, plate_number, make, model)')
+        .select('vehicle_id, vehicle:vehicles_secure(id, plate_number, make, model)')
         .eq('owner_company_id', companyId)
       const fleet      = (fleetRows || []).map(r => r.vehicle).filter(Boolean)
       const vehicleIds = fleet.map(v => v.id)
@@ -147,7 +147,7 @@ export default function CompanyReportsDashboardPage() {
           opened_at, closed_at,
           vehicle_checked_in_at, vehicle_checked_out_at, completed_at,
           status:work_order_statuses(code, display_name, is_terminal),
-          service_provider:service_providers(name),
+          service_provider:service_providers_secure(name),
           currency:currencies(id, code, symbol)
         `)
         .in('vehicle_id', vehicleIds)

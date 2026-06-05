@@ -44,11 +44,11 @@ export default function RemindersPage() {
         .select(`
           id, title, message, reminder_type, trigger_value,
           scheduled_at, sent_at, is_active, created_at,
-          vehicle:vehicles(id, plate_number, make, model),
+          vehicle:vehicles_secure(id, plate_number, make, model),
           recommendation:maintenance_recommendations(
             id, note, priority, recommended_mileage, recommended_date,
             service:services(name),
-            work_order:work_orders(id, work_order_number)
+            work_order:work_orders_secure(id, work_order_number)
           )
         `)
         .eq('user_id', profile.id)

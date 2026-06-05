@@ -59,7 +59,7 @@ export default function CompanyDashboard() {
       } else {
         const { data: companyUser } = await supabase
           .from('company_users')
-          .select('company_id, company:company_profiles(id, name, status)')
+          .select('company_id, company:company_profiles_secure(id, name, status)')
           .eq('user_id', userProfile.id)
           .eq('is_active', true)
           .maybeSingle()
@@ -124,8 +124,8 @@ export default function CompanyDashboard() {
             .from('bookings_secure')
             .select(`
               id, booking_date, booking_time_start, created_at,
-              vehicle:vehicles(plate_number, make, model),
-              provider:service_providers(name),
+              vehicle:vehicles_secure(plate_number, make, model),
+              provider:service_providers_secure(name),
               status:booking_statuses(code, display_name)
             `)
             .in('vehicle_id', vehicleIds)

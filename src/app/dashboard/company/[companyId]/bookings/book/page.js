@@ -88,7 +88,7 @@ export default function MemberBookServicePage() {
         .from('vehicle_ownership')
         .select(`
           vehicle_id,
-          vehicle:vehicles(id, plate_number, make, model, year_of_manufacture, color)
+          vehicle:vehicles_secure(id, plate_number, make, model, year_of_manufacture, color)
         `)
         .eq('owner_company_id', companyId)
 
@@ -100,7 +100,7 @@ export default function MemberBookServicePage() {
         .select(`
           *,
           provider_type:service_provider_types(display_name, code),
-          shops(id, name, town, county, latitude, longitude),
+          shops_secure(id, name, town, county, latitude, longitude),
           provider_reviews(rating)
         `)
         .eq('status', 'active')

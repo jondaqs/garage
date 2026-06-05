@@ -38,7 +38,7 @@ export async function POST(request) {
     // Look up invitation by invitation_token (NOT 'token' — that column doesn't exist)
     const { data: invitation, error: invitationError } = await supabase
       .from('company_invitations_secure')
-      .select('*, company:company_profiles(id, name)')
+      .select('*, company:company_profiles_secure(id, name)')
       .eq('invitation_token', body.token)
       .maybeSingle()
 

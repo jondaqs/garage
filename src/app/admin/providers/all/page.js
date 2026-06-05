@@ -151,9 +151,9 @@ export default function AllProvidersPage() {
           .from('service_providers_secure')
           .select(`
             id, name, status, is_active, is_verified, created_at, submitted_at,
-            owner:user_profiles(id, auth_user_id, first_name, last_name, email),
+            owner:user_profiles_secure(id, auth_user_id, first_name, last_name, email),
             provider_type:service_provider_types(display_name),
-            shops(id)
+            shops_secure(id)
           `, { count: 'exact' })
           .order('created_at', { ascending: false })
 

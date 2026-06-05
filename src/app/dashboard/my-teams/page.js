@@ -46,7 +46,7 @@ export default function MyTeamsPage() {
           is_active,
           is_verified,
           joined_at,
-          service_provider:service_providers(
+          service_provider:service_providers_secure(
             id, name, phone, email, country
           )
         `)
@@ -117,7 +117,7 @@ export default function MyTeamsPage() {
         .from('team_invitations_secure')
         .select(`
           id, role, specialization, experience_years, invited_at, expires_at,
-          service_provider:service_providers(id, name, email, phone)
+          service_provider:service_providers_secure(id, name, email, phone)
         `)
         .eq('invited_email_idx', inviteEmailIdx)
         .eq('status', 'pending')

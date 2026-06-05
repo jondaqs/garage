@@ -59,7 +59,7 @@ export default function CompanyLayout({ children }) {
             // Check if user is a company member
             const { data: companyMember } = await supabase
                 .from('company_users')
-                .select('*, company:company_profiles(*)')
+                .select('*, company:company_profiles_secure(*)')
                 .eq('user_id', profile.id)
                 .eq('is_active', true)
                 .maybeSingle()

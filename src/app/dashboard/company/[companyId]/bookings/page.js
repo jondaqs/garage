@@ -95,8 +95,8 @@ export default function MemberBookingsPage() {
           id, booking_number, booking_date, booking_time_start,
           created_at,
           status:booking_statuses(code, display_name, color_code),
-          vehicle:vehicles(plate_number, make, model),
-          provider:service_providers(name, is_verified, verification_score),
+          vehicle:vehicles_secure(plate_number, make, model),
+          provider:service_providers_secure(name, is_verified, verification_score),
           bookedBy:user_profiles!bookings_customer_user_id_fkey(first_name, last_name)
         `)
         .in('vehicle_id', vehicleIds)

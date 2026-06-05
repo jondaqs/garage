@@ -39,7 +39,7 @@ export async function GET(request) {
       .from('mechanics')
       .select(`
         *,
-        user:user_profiles(
+        user:user_profiles_secure(
           id,
           auth_user_id,
           first_name,
@@ -103,7 +103,7 @@ export async function PATCH(request) {
       .from('mechanics')
       .select(`
         *,
-        service_provider:service_providers(owner_user_id)
+        service_provider:service_providers_secure(owner_user_id)
       `)
       .eq('id', mechanic_id)
       .single()
@@ -174,7 +174,7 @@ export async function DELETE(request) {
       .from('mechanics')
       .select(`
         *,
-        service_provider:service_providers(owner_user_id)
+        service_provider:service_providers_secure(owner_user_id)
       `)
       .eq('id', mechanic_id)
       .single()
