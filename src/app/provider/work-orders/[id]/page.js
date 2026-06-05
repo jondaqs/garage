@@ -282,7 +282,16 @@ export default function WorkOrderDetailPage() {
         }
       })
 
-      setMechanics(merged)
+      // Deduplicate by user_id — keep the entry with a specialization if one exists
+      const seen = new Map()
+      for (const m of merged) {
+        const existing = seen.get(m.user_id)
+        if (!existing || (!existing.specialization && m.specialization)) {
+          seen.set(m.user_id, m)
+        }
+      }
+
+      setMechanics([...seen.values()])
     } catch (e) {
       console.error('loadMechanics error:', e.message)
     }
