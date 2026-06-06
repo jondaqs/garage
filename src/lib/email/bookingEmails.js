@@ -57,7 +57,7 @@ export async function sendBookingConfirmationEmail(supabase, {
   // ── Branched copy depending on who initiated the booking ──────────────
   const subject = isProviderInitiated
     ? `Booking Scheduled — ${bookingNumber} · ${providerName}`
-    : `Booking Confirmed — ${bookingNumber} · ${providerName}`
+    : `Booking Received — ${bookingNumber} · ${providerName}`
 
   const headerStrap = isProviderInitiated ? '✅ Booking Confirmed' : '📅 Booking Received'
 
