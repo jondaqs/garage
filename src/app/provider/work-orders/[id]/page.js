@@ -129,17 +129,7 @@ export default function WorkOrderDetailPage() {
         { p_work_order_id: params.id, p_requesting_user_id: user.id }
       )
 
-      console.log('[WO-DEBUG] RPC result:', { rpcErr, success: result?.success, hasData: !!result?.data })
       if (result?.data) {
-        console.log('[WO-DEBUG] RPC owner:', JSON.stringify(result.data.owner))
-        console.log('[WO-DEBUG] RPC walk_in fields:', {
-          walk_in_owner_name: result.data.walk_in_owner_name,
-          walk_in_owner_phone: result.data.walk_in_owner_phone,
-          walk_in_owner_email: result.data.walk_in_owner_email,
-          is_walk_in: result.data.is_walk_in,
-        })
-        console.log('[WO-DEBUG] RPC booking:', JSON.stringify(result.data.booking))
-        console.log('[WO-DEBUG] RPC vehicle_id:', result.data.vehicle_id)
       }
 
       if (!rpcErr && result?.success) {
@@ -147,7 +137,6 @@ export default function WorkOrderDetailPage() {
         return
       }
 
-      console.log('[WO-DEBUG] RPC failed, falling back to direct query. rpcErr:', rpcErr, 'result:', result)
 
       // Fallback direct query — use _secure views for PII-decrypted fields
       const { data, error: fetchErr } = await supabase
@@ -172,14 +161,6 @@ export default function WorkOrderDetailPage() {
         .single()
 
       if (fetchErr) throw fetchErr
-      console.log('[WO-DEBUG] Fallback query result keys:', Object.keys(data))
-      console.log('[WO-DEBUG] Fallback walk_in fields:', {
-        walk_in_owner_name: data.walk_in_owner_name,
-        walk_in_owner_phone: data.walk_in_owner_phone,
-        walk_in_owner_email: data.walk_in_owner_email,
-        is_walk_in: data.is_walk_in,
-      })
-      console.log('[WO-DEBUG] Fallback booking:', JSON.stringify(data.booking))
       setWo(data)
 
       // Check if issues are populated (for Send Estimates gate)
@@ -657,15 +638,6 @@ export default function WorkOrderDetailPage() {
 
   // Resolve owner from ALL available sources (handles both RPC & fallback paths)
   // Priority: 1) Booking customer  2) RPC-built wo.owner  3) Flat walk-in fields on WO
-  console.log('[WO-DEBUG] ── resolvedOwner inputs ──')
-  console.log('[WO-DEBUG] customer (from booking):', JSON.stringify(customer))
-  console.log('[WO-DEBUG] wo.owner:', JSON.stringify(wo.owner))
-  console.log('[WO-DEBUG] wo.walk_in_owner_name:', wo.walk_in_owner_name)
-  console.log('[WO-DEBUG] wo.walk_in_owner_phone:', wo.walk_in_owner_phone)
-  console.log('[WO-DEBUG] wo.walk_in_owner_email:', wo.walk_in_owner_email)
-  console.log('[WO-DEBUG] wo.is_walk_in:', wo.is_walk_in)
-  console.log('[WO-DEBUG] wo.booking_id:', wo.booking_id)
-  console.log('[WO-DEBUG] wo.vehicle_id:', wo.vehicle_id)
   const resolvedOwner = (() => {
     // 1. Booking customer (joined via booking relation)
     if (customer.first_name || customer.phone || customer.email) {
@@ -689,7 +661,6 @@ export default function WorkOrderDetailPage() {
     if (wo.owner && wo.owner.owner_type) return wo.owner
     return null
   })()
-  console.log('[WO-DEBUG] ── resolvedOwner result ──', JSON.stringify(resolvedOwner))
 
   const shop          = wo.shop     || {}
   const mechanic      = wo.mechanic || {}
