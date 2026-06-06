@@ -17,6 +17,7 @@ export default function ProviderSidebar({ provider }) {
 
   const [mobileOpen,        setMobileOpen]        = useState(false)
   const [activeWoCount,     setActiveWoCount]     = useState(0)
+  const [pendingBookings,   setPendingBookings]   = useState(0)
   const [unreadChats,       setUnreadChats]       = useState(0)
   const [unreadPeer,        setUnreadPeer]        = useState(0)
   const [upcomingCount,     setUpcomingCount]     = useState(0)
@@ -88,6 +89,25 @@ export default function ProviderSidebar({ provider }) {
     } catch {}
   }, [provider?.id])
 
+  // ── Pending bookings awaiting provider confirmation ──
+  const loadPendingBookings = useCallback(async () => {
+    try {
+      if (!provider?.id) return
+      const { data: statuses } = await supabase
+        .from('booking_statuses').select('id').eq('code', 'pending')
+      const ids = (statuses || []).map(s => s.id)
+      if (ids.length === 0) { setPendingBookings(0); return }
+
+      const { count } = await supabase
+        .from('bookings_secure')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_provider_id', provider.id)
+        .in('status_id', ids)
+
+      setPendingBookings(count || 0)
+    } catch {}
+  }, [provider?.id])
+
   // ── Initial load + realtime ──────────────────────────────────────────────
   useEffect(() => {
     if (!provider?.id) return
@@ -95,6 +115,7 @@ export default function ProviderSidebar({ provider }) {
     loadUnreadChats()
     loadUnreadPeer()
     loadUpcomingCount()
+    loadPendingBookings()
 
     const convChannel = supabase
       .channel(`prov-sidebar-convs-${provider.id}`)
@@ -125,7 +146,7 @@ export default function ProviderSidebar({ provider }) {
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'bookings',
         filter: `service_provider_id=eq.${provider.id}`,
-      }, () => loadUpcomingCount())
+      }, () => { loadUpcomingCount(); loadPendingBookings() })
       .subscribe()
 
     return () => {
@@ -134,7 +155,7 @@ export default function ProviderSidebar({ provider }) {
       supabase.removeChannel(peerRecipChannel)
       supabase.removeChannel(bookingsChannel)
     }
-  }, [provider?.id, loadUnreadChats, loadUnreadPeer, loadUpcomingCount])
+  }, [provider?.id, loadUnreadChats, loadUnreadPeer, loadUpcomingCount, loadPendingBookings])
 
   const loadActiveWoCount = async (providerId) => {
     try {
@@ -154,7 +175,8 @@ export default function ProviderSidebar({ provider }) {
 
   const navigation = [
     { name: 'Dashboard',        href: '/provider/dashboard',   icon: LayoutDashboard },
-    { name: 'Bookings',         href: '/provider/bookings',    icon: Calendar        },
+    { name: 'Bookings',         href: '/provider/bookings',    icon: Calendar,
+      badge: pendingBookings > 0 ? pendingBookings : null },
     { name: 'Calendar',         href: '/provider/calendar',    icon: CalendarDays,
       badge: upcomingCount > 0 ? upcomingCount : null },
     { name: 'Work Orders',      href: '/provider/work-orders', icon: FileText,
