@@ -137,7 +137,32 @@ export default function MechanicWorkOrderPage() {
       if (mechResult?.success) {
         result = mechResult
         setWo(result.work_order)
-        setPerms(result.mechanic_permissions)
+        const mechPerms = result.mechanic_permissions || {}
+
+        // Also load SPU permissions — the user may be both a mechanic AND
+        // an admin/manager. Mechanic RPC only returns mechanics-table perms,
+        // which may be all false. The SPU row carries the real role + perms.
+        const { data: spuCheck } = await supabase.rpc(
+          'get_provider_member_work_order',
+          { p_work_order_id: params.id, p_user_id: user.id }
+        )
+        const spuPerms = spuCheck?.success ? (spuCheck.member_permissions || {}) : {}
+
+        if (spuPerms.role) {
+          setMemberPerms(spuPerms)
+        }
+
+        // Merge: either source can grant a permission (union, not intersection)
+        setPerms({
+          mechanic_id:          mechPerms.mechanic_id,
+          can_approve_work:     !!(mechPerms.can_approve_work     || spuPerms.can_approve_work),
+          can_manage_inventory: !!(mechPerms.can_manage_inventory || spuPerms.can_manage_inventory),
+          can_manage_team:      !!(mechPerms.can_manage_team      || spuPerms.can_manage_team),
+          can_send_estimates:   !!(mechPerms.can_send_estimates   || spuPerms.can_send_estimates),
+          can_send_invoice:     !!(mechPerms.can_send_invoice     || spuPerms.can_send_invoice),
+          is_assigned:          mechPerms.is_assigned,
+          is_mechanic:          true,
+        })
       } else {
         // Fall back to SPU-based access (admin, accountant, manager, owner)
         const { data: spuResult, error: spuErr } = await supabase.rpc(
