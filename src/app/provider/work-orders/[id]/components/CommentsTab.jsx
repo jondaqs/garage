@@ -21,7 +21,7 @@ export default function CommentsTab({ workOrder }) {
         .from('comments')
         .select(`
           id, content, comment_type, is_internal, created_at,
-          author:user_profiles!author_user_id(id, first_name, last_name)
+          author:user_profiles_secure!author_user_id(id, first_name, last_name)
         `)
         .eq('work_order_id', workOrder.id)
         .order('created_at', { ascending: true })
@@ -51,7 +51,7 @@ export default function CommentsTab({ workOrder }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile }  = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { error: insertErr } = await supabase.from('comments').insert({
         work_order_id:  workOrder.id,

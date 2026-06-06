@@ -80,7 +80,7 @@ export default function MemberTeamPage() {
           id, staff_role, is_admin, is_active, created_at,
           can_approve_work, can_manage_team, can_manage_fleet,
           can_approve_estimates, can_approve_checkout, can_approve_payment, can_chat,
-          user:user_profiles!company_users_user_id_fkey(
+          user:user_profiles_secure!company_users_user_id_fkey(
             id, first_name, last_name, email, phone
           )
         `)
@@ -179,7 +179,7 @@ export default function MemberTeamPage() {
     setInviting(true); setInviteError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      const { data: profile } = await supabase.from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { data: invData, error: invErr } = await supabase.from('company_invitations').insert({
         company_id: companyId, invited_by: profile.id,
         email: inviteForm.email.trim(), first_name: inviteForm.firstName.trim() || null,

@@ -162,7 +162,7 @@ export default function WorkOrderDetailPage() {
             id, user_id, specialization,
             user:user_profiles_secure(first_name, last_name, phone)
           ),
-          booking:bookings!booking_id(
+          booking:bookings_secure!booking_id(
             booking_number, customer_user_id,
             customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
             booking_services(service:services(name), estimated_cost, notes)
@@ -542,7 +542,7 @@ export default function WorkOrderDetailPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile }  = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { error: insertErr } = await supabase.from('comments').insert({
         work_order_id: params.id, author_user_id: profile.id,
         comment_type: 'internal_note', content: internalNote, is_internal: true,

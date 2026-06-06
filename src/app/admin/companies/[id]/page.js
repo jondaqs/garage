@@ -113,7 +113,7 @@ export default function CompanyDetailPage({ params }) {
       // ── Company profile ──
       const { data: companyData, error: companyError } = await supabase
         .from('company_profiles_secure')
-        .select('*, owner:user_profiles!company_profiles_owner_user_id_fkey(id, first_name, last_name, phone, email)')
+        .select('*, owner:user_profiles_secure!company_profiles_owner_user_id_fkey(id, first_name, last_name, phone, email)')
         .eq('id', companyId)
         .single()
 
@@ -155,7 +155,7 @@ export default function CompanyDetailPage({ params }) {
         .from('company_users')
         .select(`
           id, staff_role, is_admin, is_active, created_at,
-          user:user_profiles!company_users_user_id_fkey(
+          user:user_profiles_secure!company_users_user_id_fkey(
             id, first_name, last_name, email, phone
           )
         `)

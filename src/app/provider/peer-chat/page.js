@@ -121,9 +121,9 @@ export default function ProviderPeerChatPage() {
       last_message_at, last_message_preview, updated_at, created_at,
       initiator_provider_id, recipient_provider_id,
       initiator_unread_count, recipient_unread_count,
-      closed_by:user_profiles!closed_by_id(id, first_name, last_name),
-      initiator:service_providers!initiator_provider_id(id, name, is_verified),
-      recipient:service_providers!recipient_provider_id(id, name, is_verified)
+      closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
+      initiator:service_providers_secure!initiator_provider_id(id, name, is_verified),
+      recipient:service_providers_secure!recipient_provider_id(id, name, is_verified)
     `
 
     let qInit  = supabase.from('peer_conversations').select(baseSelect)
@@ -217,7 +217,7 @@ export default function ProviderPeerChatPage() {
       .from('peer_messages')
       .select(`
         id, body, sender_id, sender_provider_id, created_at, is_read,
-        sender:user_profiles!sender_id(id, first_name, last_name)
+        sender:user_profiles_secure!sender_id(id, first_name, last_name)
       `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })

@@ -156,8 +156,8 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
           .from('vehicle_ownership')
           .select(`
             owner_user_id, owner_company_id,
-            user_profiles!vehicle_ownership_owner_user_id_fkey(first_name, last_name, email, phone),
-            company_profiles!vehicle_ownership_owner_company_id_fkey(name, phone, email)
+            user_profiles_secure!vehicle_ownership_owner_user_id_fkey(first_name, last_name, email, phone),
+            company_profiles_secure!vehicle_ownership_owner_company_id_fkey(name, phone, email)
           `)
           .eq('vehicle_id', inv.vehicle_id)
           .maybeSingle()

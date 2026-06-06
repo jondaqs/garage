@@ -82,7 +82,7 @@ export async function POST(request, context) {
       reminder_sent_at, customer_user_id, service_provider_id, customer_phone,
       customer_email,
       status:booking_statuses(code, display_name),
-      customer:user_profiles!customer_user_id(id, first_name, last_name, phone, email),
+      customer:user_profiles_secure!customer_user_id(id, first_name, last_name, phone, email),
       vehicle:vehicles_secure(plate_number, make, model),
       shop:shops_secure(name, town),
       provider:service_providers_secure(id, name, owner_user_id),

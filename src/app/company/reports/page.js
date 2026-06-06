@@ -99,7 +99,7 @@ export default function CompanyReportsPage() {
         .from('company_users')
         .select(`
           id, staff_role, is_admin,
-          user:user_profiles!company_users_user_id_fkey(first_name, last_name)
+          user:user_profiles_secure!company_users_user_id_fkey(first_name, last_name)
         `)
         .eq('company_id', companyId)
         .eq('is_active', true)
@@ -246,7 +246,7 @@ export default function CompanyReportsPage() {
           .neq('status', 'paid'),
 
         supabase.from('work_order_checkouts')
-          .select('id, work_order:work_orders!inner(vehicle_id)', { count: 'exact', head: true })
+          .select('id, work_order:work_orders_secure!inner(vehicle_id)', { count: 'exact', head: true })
           .in('work_order.vehicle_id', vehicleIds)
           .eq('customer_acceptance_status', 'pending'),
       ])

@@ -87,7 +87,7 @@ export default function ProviderWorkOrdersPage() {
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops_secure(name, town),
           mechanic:mechanics(user:user_profiles_secure(first_name, last_name)),
-          booking:bookings!booking_id(booking_number)
+          booking:bookings_secure!booking_id(booking_number)
         `)
         .eq('service_provider_id', provider.id)
         .order('opened_at', { ascending: false })

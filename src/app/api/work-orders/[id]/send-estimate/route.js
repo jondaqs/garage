@@ -144,7 +144,7 @@ export async function POST(request, { params }) {
     // ── 3. Resolve vehicle plate ──────────────────────────────────────────────
     const { data: woData } = await sc
       .from('work_orders_secure')
-      .select('vehicle:vehicles!vehicle_id(plate_number)')
+      .select('vehicle:vehicles_secure!vehicle_id(plate_number)')
       .eq('id', workOrderId)
       .maybeSingle()
     const vehiclePlate = woData?.vehicle?.plate_number || ''

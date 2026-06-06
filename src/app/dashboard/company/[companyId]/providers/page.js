@@ -51,7 +51,7 @@ export default function CompanyMemberProvidersPage() {
       if (!profile) { setAuthState('denied'); setDenyReason('Profile not found'); return }
       const { data: cu } = await supabase
         .from('company_users')
-        .select('is_admin, can_chat, is_active, company_profiles!company_id(id, name)')
+        .select('is_admin, can_chat, is_active, company_profiles_secure!company_id(id, name)')
         .eq('user_id', profile.id)
         .eq('company_id', companyId)
         .maybeSingle()

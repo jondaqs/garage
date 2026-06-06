@@ -59,7 +59,7 @@ export async function POST(request) {
     if (conv.company_id) {
       const { data: members } = await db
         .from('company_users')
-        .select('user_id, user_profiles!user_id(id, first_name, last_name, email, phone)')
+        .select('user_id, user_profiles_secure!user_id(id, first_name, last_name, email, phone)')
         .eq('company_id', conv.company_id)
         .eq('is_active', true)
         .eq('can_chat', true)

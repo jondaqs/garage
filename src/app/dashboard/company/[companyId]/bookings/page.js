@@ -97,7 +97,7 @@ export default function MemberBookingsPage() {
           status:booking_statuses(code, display_name, color_code),
           vehicle:vehicles_secure(plate_number, make, model),
           provider:service_providers_secure(name, is_verified, verification_score),
-          bookedBy:user_profiles!bookings_customer_user_id_fkey(first_name, last_name)
+          bookedBy:user_profiles_secure!bookings_customer_user_id_fkey(first_name, last_name)
         `)
         .in('vehicle_id', vehicleIds)
         .order('booking_date', { ascending: false })

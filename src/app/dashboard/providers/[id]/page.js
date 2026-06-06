@@ -74,7 +74,7 @@ export default function ProviderDetailPage() {
         .from('provider_reviews')
         .select(`
           id, rating, title, body, review_text, created_at, is_verified, provider_response,
-          reviewer:user_profiles!customer_user_id(first_name, last_name)
+          reviewer:user_profiles_secure!customer_user_id(first_name, last_name)
         `)
         .eq('service_provider_id', id)
         .eq('is_approved', true)

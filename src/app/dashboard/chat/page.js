@@ -55,7 +55,7 @@ export default function ChatPage() {
       .from('conversations')
       .select(`
         id, updated_at, last_message_at, last_message_preview, user_unread_count, status,
-        closed_at, closed_by:user_profiles!closed_by_id(id, first_name, last_name),
+        closed_at, closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
         provider:service_providers_secure(id, name, is_verified)
       `)
       .eq('user_id', profile.id)
@@ -179,7 +179,7 @@ export default function ChatPage() {
       .from('messages')
       .select(`
         id, body, sender_id, sender_role, created_at, is_read,
-        sender:user_profiles!sender_id(id, first_name, last_name)
+        sender:user_profiles_secure!sender_id(id, first_name, last_name)
       `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })

@@ -39,7 +39,7 @@ export default function ManageBookingPage() {
         .from('bookings_secure')
         .select(`
           *,
-          customer:user_profiles!customer_user_id(first_name, last_name, phone, email),
+          customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
           shop:shops_secure(name, town, county, street),
           vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture),
           status:booking_statuses(code, display_name, color_code),
@@ -143,7 +143,7 @@ export default function ManageBookingPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile }  = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       const { error: insertErr } = await supabase
         .from('booking_messages')
         .insert({ booking_id: params.id, sender_user_id: profile.id, message: newMessage })

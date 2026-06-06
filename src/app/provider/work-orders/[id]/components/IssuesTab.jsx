@@ -44,7 +44,7 @@ export default function IssuesTab({ workOrder, onIssueAdded, readOnly = false })
         .select(`
           id, title, description, severity, status,
           requires_approval, reported_at, resolved_at,
-          reporter:user_profiles!reported_by_user_id(first_name, last_name)
+          reporter:user_profiles_secure!reported_by_user_id(first_name, last_name)
         `)
         .eq('work_order_id', workOrder.id)
         .order('reported_at', { ascending: false })

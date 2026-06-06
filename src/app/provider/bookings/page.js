@@ -39,7 +39,7 @@ export default function ProviderBookingsPage() {
         .from('bookings_secure')
         .select(`
           *,
-          customer:user_profiles!customer_user_id(first_name, last_name, phone),
+          customer:user_profiles_secure!customer_user_id(first_name, last_name, phone),
           shop:shops_secure(name),
           vehicle:vehicles_secure(plate_number, make, model),
           status:booking_statuses(code, display_name, color_code),

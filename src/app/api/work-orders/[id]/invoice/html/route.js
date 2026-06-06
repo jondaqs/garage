@@ -154,7 +154,7 @@ export async function GET(_request, { params }) {
     if (!ownerName) {
       const { data: booking } = await sc
         .from('bookings_secure')
-        .select('customer:user_profiles!customer_user_id(first_name, last_name)')
+        .select('customer:user_profiles_secure!customer_user_id(first_name, last_name)')
         .eq('work_order_id', workOrderId).maybeSingle()
       if (booking?.customer) {
         ownerName = `${booking.customer.first_name || ''} ${booking.customer.last_name || ''}`.trim() || null

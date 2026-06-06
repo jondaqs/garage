@@ -204,7 +204,7 @@ export async function POST(request, { params }) {
     if (recipients.length === 0) {
       const { data: booking } = await sc
         .from('bookings_secure')
-        .select('customer_user_id, customer_email, customer_phone, customer:user_profiles!customer_user_id(first_name, last_name, phone, email, auth_user_id)')
+        .select('customer_user_id, customer_email, customer_phone, customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email, auth_user_id)')
         .eq('work_order_id', workOrderId).maybeSingle()
 
       if (booking?.customer_user_id) {
@@ -246,7 +246,7 @@ export async function POST(request, { params }) {
     if (!billToName) billToName = 'Customer'
 
     // Resolve vehicle plate (used in both the attachment and notifications).
-    const { data: veh } = await sc.from('vehicles').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
+    const { data: veh } = await sc.from('vehicles_secure').select('plate_number').eq('id', wo.vehicle_id).maybeSingle()
     const vehiclePlate  = veh?.plate_number || ''
 
     // ── 6. Mark invoice as sent (once, regardless of recipient count) ─────

@@ -417,7 +417,7 @@ export async function PATCH(request, { params }) {
     if (statusCode.startsWith('cancelled')) {
       try {
         const { data: providerRow } = await sc
-          .from('service_providers')
+          .from('service_providers_secure')
           .select('owner_user_id, id')
           .eq('id', booking.service_provider?.id)
           .maybeSingle()

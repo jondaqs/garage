@@ -75,7 +75,7 @@ export default function CompanyOwnerChatPage() {
       // param because there isn't one for this surface.
       const { data: cu } = await supabase
         .from('company_users')
-        .select('company_id, is_admin, can_chat, is_active, company_profiles!company_id(id, name)')
+        .select('company_id, is_admin, can_chat, is_active, company_profiles_secure!company_id(id, name)')
         .eq('user_id', prof.id)
         .eq('is_active', true)
         .eq('is_admin', true)
@@ -100,9 +100,9 @@ export default function CompanyOwnerChatPage() {
       .select(`
         id, updated_at, last_message_at, last_message_preview,
         company_unread_count, status, closed_at,
-        closed_by:user_profiles!closed_by_id(id, first_name, last_name),
-        provider:service_providers!service_provider_id(id, name, is_verified),
-        opened_by:user_profiles!user_id(id, first_name, last_name)
+        closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
+        provider:service_providers_secure!service_provider_id(id, name, is_verified),
+        opened_by:user_profiles_secure!user_id(id, first_name, last_name)
       `)
       .eq('company_id', company.id)
       .order('last_message_at', { ascending: false, nullsFirst: false })
@@ -198,8 +198,8 @@ export default function CompanyOwnerChatPage() {
       })
       .select(`
         id, updated_at, last_message_at, last_message_preview, company_unread_count, status,
-        provider:service_providers!service_provider_id(id, name, is_verified),
-        opened_by:user_profiles!user_id(id, first_name, last_name)
+        provider:service_providers_secure!service_provider_id(id, name, is_verified),
+        opened_by:user_profiles_secure!user_id(id, first_name, last_name)
       `)
       .single()
 
@@ -223,7 +223,7 @@ export default function CompanyOwnerChatPage() {
       .from('messages')
       .select(`
         id, body, sender_id, sender_role, created_at, is_read,
-        sender:user_profiles!sender_id(id, first_name, last_name)
+        sender:user_profiles_secure!sender_id(id, first_name, last_name)
       `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })

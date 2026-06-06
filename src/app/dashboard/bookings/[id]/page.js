@@ -92,7 +92,7 @@ export default function BookingDetailPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase
-        .from('user_profiles')
+        .from('user_profiles_secure')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()

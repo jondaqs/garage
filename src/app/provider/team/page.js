@@ -98,7 +98,7 @@ export default function ProviderTeamPage() {
           is_active, is_verified,
           can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates,
           can_send_invoice, can_chat,
-          user:user_profiles!user_id(first_name, last_name, email, phone)
+          user:user_profiles_secure!user_id(first_name, last_name, email, phone)
         `)
         .eq('service_provider_id', pId)
         .eq('is_active', true)

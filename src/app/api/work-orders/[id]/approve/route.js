@@ -71,7 +71,7 @@ export async function POST(request, { params }) {
 
     const { data: spOwner } = await sc
       .from('service_providers_secure')
-      .select('owner_user_id, email, user_profiles!owner_user_id(first_name, last_name, email, phone)')
+      .select('owner_user_id, email, user_profiles_secure!owner_user_id(first_name, last_name, email, phone)')
       .eq('id', provider_id).maybeSingle()
     if (spOwner?.owner_user_id) {
       addR({
@@ -85,7 +85,7 @@ export async function POST(request, { params }) {
 
     const { data: spuList } = await sc
       .from('service_provider_users')
-      .select('user_id, user_profiles!user_id(first_name, last_name, email, phone)')
+      .select('user_id, user_profiles_secure!user_id(first_name, last_name, email, phone)')
       .eq('service_provider_id', provider_id).eq('is_active', true)
       .in('role', ['admin', 'manager', 'accountant'])
     for (const s of spuList || []) {
@@ -94,7 +94,7 @@ export async function POST(request, { params }) {
 
     const { data: mechList } = await sc
       .from('mechanics')
-      .select('user_id, user_profiles!user_id(first_name, last_name, email, phone)')
+      .select('user_id, user_profiles_secure!user_id(first_name, last_name, email, phone)')
       .eq('service_provider_id', provider_id).eq('is_active', true).eq('can_approve_work', true)
     for (const m of mechList || []) {
       addR({ user_id: m.user_id, first_name: m.user_profiles?.first_name, last_name: m.user_profiles?.last_name, email: m.user_profiles?.email, phone: m.user_profiles?.phone })

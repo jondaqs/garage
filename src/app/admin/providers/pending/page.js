@@ -103,7 +103,7 @@ export default function PendingProvidersPage() {
       // Resolve admin profile id
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
       if (!adminProfile) throw new Error('Admin profile not found')
 
       // Update provider status

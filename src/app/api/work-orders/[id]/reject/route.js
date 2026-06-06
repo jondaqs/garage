@@ -40,7 +40,7 @@ export async function POST(request, { params }) {
         service_provider_id,
         vehicle:vehicles_secure(plate_number),
         provider:service_providers_secure(email, owner_user_id,
-          owner:user_profiles!owner_user_id(phone)
+          owner:user_profiles_secure!owner_user_id(phone)
         )
       `)
       .eq('id', workOrderId)

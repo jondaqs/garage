@@ -214,7 +214,7 @@ export default function UserReportsPage() {
           .neq('status', 'paid'),
 
         supabase.from('work_order_checkouts')
-          .select('id, work_order:work_orders!inner(vehicle_id)', { count: 'exact', head: true })
+          .select('id, work_order:work_orders_secure!inner(vehicle_id)', { count: 'exact', head: true })
           .in('work_order.vehicle_id', vehicleIds)
           .eq('customer_acceptance_status', 'pending'),
       ])

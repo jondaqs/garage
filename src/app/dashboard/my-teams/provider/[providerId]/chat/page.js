@@ -128,9 +128,9 @@ export default function ProviderMemberChatPage() {
       .select(`
         id, updated_at, last_message_at, last_message_preview,
         provider_unread_count, status, closed_at, company_id,
-        closed_by:user_profiles!closed_by_id(id, first_name, last_name),
-        user:user_profiles!user_id(id, first_name, last_name),
-        company:company_profiles!company_id(id, name)
+        closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
+        user:user_profiles_secure!user_id(id, first_name, last_name),
+        company:company_profiles_secure!company_id(id, name)
       `)
       .eq('service_provider_id', providerId)
       .order('last_message_at', { ascending: false, nullsFirst: false })
@@ -222,7 +222,7 @@ export default function ProviderMemberChatPage() {
       .from('messages')
       .select(`
         id, body, sender_id, sender_role, created_at, is_read,
-        sender:user_profiles!sender_id(id, first_name, last_name)
+        sender:user_profiles_secure!sender_id(id, first_name, last_name)
       `)
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })

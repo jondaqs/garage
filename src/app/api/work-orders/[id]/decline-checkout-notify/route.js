@@ -66,7 +66,7 @@ export async function POST(request, { params }) {
     // Provider owner
     const { data: spOwner } = await sc
       .from('service_providers_secure')
-      .select('owner_user_id, user_profiles!owner_user_id(first_name, last_name, email, phone)')
+      .select('owner_user_id, user_profiles_secure!owner_user_id(first_name, last_name, email, phone)')
       .eq('id', wo.service_provider_id)
       .maybeSingle()
     if (spOwner?.owner_user_id) {
@@ -82,7 +82,7 @@ export async function POST(request, { params }) {
     // SPU staff
     const { data: spuList } = await sc
       .from('service_provider_users')
-      .select('user_id, user_profiles!user_id(first_name, last_name, email, phone)')
+      .select('user_id, user_profiles_secure!user_id(first_name, last_name, email, phone)')
       .eq('service_provider_id', wo.service_provider_id)
       .eq('is_active', true)
       .in('role', ['admin', 'manager', 'accountant'])
@@ -99,7 +99,7 @@ export async function POST(request, { params }) {
     // Mechanics with can_approve_work
     const { data: mechList } = await sc
       .from('mechanics')
-      .select('user_id, user_profiles!user_id(first_name, last_name, email, phone)')
+      .select('user_id, user_profiles_secure!user_id(first_name, last_name, email, phone)')
       .eq('service_provider_id', wo.service_provider_id)
       .eq('is_active', true)
       .eq('can_approve_work', true)

@@ -125,7 +125,7 @@ export async function POST(request) {
         .insert({ service_provider_id, service_id: newService.id, is_active: true })
         .onConflict('service_provider_id,service_id').ignore()
 
-      const { data: prov } = await sc.from('service_providers')
+      const { data: prov } = await sc.from('service_providers_secure')
         .select('name').eq('id', service_provider_id).maybeSingle()
       providerName = prov?.name || null
     }

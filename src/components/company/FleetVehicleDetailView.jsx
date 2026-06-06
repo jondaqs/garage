@@ -236,7 +236,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         .select(`
           id, status, requested_at, request_reason,
           requested_by_user_id,
-          requester:user_profiles!requested_by_user_id(first_name, last_name)
+          requester:user_profiles_secure!requested_by_user_id(first_name, last_name)
         `)
         .eq('vehicle_id', vehicleId)
         .eq('status', 'pending')
@@ -333,7 +333,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         .select(`
           id, status, requested_at, request_reason,
           requested_by_user_id,
-          requester:user_profiles!requested_by_user_id(first_name, last_name)
+          requester:user_profiles_secure!requested_by_user_id(first_name, last_name)
         `)
         .eq('vehicle_id', vehicleId)
         .eq('status', 'pending')

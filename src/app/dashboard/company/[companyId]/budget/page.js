@@ -142,7 +142,7 @@ export default function CompanyBudgetDashboardPage() {
         amount_paid,
         invoice:invoices!inner(
           vehicle_id, status,
-          work_order:work_orders!inner(
+          work_order:work_orders_secure!inner(
             currency:currencies(id, code, symbol)
           )
         )
@@ -187,7 +187,7 @@ export default function CompanyBudgetDashboardPage() {
           amount_paid,
           invoice:invoices!inner(
             id, vehicle_id, status,
-            work_order:work_orders!inner(
+            work_order:work_orders_secure!inner(
               currency:currencies(id, code, symbol)
             )
           )

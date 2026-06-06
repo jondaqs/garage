@@ -223,7 +223,7 @@ async function notifyOwnerAndAdminsBackground({
     sc.from('service_provider_users')
       .select(`
         role, user_id, is_active,
-        user:user_profiles!service_provider_users_user_id_fkey(
+        user:user_profiles_secure!service_provider_users_user_id_fkey(
           id, first_name, last_name, email, phone
         )
       `)

@@ -233,7 +233,7 @@ export default function MemberAnalyticsPage() {
       // ── Invoices (issued_at — for revenue, top services, shops) ─────────
       let invQ = supabase
         .from('invoices')
-        .select('id, total_amount, issued_at, issued_to_user_id, work_order_id, work_order:work_orders!work_order_id(shop_id, vehicle_id, currency, currency_id, currency_ref:currencies!currency_id(code, symbol))')
+        .select('id, total_amount, issued_at, issued_to_user_id, work_order_id, work_order:work_orders_secure!work_order_id(shop_id, vehicle_id, currency, currency_id, currency_ref:currencies!currency_id(code, symbol))')
         .eq('service_provider_id', providerId)
         .gte('issued_at', since)
       if (shopFilter) invQ = invQ.eq('work_order.shop_id', shopFilter)
@@ -244,7 +244,7 @@ export default function MemberAnalyticsPage() {
 
       let prevInvQ = supabase
         .from('invoices')
-        .select('id, total_amount, work_order:work_orders!work_order_id(shop_id, currency, currency_ref:currencies!currency_id(code))')
+        .select('id, total_amount, work_order:work_orders_secure!work_order_id(shop_id, currency, currency_ref:currencies!currency_id(code))')
         .eq('service_provider_id', providerId)
         .gte('issued_at', prevSince)
         .lt('issued_at', since)
@@ -419,7 +419,7 @@ export default function MemberAnalyticsPage() {
 
       const { data: mechanics } = await supabase
         .from('mechanics')
-        .select('id, user_id, specialization, user:user_profiles!user_id(first_name, last_name)')
+        .select('id, user_id, specialization, user:user_profiles_secure!user_id(first_name, last_name)')
         .eq('service_provider_id', providerId)
         .eq('is_active', true)
 

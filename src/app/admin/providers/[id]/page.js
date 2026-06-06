@@ -127,7 +127,7 @@ export default function ProviderDetailPage({ params }) {
       // ── Provider profile ──
       // Be explicit about the columns — relying on `select(*)` together with
       // aliased nested selects has bitten us before (owner_user_id sometimes
-      // gets hidden by the `owner:user_profiles(...)` alias on the same row).
+      // gets hidden by the `owner:user_profiles_secure(...)` alias on the same row).
       const { data: providerData, error: pErr } = await supabase
         .from('service_providers_secure')
         .select(`
@@ -140,7 +140,7 @@ export default function ProviderDetailPage({ params }) {
           registration_verified, registration_verified_at, registration_verified_by,
           location_verified, location_verified_at, location_verified_by,
           verification_score,
-          owner:user_profiles!service_providers_owner_user_id_fkey(
+          owner:user_profiles_secure!service_providers_owner_user_id_fkey(
             id, first_name, last_name, email, phone
           ),
           provider_type:service_provider_types(id, display_name, code),
@@ -325,7 +325,7 @@ export default function ProviderDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { error } = await supabase
         .from('service_providers')
@@ -388,7 +388,7 @@ export default function ProviderDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       const { error: updErr } = await supabase
         .from('service_providers')
@@ -442,7 +442,7 @@ export default function ProviderDetailPage({ params }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: adminProfile } = await supabase
-        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
 
       await supabase.from('admin_action_logs').insert({
         admin_user_id: adminProfile.id,

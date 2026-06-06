@@ -213,7 +213,7 @@ export default function AdminReportsPage() {
   const loadRecentAdminActions = async () => {
     const { data } = await supabase
       .from('admin_action_logs')
-      .select('id, action_type, target_type, action_data, created_at, admin:user_profiles!admin_action_logs_admin_user_id_fkey(first_name, last_name)')
+      .select('id, action_type, target_type, action_data, created_at, admin:user_profiles_secure!admin_action_logs_admin_user_id_fkey(first_name, last_name)')
       .order('created_at', { ascending: false })
       .limit(10)
 
