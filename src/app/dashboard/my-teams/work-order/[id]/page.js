@@ -119,6 +119,10 @@ export default function MechanicWorkOrderPage() {
   const [refreshing,     setRefreshing]     = useState(false)
   const [checkinMileage, setCheckinMileage] = useState('')
 
+  // Mechanic assignment (for members with can_manage_team or can_approve_work)
+  const [mechanics,        setMechanics]        = useState([])
+  const [selectedMechanic, setSelectedMechanic] = useState('')
+
   const load = useCallback(async () => {
     try {
       setError('')
@@ -196,6 +200,58 @@ export default function MechanicWorkOrderPage() {
   }, [params.id])
 
   useEffect(() => { load() }, [load])
+
+  // Load mechanics list when WO + permissions are available
+  // Only for members with can_manage_team or can_approve_work
+  useEffect(() => {
+    if (!wo?.service_provider_id || !perms) return
+    if (!perms.can_manage_team && !perms.can_approve_work) return
+
+    ;(async () => {
+      try {
+        const { data: mechanicsData } = await supabase
+          .from('mechanics')
+          .select('id, specialization, user_id')
+          .eq('service_provider_id', wo.service_provider_id)
+          .eq('is_active', true)
+
+        if (!mechanicsData?.length) { setMechanics([]); return }
+
+        // Resolve names via the provider team members RPC
+        const { data: teamData } = await supabase.rpc(
+          'get_provider_team_members',
+          { p_provider_id: wo.service_provider_id }
+        )
+
+        const merged = mechanicsData.map(m => {
+          const t = (teamData || []).find(tm => tm.user_id === m.user_id)
+          return { ...m, user: t ? { first_name: t.first_name, last_name: t.last_name } : {} }
+        })
+        setMechanics(merged)
+      } catch (err) {
+        console.error('Failed to load mechanics:', err)
+      }
+    })()
+  }, [wo?.service_provider_id, perms?.can_manage_team, perms?.can_approve_work])
+
+  // Assign mechanic handler
+  const assignMechanic = async () => {
+    if (!selectedMechanic) { setError('Select a mechanic'); return }
+    setActing(true); setError(''); setSuccess('')
+    try {
+      const res = await fetch(`/api/work-orders/${params.id}/assign-mechanic`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ mechanicId: selectedMechanic }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to assign')
+      setSuccess(`Mechanic assigned — notification sent${data.email_sent ? ' (email ✓)' : ''}${data.sms_sent ? ' (SMS ✓)' : ''}`)
+      setSelectedMechanic('')
+      await load()
+    } catch (e) { setError(e.message) }
+    finally { setActing(false) }
+  }
 
   const handleAcknowledge = async () => {
     setActing(true); setError(''); setSuccess('')
@@ -387,6 +443,9 @@ export default function MechanicWorkOrderPage() {
     || (!isTerminal && (canApprove || !!memberPerms?.can_approve_work))
   const isAssigned      = !!perms?.is_assigned
 
+  // Members with can_manage_team or can_approve_work can assign mechanics
+  const canAssignMechanic = !!(perms?.can_manage_team || perms?.can_approve_work)
+
   // Invoice permissions — admins get full access; can_send_invoice gives full invoice access including generate
   const invoicePerms = {
     canGenerate:      isAdmin || canSendInvoice,
@@ -491,7 +550,7 @@ export default function MechanicWorkOrderPage() {
           specific permission booleans (canApprove, canSendEst, etc.) rather
           than role labels, so an admin without can_approve_work will see
           the card but not see the status-advance buttons. */}
-      {!isTerminal && (isAssigned || isAdmin) && (
+      {!isTerminal && (isAssigned || isAdmin || canAssignMechanic) && (
         <div className={`rounded-xl p-4 border space-y-3 ${
           isAssigned
             ? (isPending      ? 'bg-yellow-50 border-yellow-300'
@@ -589,6 +648,50 @@ export default function MechanicWorkOrderPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Assign / Reassign mechanic — for members with can_manage_team or can_approve_work */}
+          {canAssignMechanic && (
+            <>
+              {/* Pending assignment banner with reassign option */}
+              {wo.assigned_mechanic_id && assignStatus === 'pending' && !isAssigned && (
+                <div className="border-t border-yellow-200 pt-3">
+                  <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-yellow-50 border border-yellow-300 rounded-lg text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse flex-shrink-0" />
+                      <span className="text-yellow-800 font-medium">Waiting for mechanic to acknowledge</span>
+                    </div>
+                    <button
+                      onClick={() => { supabase.from('work_orders').update({ assigned_mechanic_id: null, mechanic_assignment_status: null }).eq('id', params.id).then(() => load()) }}
+                      className="text-xs text-red-600 hover:underline flex-shrink-0">
+                      Reassign
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Assign mechanic dropdown — when no mechanic assigned and WO is in early status */}
+              {!wo.assigned_mechanic_id && ['intake','assigned'].includes(statusCode) && mechanics.length > 0 && (
+                <div className="border-t border-green-200 pt-3">
+                  <p className="text-xs font-medium text-green-800 mb-2">Assign mechanic:</p>
+                  <div className="flex items-center gap-2">
+                    <select value={selectedMechanic} onChange={e => setSelectedMechanic(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 flex-1">
+                      <option value="">Select mechanic...</option>
+                      {mechanics.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.user?.first_name || ''} {m.user?.last_name || ''}{m.specialization ? ` (${m.specialization})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={assignMechanic} disabled={acting || !selectedMechanic}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                      {acting ? 'Assigning...' : 'Assign'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Internal Estimate Review — gated on can_send_estimates only.
