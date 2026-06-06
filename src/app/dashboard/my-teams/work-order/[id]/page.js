@@ -227,10 +227,11 @@ export default function MechanicWorkOrderPage() {
   useEffect(() => { load() }, [load])
 
   // Load mechanics list when WO + permissions are available
-  // Only for members with can_manage_team or can_approve_work
+  // For members with admin/accountant role, can_manage_team or can_approve_work
+  const isAdminRole = ['admin', 'accountant'].includes(memberPerms?.role)
   useEffect(() => {
-    if (!wo?.service_provider_id || !perms) return
-    if (!perms.can_manage_team && !perms.can_approve_work) return
+    if (!wo?.service_provider_id || (!perms && !memberPerms)) return
+    if (!isAdminRole && !perms?.can_manage_team && !perms?.can_approve_work) return
 
     ;(async () => {
       try {
@@ -257,7 +258,7 @@ export default function MechanicWorkOrderPage() {
         console.error('Failed to load mechanics:', err)
       }
     })()
-  }, [wo?.service_provider_id, perms?.can_manage_team, perms?.can_approve_work])
+  }, [wo?.service_provider_id, perms?.can_manage_team, perms?.can_approve_work, isAdminRole])
 
   // Assign mechanic handler
   const assignMechanic = async () => {
@@ -450,9 +451,12 @@ export default function MechanicWorkOrderPage() {
   const isAcknowledged= assignStatus === 'acknowledged'
   const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
   const isAdmin         = ['admin', 'accountant'].includes(memberPerms?.role)
-  const canApprove      = !!perms?.can_approve_work
-  const canSendEst      = !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
-  const canSendInvoice  = !!(perms?.can_send_invoice   || memberPerms?.can_send_invoice)
+  // Admin role implicitly grants ALL work order capabilities — they have full
+  // operational control just like the provider owner. Individual boolean flags
+  // are still checked for non-admin members (mechanic, manager, etc.).
+  const canApprove      = isAdmin || !!perms?.can_approve_work
+  const canSendEst      = isAdmin || !!(perms?.can_send_estimates || memberPerms?.can_send_estimates)
+  const canSendInvoice  = isAdmin || !!(perms?.can_send_invoice   || memberPerms?.can_send_invoice)
   const canCheckout     = isAdmin || !!(perms?.can_approve_work || memberPerms?.can_approve_work)
   const isMechanic      = !!perms?.mechanic_id || !memberPerms   // has mechanic record
   const memberRole      = memberPerms?.role || (isMechanic ? 'mechanic' : null)
@@ -468,8 +472,8 @@ export default function MechanicWorkOrderPage() {
     || (!isTerminal && (canApprove || !!memberPerms?.can_approve_work))
   const isAssigned      = !!perms?.is_assigned
 
-  // Members with can_manage_team or can_approve_work can assign mechanics
-  const canAssignMechanic = !!(perms?.can_manage_team || perms?.can_approve_work)
+  // Members with admin role, can_manage_team or can_approve_work can assign mechanics
+  const canAssignMechanic = isAdmin || !!(perms?.can_manage_team || perms?.can_approve_work)
 
   // Invoice permissions — admins get full access; can_send_invoice gives full invoice access including generate
   const invoicePerms = {
@@ -571,10 +575,10 @@ export default function MechanicWorkOrderPage() {
           Visible whenever the work order isn't terminal AND the viewer has
           *some* role-driven action available — either they're the assigned
           mechanic, or they're a manager-level member (admin/accountant) who
-          can drive the workflow. Inside the card each section guards on the
-          specific permission booleans (canApprove, canSendEst, etc.) rather
-          than role labels, so an admin without can_approve_work will see
-          the card but not see the status-advance buttons. */}
+          can drive the workflow. Admin-role members get all capabilities
+          implicitly — they can perform every transition action just like
+          the provider owner. Other roles are gated on specific boolean
+          permissions (canApprove, canSendEst, etc.). */}
       {!isTerminal && (isAssigned || isAdmin || canAssignMechanic) && (
         <div className={`rounded-xl p-4 border space-y-3 ${
           isAssigned
