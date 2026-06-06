@@ -320,7 +320,7 @@ export default function MechanicWorkOrderPage() {
       if (rpcErr) throw rpcErr
       if (!data.success) throw new Error(data.error)
       // Redirect back to My Teams after declining
-      router.push('/dashboard/my-teams')
+      router.push('/dashboard/my-teams/work-orders')
     } catch (err) { setError(err.message); setActing(false) }
   }
 
@@ -445,9 +445,9 @@ export default function MechanicWorkOrderPage() {
 
   if (error && !wo) return (
     <div className="max-w-2xl mx-auto p-6">
-      <button onClick={() => router.push('/dashboard/my-teams')}
+      <button onClick={() => router.push('/dashboard/my-teams/work-orders')}
         className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 text-sm">
-        <ArrowLeft size={16} /> Back to My Teams
+        <ArrowLeft size={16} /> Back to Work Orders
       </button>
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
         <AlertCircle className="text-red-500 flex-shrink-0" size={20} />
@@ -522,9 +522,9 @@ export default function MechanicWorkOrderPage() {
     <WOErrorBoundary>
     <div className="max-w-4xl mx-auto space-y-5">
       {/* Back */}
-      <button onClick={() => router.push('/dashboard/my-teams')}
+      <button onClick={() => router.push('/dashboard/my-teams/work-orders')}
         className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm">
-        <ArrowLeft size={16} /> Back to My Teams
+        <ArrowLeft size={16} /> Back to Work Orders
       </button>
 
       {/* Header */}
