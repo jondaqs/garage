@@ -127,17 +127,21 @@ export default function MechanicWorkOrderPage() {
     try {
       setError('')
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('[DEBUG] Loading WO for user:', user.id)
       // Try mechanic RPC first
       let result = null
       const { data: mechResult } = await supabase.rpc(
         'get_mechanic_work_order',
         { p_work_order_id: params.id, p_mechanic_user_id: user.id }
       )
+      console.log('[DEBUG] mechResult success:', mechResult?.success, 'error:', mechResult?.error)
 
       if (mechResult?.success) {
         result = mechResult
         setWo(result.work_order)
         const mechPerms = result.mechanic_permissions || {}
+        console.log('[DEBUG] PATH: mechanic RPC succeeded')
+        console.log('[DEBUG] mechPerms:', JSON.stringify(mechPerms))
 
         // Also load SPU permissions — the user may be both a mechanic AND
         // an admin/manager. Mechanic RPC only returns mechanics-table perms,
@@ -147,13 +151,17 @@ export default function MechanicWorkOrderPage() {
           { p_work_order_id: params.id, p_user_id: user.id }
         )
         const spuPerms = spuCheck?.success ? (spuCheck.member_permissions || {}) : {}
+        console.log('[DEBUG] spuPerms (secondary):', JSON.stringify(spuPerms))
 
         if (spuPerms.role) {
           setMemberPerms(spuPerms)
+          console.log('[DEBUG] memberPerms set to spuPerms, role:', spuPerms.role)
+        } else {
+          console.log('[DEBUG] spuPerms has NO role — memberPerms NOT set')
         }
 
         // Merge: either source can grant a permission (union, not intersection)
-        setPerms({
+        const mergedPerms = {
           mechanic_id:          mechPerms.mechanic_id,
           can_approve_work:     !!(mechPerms.can_approve_work     || spuPerms.can_approve_work),
           can_manage_inventory: !!(mechPerms.can_manage_inventory || spuPerms.can_manage_inventory),
@@ -162,20 +170,25 @@ export default function MechanicWorkOrderPage() {
           can_send_invoice:     !!(mechPerms.can_send_invoice     || spuPerms.can_send_invoice),
           is_assigned:          mechPerms.is_assigned,
           is_mechanic:          true,
-        })
+        }
+        console.log('[DEBUG] merged perms:', JSON.stringify(mergedPerms))
+        setPerms(mergedPerms)
       } else {
         // Fall back to SPU-based access (admin, accountant, manager, owner)
+        console.log('[DEBUG] PATH: mechanic RPC failed, trying SPU fallback')
         const { data: spuResult, error: spuErr } = await supabase.rpc(
           'get_provider_member_work_order',
           { p_work_order_id: params.id, p_user_id: user.id }
         )
+        console.log('[DEBUG] spuResult success:', spuResult?.success, 'error:', spuResult?.error || spuErr?.message)
         if (spuErr) throw spuErr
         if (!spuResult?.success) throw new Error(spuResult?.error || 'Access denied or work order not found')
         result = spuResult
         setWo(result.work_order)
+        console.log('[DEBUG] memberPerms from SPU:', JSON.stringify(result.member_permissions))
         setMemberPerms(result.member_permissions)
         // Create a compatible perms object for components that use mechanic perms
-        setPerms({
+        const spuBasedPerms = {
           can_approve_work:     result.member_permissions.can_approve_work,
           can_manage_inventory: result.member_permissions.can_manage_inventory,
           can_manage_team:      result.member_permissions.can_manage_team,
@@ -183,11 +196,21 @@ export default function MechanicWorkOrderPage() {
           can_send_invoice:     result.member_permissions.can_send_invoice,
           is_assigned:          false,
           is_mechanic:          result.member_permissions.is_mechanic,
-        })
+        }
+        console.log('[DEBUG] perms set from SPU:', JSON.stringify(spuBasedPerms))
+        setPerms(spuBasedPerms)
       }
 
       // Fetch gate counts
       const woId = result.work_order.id
+      console.log('[DEBUG] WO loaded:', {
+        id: woId,
+        statusCode: result.work_order.status?.code,
+        statusDisplay: result.work_order.status?.display_name,
+        assigned_mechanic_id: result.work_order.assigned_mechanic_id || 'null',
+        mechanic_assignment_status: result.work_order.mechanic_assignment_status || 'null',
+        vehicle_checked_in_at: result.work_order.vehicle_checked_in_at || 'null',
+      })
       supabase.from('vehicle_issues').select('id', { count: 'exact', head: true })
         .eq('work_order_id', woId).then(({ count }) => setIssueCount(count || 0)).catch(() => {})
       supabase.from('work_order_services').select('id', { count: 'exact', head: true })
@@ -230,8 +253,20 @@ export default function MechanicWorkOrderPage() {
   // For members with admin/accountant role, can_manage_team or can_approve_work
   const isAdminRole = ['admin', 'accountant'].includes(memberPerms?.role)
   useEffect(() => {
+    console.log('[DEBUG] Mechanics useEffect check:', {
+      hasWoProviderId: !!wo?.service_provider_id,
+      hasPerms: !!perms,
+      hasMemberPerms: !!memberPerms,
+      isAdminRole,
+      canManageTeam: perms?.can_manage_team,
+      canApproveWork: perms?.can_approve_work,
+    })
     if (!wo?.service_provider_id || (!perms && !memberPerms)) return
-    if (!isAdminRole && !perms?.can_manage_team && !perms?.can_approve_work) return
+    if (!isAdminRole && !perms?.can_manage_team && !perms?.can_approve_work) {
+      console.log('[DEBUG] Mechanics load SKIPPED — no permission')
+      return
+    }
+    console.log('[DEBUG] Loading mechanics for provider:', wo.service_provider_id)
 
     ;(async () => {
       try {
@@ -254,6 +289,7 @@ export default function MechanicWorkOrderPage() {
           return { ...m, user: t ? { first_name: t.first_name, last_name: t.last_name } : {} }
         })
         setMechanics(merged)
+        console.log('[DEBUG] Mechanics loaded:', merged.length, 'mechanics')
       } catch (err) {
         console.error('Failed to load mechanics:', err)
       }
@@ -570,6 +606,39 @@ export default function MechanicWorkOrderPage() {
           <p className="text-green-700">{success}</p>
         </div>
       )}
+
+      {/* ── DEBUG PANEL — remove after troubleshooting ──────────────── */}
+      <details className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-xs font-mono">
+        <summary className="font-bold text-yellow-800 cursor-pointer">🐛 Debug: Permissions &amp; State</summary>
+        <div className="mt-3 space-y-2 text-yellow-900">
+          <p><strong>statusCode:</strong> "{statusCode}" | <strong>assignStatus:</strong> "{assignStatus || 'null'}"</p>
+          <p><strong>isPending:</strong> {String(isPending)} | <strong>isAcknowledged:</strong> {String(isAcknowledged)} | <strong>isTerminal:</strong> {String(isTerminal)}</p>
+          <p><strong>isAssigned:</strong> {String(isAssigned)} | <strong>isMechanic:</strong> {String(isMechanic)} | <strong>isAdmin:</strong> {String(isAdmin)}</p>
+          <p><strong>memberRole:</strong> "{memberRole || 'null'}" | <strong>isProviderAdmin:</strong> {String(isProviderAdmin)}</p>
+          <hr className="border-yellow-300" />
+          <p><strong>canApprove:</strong> {String(canApprove)} | <strong>canSendEst:</strong> {String(canSendEst)} | <strong>canSendInvoice:</strong> {String(canSendInvoice)}</p>
+          <p><strong>canCheckout:</strong> {String(canCheckout)} | <strong>canAssignMechanic:</strong> {String(canAssignMechanic)} | <strong>isReadOnly:</strong> {String(isReadOnly)}</p>
+          <hr className="border-yellow-300" />
+          <p><strong>Action card visible:</strong> {String(!isTerminal && (isAssigned || isAdmin || canAssignMechanic))}</p>
+          <p><strong>Status advance visible:</strong> {String((canApprove && (isAcknowledged || !isAssigned)) && !isTerminal)}</p>
+          <p><strong>Check-in visible:</strong> {String((isAcknowledged || isAdmin) && !wo.vehicle_checked_in_at)}</p>
+          <p><strong>EstimateReview visible:</strong> {String(statusCode === 'internal_review' && canSendEst)}</p>
+          <p><strong>Assign mechanic visible:</strong> {String(canAssignMechanic && !wo.assigned_mechanic_id && ['intake','assigned'].includes(statusCode) && mechanics.length > 0)}</p>
+          <hr className="border-yellow-300" />
+          <p><strong>perms:</strong> {JSON.stringify(perms, null, 0)}</p>
+          <p><strong>memberPerms:</strong> {JSON.stringify(memberPerms, null, 0)}</p>
+          <p><strong>mechanics count:</strong> {mechanics.length}</p>
+          <p><strong>wo.assigned_mechanic_id:</strong> {wo.assigned_mechanic_id || 'null'}</p>
+          <p><strong>wo.vehicle_checked_in_at:</strong> {wo.vehicle_checked_in_at || 'null'}</p>
+          <p><strong>issueCount:</strong> {String(issueCount)} | <strong>serviceCount:</strong> {String(serviceCount)}</p>
+          <hr className="border-yellow-300" />
+          <p className="text-yellow-700 font-sans font-normal">
+            ℹ️ If <strong>Status advance visible</strong> is <code>true</code> but no buttons show, the current <code>statusCode</code> may not have a matching case in the advance section. 
+            Currently handled: assigned, diagnosing, services_estimates, internal_review, awaiting_approval, approved, in_progress, quality_check, rework.
+            <strong> Missing: intake → assigned transition (not implemented in member page).</strong>
+          </p>
+        </div>
+      </details>
 
       {/* ── Work-order action card ───────────────────────────────────────
           Visible whenever the work order isn't terminal AND the viewer has
