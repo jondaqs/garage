@@ -94,6 +94,17 @@ export default function ProviderWorkOrdersPage() {
 
       if (fetchErr) throw fetchErr
       setWorkOrders(data || [])
+      // Debug: log first few WOs with their walk-in fields
+      console.log('[WO-LIST-DEBUG] First 3 WOs walk-in data:', (data || []).slice(0, 3).map(w => ({
+        id: w.id,
+        wo_number: w.work_order_number,
+        is_walk_in: w.is_walk_in,
+        walk_in_owner_name: w.walk_in_owner_name,
+        walk_in_owner_phone: w.walk_in_owner_phone,
+        walk_in_owner_email: w.walk_in_owner_email,
+        hasBooking: !!w.booking?.booking_number,
+        vehiclePlate: w.vehicle?.plate_number,
+      })))
       setCheckoutRequestCount((data || []).filter(w => w.checkout_requested && !w.checkout_request_satisfied).length)
       setCheckoutDeclinedCount((data || []).filter(w => w.checkout_declined).length)
       setEstimateApprovedCount((data || []).filter(w => w.estimate_approved && w.status?.code === 'approved').length)
@@ -102,6 +113,7 @@ export default function ProviderWorkOrdersPage() {
       const { data: custResult } = await supabase.rpc('get_provider_wo_customers', {
         p_provider_id: provider.id,
       })
+      console.log('[WO-LIST-DEBUG] custResult:', JSON.stringify(custResult)?.slice(0, 1000))
       if (custResult?.success && Array.isArray(custResult.customers)) {
         const map = {}
         custResult.customers.forEach(c => {
@@ -109,7 +121,15 @@ export default function ProviderWorkOrdersPage() {
             map[c.work_order_id] = c.customer_name
           }
         })
+        console.log('[WO-LIST-DEBUG] customerMap built:', JSON.stringify(map)?.slice(0, 1000))
         setCustomerMap(map)
+      } else {
+        console.log('[WO-LIST-DEBUG] custResult failed or not array:', {
+          success: custResult?.success,
+          isArray: Array.isArray(custResult?.customers),
+          type: typeof custResult?.customers,
+          raw: JSON.stringify(custResult?.customers)?.slice(0, 500),
+        })
       }
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
@@ -119,12 +139,20 @@ export default function ProviderWorkOrdersPage() {
   }
 
   const getCustomerName = (wo) => {
-    // Priority: RPC-resolved name → walk-in name → walk-in phone → walk-in email
-    if (customerMap[wo.id]) return customerMap[wo.id]
-    if (wo.walk_in_owner_name) return wo.walk_in_owner_name
-    if (wo.walk_in_owner_phone) return wo.walk_in_owner_phone
-    if (wo.walk_in_owner_email) return wo.walk_in_owner_email
-    return ''
+    const fromMap = customerMap[wo.id]
+    const result = fromMap || wo.walk_in_owner_name || wo.walk_in_owner_phone || wo.walk_in_owner_email || ''
+    if (!result) {
+      console.log('[WO-LIST-DEBUG] getCustomerName EMPTY for', wo.work_order_number, {
+        mapHit: fromMap,
+        walk_in_owner_name: wo.walk_in_owner_name,
+        walk_in_owner_phone: wo.walk_in_owner_phone,
+        walk_in_owner_email: wo.walk_in_owner_email,
+        is_walk_in: wo.is_walk_in,
+        woId: wo.id,
+        mapKeys: Object.keys(customerMap).slice(0, 5),
+      })
+    }
+    return result
   }
 
   const filtered = useMemo(() => {
