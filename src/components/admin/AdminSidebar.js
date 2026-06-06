@@ -90,6 +90,7 @@ export default function AdminSidebar() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
+    router.refresh()
   }
 
   return (

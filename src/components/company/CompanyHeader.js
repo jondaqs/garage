@@ -40,6 +40,7 @@ export default function CompanyHeader({ company, user: authUser, userRole }) {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
+    router.refresh()
   }
 
   const statusConfig = {

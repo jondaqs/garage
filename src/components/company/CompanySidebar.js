@@ -116,6 +116,7 @@ export default function CompanySidebar({ company, userRole }) {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
+    router.refresh()
   }
 
   const statusConfig = {

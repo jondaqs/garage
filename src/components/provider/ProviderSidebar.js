@@ -197,6 +197,7 @@ export default function ProviderSidebar({ provider }) {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
+    router.refresh()
   }
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/')
