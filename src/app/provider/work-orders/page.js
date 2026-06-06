@@ -82,7 +82,7 @@ export default function ProviderWorkOrdersPage() {
         .select(`
           id, work_order_number, priority, opened_at, scheduled_start,
           checkout_requested, checkout_request_satisfied, checkout_declined, estimate_approved,
-          walk_in_owner_name,
+          walk_in_owner_name, walk_in_owner_phone, walk_in_owner_email, is_walk_in,
           vehicle:vehicles_secure(plate_number, make, model),
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops_secure(name, town),
@@ -102,7 +102,15 @@ export default function ProviderWorkOrdersPage() {
       const { data: custResult } = await supabase.rpc('get_provider_wo_customers', {
         p_provider_id: provider.id,
       })
-      if (custResult?.success) setCustomerMap(custResult.customers || {})
+      if (custResult?.success && Array.isArray(custResult.customers)) {
+        const map = {}
+        custResult.customers.forEach(c => {
+          if (c.work_order_id && c.customer_name) {
+            map[c.work_order_id] = c.customer_name
+          }
+        })
+        setCustomerMap(map)
+      }
     } catch (err) {
       setError(err.message || 'Failed to load work orders')
     } finally {
@@ -111,7 +119,12 @@ export default function ProviderWorkOrdersPage() {
   }
 
   const getCustomerName = (wo) => {
-    return customerMap[wo.id] || wo.walk_in_owner_name || ''
+    // Priority: RPC-resolved name → walk-in name → walk-in phone → walk-in email
+    if (customerMap[wo.id]) return customerMap[wo.id]
+    if (wo.walk_in_owner_name) return wo.walk_in_owner_name
+    if (wo.walk_in_owner_phone) return wo.walk_in_owner_phone
+    if (wo.walk_in_owner_email) return wo.walk_in_owner_email
+    return ''
   }
 
   const filtered = useMemo(() => {
