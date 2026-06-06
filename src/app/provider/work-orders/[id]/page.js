@@ -631,6 +631,33 @@ export default function WorkOrderDetailPage() {
   const vehicle       = wo.vehicle  || {}
   const booking       = wo.booking  || {}
   const customer      = booking.customer || {}
+
+  // Resolve owner from ALL available sources (handles both RPC & fallback paths)
+  // Priority: 1) Booking customer  2) RPC-built wo.owner  3) Flat walk-in fields on WO
+  const resolvedOwner = (() => {
+    // 1. Booking customer (joined via booking relation)
+    if (customer.first_name || customer.phone || customer.email) {
+      return { ...customer, owner_type: 'booking_customer' }
+    }
+    // 2. RPC-resolved owner (get_work_order_with_details builds this)
+    if (wo.owner && (wo.owner.first_name || wo.owner.phone || wo.owner.email)) {
+      return wo.owner
+    }
+    // 3. Flat walk-in fields from work_orders_secure (fallback query path)
+    if (wo.walk_in_owner_name || wo.walk_in_owner_phone || wo.walk_in_owner_email) {
+      return {
+        first_name: wo.walk_in_owner_name || null,
+        last_name:  null,
+        phone:      wo.walk_in_owner_phone || null,
+        email:      wo.walk_in_owner_email || null,
+        owner_type: 'walk_in',
+      }
+    }
+    // 4. RPC owner that only has owner_type (e.g. company with no contact)
+    if (wo.owner && wo.owner.owner_type) return wo.owner
+    return null
+  })()
+
   const shop          = wo.shop     || {}
   const mechanic      = wo.mechanic || {}
   const mechanicUser  = mechanic.user || wo.mechanic_profile || {}
@@ -1068,30 +1095,31 @@ export default function WorkOrderDetailPage() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
                     <User size={13} /> Owner
                   </p>
-                  {customer.first_name ? (
+                  {resolvedOwner ? (
                     <div className="space-y-1 text-sm">
-                      <p className="font-semibold text-gray-900">{customer.first_name} {customer.last_name}</p>
-                      {customer.phone && <p className="text-gray-600">{customer.phone}</p>}
-                      {customer.email && <p className="text-gray-500">{customer.email}</p>}
-                      {booking.booking_number && (
+                      {(resolvedOwner.first_name || resolvedOwner.last_name) ? (
+                        <p className="font-semibold text-gray-900">
+                          {resolvedOwner.first_name || ''}{resolvedOwner.last_name ? ` ${resolvedOwner.last_name}` : ''}
+                        </p>
+                      ) : (
+                        <p className="font-medium text-gray-600 italic">Name not provided</p>
+                      )}
+                      {resolvedOwner.phone && <p className="text-gray-600">{resolvedOwner.phone}</p>}
+                      {resolvedOwner.email && <p className="text-gray-500">{resolvedOwner.email}</p>}
+                      {resolvedOwner.owner_type === 'booking_customer' && booking.booking_number && (
                         <button onClick={() => router.push(`/provider/bookings/${wo.booking_id}`)}
                           className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs mt-1">
                           <Hash size={11} /> Booking #{booking.booking_number} <ExternalLink size={10} />
                         </button>
                       )}
-                    </div>
-                  ) : wo.owner?.first_name ? (
-                    <div className="space-y-1 text-sm">
-                      <p className="font-semibold text-gray-900">
-                        {wo.owner.first_name}{wo.owner.last_name ? ` ${wo.owner.last_name}` : ''}
-                      </p>
-                      {wo.owner.phone && <p className="text-gray-600">{wo.owner.phone}</p>}
-                      {wo.owner.email && <p className="text-gray-500">{wo.owner.email}</p>}
-                      {wo.owner.owner_type === 'company' && (
+                      {resolvedOwner.owner_type === 'company' && (
                         <p className="text-xs text-blue-600">Company fleet</p>
                       )}
-                      {wo.owner.owner_type === 'walk_in' && (
+                      {resolvedOwner.owner_type === 'walk_in' && (
                         <p className="text-xs text-amber-600">Walk-in · not linked to account</p>
+                      )}
+                      {resolvedOwner.owner_type === 'individual' && (
+                        <p className="text-xs text-green-600">Registered owner</p>
                       )}
                     </div>
                   ) : (
