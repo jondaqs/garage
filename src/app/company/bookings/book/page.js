@@ -134,7 +134,9 @@ export default function CompanyBookServicePage() {
       alert('Please select a fleet vehicle first')
       return
     }
-    router.push(`/company/bookings/new?provider=${provider.id}&vehicle=${selectedVehicle}`)
+    const params = new URLSearchParams({ provider: provider.id, vehicle: selectedVehicle })
+    if (selectedDate) params.set('date', selectedDate)
+    router.push(`/company/bookings/new?${params.toString()}`)
   }
 
   const filtered = providers.filter(p => {

@@ -54,8 +54,9 @@ export default function CompanyNewBookingPage() {
     }
     loadData()
 
-    // Restore pre-selected date from calendar
-    const stored = sessionStorage.getItem('selectedBookingDate')
+    // Restore pre-selected date — URL param (preferred) or sessionStorage (legacy)
+    const dateParam = searchParams.get('date')
+    const stored = dateParam || sessionStorage.getItem('selectedBookingDate')
     if (stored) {
       setFormData(prev => ({ ...prev, booking_date: stored }))
       sessionStorage.removeItem('selectedBookingDate')

@@ -126,8 +126,9 @@ export default function BookServicePage() {
       return
     }
     setSelectedProvider(provider)
-    // Date will be preserved in sessionStorage
-    router.push(`/dashboard/bookings/new?provider=${provider.id}&vehicle=${selectedVehicle}`)
+    const params = new URLSearchParams({ provider: provider.id, vehicle: selectedVehicle })
+    if (selectedDate) params.set('date', selectedDate)
+    router.push(`/dashboard/bookings/new?${params.toString()}`)
   }
 
   if (loading) {

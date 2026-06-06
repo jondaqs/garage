@@ -61,14 +61,15 @@ export default function NewBookingPage() {
     if (providerId && vehicleId) {
       loadBookingData()
       
-      // Check for pre-selected date from calendar (stored in sessionStorage)
-      const storedDate = sessionStorage.getItem('selectedBookingDate')
+      // Check for pre-selected date — URL param (preferred) or sessionStorage (legacy)
+      const dateParam = searchParams.get('date')
+      const storedDate = dateParam || sessionStorage.getItem('selectedBookingDate')
       if (storedDate) {
         setFormData(prev => ({
           ...prev,
           booking_date: storedDate
         }))
-        // Clear after using so it doesn't persist
+        // Clear sessionStorage if it was used, so it doesn't persist on abandoned bookings
         sessionStorage.removeItem('selectedBookingDate')
       }
     }
