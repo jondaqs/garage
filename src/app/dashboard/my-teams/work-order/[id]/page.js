@@ -233,32 +233,50 @@ export default function MechanicWorkOrderPage() {
   // RPC returns service_provider as nested object, not top-level service_provider_id
   const woProviderId = wo?.service_provider_id || wo?.service_provider?.id
   useEffect(() => {
-    if (!woProviderId || (!perms && !memberPerms)) return
-    if (!isAdminRole && !perms?.can_manage_team && !perms?.can_approve_work) return
+    console.log('[DEBUG-MECH] useEffect fired. woProviderId:', woProviderId,
+      '| isAdminRole:', isAdminRole,
+      '| perms?.can_manage_team:', perms?.can_manage_team,
+      '| perms?.can_approve_work:', perms?.can_approve_work,
+      '| memberPerms?.role:', memberPerms?.role,
+      '| wo?.service_provider_id:', wo?.service_provider_id,
+      '| wo?.service_provider?.id:', wo?.service_provider?.id)
+    if (!woProviderId || (!perms && !memberPerms)) {
+      console.log('[DEBUG-MECH] BAIL: no woProviderId or no perms. woProviderId:', woProviderId, 'perms:', !!perms, 'memberPerms:', !!memberPerms)
+      return
+    }
+    if (!isAdminRole && !perms?.can_manage_team && !perms?.can_approve_work) {
+      console.log('[DEBUG-MECH] BAIL: no permission to load mechanics')
+      return
+    }
+    console.log('[DEBUG-MECH] Loading mechanics for provider:', woProviderId)
 
     ;(async () => {
       try {
-        const { data: mechanicsData } = await supabase
+        const { data: mechanicsData, error: mechErr } = await supabase
           .from('mechanics')
           .select('id, specialization, user_id')
           .eq('service_provider_id', woProviderId)
           .eq('is_active', true)
 
+        console.log('[DEBUG-MECH] mechanics query result:', mechanicsData?.length, 'rows, error:', mechErr?.message || 'none')
+
         if (!mechanicsData?.length) { setMechanics([]); return }
 
         // Resolve names via the provider team members RPC
-        const { data: teamData } = await supabase.rpc(
+        const { data: teamData, error: teamErr } = await supabase.rpc(
           'get_provider_team_members',
           { p_provider_id: woProviderId }
         )
+        console.log('[DEBUG-MECH] team members RPC:', teamData?.length, 'rows, error:', teamErr?.message || 'none')
 
         const merged = mechanicsData.map(m => {
           const t = (teamData || []).find(tm => tm.user_id === m.user_id)
           return { ...m, user: t ? { first_name: t.first_name, last_name: t.last_name } : {} }
         })
+        console.log('[DEBUG-MECH] Final merged mechanics:', merged.length)
         setMechanics(merged)
       } catch (err) {
-        console.error('Failed to load mechanics:', err)
+        console.error('[DEBUG-MECH] CATCH error:', err.message, err)
       }
     })()
   }, [woProviderId, perms?.can_manage_team, perms?.can_approve_work, isAdminRole])
@@ -575,6 +593,35 @@ export default function MechanicWorkOrderPage() {
           <p className="text-green-700">{success}</p>
         </div>
       )}
+
+      {/* ── DEBUG PANEL — remove after troubleshooting ──────────────── */}
+      <details open className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-xs font-mono">
+        <summary className="font-bold text-yellow-800 cursor-pointer">🐛 Debug: Mechanics &amp; Permissions</summary>
+        <div className="mt-3 space-y-2 text-yellow-900">
+          <p><strong>statusCode:</strong> "{statusCode}" | <strong>isFullAdmin:</strong> {String(isFullAdmin)} | <strong>isAdmin:</strong> {String(isAdmin)} | <strong>isAdminRole:</strong> {String(isAdminRole)}</p>
+          <p><strong>canApprove:</strong> {String(canApprove)} | <strong>canAssignMechanic:</strong> {String(canAssignMechanic)}</p>
+          <hr className="border-yellow-300" />
+          <p className="font-bold text-yellow-800">Mechanics Loading:</p>
+          <p><strong>woProviderId:</strong> {woProviderId || 'UNDEFINED/NULL'}</p>
+          <p><strong>wo.service_provider_id:</strong> {wo?.service_provider_id || 'UNDEFINED'} | <strong>wo.service_provider?.id:</strong> {wo?.service_provider?.id || 'UNDEFINED'}</p>
+          <p><strong>wo.service_provider:</strong> {JSON.stringify(wo?.service_provider || null)}</p>
+          <p><strong>mechanics.length:</strong> {mechanics.length}</p>
+          <p><strong>perms?.can_manage_team:</strong> {String(perms?.can_manage_team)} | <strong>perms?.can_approve_work:</strong> {String(perms?.can_approve_work)}</p>
+          <hr className="border-yellow-300" />
+          <p className="font-bold text-yellow-800">Assign Mechanic Visibility:</p>
+          <p><strong>canAssignMechanic:</strong> {String(canAssignMechanic)}</p>
+          <p><strong>!wo.assigned_mechanic_id:</strong> {String(!wo.assigned_mechanic_id)}</p>
+          <p><strong>statusCode in [intake,assigned]:</strong> {String(['intake','assigned'].includes(statusCode))}</p>
+          <p><strong>mechanics.length &gt; 0:</strong> {String(mechanics.length > 0)}</p>
+          <p><strong>ALL conditions met:</strong> {String(canAssignMechanic && !wo.assigned_mechanic_id && ['intake','assigned'].includes(statusCode) && mechanics.length > 0)}</p>
+          <hr className="border-yellow-300" />
+          <p><strong>perms:</strong> {JSON.stringify(perms, null, 0)}</p>
+          <p><strong>memberPerms:</strong> {JSON.stringify(memberPerms, null, 0)}</p>
+          <p className="text-yellow-700 font-sans font-normal mt-2">
+            ℹ️ Check browser console for <code>[DEBUG-MECH]</code> logs — they trace the full mechanics loading flow including DB query results.
+          </p>
+        </div>
+      </details>
 
       {/* ── Work-order action card ───────────────────────────────────────
           Visible whenever the work order isn't terminal AND the viewer has
