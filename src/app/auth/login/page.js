@@ -63,6 +63,7 @@ function LoginPageInner() {
   React.useEffect(() => {
     const el = turnstileRef.current
     if (!el) return
+    let pollTimer = null
 
     const renderWidget = () => {
       if (!window.turnstile || !el) return
@@ -86,14 +87,14 @@ function LoginPageInner() {
       renderWidget()
     } else {
       // Script not yet loaded — poll until it is
-      const poll = setInterval(() => {
-        if (window.turnstile) { clearInterval(poll); renderWidget() }
+      pollTimer = setInterval(() => {
+        if (window.turnstile) { clearInterval(pollTimer); pollTimer = null; renderWidget() }
       }, 150)
-      return () => clearInterval(poll)
     }
 
+    // Single cleanup handles both paths: clear poll + remove widget
     return () => {
-      // Clean up widget on unmount
+      if (pollTimer) clearInterval(pollTimer)
       if (window.turnstile && turnstileWidgetId.current != null) {
         try { window.turnstile.remove(turnstileWidgetId.current) } catch {}
         turnstileWidgetId.current = null
