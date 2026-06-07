@@ -34,11 +34,12 @@ function LoginPageInner() {
   // Turnstile CAPTCHA
   const [turnstileToken, setTurnstileToken] = useState('')
   const turnstileRef = useRef(null)
+  const turnstileWidgetId = useRef(null)
 
   const resetTurnstile = useCallback(() => {
     setTurnstileToken('')
-    if (window.turnstile && turnstileRef.current) {
-      window.turnstile.reset(turnstileRef.current)
+    if (window.turnstile && turnstileWidgetId.current != null) {
+      window.turnstile.reset(turnstileWidgetId.current)
     }
   }, [])
 
@@ -51,6 +52,52 @@ function LoginPageInner() {
     return () => {
       window.removeEventListener('turnstile-success', onSuccess)
       window.removeEventListener('turnstile-expired', onExpired)
+    }
+  }, [])
+
+  // Explicitly render the Turnstile widget on mount. The auto-render that
+  // Turnstile performs when its script first loads only fires once; on any
+  // subsequent client-side navigation (homepage → login, logout → login)
+  // the script is already loaded and won't re-scan the DOM. This effect
+  // detects that situation and calls turnstile.render() manually.
+  React.useEffect(() => {
+    const el = turnstileRef.current
+    if (!el) return
+
+    const renderWidget = () => {
+      if (!window.turnstile || !el) return
+      // Skip if already rendered (auto-render on first script load)
+      if (el.querySelector('iframe')) return
+      turnstileWidgetId.current = window.turnstile.render(el, {
+        sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+        callback: (token) => {
+          window.__turnstileToken = token
+          window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }))
+        },
+        'expired-callback': () => {
+          window.__turnstileToken = ''
+          window.dispatchEvent(new CustomEvent('turnstile-expired'))
+        },
+        theme: 'light',
+      })
+    }
+
+    if (window.turnstile) {
+      renderWidget()
+    } else {
+      // Script not yet loaded — poll until it is
+      const poll = setInterval(() => {
+        if (window.turnstile) { clearInterval(poll); renderWidget() }
+      }, 150)
+      return () => clearInterval(poll)
+    }
+
+    return () => {
+      // Clean up widget on unmount
+      if (window.turnstile && turnstileWidgetId.current != null) {
+        try { window.turnstile.remove(turnstileWidgetId.current) } catch {}
+        turnstileWidgetId.current = null
+      }
     }
   }, [])
 
