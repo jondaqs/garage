@@ -65,7 +65,7 @@ export default function CompanyMemberProvidersPage() {
         setDenyReason('You don\u2019t have chat permission for this company. Ask an admin to enable it.')
         return
       }
-      setCompany({ id: cu.company_profiles.id, name: cu.company_profiles.name })
+      setCompany({ id: cu.company_profiles_secure.id, name: cu.company_profiles_secure.name })
       setAuthState('ok')
     }
     check()

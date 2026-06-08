@@ -81,12 +81,12 @@ export default function CompanyOwnerChatPage() {
         .eq('is_admin', true)
         .maybeSingle()
 
-      if (!cu || !cu.company_profiles) {
+      if (!cu || !cu.company_profiles_secure) {
         setAuthState('denied')
         setDenyReason('No active company-admin membership found for this account.')
         return
       }
-      setCompany({ id: cu.company_profiles.id, name: cu.company_profiles.name })
+      setCompany({ id: cu.company_profiles_secure.id, name: cu.company_profiles_secure.name })
       setAuthState('ok')
     }
     init()
