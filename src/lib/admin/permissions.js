@@ -1,6 +1,8 @@
 // src/lib/admin/permissions.js
 // Central permission matrix for admin sub-roles.
 // Import this wherever you need to check what an admin can do.
+//
+// UPDATED: Added manage_subscriptions permission
 
 export const ADMIN_ROLES = {
   platform_admin: {
@@ -43,64 +45,69 @@ export const ADMIN_ROLES = {
 // Permission matrix — true = allowed, false = hidden/blocked
 export const PERMISSIONS = {
   platform_admin: {
-    view_dashboard:      true,
-    manage_providers:    true,   // approve, reject, suspend, deactivate
-    manage_companies:    true,
-    manage_users:        true,   // view, suspend, deactivate
-    suspend_accounts:    true,   // suspend/deactivate users, providers, companies
-    manage_admins:       true,   // invite, promote, demote
-    view_email_queue:    true,
-    view_reports:        true,
-    system_settings:     true,
-    view_feedback:       true,
+    view_dashboard:        true,
+    manage_providers:      true,
+    manage_companies:      true,
+    manage_users:          true,
+    suspend_accounts:      true,
+    manage_admins:         true,
+    view_email_queue:      true,
+    view_reports:          true,
+    system_settings:       true,
+    view_feedback:         true,
+    manage_subscriptions:  true,   // full CRUD on pricing, tiers, discounts, packages, subscriber lifecycle
   },
   admin: {
-    view_dashboard:      true,
-    manage_providers:    true,
-    manage_companies:    true,
-    manage_users:        true,
-    suspend_accounts:    true,
-    manage_admins:       false,
-    view_email_queue:    true,
-    view_reports:        true,
-    system_settings:     false,
-    view_feedback:       true,
+    view_dashboard:        true,
+    manage_providers:      true,
+    manage_companies:      true,
+    manage_users:          true,
+    suspend_accounts:      true,
+    manage_admins:         false,
+    view_email_queue:      true,
+    view_reports:          true,
+    system_settings:       false,
+    view_feedback:         true,
+    manage_subscriptions:  true,   // can manage subscriptions (approve, suspend, pricing)
   },
   moderator: {
-    view_dashboard:      true,
-    manage_providers:    true,   // approve/reject only — no suspend (enforced in UI)
-    manage_companies:    true,   // approve/reject only
-    manage_users:        true,   // view only
-    suspend_accounts:    false,
-    manage_admins:       false,
-    view_email_queue:    false,
-    view_reports:        false,
-    system_settings:     false,
-    view_feedback:       true,
+    view_dashboard:        true,
+    manage_providers:      true,
+    manage_companies:      true,
+    manage_users:          true,
+    suspend_accounts:      false,
+    manage_admins:         false,
+    view_email_queue:      false,
+    view_reports:          false,
+    system_settings:       false,
+    view_feedback:         true,
+    manage_subscriptions:  false,
   },
   support: {
-    view_dashboard:      true,
-    manage_providers:    false,
-    manage_companies:    false,
-    manage_users:        true,   // view only
-    suspend_accounts:    false,
-    manage_admins:       false,
-    view_email_queue:    true,
-    view_reports:        false,
-    system_settings:     false,
-    view_feedback:       true,
+    view_dashboard:        true,
+    manage_providers:      false,
+    manage_companies:      false,
+    manage_users:          true,
+    suspend_accounts:      false,
+    manage_admins:         false,
+    view_email_queue:      true,
+    view_reports:          false,
+    system_settings:       false,
+    view_feedback:         true,
+    manage_subscriptions:  false,
   },
   reviewer: {
-    view_dashboard:      true,
-    manage_providers:    true,   // approve/reject only
-    manage_companies:    true,   // approve/reject only
-    manage_users:        false,
-    suspend_accounts:    false,
-    manage_admins:       false,
-    view_email_queue:    false,
-    view_reports:        false,
-    system_settings:     false,
-    view_feedback:       false,
+    view_dashboard:        true,
+    manage_providers:      true,
+    manage_companies:      true,
+    manage_users:          false,
+    suspend_accounts:      false,
+    manage_admins:         false,
+    view_email_queue:      false,
+    view_reports:          false,
+    system_settings:       false,
+    view_feedback:         false,
+    manage_subscriptions:  false,
   },
 }
 
