@@ -247,6 +247,23 @@ export default function LandingPage() {
               About Us
             </button>
             <button
+               onClick={() => router.push('/pricing')}
+               className="gc-nav-link"
+               style={{
+                 background: 'transparent',
+                 color: 'rgba(255,255,255,0.75)',
+                 border: 'none',
+                 padding: '10px 16px',
+                 borderRadius: 8,
+                 fontSize: 14,
+                 fontWeight: 500,
+                 cursor: 'pointer',
+                 transition: 'all 0.2s ease',
+               }}
+             >
+               Pricing
+             </button>
+            <button
               onClick={() => router.push('/contact')}
               className="gc-nav-link"
               style={{
@@ -443,6 +460,14 @@ export default function LandingPage() {
             >
               About
             </button>
+            <button
+               onClick={() => router.push('/pricing')}
+               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+               onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+             >
+               Pricing
+             </button>
             <button
               onClick={() => router.push('/contact')}
               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
