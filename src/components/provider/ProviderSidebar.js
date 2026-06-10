@@ -191,7 +191,7 @@ export default function ProviderSidebar({ provider }) {
     { name: 'Inventory',        href: '/provider/inventory',   icon: Package         },
     { name: 'Analytics',        href: '/provider/analytics',   icon: BarChart3       },
     { name: 'Revenue',          href: '/provider/revenue',     icon: DollarSign      },
-    { icon: CreditCard, label: 'Subscription', path: '/provider/subscription', icon: CreditCard },
+    { name: 'Subscription',     href: '/provider/subscription', icon: CreditCard     },
     { name: 'Settings',         href: '/provider/settings',    icon: Settings        },
   ]
 
