@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   LayoutDashboard, Calendar, CalendarDays, Users, Package, FileText,
   BarChart3, DollarSign, Settings, Store, LogOut, Menu, X, MessageSquare,
-  Search, Building2, MessageCircle
+  Search, Building2, MessageCircle, CreditCard
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -191,6 +191,7 @@ export default function ProviderSidebar({ provider }) {
     { name: 'Inventory',        href: '/provider/inventory',   icon: Package         },
     { name: 'Analytics',        href: '/provider/analytics',   icon: BarChart3       },
     { name: 'Revenue',          href: '/provider/revenue',     icon: DollarSign      },
+    { icon: CreditCard, label: 'Subscription', path: '/provider/subscription', icon: CreditCard },
     { name: 'Settings',         href: '/provider/settings',    icon: Settings        },
   ]
 

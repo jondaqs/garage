@@ -6,7 +6,7 @@ import {
   Settings, LogOut, Menu, X, Users, Building2,
   Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
   AlertCircle, Wrench, ClipboardList, Search, MessageSquare,
-  MessageCircle, UserCheck, Package, Shield
+  MessageCircle, UserCheck, Package, Shield, CreditCard
 } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -565,6 +565,7 @@ export default function Sidebar({ user }) {
     { icon: CalendarDays,  label: 'Calendar',               path: '/dashboard/calendar' },
     { icon: History,       label: 'History',                path: '/dashboard/history' },
     { icon: BarChart3,     label: 'Reports',                path: '/dashboard/reports' },
+    { icon: CreditCard,   label: 'Subscription',           path: '/dashboard/subscription' },
     { icon: Settings,      label: 'Profile',                path: '/dashboard/profile' },
   ]
 
@@ -598,6 +599,7 @@ export default function Sidebar({ user }) {
       { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
       { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // budget access has its own rules — see filter below
       { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
+      { icon: CreditCard,   label: 'Subscription', path: `/company/subscription`,   everyone: false },
     ]
     // Filter out restricted items for users who don't qualify.
     //   • Most admin-only rows show only to is_admin
@@ -608,19 +610,32 @@ export default function Sidebar({ user }) {
       membership.is_admin ||
       membership.staff_role === 'accountant' ||
       membership.can_approve_payment
-    return items.filter(item => {
-      if (item.everyone)        return true
-      if (item.label === 'Budget') return canViewBudget
-      return membership.is_admin
-    })
+    const canManageSub =
+       membership.is_admin ||
+       membership.staff_role === 'accountant'
+     return items.filter(item => {
+       if (item.everyone)             return true
+       if (item.label === 'Budget')       return canViewBudget
+       if (item.label === 'Subscription') return canManageSub
+       return membership.is_admin
+     })
   }
 
   // ── Provider (mechanic) nav items ────────────────────────────────────────
-  const providerNavItems = (m) => [
-    { icon: Building2,     label: 'Overview',              path: `/dashboard/my-teams/provider/${m.providerId}`  },
-    { icon: Users,         label: 'My Teams',              path: '/dashboard/my-teams'                           },
-    { icon: ClipboardList, label: 'Assigned Work Orders',  path: '/dashboard/my-teams/work-orders'               },
-  ]
+  const providerNavItems = (m) => {
+       const canManageProviderSub = [
+         'service_provider_owner', 'admin', 'accountant'
+       ].includes(m.role)
+
+       return [
+         { icon: Building2,     label: 'Overview',              path: `/dashboard/my-teams/provider/${m.providerId}`  },
+         { icon: Users,         label: 'My Teams',              path: '/dashboard/my-teams'                           },
+         { icon: ClipboardList, label: 'Assigned Work Orders',  path: '/dashboard/my-teams/work-orders'               },
+         ...(canManageProviderSub ? [
+           { icon: CreditCard,  label: 'Subscription',          path: '/provider/subscription'                        },
+         ] : []),
+       ]
+     }
 
   // ── Status config ─────────────────────────────────────────────────────────
   const statusBadge = (status) => {

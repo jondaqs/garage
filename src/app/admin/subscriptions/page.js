@@ -3,11 +3,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
     CreditCard, Package, Percent, Gift, Calculator, Users, Building2, Wrench,
     Plus, Save, Trash2, X, CheckCircle, AlertCircle, Loader2, ToggleLeft, ToggleRight,
     ChevronDown, ChevronRight, Search, Filter, Eye, Ban, PlayCircle, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store
+    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 
@@ -19,6 +20,8 @@ const TABS = [
     { id: 'discounts', label: 'Period Discounts', icon: Percent },
     { id: 'trials', label: 'Trial Config', icon: Gift },
     { id: 'shops', label: 'Shop Tiers', icon: Store },
+    { id: 'invoices',  label: 'Invoices',  icon: FileText },
+    { id: 'receipts',  label: 'Receipts',  icon: Receipt || CreditCard },
     { id: 'calculator', label: 'Price Calculator', icon: Calculator },
 ]
 
@@ -1308,6 +1311,378 @@ function CalculatorTab({ supabase }) {
     )
 }
 
+// ════════════════════════════════════════════════════════════════
+//  ADMIN INVOICES TAB
+// ════════════════════════════════════════════════════════════════
+ 
+const PAYMENT_METHODS_ADMIN = [
+  { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
+  { value: 'cash',          label: 'Cash',      icon: Banknote },
+  { value: 'card',          label: 'Card',      icon: CreditCard },
+  { value: 'bank_transfer', label: 'Bank',      icon: Building2 },
+]
+ 
+function InvoicesTab({ supabase }) {
+  const [invoices, setInvoices] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const pageSize = 15
+ 
+  // Payment form
+  const [payingId, setPayingId] = useState(null)
+  const [payMethod, setPayMethod] = useState('mpesa')
+  const [payAmount, setPayAmount] = useState('')
+  const [payRef, setPayRef] = useState('')
+  const [payNotes, setPayNotes] = useState('')
+  const [paying, setPaying] = useState(false)
+ 
+  useEffect(() => { loadInvoices() }, [statusFilter, page])
+ 
+  const loadInvoices = async () => {
+    setLoading(true)
+    try {
+      let q = supabase.from('subscription_invoice_details')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1)
+ 
+      if (statusFilter !== 'all') q = q.eq('effective_status', statusFilter)
+ 
+      const { data, count, error } = await q
+      if (error) throw error
+      setInvoices(data || [])
+      setTotal(count || 0)
+    } catch (e) {
+      console.error('Invoice load error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+ 
+  const handlePayment = async (invoiceId) => {
+    if (!payAmount || parseFloat(payAmount) <= 0) { setToast({ message: 'Enter a valid amount', type: 'error' }); return }
+    setPaying(true)
+    try {
+      const { data, error } = await supabase.rpc('record_subscription_payment', {
+        p_invoice_id: invoiceId,
+        p_amount: parseFloat(payAmount),
+        p_paid_via: payMethod,
+        p_transaction_id: payRef || null,
+        p_notes: payNotes || null,
+      })
+      if (error) throw error
+      const result = typeof data === 'string' ? JSON.parse(data) : data
+      if (!result.success) throw new Error(result.error)
+      setToast({ message: `Payment recorded — Ref: ${result.payment_ref}`, type: 'success' })
+      setTimeout(() => setToast({ message: '' }), 4000)
+      setPayingId(null); setPayAmount(''); setPayRef(''); setPayNotes('')
+      await loadInvoices()
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally {
+      setPaying(false)
+    }
+  }
+ 
+  const filtered = invoices.filter(i => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (i.invoice_ref_no || '').toLowerCase().includes(q)
+      || (i.subscription_number || '').toLowerCase().includes(q)
+  })
+ 
+  const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+ 
+  return (
+    <div className="space-y-4">
+      <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
+ 
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search by invoice or subscription number…" value={search}
+            onChange={e => setSearch(e.target.value)} className={inp + ' pl-9'} />
+        </div>
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }} className={inp + ' w-auto'}>
+          <option value="all">All statuses</option>
+          <option value="unpaid">Unpaid</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+        </select>
+      </div>
+ 
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Invoice</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Subscription</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Paid</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Balance</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Due</th>
+                  <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="text-right py-2.5 px-3 w-28" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.length === 0 ? (
+                  <tr><td colSpan={8} className="py-8 text-center text-gray-400 text-sm">No invoices found</td></tr>
+                ) : filtered.map(inv => (
+                  <tr key={inv.id} className="hover:bg-gray-50">
+                    <td className="py-2.5 px-3 font-mono text-xs text-gray-700">{inv.invoice_ref_no}</td>
+                    <td className="py-2.5 px-3 text-xs text-gray-600">{inv.subscription_number}</td>
+                    <td className="py-2.5 px-3 text-right text-xs font-medium">{inv.currency_symbol}{Number(inv.total_amount).toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right text-xs text-green-700">{inv.currency_symbol}{Number(inv.total_paid).toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right text-xs font-medium text-red-600">
+                      {Number(inv.balance_due) > 0 ? `${inv.currency_symbol}${Number(inv.balance_due).toLocaleString()}` : '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-xs text-gray-600">{fmtD(inv.due_date)}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <StatusBadge code={inv.effective_status} />
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      {inv.effective_status !== 'paid' && (
+                        <button onClick={() => { setPayingId(payingId === inv.id ? null : inv.id); setPayAmount(inv.balance_due?.toString()) }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                          {payingId === inv.id ? 'Cancel' : 'Record Payment'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+ 
+          {/* Inline payment form */}
+          {payingId && (
+            <div className="rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-900 px-5 py-3 flex items-center gap-2">
+                <DollarSign size={14} className="text-amber-400" />
+                <span className="text-white font-semibold text-sm">
+                  Record Payment for {invoices.find(i => i.id === payingId)?.invoice_ref_no}
+                </span>
+              </div>
+              <div className="p-5 space-y-4 bg-white">
+                <div className="grid grid-cols-4 gap-2">
+                  {PAYMENT_METHODS_ADMIN.map(m => (
+                    <button key={m.value} onClick={() => setPayMethod(m.value)}
+                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                        payMethod === m.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                      }`}>
+                      <m.icon size={15} /> {m.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Amount</label>
+                    <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
+                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. M-Pesa QXZ12345" className={inp} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Notes</label>
+                    <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => handlePayment(payingId)} disabled={paying}
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+                    {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Confirm Payment
+                  </button>
+                  <button onClick={() => setPayingId(null)} className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+ 
+          <Pagination page={page} pageSize={pageSize} totalCount={total} onPageChange={setPage} />
+        </>
+      )}
+    </div>
+  )
+}
+ 
+ 
+// ════════════════════════════════════════════════════════════════
+//  ADMIN RECEIPTS TAB (with confirmation workflow)
+// ════════════════════════════════════════════════════════════════
+ 
+function ReceiptsTab({ supabase }) {
+  const [receipts, setReceipts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [confirmFilter, setConfirmFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const [confirming, setConfirming] = useState(null)
+  const pageSize = 15
+ 
+  useEffect(() => { loadReceipts() }, [confirmFilter, page])
+ 
+  const loadReceipts = async () => {
+    setLoading(true)
+    try {
+      let q = supabase.from('subscription_receipt_details')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1)
+ 
+      if (confirmFilter === 'unconfirmed') q = q.eq('confirmed', false)
+      if (confirmFilter === 'confirmed') q = q.eq('confirmed', true)
+ 
+      const { data, count, error } = await q
+      if (error) throw error
+      setReceipts(data || [])
+      setTotal(count || 0)
+    } catch (e) {
+      console.error('Receipts load error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+ 
+  const handleConfirm = async (receiptId) => {
+    if (!confirm('Confirm this payment has been received?')) return
+    setConfirming(receiptId)
+    try {
+      const { data, error } = await supabase.rpc('confirm_subscription_receipt', { p_receipt_id: receiptId })
+      if (error) throw error
+      const result = typeof data === 'string' ? JSON.parse(data) : data
+      if (!result.success) throw new Error(result.error)
+      setToast({ message: `Receipt ${result.receipt_number} confirmed`, type: 'success' })
+      setTimeout(() => setToast({ message: '' }), 3000)
+      await loadReceipts()
+    } catch (e) {
+      setToast({ message: e.message, type: 'error' })
+    } finally {
+      setConfirming(null)
+    }
+  }
+ 
+  const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+ 
+  const filtered = receipts.filter(r => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (r.receipt_number || '').toLowerCase().includes(q)
+      || (r.subscription_number || '').toLowerCase().includes(q)
+      || (r.paid_by_name || '').toLowerCase().includes(q)
+      || (r.payment_ref_id || '').toLowerCase().includes(q)
+  })
+ 
+  const unconfirmedCount = receipts.filter(r => !r.confirmed).length
+ 
+  return (
+    <div className="space-y-4">
+      <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
+ 
+      {unconfirmedCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-800">
+          <Clock size={15} /> <strong>{unconfirmedCount}</strong> receipt{unconfirmedCount > 1 ? 's' : ''} awaiting confirmation
+        </div>
+      )}
+ 
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search by receipt, subscription, payer, or ref…" value={search}
+            onChange={e => setSearch(e.target.value)} className={inp + ' pl-9'} />
+        </div>
+        <select value={confirmFilter} onChange={e => { setConfirmFilter(e.target.value); setPage(1) }} className={inp + ' w-auto'}>
+          <option value="all">All receipts</option>
+          <option value="unconfirmed">Awaiting confirmation</option>
+          <option value="confirmed">Confirmed</option>
+        </select>
+      </div>
+ 
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Receipt</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Subscriber</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Paid By</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Method</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Ref</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="text-right py-2.5 px-3 w-36" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.length === 0 ? (
+                  <tr><td colSpan={9} className="py-8 text-center text-gray-400 text-sm">No receipts found</td></tr>
+                ) : filtered.map(r => (
+                  <tr key={r.id} className={`hover:bg-gray-50 ${!r.confirmed ? 'bg-amber-50/30' : ''}`}>
+                    <td className="py-2.5 px-3 font-mono text-xs text-gray-700">{r.receipt_number}</td>
+                    <td className="py-2.5 px-3">
+                      <p className="text-xs font-medium text-gray-900">{r.subscriber_name || '—'}</p>
+                      <p className="text-[10px] text-gray-400 capitalize">{r.subscriber_type?.replace('_', ' ')}</p>
+                    </td>
+                    <td className="py-2.5 px-3 text-xs text-gray-600">{r.paid_by_name || '—'}</td>
+                    <td className="py-2.5 px-3 text-right text-xs font-medium">
+                      {r.currency_symbol}{Number(r.amount_paid).toLocaleString()}
+                      {r.change_given > 0 && (
+                        <p className="text-[10px] text-gray-400">Change: {r.currency_symbol}{Number(r.change_given).toLocaleString()}</p>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-xs text-gray-600 capitalize">{r.payment_method?.replace('_', ' ')}</td>
+                    <td className="py-2.5 px-3 text-xs font-mono text-gray-500">{r.payment_ref_id || r.transaction_ref || '—'}</td>
+                    <td className="py-2.5 px-3 text-xs text-gray-600">{fmtD(r.issued_at)}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      {r.confirmed ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <CheckCircle size={10} /> Confirmed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          <Clock size={10} /> Pending
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      {!r.confirmed && (
+                        <button onClick={() => handleConfirm(r.id)} disabled={confirming === r.id}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                          {confirming === r.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                          Confirm
+                        </button>
+                      )}
+                      {r.confirmed && r.confirmed_by_name && (
+                        <p className="text-[10px] text-gray-400">by {r.confirmed_by_name}</p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageSize={pageSize} totalCount={total} onPageChange={setPage} />
+        </>
+      )}
+    </div>
+  )
+}
+
 
 // ════════════════════════════════════════════════════════════════
 //  MAIN PAGE
@@ -1345,6 +1720,8 @@ export default function AdminSubscriptionsPage() {
             {tab === 'discounts' && <DiscountsTab supabase={supabase} />}
             {tab === 'trials' && <TrialConfigTab supabase={supabase} />}
             {tab === 'shops' && <ShopTiersTab supabase={supabase} />}
+            {tab === 'invoices' && <InvoicesTab supabase={supabase} />}
+            {tab === 'receipts' && <ReceiptsTab supabase={supabase} />}
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
         </div>
     )
