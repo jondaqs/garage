@@ -195,6 +195,8 @@ export default function ProviderSidebar({ provider }) {
     { name: 'Settings',         href: '/provider/settings',    icon: Settings        },
   ]
 
+  //support required
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
