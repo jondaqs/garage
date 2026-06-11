@@ -400,23 +400,42 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {packages.filter(p => p.billing_period_code === selectedPeriod).map(p => {
               const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
+              const isFree = Number(p.cost) === 0
+              const isStarter = (p.name || '').toLowerCase().includes('starter')
+              const isRecommended = isStarter || (!isFree && !isStarter && packages.filter(pk => pk.billing_period_code === selectedPeriod).indexOf(p) === 1)
               return (
-                <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col shadow-sm hover:shadow-md transition-shadow">
+                <div key={p.id} className={`rounded-xl border p-5 flex flex-col shadow-sm hover:shadow-md transition-all ${
+                  isRecommended ? 'border-blue-300 bg-blue-50/30 ring-1 ring-blue-200' : isFree ? 'border-gray-200 bg-gray-50/50' : 'border-gray-200 bg-white'
+                }`}>
+                  {isRecommended && (
+                    <span className="self-start inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 mb-3">
+                      <Sparkles size={10} /> RECOMMENDED
+                    </span>
+                  )}
                   <h3 className="text-base font-bold text-gray-900 mb-1">{p.name}</h3>
                   <p className="text-xs text-gray-500 mb-4">{p.description}</p>
 
                   <div className="mb-4">
-                    <span className="text-2xl font-black text-gray-900">{p.currency_symbol}{Number(p.cost).toLocaleString()}</span>
-                    <span className="text-sm text-gray-400 ml-1">/{p.billing_period_name?.toLowerCase()}</span>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      ≈ {p.currency_symbol}{Number(p.monthly_equivalent_cost).toFixed(2)}/mo
-                    </p>
+                    {isFree ? (
+                      <div>
+                        <span className="text-2xl font-black text-green-600">Free</span>
+                        <p className="text-xs text-gray-400 mt-0.5">No credit card required</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="text-2xl font-black text-gray-900">{p.currency_symbol}{Number(p.cost).toLocaleString()}</span>
+                        <span className="text-sm text-gray-400 ml-1">/{p.billing_period_name?.toLowerCase()}</span>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          ≈ {p.currency_symbol}{Number(p.monthly_equivalent_cost).toFixed(2)}/mo
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Limits */}
                   <div className="flex gap-2 flex-wrap mb-3">
                     {p.max_users && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_users} users</span>}
-                    {p.max_vehicles && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_vehicles} vehicles</span>}
+                    {p.max_vehicles && <span className={`text-[10px] px-2 py-0.5 rounded ${isFree ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{p.max_vehicles} vehicle{p.max_vehicles > 1 ? 's' : ''}</span>}
                     {p.max_shops && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_shops} shops</span>}
                   </div>
 
@@ -424,15 +443,19 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   <ul className="flex-1 space-y-1.5 mb-4">
                     {features.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                        <Check size={12} className="text-green-500 mt-0.5 flex-shrink-0" /> {f}
+                        <Check size={12} className={`mt-0.5 flex-shrink-0 ${isFree ? 'text-green-500' : isStarter ? 'text-blue-500' : 'text-green-500'}`} /> {f}
                       </li>
                     ))}
                   </ul>
 
                   <button onClick={() => handleSubscribe(p.id)} disabled={subscribing}
-                    className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                    className={`w-full py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors ${
+                      isFree ? 'bg-green-600 text-white hover:bg-green-700'
+                      : isRecommended ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-900 text-white hover:bg-gray-800'
+                    }`}>
                     {subscribing ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
-                    Subscribe
+                    {isFree ? 'Start Free' : isStarter ? 'Unlock Starter' : 'Subscribe'}
                   </button>
                 </div>
               )

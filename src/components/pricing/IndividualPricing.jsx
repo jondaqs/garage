@@ -1,34 +1,43 @@
 // src/components/pricing/IndividualPricing.jsx
 'use client'
 
-import { Car, Check, ArrowRight, Sparkles } from 'lucide-react'
+import { Car, Check, ArrowRight, Sparkles, Star, Zap } from 'lucide-react'
 
 const ACCENT = '#3b82f6'
 
 export default function IndividualPricing({ tiers = [], period, trialConfig }) {
   if (!tiers.length) return <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No plans available</p>
 
-  const popular = tiers.length >= 2 ? tiers[1] : null
+  // Identify special tiers
+  const freeTier = tiers.find(t => Number(t.base_monthly_price) === 0)
+  const starterTier = tiers.find(t => t.tier_code === 'ind_starter')
+  // Mark popular: the starter if it exists, otherwise the second tier
+  const popularCode = starterTier?.tier_code || (tiers.length >= 2 ? tiers[1]?.tier_code : null)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(tiers.length, 4)}, 1fr)`, gap: 20, alignItems: 'stretch' }}>
       {tiers.map((t, i) => {
-        const isPop = popular && t.tier_code === popular.tier_code
+        const isPop = t.tier_code === popularCode
         const price = t[`${period}_price`] ?? t.monthly_price ?? t.base_monthly_price
         const monthly = t.base_monthly_price
         const isFree = Number(monthly) === 0
+        const isStarter = t.tier_code === 'ind_starter'
         const features = (() => { try { return typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || []) } catch { return [] } })()
+
+        // Determine what premium features are missing from the free tier
+        const premiumFeatures = ['Budget tracking', 'Expense reports', 'Maintenance history', 'Service reminders']
 
         return (
           <div key={t.tier_code} style={{
             position: 'relative',
-            background: isPop ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)',
+            background: isPop ? 'rgba(59,130,246,0.08)' : isFree ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
             border: `1px solid ${isPop ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
             borderRadius: 16,
             padding: '32px 24px 28px',
             display: 'flex', flexDirection: 'column',
             transition: 'all 0.25s ease',
           }}>
+            {/* Badges */}
             {isPop && (
               <div style={{
                 position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
@@ -36,7 +45,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                 padding: '4px 14px', borderRadius: 20, letterSpacing: '0.04em',
                 display: 'flex', alignItems: 'center', gap: 4,
               }}>
-                <Sparkles size={12} /> MOST POPULAR
+                <Sparkles size={12} /> RECOMMENDED
               </div>
             )}
 
@@ -50,13 +59,14 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               </div>
             )}
 
+            {/* Tier icon + name */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <div style={{
                 width: 36, height: 36, borderRadius: 10,
-                background: isFree ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)',
+                background: isFree ? 'rgba(16,185,129,0.15)' : isStarter ? 'rgba(59,130,246,0.15)' : 'rgba(168,85,247,0.15)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Car size={18} color={isFree ? '#10b981' : ACCENT} />
+                {isFree ? <Car size={18} color="#10b981" /> : isStarter ? <Zap size={18} color={ACCENT} /> : <Star size={18} color="#a855f7" />}
               </div>
               <div>
                 <h3 className="gc-display" style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
@@ -65,10 +75,12 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               </div>
             </div>
 
+            {/* Description */}
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 20px', lineHeight: 1.5 }}>
               {t.tier_description || t.description || `${t.min_vehicles}${t.max_vehicles ? '–' + t.max_vehicles : '+'} vehicles`}
             </p>
 
+            {/* Pricing */}
             <div style={{ marginBottom: 20 }}>
               {isFree ? (
                 <div>
@@ -102,6 +114,20 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               )}
             </div>
 
+            {/* Upgrade nudge for free tier */}
+            {isFree && starterTier && (
+              <div style={{
+                background: 'rgba(59,130,246,0.06)',
+                border: '1px solid rgba(59,130,246,0.15)',
+                borderRadius: 10, padding: '10px 12px', marginBottom: 16,
+                fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
+              }}>
+                <span style={{ color: ACCENT, fontWeight: 600 }}>Want more?</span>{' '}
+                Upgrade to Starter for budgets, reports, reminders & full history — just {starterTier.currency_symbol || '$'}{Number(starterTier.base_monthly_price).toFixed(2)}/mo
+              </div>
+            )}
+
+            {/* Features list */}
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
                 What's included
@@ -109,13 +135,32 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {features.map((f, j) => (
                   <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-                    <Check size={14} style={{ color: isFree ? '#10b981' : ACCENT, marginTop: 2, flexShrink: 0 }} />
+                    <Check size={14} style={{ color: isFree ? '#10b981' : isStarter ? ACCENT : '#a855f7', marginTop: 2, flexShrink: 0 }} />
                     {f}
                   </li>
                 ))}
               </ul>
+
+              {/* Show what's NOT included in free tier */}
+              {isFree && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                    Available with Starter
+                  </p>
+                  {premiumFeatures.map((f, j) => (
+                    <p key={j} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
+                      color: 'rgba(255,255,255,0.25)', marginBottom: 6,
+                    }}>
+                      <Zap size={12} style={{ color: 'rgba(59,130,246,0.4)', flexShrink: 0 }} />
+                      {f}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* CTA button */}
             <button
               onClick={() => window.location.href = `/dashboard/subscription?plan=${t.tier_code}&period=${period}`}
               style={{
@@ -130,7 +175,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.opacity = '0.9' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.opacity = '1' }}
             >
-              {isFree ? 'Get Started Free' : 'Subscribe'} <ArrowRight size={15} />
+              {isFree ? 'Get Started Free' : isStarter ? 'Unlock Starter' : 'Subscribe'} <ArrowRight size={15} />
             </button>
           </div>
         )
