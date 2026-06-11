@@ -1242,11 +1242,19 @@ function CalculatorTab({ supabase }) {
 
                         <div>
                             <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Metrics used</p>
-                            <div className="flex gap-3 text-xs">
-                                <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.vehicles} vehicles</span>
-                                <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.staff} staff</span>
-                                <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.monthly_clients} clients/mo</span>
-                                <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.shops} shops</span>
+                            <div className="flex flex-wrap gap-3 text-xs">
+                                {(type === 'individual' || type === 'company') && (
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.vehicles} vehicle{result.metrics?.vehicles !== 1 ? 's' : ''}</span>
+                                )}
+                                {(type === 'company' || type === 'service_provider') && (
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.staff} staff</span>
+                                )}
+                                {type === 'service_provider' && (
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.monthly_clients} clients/mo</span>
+                                )}
+                                {type === 'service_provider' && (
+                                    <span className="bg-gray-100 px-2 py-1 rounded">{result.metrics?.shops} shop{result.metrics?.shops !== 1 ? 's' : ''}</span>
+                                )}
                             </div>
                         </div>
 
