@@ -80,31 +80,41 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       const subField = subscriberType === 'individual' ? 'user_id'
         : subscriberType === 'company' ? 'company_id' : 'service_provider_id'
 
+      // Step 1: Fetch subscriptions, packages, invoices in parallel
       const [
-        { data: subs },
+        { data: subs, error: subsErr },
         { data: pkgs },
         { data: invs },
-        { data: rcts },
+        { data: trial },
       ] = await Promise.all([
         supabase.from('subscription_details').select('*').eq(subField, subscriberId).order('created_at', { ascending: false }),
         supabase.from('subscription_package_listing').select('*')
           .eq('subscription_type_code', subscriberType).order('sort_order'),
         supabase.from('subscription_invoice_details').select('*').eq(subField, subscriberId).order('created_at', { ascending: false }),
-        supabase.from('subscription_receipt_details').select('*')
-          .in('subscription_id', (await supabase.from('subscriptions').select('id').eq(subField, subscriberId)).data?.map(s => s.id) || [])
-          .order('created_at', { ascending: false }),
+        supabase.rpc('check_trial_eligibility', {
+          p_subscriber_type: subscriberType, p_subscriber_id: subscriberId,
+        }),
       ])
+
+      if (subsErr) console.error('Subscriptions query error:', subsErr)
 
       setSubscriptions(subs || [])
       setPackages(pkgs || [])
       setInvoices(invs || [])
-      setReceipts(rcts || [])
-
-      // Check trial eligibility
-      const { data: trial } = await supabase.rpc('check_trial_eligibility', {
-        p_subscriber_type: subscriberType, p_subscriber_id: subscriberId,
-      })
       if (trial?.[0]) setTrialInfo(trial[0])
+
+      // Step 2: Fetch receipts using subscription IDs (avoids .in([]) error)
+      const subIds = (subs || []).map(s => s.id)
+      if (subIds.length > 0) {
+        const { data: rcts } = await supabase
+          .from('subscription_receipt_details')
+          .select('*')
+          .in('subscription_id', subIds)
+          .order('created_at', { ascending: false })
+        setReceipts(rcts || [])
+      } else {
+        setReceipts([])
+      }
     } catch (e) {
       console.error('Load error:', e)
     } finally {
