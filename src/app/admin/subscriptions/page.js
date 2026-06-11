@@ -470,15 +470,34 @@ function PackagesTab({ supabase }) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {pkgs.map(p => (
-                                    <tr key={p.id} className="hover:bg-gray-50">
-                                        <td className="py-2 px-3 text-gray-900 font-medium text-xs">{p.name}</td>
+                                {pkgs.map(p => {
+                                    const isFree = Number(p.cost) === 0
+                                    const isBasicPlus = (p.name || '').toLowerCase().includes('basic plus')
+                                    const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
+                                    return (
+                                    <tr key={p.id} className={`hover:bg-gray-50 ${isFree ? 'bg-green-50/30' : isBasicPlus ? 'bg-blue-50/30' : ''}`}>
+                                        <td className="py-2 px-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-gray-900 font-medium text-xs">{p.name}</span>
+                                                {isFree && <span className="text-[9px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">FREE</span>}
+                                                {isBasicPlus && <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">BASIC PLUS</span>}
+                                            </div>
+                                            {p.description && <p className="text-[10px] text-gray-400 mt-0.5 max-w-[240px] truncate" title={p.description}>{p.description}</p>}
+                                            {features.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {features.slice(0, 3).map((f, fi) => (
+                                                        <span key={fi} className="text-[9px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded">{f}</span>
+                                                    ))}
+                                                    {features.length > 3 && <span className="text-[9px] text-gray-400">+{features.length - 3}</span>}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="py-2 px-3 text-gray-600 text-xs">{p.billing_period_name}</td>
                                         <td className="py-2 px-3 text-right font-mono text-xs">
-                                            {p.currency_symbol}{Number(p.cost).toLocaleString()}
+                                            {isFree ? <span className="text-green-600 font-semibold">Free</span> : `${p.currency_symbol}${Number(p.cost).toLocaleString()}`}
                                         </td>
                                         <td className="py-2 px-3 text-right text-gray-400 text-xs">
-                                            {p.currency_symbol}{Number(p.monthly_equivalent_cost).toLocaleString()}/mo
+                                            {isFree ? '—' : `${p.currency_symbol}${Number(p.monthly_equivalent_cost).toLocaleString()}/mo`}
                                         </td>
                                         <td className="py-2 px-3 text-center text-xs text-gray-500">
                                             {[
@@ -493,7 +512,8 @@ function PackagesTab({ supabase }) {
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -539,6 +559,7 @@ function PricingTiersTab({ supabase }) {
         setEditId(tier.id)
         setEditData({
             tier_name: tier.tier_name,
+            description: tier.description || '',
             base_monthly_price: tier.base_monthly_price,
             per_extra_vehicle_price: tier.per_extra_vehicle_price || 0,
             per_extra_staff_price: tier.per_extra_staff_price || 0,
@@ -560,6 +581,7 @@ function PricingTiersTab({ supabase }) {
                 'min_vehicles', 'max_vehicles', 'min_staff', 'max_staff', 'min_monthly_clients', 'max_monthly_clients']) {
                 update[k] = update[k] === '' || update[k] === null ? null : Number(update[k])
             }
+            // description stays as string
             const { error } = await supabase.from('subscription_pricing_tiers').update(update).eq('id', editId)
             if (error) throw error
             setEditId(null)
@@ -612,15 +634,36 @@ function PricingTiersTab({ supabase }) {
                             <tbody className="divide-y divide-gray-100">
                                 {tierList.map(t => {
                                     const isEditing = editId === t.id
+                                    const isFree = Number(t.base_monthly_price) === 0
+                                    const isBasicPlus = (t.tier_code || '').includes('basic_plus')
+                                    const features = (() => { try { return typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || []) } catch { return [] } })()
                                     return (
                                         <tr key={t.id} className={`hover:bg-gray-50 cursor-pointer ${isEditing ? 'bg-blue-50' : ''} ${!t.is_active ? 'opacity-50' : ''}`}
                                             onClick={() => !isEditing && startEdit(t)}>
                                             <td className="py-2 px-2">
-                                                <p className="font-medium text-gray-900">{isEditing ? ed('tier_name') : t.tier_name}</p>
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className="font-medium text-gray-900">{isEditing ? ed('tier_name') : t.tier_name}</p>
+                                                    {isFree && <span className="text-[9px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">FREE</span>}
+                                                    {isBasicPlus && <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">BASIC PLUS</span>}
+                                                </div>
                                                 <p className="text-[10px] text-gray-400">{t.tier_code}</p>
+                                                {isEditing ? (
+                                                    <input type="text" value={editData.description ?? ''} onChange={e => setEditData(d => ({ ...d, description: e.target.value }))}
+                                                        className={inp + ' py-1 text-xs mt-1'} placeholder="Description" />
+                                                ) : t.description ? (
+                                                    <p className="text-[10px] text-gray-400 mt-0.5 max-w-[200px] truncate" title={t.description}>{t.description}</p>
+                                                ) : null}
+                                                {!isEditing && features.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {features.slice(0, 3).map((f, fi) => (
+                                                            <span key={fi} className="text-[9px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded">{f}</span>
+                                                        ))}
+                                                        {features.length > 3 && <span className="text-[9px] text-gray-400">+{features.length - 3}</span>}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="py-2 px-2 text-right font-mono">
-                                                {isEditing ? ed('base_monthly_price', 'number') : `$${Number(t.base_monthly_price).toFixed(2)}`}
+                                                {isEditing ? ed('base_monthly_price', 'number') : (isFree ? <span className="text-green-600 font-semibold text-xs">Free</span> : `$${Number(t.base_monthly_price).toFixed(2)}`)}
                                             </td>
                                             <td className="py-2 px-2 text-center text-gray-600">
                                                 {isEditing ? (

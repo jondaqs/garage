@@ -401,8 +401,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             {packages.filter(p => p.billing_period_code === selectedPeriod).map(p => {
               const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
               const isFree = Number(p.cost) === 0
-              const isStarter = (p.name || '').toLowerCase().includes('starter')
-              const isRecommended = isStarter || (!isFree && !isStarter && packages.filter(pk => pk.billing_period_code === selectedPeriod).indexOf(p) === 1)
+              const isBasicPlus = (p.name || '').toLowerCase().includes('basic plus')
+              const isRecommended = isBasicPlus || (!isFree && !isBasicPlus && packages.filter(pk => pk.billing_period_code === selectedPeriod).indexOf(p) === 1)
               return (
                 <div key={p.id} className={`rounded-xl border p-5 flex flex-col shadow-sm hover:shadow-md transition-all ${
                   isRecommended ? 'border-blue-300 bg-blue-50/30 ring-1 ring-blue-200' : isFree ? 'border-gray-200 bg-gray-50/50' : 'border-gray-200 bg-white'
@@ -443,7 +443,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   <ul className="flex-1 space-y-1.5 mb-4">
                     {features.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                        <Check size={12} className={`mt-0.5 flex-shrink-0 ${isFree ? 'text-green-500' : isStarter ? 'text-blue-500' : 'text-green-500'}`} /> {f}
+                        <Check size={12} className={`mt-0.5 flex-shrink-0 ${isFree ? 'text-green-500' : isBasicPlus ? 'text-blue-500' : 'text-green-500'}`} /> {f}
                       </li>
                     ))}
                   </ul>
@@ -455,7 +455,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                       : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}>
                     {subscribing ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
-                    {isFree ? 'Start Free' : isStarter ? 'Unlock Starter' : 'Subscribe'}
+                    {isFree ? 'Start Free' : isBasicPlus ? 'Unlock Basic Plus' : 'Subscribe'}
                   </button>
                 </div>
               )
@@ -613,4 +613,4 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       )}
     </div>
   )
-} 
+}
