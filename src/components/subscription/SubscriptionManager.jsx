@@ -279,19 +279,100 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               </button>
             </div>
           ) : (
-            subscriptions.filter(s => s.id !== activeSub?.id).map(s => (
-              <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{s.package_name}</p>
-                    <p className="text-xs text-gray-500">{s.subscription_number} · {fmtD(s.start_date)} – {fmtD(s.expiry_date)}</p>
+            <>
+              {/* Quick stats */}
+              {activeSub && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <p className="text-xs text-gray-500 font-medium">Package</p>
+                    <p className="text-sm font-bold text-gray-900 mt-1">{activeSub.package_name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{activeSub.billing_period_name}</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <p className="text-xs text-gray-500 font-medium">Days remaining</p>
+                    <p className={`text-2xl font-bold mt-1 ${activeSub.days_until_expiry <= 7 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {Math.max(0, activeSub.days_until_expiry || 0)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">Expires {fmtD(activeSub.expiry_date)}</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <p className="text-xs text-gray-500 font-medium">Total invoices</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{invoices.length}</p>
+                    {invoices.filter(i => i.effective_status === 'unpaid' || i.effective_status === 'overdue').length > 0 && (
+                      <p className="text-xs text-amber-600 font-medium mt-0.5">
+                        {invoices.filter(i => i.effective_status === 'unpaid' || i.effective_status === 'overdue').length} unpaid
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <p className="text-xs text-gray-500 font-medium">Total paid</p>
+                    <p className="text-2xl font-bold text-green-700 mt-1">
+                      {activeSub.currency_symbol}{invoices.reduce((sum, i) => sum + Number(i.total_paid || 0), 0).toLocaleString()}
+                    </p>
                   </div>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status_code] || 'bg-gray-100'}`}>
-                  {s.status_name}
-                </span>
+              )}
+
+              {/* Unpaid invoices alert */}
+              {invoices.filter(i => i.effective_status === 'unpaid' || i.effective_status === 'overdue').length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={16} className="text-amber-600" />
+                      <p className="text-sm font-semibold text-amber-800">
+                        {invoices.filter(i => i.effective_status === 'unpaid' || i.effective_status === 'overdue').length} unpaid invoice{invoices.filter(i => i.effective_status !== 'paid').length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <button onClick={() => setView('invoice')}
+                      className="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
+                      View invoices <ArrowRight size={12} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick actions */}
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setView('invoice')}
+                  className="bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors text-left flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <FileText size={18} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Invoices & Receipts</p>
+                    <p className="text-xs text-gray-500">View payment history and make payments</p>
+                  </div>
+                </button>
+                <button onClick={() => setView('packages')}
+                  className="bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors text-left flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+                    <Package size={18} className="text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{hasActive ? 'Change Plan' : 'Browse Plans'}</p>
+                    <p className="text-xs text-gray-500">{hasActive ? 'Upgrade or switch your package' : 'Find the right plan for you'}</p>
+                  </div>
+                </button>
               </div>
-            ))
+
+              {/* Past subscriptions */}
+              {subscriptions.filter(s => s.id !== activeSub?.id).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Previous subscriptions</p>
+                  {subscriptions.filter(s => s.id !== activeSub?.id).map(s => (
+                    <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{s.package_name}</p>
+                        <p className="text-xs text-gray-500">{s.subscription_number} · {fmtD(s.start_date)} – {fmtD(s.expiry_date)}</p>
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status_code] || 'bg-gray-100'}`}>
+                        {s.status_name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           {!hasActive && subscriptions.length > 0 && (
             <button onClick={() => setView('packages')}
