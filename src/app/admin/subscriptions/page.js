@@ -1139,27 +1139,73 @@ function CalculatorTab({ supabase }) {
     const [result, setResult] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    // Tier selector for individual
+    const [indTiers, setIndTiers] = useState([])
+    const [selectedTier, setSelectedTier] = useState('auto')
+    const [discounts, setDiscounts] = useState({})
+
+    // Load individual tiers and discounts on mount
+    useEffect(() => {
+        const load = async () => {
+            const [{ data: tiers }, { data: discs }] = await Promise.all([
+                supabase.from('subscription_pricing_overview').select('*').eq('subscription_type', 'individual').eq('is_active', true).order('sort_order'),
+                supabase.from('subscription_period_discounts').select('*, billing_periods!inner(code, duration_months)').eq('is_active', true),
+            ])
+            setIndTiers(tiers || [])
+            const discMap = {}
+            ;(discs || []).forEach(d => { discMap[d.billing_periods.code] = { pct: Number(d.discount_percentage), months: d.billing_periods.duration_months } })
+            setDiscounts(discMap)
+        }
+        load()
+    }, [])
 
     const compute = async () => {
         setLoading(true)
         setError('')
         setResult(null)
         try {
-            // Use a dummy uuid since we're passing overrides
-            const dummyId = '00000000-0000-0000-0000-000000000000'
-            const { data, error: rpcErr } = await supabase.rpc('compute_subscription_price', {
-                p_subscriber_type: type,
-                p_subscriber_id: dummyId,
-                p_billing_period_code: period,
-                p_vehicle_count: vehicles,
-                p_staff_count: staff,
-                p_monthly_client_count: clients,
-                p_shop_count: shops,
-            })
-            if (rpcErr) throw rpcErr
-            const r = typeof data === 'string' ? JSON.parse(data) : data
-            if (!r.success) throw new Error(r.error)
-            setResult(r)
+            // If individual + specific tier selected → compute locally
+            if (type === 'individual' && selectedTier !== 'auto') {
+                const tier = indTiers.find(t => t.tier_code === selectedTier)
+                if (!tier) throw new Error('Tier not found')
+                const base = Number(tier.base_monthly_price)
+                const isFree = base === 0
+                const disc = discounts[period] || { pct: 0, months: 1 }
+                const discounted = isFree ? 0 : Math.round(base * (1 - disc.pct / 100) * 100) / 100
+                const total = isFree ? 0 : Math.round(discounted * disc.months * 100) / 100
+                const savings = isFree ? 0 : Math.round((base * disc.months - total) * 100) / 100
+                const features = (() => { try { return typeof tier.features === 'string' ? JSON.parse(tier.features) : (tier.features || []) } catch { return [] } })()
+                setResult({
+                    success: true,
+                    subscriber_type: 'individual',
+                    metrics: { vehicles, staff: 0, monthly_clients: 0, shops: 0 },
+                    tier: { code: tier.tier_code, name: tier.tier_name, features },
+                    pricing: {
+                        base_monthly_price: base, shop_addon_monthly: 0,
+                        monthly_total: base, billing_period: period,
+                        duration_months: disc.months, discount_percentage: disc.pct,
+                        discounted_monthly: discounted, period_total: total,
+                        savings, currency_code: tier.currency_code, currency_symbol: tier.currency_symbol,
+                    },
+                    trial: { is_free: isFree, reason: isFree ? 'Free tier' : null },
+                })
+            } else {
+                // Use RPC for auto-match or other types
+                const dummyId = '00000000-0000-0000-0000-000000000000'
+                const { data, error: rpcErr } = await supabase.rpc('compute_subscription_price', {
+                    p_subscriber_type: type,
+                    p_subscriber_id: dummyId,
+                    p_billing_period_code: period,
+                    p_vehicle_count: vehicles,
+                    p_staff_count: staff,
+                    p_monthly_client_count: clients,
+                    p_shop_count: shops,
+                })
+                if (rpcErr) throw rpcErr
+                const r = typeof data === 'string' ? JSON.parse(data) : data
+                if (!r.success) throw new Error(r.error)
+                setResult(r)
+            }
         } catch (e) {
             setError(e.message)
         } finally {
@@ -1187,6 +1233,23 @@ function CalculatorTab({ supabase }) {
                             </label>
                             <input type="number" min={0} value={vehicles} onChange={e => setVehicles(Number(e.target.value))}
                                 className={inp} />
+                        </div>
+                    )}
+
+                    {type === 'individual' && indTiers.length > 0 && (
+                        <div>
+                            <label className="text-xs font-medium text-gray-700 block mb-1">Tier (override)</label>
+                            <select value={selectedTier} onChange={e => setSelectedTier(e.target.value)} className={inp}>
+                                <option value="auto">Auto-match by vehicle count</option>
+                                {indTiers.map(t => (
+                                    <option key={t.tier_code} value={t.tier_code}>
+                                        {t.tier_name} — ${Number(t.base_monthly_price).toFixed(2)}/mo
+                                        {Number(t.base_monthly_price) === 0 ? ' (Free)' : ''}
+                                        {t.min_vehicles != null ? ` · ${t.min_vehicles}${t.max_vehicles ? '–' + t.max_vehicles : '+'} vehicles` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-gray-400 mt-1">Select a specific tier or let the system match by vehicle count</p>
                         </div>
                     )}
 

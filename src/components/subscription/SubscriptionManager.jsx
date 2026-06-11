@@ -386,6 +386,49 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       {/* ═══ PACKAGES ═══ */}
       {view === 'packages' && (
         <div className="space-y-4">
+
+          {/* ── Free tier card for individual (always visible, no period needed) ── */}
+          {subscriberType === 'individual' && (
+            <div className="rounded-2xl border border-green-200 bg-green-50/40 p-5">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg font-bold text-gray-900">Free</span>
+                    <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">FOREVER FREE</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3">Basic vehicle tracking for your first car — no payment needed.</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['1 vehicle included', 'View service history', 'Basic notifications', 'Find nearby garages'].map((f, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 text-[11px] text-green-700 bg-green-100/60 px-2 py-0.5 rounded-full">
+                        <Check size={10} /> {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-black text-green-600">Free</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">1 vehicle · no expiry</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Trial banner for Basic Plus ── */}
+          {subscriberType === 'individual' && trialInfo?.is_eligible && trialInfo?.trial_months > 0 && !hasActive && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+              <Sparkles size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-900">
+                  {trialInfo.trial_months}-month Basic Plus trial included!
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  {trialInfo.reason}
+                  {trialInfo.trial_expires_at && ` · Expires ${fmtD(trialInfo.trial_expires_at)}`}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Period selector */}
           <div className="flex justify-center gap-2 flex-wrap">
             {Object.entries(PERIOD_LABELS).map(([code, label]) => (
@@ -398,28 +441,36 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {packages.filter(p => p.billing_period_code === selectedPeriod).map(p => {
+            {packages.filter(p => p.billing_period_code === selectedPeriod && Number(p.cost) > 0).map(p => {
               const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
-              const isFree = Number(p.cost) === 0
               const isBasicPlus = (p.name || '').toLowerCase().includes('basic plus')
-              const isRecommended = isBasicPlus || (!isFree && !isBasicPlus && packages.filter(pk => pk.billing_period_code === selectedPeriod).indexOf(p) === 1)
+              const isRecommended = isBasicPlus
+              const hasActiveTrial = isBasicPlus && trialInfo?.is_eligible && trialInfo?.trial_months > 0
               return (
                 <div key={p.id} className={`rounded-xl border p-5 flex flex-col shadow-sm hover:shadow-md transition-all ${
-                  isRecommended ? 'border-blue-300 bg-blue-50/30 ring-1 ring-blue-200' : isFree ? 'border-gray-200 bg-gray-50/50' : 'border-gray-200 bg-white'
+                  isRecommended ? 'border-blue-300 bg-blue-50/30 ring-1 ring-blue-200' : 'border-gray-200 bg-white'
                 }`}>
                   {isRecommended && (
                     <span className="self-start inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 mb-3">
                       <Sparkles size={10} /> RECOMMENDED
                     </span>
                   )}
+                  {hasActiveTrial && (
+                    <span className="self-start inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 mb-2">
+                      <Clock size={10} /> {trialInfo.trial_months}-MONTH FREE TRIAL
+                    </span>
+                  )}
                   <h3 className="text-base font-bold text-gray-900 mb-1">{p.name}</h3>
                   <p className="text-xs text-gray-500 mb-4">{p.description}</p>
 
                   <div className="mb-4">
-                    {isFree ? (
+                    {hasActiveTrial ? (
                       <div>
                         <span className="text-2xl font-black text-green-600">Free</span>
-                        <p className="text-xs text-gray-400 mt-0.5">No credit card required</p>
+                        <span className="text-sm text-gray-400 ml-2 line-through">{p.currency_symbol}{Number(p.cost).toLocaleString()}</span>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Free for {trialInfo.trial_months} months, then {p.currency_symbol}{Number(p.monthly_equivalent_cost).toFixed(2)}/mo
+                        </p>
                       </div>
                     ) : (
                       <div>
@@ -432,37 +483,32 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                     )}
                   </div>
 
-                  {/* Limits */}
                   <div className="flex gap-2 flex-wrap mb-3">
+                    {p.max_vehicles && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_vehicles} vehicle{p.max_vehicles > 1 ? 's' : ''}</span>}
                     {p.max_users && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_users} users</span>}
-                    {p.max_vehicles && <span className={`text-[10px] px-2 py-0.5 rounded ${isFree ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{p.max_vehicles} vehicle{p.max_vehicles > 1 ? 's' : ''}</span>}
-                    {p.max_shops && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_shops} shops</span>}
                   </div>
 
-                  {/* Features */}
                   <ul className="flex-1 space-y-1.5 mb-4">
                     {features.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                        <Check size={12} className={`mt-0.5 flex-shrink-0 ${isFree ? 'text-green-500' : isBasicPlus ? 'text-blue-500' : 'text-green-500'}`} /> {f}
+                        <Check size={12} className={`mt-0.5 flex-shrink-0 ${isBasicPlus ? 'text-blue-500' : 'text-green-500'}`} /> {f}
                       </li>
                     ))}
                   </ul>
 
                   <button onClick={() => handleSubscribe(p.id)} disabled={subscribing}
                     className={`w-full py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors ${
-                      isFree ? 'bg-green-600 text-white hover:bg-green-700'
-                      : isRecommended ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-900 text-white hover:bg-gray-800'
+                      isRecommended ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}>
                     {subscribing ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
-                    {isFree ? 'Start Free' : isBasicPlus ? 'Unlock Basic Plus' : 'Subscribe'}
+                    {hasActiveTrial ? 'Start Free Trial' : isBasicPlus ? 'Unlock Basic Plus' : 'Subscribe'}
                   </button>
                 </div>
               )
             })}
           </div>
-          {packages.filter(p => p.billing_period_code === selectedPeriod).length === 0 && (
-            <p className="text-center text-sm text-gray-400 py-8">No packages available for this period. Try another billing cycle.</p>
+          {packages.filter(p => p.billing_period_code === selectedPeriod && Number(p.cost) > 0).length === 0 && (
+            <p className="text-center text-sm text-gray-400 py-8">No paid packages available for this period. Try another billing cycle.</p>
           )}
         </div>
       )}
