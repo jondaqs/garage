@@ -109,7 +109,7 @@ export default function CompanySidebar({ company, userRole }) {
       badge: recommendationsCount > 0 ? recommendationsCount : null },
     { name: 'Budget',            href: '/company/budget',       icon: DollarSign   },
     { name: 'Reports',           href: '/company/reports',      icon: BarChart3    },
-    { icon: CreditCard, label: 'Subscription', path: '/company/subscription' },
+    { name: 'Subscription', href: '/company/subscription', icon: CreditCard },
   ]
 
   const showInfoAlert = company?.status === 'pending_info'
