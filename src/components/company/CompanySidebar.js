@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Home, Truck, Users, Calendar, CalendarDays, ClipboardList,
   BarChart3, DollarSign, LogOut, Building2, AlertCircle,
-  Bell, Menu, X, Search, MessageSquare, MessageCircle, UserCheck
+  Bell, Menu, X, Search, MessageSquare, MessageCircle, UserCheck, CreditCard
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
