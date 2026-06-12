@@ -19,7 +19,7 @@ import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
   Package, CreditCard, FileText, CheckCircle, AlertCircle, Loader2,
   ArrowRight, Clock, DollarSign, Send, Banknote, Building2,
-  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp
+  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt
 } from 'lucide-react'
 
 const PAYMENT_METHODS = [
@@ -255,7 +255,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         {[
           { id: 'overview', label: 'Overview',  icon: CreditCard },
           { id: 'packages', label: 'Browse Plans', icon: Package },
-          { id: 'invoice',  label: 'Invoices & Receipts', icon: FileText },
+          { id: 'invoices',  label: 'Invoices',  icon: FileText },
+          { id: 'receipts',  label: 'Receipts',  icon: Receipt },
         ].map(t => (
           <button key={t.id} onClick={() => setView(t.id)}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
@@ -323,7 +324,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         {invoices.filter(i => i.effective_status === 'unpaid' || i.effective_status === 'overdue').length} unpaid invoice{invoices.filter(i => i.effective_status !== 'paid').length > 1 ? 's' : ''}
                       </p>
                     </div>
-                    <button onClick={() => setView('invoice')}
+                    <button onClick={() => setView('invoices')}
                       className="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1">
                       View invoices <ArrowRight size={12} />
                     </button>
@@ -333,7 +334,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
               {/* Quick actions */}
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setView('invoice')}
+                <button onClick={() => setView('invoices')}
                   className="bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors text-left flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                     <FileText size={18} className="text-blue-600" />
@@ -513,24 +514,54 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         </div>
       )}
 
-      {/* ═══ INVOICES & RECEIPTS ═══ */}
-      {view === 'invoice' && (
+      {/* ═══ INVOICES ═══ */}
+      {view === 'invoices' && (
         <div className="space-y-4">
-          {invoices.length === 0 ? (
+          {invoices.filter(i => Number(i.total_amount) > 0).length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
               <FileText size={40} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500">No invoices yet. Subscribe to a plan to receive your first invoice.</p>
+              <p className="text-sm text-gray-500">No invoices yet. Subscribe to a paid plan to receive your first invoice.</p>
             </div>
           ) : (
-            invoices.map(inv => {
+            invoices.filter(i => Number(i.total_amount) > 0).map(inv => {
               const isExpanded = expandedInvoice === inv.id
-              const invReceipts = receipts.filter(r => r.subscription_invoice_id === inv.id)
               const isPaid = inv.invoice_status_code === 'paid'
               const isPayingThis = payingInvoiceId === inv.id
 
+              const downloadInvoice = () => {
+                const w = window.open('', '_blank')
+                w.document.write(`<!DOCTYPE html><html><head><title>Invoice ${inv.invoice_ref_no}</title>
+                <style>
+                  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:40px;color:#1a1a1a}
+                  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a1a1a;padding-bottom:20px;margin-bottom:30px}
+                  .header h1{font-size:28px;margin:0}.meta{text-align:right;font-size:13px;color:#666}.meta p{margin:2px 0}
+                  .grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px}
+                  .stitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:6px;font-weight:600}
+                  .section p{margin:2px 0;font-size:14px}
+                  table{width:100%;border-collapse:collapse;margin-bottom:30px}
+                  th{text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;background:#f5f5f5;border-bottom:2px solid #ddd}
+                  td{padding:10px 12px;font-size:14px;border-bottom:1px solid #eee}.tr{text-align:right}
+                  .totals{margin-left:auto;width:280px}.totals tr td{font-size:14px;padding:6px 12px}
+                  .grand{font-weight:700;font-size:18px;border-top:2px solid #1a1a1a}
+                  .footer{margin-top:40px;padding-top:20px;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center}
+                  @media print{button{display:none!important}}
+                </style></head><body>
+                <div style="text-align:right;margin-bottom:20px"><button onclick="window.print()" style="padding:8px 24px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">Print / Save as PDF</button></div>
+                <div class="header"><div><h1>INVOICE</h1><p style="color:#666;margin:4px 0;font-size:13px">GariCare Auto Services</p></div>
+                <div class="meta"><p><strong>${inv.invoice_ref_no}</strong></p><p>Issued: ${inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}) : '—'}</p><p>Due: ${inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}) : '—'}</p></div></div>
+                <div class="grid"><div><p class="stitle">Subscription</p><div class="section"><p>${inv.subscription_number || '—'}</p><p>${inv.package_name || ''}</p></div></div>
+                <div><p class="stitle">Period</p><div class="section"><p>${inv.billing_period_start ? new Date(inv.billing_period_start).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'}) : '—'} – ${inv.billing_period_end ? new Date(inv.billing_period_end).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'}) : '—'}</p></div></div></div>
+                <table><thead><tr><th>Description</th><th class="tr">Amount</th></tr></thead><tbody>
+                <tr><td>Subscription fee</td><td class="tr">${inv.currency_symbol||''}${Number(inv.amount_due||inv.total_amount).toLocaleString()}</td></tr></tbody></table>
+                <table class="totals"><tr><td>Total</td><td class="tr">${inv.currency_symbol||''}${Number(inv.total_amount).toLocaleString()}</td></tr>
+                <tr><td>Paid</td><td class="tr">${inv.currency_symbol||''}${Number(inv.total_paid||0).toLocaleString()}</td></tr>
+                <tr class="grand"><td>Balance</td><td class="tr">${inv.currency_symbol||''}${Number(inv.balance_due||0).toLocaleString()}</td></tr></table>
+                <div class="footer"><p>Thank you for your business.</p></div></body></html>`)
+                w.document.close()
+              }
+
               return (
                 <div key={inv.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                  {/* Invoice header */}
                   <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)}
                     className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
                     <div className="flex items-center gap-4">
@@ -557,45 +588,20 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                     </div>
                   </button>
 
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
-                      {/* Invoice details grid */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        <div>
-                          <p className="text-xs text-gray-500">Amount Due</p>
-                          <p className="font-semibold">{fmt(inv.amount_due, inv.currency_symbol)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Tax</p>
-                          <p className="font-semibold">{fmt(inv.tax_amount, inv.currency_symbol)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Total Paid</p>
-                          <p className="font-semibold text-green-700">{fmt(inv.total_paid, inv.currency_symbol)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Period</p>
-                          <p className="font-semibold">{fmtD(inv.billing_period_start)} – {fmtD(inv.billing_period_end)}</p>
-                        </div>
+                        <div><p className="text-xs text-gray-500">Amount Due</p><p className="font-semibold">{fmt(inv.amount_due, inv.currency_symbol)}</p></div>
+                        <div><p className="text-xs text-gray-500">Tax</p><p className="font-semibold">{fmt(inv.tax_amount, inv.currency_symbol)}</p></div>
+                        <div><p className="text-xs text-gray-500">Total Paid</p><p className="font-semibold text-green-700">{fmt(inv.total_paid, inv.currency_symbol)}</p></div>
+                        <div><p className="text-xs text-gray-500">Period</p><p className="font-semibold">{fmtD(inv.billing_period_start)} – {fmtD(inv.billing_period_end)}</p></div>
                       </div>
 
-                      {/* Receipts */}
-                      {invReceipts.length > 0 && (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receipts</p>
-                          {invReceipts.map(r => (
-                            <SubscriptionReceiptCard
-                              key={r.id}
-                              receipt={r}
-                              canConfirm={false}
-                              onConfirmed={loadAll}
-                            />
-                          ))}
-                        </div>
-                      )}
+                      <button onClick={downloadInvoice}
+                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                        <Download size={14} /> Download Invoice
+                      </button>
 
-                      {/* Record payment */}
                       {!isPaid && (
                         <div>
                           {!isPayingThis ? (
@@ -627,8 +633,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                   </div>
                                   <div>
                                     <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
-                                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)}
-                                      placeholder="e.g. M-Pesa QXZ12345" className={inp} />
+                                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. M-Pesa QXZ12345" className={inp} />
                                   </div>
                                 </div>
                                 <div>
@@ -638,11 +643,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                 <div className="flex gap-2">
                                   <button onClick={handlePayment} disabled={paying}
                                     className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                                    {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />}
-                                    Confirm Payment
+                                    {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Confirm Payment
                                   </button>
-                                  <button onClick={() => setPayingInvoiceId(null)}
-                                    className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                                  <button onClick={() => setPayingInvoiceId(null)} className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
                                 </div>
                               </div>
                             </div>
@@ -651,6 +654,81 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                       )}
                     </div>
                   )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+
+      {/* ═══ RECEIPTS ═══ */}
+      {view === 'receipts' && (
+        <div className="space-y-4">
+          {receipts.filter(r => Number(r.amount_paid) > 0).length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+              <Receipt size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-gray-500">No receipts yet. Receipts are generated when payments are recorded.</p>
+            </div>
+          ) : (
+            receipts.filter(r => Number(r.amount_paid) > 0).map(r => {
+              const downloadReceipt = () => {
+                const w = window.open('', '_blank')
+                w.document.write(`<!DOCTYPE html><html><head><title>Receipt ${r.receipt_number}</title>
+                <style>
+                  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:700px;margin:0 auto;padding:40px;color:#1a1a1a}
+                  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #10b981;padding-bottom:20px;margin-bottom:30px}
+                  .header h1{font-size:28px;margin:0;color:#065f46}.meta{text-align:right;font-size:13px;color:#666}.meta p{margin:2px 0}
+                  .amount-box{background:#f0fdf4;border:2px solid #bbf7d0;border-radius:12px;padding:24px;text-align:center;margin-bottom:30px}
+                  .amount-box .label{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.08em}
+                  .amount-box .value{font-size:36px;font-weight:800;color:#065f46;margin:8px 0 0}
+                  .grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px}
+                  .stitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:6px;font-weight:600}
+                  .section p{margin:2px 0;font-size:14px}
+                  .footer{margin-top:40px;padding-top:20px;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center}
+                  @media print{button{display:none!important}}
+                </style></head><body>
+                <div style="text-align:right;margin-bottom:20px"><button onclick="window.print()" style="padding:8px 24px;background:#065f46;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">Print / Save as PDF</button></div>
+                <div class="header"><div><h1>PAYMENT RECEIPT</h1><p style="color:#666;margin:4px 0;font-size:13px">GariCare Auto Services</p></div>
+                <div class="meta"><p><strong>${r.receipt_number}</strong></p><p>Date: ${r.issued_at ? new Date(r.issued_at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}) : '—'}</p>
+                <p>${r.confirmed ? '<span style="background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">Confirmed</span>' : '<span style="background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">Pending</span>'}</p></div></div>
+                <div class="amount-box"><p class="label">Amount Received</p><p class="value">${r.currency_symbol||''}${Number(r.amount_paid).toLocaleString()}</p></div>
+                <div class="grid"><div><p class="stitle">Payment Details</p><div class="section"><p>Method: ${(r.payment_method||'').replace('_',' ')}</p><p>Ref: ${r.payment_ref_id||r.transaction_ref||'—'}</p></div></div>
+                <div><p class="stitle">Subscription</p><div class="section"><p>${r.subscription_number||'—'}</p></div></div></div>
+                <div class="footer"><p>Thank you for your payment.</p></div></body></html>`)
+                w.document.close()
+              }
+
+              return (
+                <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${r.confirmed ? 'bg-green-100' : 'bg-amber-100'}`}>
+                        <Receipt size={16} className={r.confirmed ? 'text-green-600' : 'text-amber-600'} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{r.receipt_number}</p>
+                        <p className="text-xs text-gray-500">{fmtD(r.issued_at)} · {r.subscription_number}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 capitalize">{(r.payment_method || '').replace('_', ' ')} {r.payment_ref_id || r.transaction_ref ? `· ${r.payment_ref_id || r.transaction_ref}` : ''}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">{fmt(r.amount_paid, r.currency_symbol)}</p>
+                        {Number(r.change_given) > 0 && (
+                          <p className="text-[10px] text-gray-400">Change: {fmt(r.change_given, r.currency_symbol)}</p>
+                        )}
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${r.confirmed ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {r.confirmed ? 'Confirmed' : 'Pending'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <button onClick={downloadReceipt}
+                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                      <Download size={14} /> Download Receipt
+                    </button>
+                  </div>
                 </div>
               )
             })
