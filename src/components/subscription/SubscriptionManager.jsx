@@ -139,6 +139,14 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setSuccess('Subscription created successfully! Check your invoices below.')
       setView('overview')
       await loadAll()
+      // Send invoice notification (email + SMS) — non-blocking
+      try {
+        await fetch('/api/subscription/send-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription_id: data }),
+        })
+      } catch (e) { console.warn('Invoice notification failed (non-fatal):', e.message) }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -164,6 +172,20 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setSuccess(`Payment recorded! Ref: ${result.payment_ref}${result.change_given > 0 ? ` — Change: ${fmt(result.change_given)}` : ''}`)
       setPayingInvoiceId(null); setPayAmount(''); setPayRef(''); setPayNotes('')
       await loadAll()
+      // Send receipt notification (email + SMS) — non-blocking
+      try {
+        await fetch('/api/subscription/payment-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoice_id: payingInvoiceId,
+            receipt_number: result.receipt_number,
+            amount_paid: result.amount_paid,
+            payment_method: payMethod,
+            transaction_ref: payRef || null,
+          }),
+        })
+      } catch (e) { console.warn('Receipt notification failed (non-fatal):', e.message) }
     } catch (e) {
       setError(e.message)
     } finally {
