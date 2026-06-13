@@ -147,7 +147,20 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
   // ── Subscribe to a package ─────────────────────────────────
   const handleSubscribe = async (packageId) => {
-    if (!confirm('Subscribe to this package?')) return
+    // Check for active subscription and warn about upgrade
+    const activePaid = subscriptions.find(s => s.is_currently_active && Number(s.package_cost) > 0)
+    const pkg = packages.find(p => p.id === packageId)
+    let confirmMsg = `Subscribe to ${pkg?.name || 'this package'}?`
+    if (activePaid) {
+      const remaining = activePaid.days_until_expiry || 0
+      confirmMsg = `You have an active subscription (${activePaid.package_name}) with ${remaining} days remaining.\n\n` +
+        `Upgrading to ${pkg?.name || 'this package'} will:\n` +
+        `• Cancel your current plan\n` +
+        `• Apply a pro-rata credit for the ${remaining} unused days\n` +
+        `• Deduct that credit from the new invoice\n\n` +
+        `Continue with upgrade?`
+    }
+    if (!confirm(confirmMsg)) return
     setSubscribing(true); setError(''); setSuccess('')
     try {
       const { data, error: rpcErr } = await supabase.rpc('create_subscription', {
@@ -157,17 +170,33 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         p_auto_renew: false,
       })
       if (rpcErr) throw rpcErr
-      setSuccess('Subscription created successfully! Check your invoices below.')
-      setView('overview')
+      const result = typeof data === 'string' ? JSON.parse(data) : data
+      if (result?.success === false) throw new Error(result.error)
+
+      // Build success message with credit info
+      const subId = result?.subscription_id || data
+      let msg = 'Subscription created successfully!'
+      if (result?.upgrade_credit > 0) {
+        msg = `Upgraded successfully! A credit of ${fmt(result.upgrade_credit)} from your previous plan (${result.upgraded_from}) has been applied. ` +
+          (result.net_amount > 0
+            ? `Net amount due: ${fmt(result.net_amount)}.`
+            : `The upgrade is fully covered by your credit — no payment needed!`)
+      } else {
+        msg += ' Check your invoices below.'
+      }
+      setSuccess(msg)
+      setView('invoices')
       await loadAll()
       // Send invoice notification (email + SMS) — non-blocking
-      try {
-        await fetch('/api/subscription/send-invoice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscription_id: data }),
-        })
-      } catch (e) { console.warn('Invoice notification failed (non-fatal):', e.message) }
+      if (subId) {
+        try {
+          await fetch('/api/subscription/send-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription_id: subId }),
+          })
+        } catch (e) { console.warn('Invoice notification failed (non-fatal):', e.message) }
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -586,6 +615,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   amountDue: inv.amount_due || inv.total_amount,
                   taxAmount: inv.tax_amount || 0,
                   totalAmount: inv.total_amount,
+                  grossAmount: inv.gross_amount || inv.total_amount,
+                  upgradeCredit: Number(inv.upgrade_credit || 0),
+                  upgradeNotes: inv.upgrade_notes || null,
                   currencySymbol: inv.currency_symbol || '',
                   status: inv.effective_status || 'unpaid',
                   ctaUrl: window.location.href,
@@ -606,7 +638,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{inv.invoice_ref_no}</p>
-                        <p className="text-xs text-gray-500">Due: {fmtD(inv.due_date)} · {inv.subscription_number}</p>
+                        <p className="text-xs text-gray-500">{inv.package_name && `${inv.package_name} · `}Due: {fmtD(inv.due_date)} · {inv.subscription_number}</p>
+                        {Number(inv.upgrade_credit) > 0 && (
+                          <p className="text-[10px] text-green-600 font-medium mt-0.5">↗ Upgrade credit: {fmt(inv.upgrade_credit, inv.currency_symbol)}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -625,12 +660,62 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
                   {isExpanded && (
                     <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        <div><p className="text-xs text-gray-500">Amount Due</p><p className="font-semibold">{fmt(inv.amount_due, inv.currency_symbol)}</p></div>
-                        <div><p className="text-xs text-gray-500">Tax</p><p className="font-semibold">{fmt(inv.tax_amount, inv.currency_symbol)}</p></div>
-                        <div><p className="text-xs text-gray-500">Total Paid</p><p className="font-semibold text-green-700">{fmt(inv.total_paid, inv.currency_symbol)}</p></div>
-                        <div><p className="text-xs text-gray-500">Period</p><p className="font-semibold">{fmtD(inv.billing_period_start)} – {fmtD(inv.billing_period_end)}</p></div>
+                      {/* Package & subscriber info */}
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs text-gray-500">Package</p>
+                          <p className="font-semibold">{inv.package_name || inv.subscription_number}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Billing Period</p>
+                          <p className="font-semibold">{fmtD(inv.billing_period_start)} – {fmtD(inv.billing_period_end)}</p>
+                        </div>
                       </div>
+
+                      {/* Pricing breakdown */}
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                        {Number(inv.upgrade_credit) > 0 && inv.gross_amount && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Package Price</span>
+                            <span className="font-semibold">{fmt(inv.gross_amount, inv.currency_symbol)}</span>
+                          </div>
+                        )}
+                        {Number(inv.upgrade_credit) > 0 && (
+                          <div className="flex justify-between text-sm text-green-600">
+                            <span>Upgrade Credit</span>
+                            <span className="font-semibold">−{fmt(inv.upgrade_credit, inv.currency_symbol)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Amount Due</span>
+                          <span className="font-semibold">{fmt(inv.amount_due, inv.currency_symbol)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Tax</span>
+                          <span className="font-semibold">{fmt(inv.tax_amount, inv.currency_symbol)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
+                          <span className="font-bold text-gray-900">Total</span>
+                          <span className="font-bold text-gray-900">{fmt(inv.total_amount, inv.currency_symbol)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-green-700">Total Paid</span>
+                          <span className="font-semibold text-green-700">{fmt(inv.total_paid, inv.currency_symbol)}</span>
+                        </div>
+                        {Number(inv.balance_due) > 0 && (
+                          <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+                            <span className="font-bold text-red-600">Balance Due</span>
+                            <span className="font-bold text-red-600">{fmt(inv.balance_due, inv.currency_symbol)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {Number(inv.upgrade_credit) > 0 && inv.upgrade_notes && (
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                          <p className="text-xs font-semibold text-green-800 mb-1">↗ Upgrade Credit Applied</p>
+                          <p className="text-xs text-green-700">{inv.upgrade_notes}</p>
+                        </div>
+                      )}
 
                       <button onClick={downloadInvoice}
                         className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
