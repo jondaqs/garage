@@ -626,7 +626,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               const isPaid = inv.invoice_status_code === 'paid'
               const isPayingThis = payingInvoiceId === inv.id
 
-              const invoiceHtml = () => buildSubscriptionInvoiceHtml({
+              const buildInvoiceArgs = () => ({
                   invoiceRef: inv.invoice_ref_no,
                   subscriptionNumber: inv.subscription_number,
                   packageName: inv.package_name || 'Subscription',
@@ -650,13 +650,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
               const viewInvoice = () => {
                 const w = window.open('', '_blank')
-                w.document.write(invoiceHtml())
+                w.document.write(buildSubscriptionInvoiceHtml({ ...buildInvoiceArgs(), forPdf: false }))
                 w.document.close()
               }
 
               const downloadInvoice = async () => {
                 setDownloadingId(inv.id)
-                try { await downloadHtmlAsPdf(invoiceHtml(), `Invoice-${inv.invoice_ref_no}`) }
+                try { await downloadHtmlAsPdf(buildSubscriptionInvoiceHtml({ ...buildInvoiceArgs(), forPdf: true }), `Invoice-${inv.invoice_ref_no}`) }
                 catch (e) { console.error('PDF download error:', e) }
                 finally { setDownloadingId(null) }
               }

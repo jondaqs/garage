@@ -17,7 +17,7 @@
 const BRAND = 'GariCare'
 
 /**
- * @param {object} args 
+ * @param {object} args
  * @param {string} args.invoiceRef
  * @param {string} args.subscriptionNumber
  * @param {string} args.packageName
@@ -38,6 +38,7 @@ const BRAND = 'GariCare'
  * @param {number} [args.grossAmount]     - full price before credit
  * @param {number} [args.upgradeCredit]   - credit from previous subscription
  * @param {string} [args.upgradeNotes]    - explanation of the credit
+ * @param {boolean} [args.forPdf]         - if true, removes clickable buttons (PDF is raster)
  * @param {string} [args.ctaUrl]
  */
 export function buildSubscriptionInvoiceHtml({
@@ -61,6 +62,7 @@ export function buildSubscriptionInvoiceHtml({
   grossAmount,
   upgradeCredit = 0,
   upgradeNotes,
+  forPdf = false,
   ctaUrl = '#',
 }) {
   const fmt  = (n) => `${currencySymbol}${Number(n || 0).toLocaleString('en-KE')}`
@@ -71,31 +73,39 @@ export function buildSubscriptionInvoiceHtml({
   const statusColor = status === 'paid' ? '#22c55e' : status === 'overdue' ? '#ef4444' : '#f59e0b'
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
   const lineItemAmount = fmt(grossAmount || amountDue)
-  // CTA section based on payment status
+  // CTA section based on payment status + PDF mode
   const isPaid = status === 'paid'
-  const ctaSection = isPaid
-    ? `<td style="padding:24px 32px;text-align:center;background:#0f172a;">
-        <p style="margin:0 0 16px;font-size:14px;color:#4ade80;">
-          ✓ This invoice has been paid in full. Thank you!
-        </p>
-        <a href="${ctaUrl}"
-          style="display:inline-block;background:#22c55e;color:#ffffff;
-            padding:12px 32px;border-radius:8px;text-decoration:none;
-            font-weight:800;font-size:14px;letter-spacing:0.02em;">
-          View Subscription
-        </a>
-      </td>`
-    : `<td style="padding:24px 32px;text-align:center;background:#0f172a;">
-        <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;">
-          Please review and arrange payment at your earliest convenience.
-        </p>
-        <a href="${ctaUrl}"
-          style="display:inline-block;background:#3b82f6;color:#ffffff;
-            padding:12px 32px;border-radius:8px;text-decoration:none;
-            font-weight:800;font-size:14px;letter-spacing:0.02em;">
-          View &amp; Pay Invoice
-        </a>
-      </td>`
+  let ctaSection = ''
+  if (forPdf) {
+    // PDF: no clickable buttons, just a thank-you or payment reminder
+    ctaSection = isPaid
+      ? `<td style="padding:24px 32px;text-align:center;background:#0f172a;">
+          <p style="margin:0;font-size:14px;color:#4ade80;">✓ This invoice has been paid in full. Thank you!</p>
+        </td>`
+      : `<td style="padding:24px 32px;text-align:center;background:#0f172a;">
+          <p style="margin:0 0 8px;font-size:14px;color:#94a3b8;">Please log in to your ${BRAND} dashboard to arrange payment.</p>
+          <p style="margin:0;font-size:12px;color:#64748b;font-family:monospace;word-break:break-all;">${ctaUrl}</p>
+        </td>`
+  } else {
+    // HTML: clickable buttons
+    ctaSection = isPaid
+      ? `<td style="padding:24px 32px;text-align:center;background:#0f172a;">
+          <p style="margin:0 0 16px;font-size:14px;color:#4ade80;">✓ This invoice has been paid in full. Thank you!</p>
+          <a href="${ctaUrl}" style="display:inline-block;background:#22c55e;color:#ffffff;
+            padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:800;font-size:14px;letter-spacing:0.02em;">
+            View Subscription
+          </a>
+        </td>`
+      : `<td style="padding:24px 32px;text-align:center;background:#0f172a;">
+          <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;">
+            Please review and arrange payment at your earliest convenience.
+          </p>
+          <a href="${ctaUrl}" style="display:inline-block;background:#3b82f6;color:#ffffff;
+            padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:800;font-size:14px;letter-spacing:0.02em;">
+            View &amp; Pay Invoice
+          </a>
+        </td>`
+  }
 
   const hasCredit = upgradeCredit > 0
 
