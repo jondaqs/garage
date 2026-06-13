@@ -1,6 +1,6 @@
 // src/components/subscription/SubscriptionManager.jsx
 'use client'
-
+console.log('[LOAD] SubscriptionManager')
 /**
  * SubscriptionManager
  *

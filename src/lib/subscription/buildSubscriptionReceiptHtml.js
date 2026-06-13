@@ -15,7 +15,7 @@
  *   - /api/subscription/payment-notify (email)
  *   - SubscriptionManager (client-side download)
  */
-
+console.log('[LOAD] buildSubscriptionReceiptHtml')
 const BRAND = 'GariCare'
 
 /**
