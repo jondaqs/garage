@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
+import { downloadHtmlAsPdf } from '@/lib/subscription/downloadHtmlAsPdf'
 
 const PAYMENT_METHODS = [
   { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
@@ -84,6 +85,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
   // Subscriber profile (for invoice/receipt "Bill To")
   const [subscriberProfile, setSubscriberProfile] = useState(null)
+  const [downloadingId, setDownloadingId] = useState(null)
 
   // Auto-scroll to deep-linked invoice after data loads
   useEffect(() => {
@@ -624,31 +626,33 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               const isPaid = inv.invoice_status_code === 'paid'
               const isPayingThis = payingInvoiceId === inv.id
 
-              const downloadInvoice = () => {
-                const html = buildSubscriptionInvoiceHtml({
-                  invoiceRef: inv.invoice_ref_no,
-                  subscriptionNumber: inv.subscription_number,
-                  packageName: inv.package_name || 'Subscription',
-                  subscriberName: subscriberProfile?.name || null,
-                  subscriberEmail: subscriberProfile?.email || null,
-                  subscriberPhone: subscriberProfile?.phone || null,
-                  billingStart: inv.billing_period_start,
-                  billingEnd: inv.billing_period_end,
-                  issuedAt: inv.created_at,
-                  dueDate: inv.due_date,
-                  amountDue: inv.amount_due || inv.total_amount,
-                  taxAmount: inv.tax_amount || 0,
-                  totalAmount: inv.total_amount,
-                  grossAmount: inv.gross_amount || inv.total_amount,
-                  upgradeCredit: Number(inv.upgrade_credit || 0),
-                  upgradeNotes: inv.upgrade_notes || null,
-                  currencySymbol: inv.currency_symbol || '',
-                  status: inv.effective_status || 'unpaid',
-                  ctaUrl: `${window.location.origin}/dashboard/subscription?view=invoices&invoice=${inv.id}`,
-                })
-                const w = window.open('', '_blank')
-                w.document.write(html)
-                w.document.close()
+              const downloadInvoice = async () => {
+                setDownloadingId(inv.id)
+                try {
+                  const html = buildSubscriptionInvoiceHtml({
+                    invoiceRef: inv.invoice_ref_no,
+                    subscriptionNumber: inv.subscription_number,
+                    packageName: inv.package_name || 'Subscription',
+                    subscriberName: subscriberProfile?.name || null,
+                    subscriberEmail: subscriberProfile?.email || null,
+                    subscriberPhone: subscriberProfile?.phone || null,
+                    billingStart: inv.billing_period_start,
+                    billingEnd: inv.billing_period_end,
+                    issuedAt: inv.created_at,
+                    dueDate: inv.due_date,
+                    amountDue: inv.amount_due || inv.total_amount,
+                    taxAmount: inv.tax_amount || 0,
+                    totalAmount: inv.total_amount,
+                    grossAmount: inv.gross_amount || inv.total_amount,
+                    upgradeCredit: Number(inv.upgrade_credit || 0),
+                    upgradeNotes: inv.upgrade_notes || null,
+                    currencySymbol: inv.currency_symbol || '',
+                    status: inv.effective_status || 'unpaid',
+                    ctaUrl: `${window.location.origin}/dashboard/subscription?view=invoices&invoice=${inv.id}`,
+                  })
+                  await downloadHtmlAsPdf(html, `Invoice-${inv.invoice_ref_no}`)
+                } catch (e) { console.error('PDF download error:', e) }
+                finally { setDownloadingId(null) }
               }
 
               return (
@@ -741,9 +745,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         </div>
                       )}
 
-                      <button onClick={downloadInvoice}
-                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                        <Download size={14} /> Download Invoice
+                      <button onClick={downloadInvoice} disabled={downloadingId === inv.id}
+                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                        {downloadingId === inv.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                        {downloadingId === inv.id ? 'Generating PDF…' : 'Download Invoice'}
                       </button>
 
                       {!isPaid && (
@@ -815,30 +820,32 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             </div>
           ) : (
             receipts.filter(r => Number(r.amount_paid) > 0).map(r => {
-              const downloadReceipt = () => {
-                const html = buildSubscriptionReceiptHtml({
-                  receiptNumber: r.receipt_number,
-                  invoiceRef: r.invoice_ref_no || r.subscription_number || '—',
-                  subscriptionNumber: r.subscription_number,
-                  packageName: r.package_name || 'Subscription',
-                  subscriberName: subscriberProfile?.name || r.subscriber_name || r.paid_by_name || null,
-                  subscriberEmail: subscriberProfile?.email || null,
-                  subscriberPhone: subscriberProfile?.phone || null,
-                  amountPaid: r.amount_paid,
-                  amountDue: r.amount_paid,
-                  taxAmount: 0,
-                  totalInvoice: r.amount_paid,
-                  paymentMethod: r.payment_method,
-                  transactionRef: r.payment_ref_id || r.transaction_ref,
-                  paidAt: r.issued_at,
-                  confirmed: r.confirmed,
-                  confirmedAt: r.confirmed_at,
-                  currencySymbol: r.currency_symbol || '',
-                  notes: r.notes,
-                })
-                const w = window.open('', '_blank')
-                w.document.write(html)
-                w.document.close()
+              const downloadReceipt = async () => {
+                setDownloadingId(r.id)
+                try {
+                  const html = buildSubscriptionReceiptHtml({
+                    receiptNumber: r.receipt_number,
+                    invoiceRef: r.invoice_ref_no || r.subscription_number || '—',
+                    subscriptionNumber: r.subscription_number,
+                    packageName: r.package_name || 'Subscription',
+                    subscriberName: subscriberProfile?.name || r.subscriber_name || r.paid_by_name || null,
+                    subscriberEmail: subscriberProfile?.email || null,
+                    subscriberPhone: subscriberProfile?.phone || null,
+                    amountPaid: r.amount_paid,
+                    amountDue: r.amount_paid,
+                    taxAmount: 0,
+                    totalInvoice: r.amount_paid,
+                    paymentMethod: r.payment_method,
+                    transactionRef: r.payment_ref_id || r.transaction_ref,
+                    paidAt: r.issued_at,
+                    confirmed: r.confirmed,
+                    confirmedAt: r.confirmed_at,
+                    currencySymbol: r.currency_symbol || '',
+                    notes: r.notes,
+                  })
+                  await downloadHtmlAsPdf(html, `Receipt-${r.receipt_number}`)
+                } catch (e) { console.error('PDF download error:', e) }
+                finally { setDownloadingId(null) }
               }
 
               return (
@@ -867,9 +874,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                     </div>
                   </div>
                   <div className="mt-3 pt-3 border-t border-gray-100">
-                    <button onClick={downloadReceipt}
-                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                      <Download size={14} /> Download Receipt
+                    <button onClick={downloadReceipt} disabled={downloadingId === r.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                      {downloadingId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                      {downloadingId === r.id ? 'Generating PDF…' : 'Download Receipt'}
                     </button>
                   </div>
                 </div>
