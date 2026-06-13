@@ -129,33 +129,28 @@ export async function POST(request) {
       .from('currencies').select('symbol, code').eq('id', pkg?.currency_id).maybeSingle()
     const currencySymbol = cur?.symbol || 'KES '
 
-    // Resolve subscriber
+    // Resolve subscriber user
     const subscriberUserId = sub.user_id || sub.subscribed_by
-    let companyOwnerId = null
+    let entityOwnerId = null
     if (sub.company_id) {
       const { data: co } = await sc.from('company_profiles').select('owner_user_id').eq('id', sub.company_id).maybeSingle()
-      companyOwnerId = co?.owner_user_id
+      entityOwnerId = co?.owner_user_id
     }
     if (sub.service_provider_id) {
       const { data: sp } = await sc.from('service_providers').select('owner_user_id').eq('id', sub.service_provider_id).maybeSingle()
-      companyOwnerId = sp?.owner_user_id
+      entityOwnerId = sp?.owner_user_id
     }
-    const recipientUserId = subscriberUserId || companyOwnerId
+    const recipientUserId = subscriberUserId || entityOwnerId
     if (!recipientUserId) return NextResponse.json({ success: true, skipped: true, reason: 'No recipient' })
 
+    // Get decrypted profile from user_profiles_secure
     const { data: profile } = await sc
       .from('user_profiles_secure')
-      .select('id, first_name, last_name, email, phone, auth_user_id')
+      .select('id, first_name, last_name, email, phone')
       .eq('id', recipientUserId).maybeSingle()
     if (!profile) return NextResponse.json({ success: true, skipped: true, reason: 'Profile not found' })
 
-    // Resolve email from auth if not in profile
-    let email = profile.email || null
-    if (!email && profile.auth_user_id) {
-      const { data: au } = await sc.auth.admin.getUserById(profile.auth_user_id)
-      email = au?.user?.email || null
-    }
-
+    const email = profile.email || null
     const subscriberName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'there'
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
     const ctaUrl = `${APP_URL()}/dashboard/subscription?view=invoices&invoice=${inv.id}`

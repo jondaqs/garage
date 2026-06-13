@@ -2,10 +2,9 @@
  * POST /api/subscription/payment-notify
  *
  * Called client-side after record_subscription_payment RPC succeeds.
- * Sends the payment receipt to the subscriber via:
- *   1. In-app notification
- *   2. Email (Mailjet)
- *   3. SMS (Africa's Talking)
+ * Sends the payment receipt to:
+ *   A. The subscriber (notification + email + SMS)
+ *   B. System admins & accountants (notification + email + SMS) for confirmation
  *
  * Body: { invoice_id, receipt_number, amount_paid, payment_method, transaction_ref }
  */
@@ -96,6 +95,37 @@ function buildReceiptEmailHtml({ subscriberName, receiptNumber, invoiceRef,
 </body></html>`
 }
 
+function buildAdminPaymentAlertHtml({ subscriberName, receiptNumber, invoiceRef,
+  amount, currencySymbol, paymentMethod, transactionRef, ctaUrl }) {
+  const method = (paymentMethod || 'payment').replace(/_/g, ' ')
+  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:#0f172a;padding:20px 24px;border-radius:12px 12px 0 0">
+    <p style="margin:0;font-size:18px;font-weight:700;color:#fff">${BRAND} — Payment Alert</p>
+    <p style="margin:4px 0 0;font-size:12px;color:#94a3b8">A subscription payment requires your review</p>
+  </div>
+  <div style="height:3px;background:linear-gradient(90deg,#f59e0b,#fbbf24,transparent)"></div>
+  <div style="padding:20px 24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+    <div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:10px;padding:16px;text-align:center;margin:0 0 16px">
+      <p style="margin:0;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.08em">Amount Received</p>
+      <p style="margin:6px 0 0;font-size:28px;font-weight:800;color:#065f46">${currencySymbol}${Number(amount || 0).toLocaleString('en-KE')}</p>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 16px">
+      <tr><td style="padding:6px 0;color:#666;font-size:13px">From</td><td style="padding:6px 0;font-weight:700;font-size:13px">${subscriberName}</td></tr>
+      <tr><td style="padding:6px 0;color:#666;font-size:13px">Receipt</td><td style="padding:6px 0;font-weight:700;font-size:13px;font-family:monospace">${receiptNumber}</td></tr>
+      <tr><td style="padding:6px 0;color:#666;font-size:13px">Invoice</td><td style="padding:6px 0;font-size:13px">${invoiceRef}</td></tr>
+      <tr><td style="padding:6px 0;color:#666;font-size:13px">Method</td><td style="padding:6px 0;font-size:13px;text-transform:capitalize">${method}</td></tr>
+      ${transactionRef ? `<tr><td style="padding:6px 0;color:#666;font-size:13px">Ref</td><td style="padding:6px 0;font-size:13px;font-family:monospace">${transactionRef}</td></tr>` : ''}
+    </table>
+    <div style="text-align:center">
+      <a href="${ctaUrl}" style="display:inline-block;background:#f59e0b;color:#000;padding:10px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:13px">
+        Review &amp; Confirm Receipt
+      </a>
+    </div>
+    <p style="margin:12px 0 0;font-size:11px;color:#999;text-align:center">Log in to the admin panel to confirm this payment.</p>
+  </div>
+</div>`
+}
+
 export async function POST(request) {
   try {
     const supabase = await createClient()
@@ -128,8 +158,7 @@ export async function POST(request) {
     const currencySymbol = cur?.symbol || 'KES '
 
     // Resolve subscriber
-    const subscriberUserId = sub?.user_id || sub?.subscribed_by
-    let recipientUserId = subscriberUserId
+    let recipientUserId = sub?.user_id || sub?.subscribed_by
     if (!recipientUserId && sub?.company_id) {
       const { data: co } = await sc.from('company_profiles').select('owner_user_id').eq('id', sub.company_id).maybeSingle()
       recipientUserId = co?.owner_user_id
@@ -140,26 +169,24 @@ export async function POST(request) {
     }
     if (!recipientUserId) return NextResponse.json({ success: true, skipped: true, reason: 'No recipient' })
 
+    // Get decrypted profile
     const { data: profile } = await sc
       .from('user_profiles_secure')
-      .select('id, first_name, last_name, email, phone, auth_user_id')
+      .select('id, first_name, last_name, email, phone')
       .eq('id', recipientUserId).maybeSingle()
     if (!profile) return NextResponse.json({ success: true, skipped: true, reason: 'Profile not found' })
 
-    let email = profile.email || null
-    if (!email && profile.auth_user_id) {
-      const { data: au } = await sc.auth.admin.getUserById(profile.auth_user_id)
-      email = au?.user?.email || null
-    }
-
+    const email = profile.email || null
     const subscriberName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'there'
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
-    const ctaUrl = `${APP_URL()}/dashboard/subscription`
+    const ctaUrl = `${APP_URL()}/dashboard/subscription?view=receipts`
     const finalAmount = amount_paid || inv.total_amount || 0
     const finalReceipt = receipt_number || 'N/A'
     const finalMethod = payment_method || 'payment'
 
     const results = { notification: false, email_sent: false, sms_sent: false }
+
+    // ═══ A. NOTIFY SUBSCRIBER ═══
 
     // 1. In-app notification
     try {
@@ -176,7 +203,7 @@ export async function POST(request) {
       console.error('[sub/payment-notify] notification failed:', e.message)
     }
 
-    // 2. Email
+    // 2. Email to subscriber
     if (email) {
       try {
         await sendAndQueueEmail(sc, {
@@ -200,7 +227,7 @@ export async function POST(request) {
       }
     }
 
-    // 3. SMS
+    // 3. SMS to subscriber
     const phone = normalisePhone(profile.phone)
     if (phone) {
       try {
@@ -215,6 +242,94 @@ export async function POST(request) {
       } catch (e) {
         console.error('[sub/payment-notify] SMS failed:', e.message)
       }
+    }
+
+    // ═══ B. NOTIFY ADMINS & ACCOUNTANTS ═══
+
+    try {
+      const { data: adminUsers } = await sc
+        .from('user_roles')
+        .select('user_id, user_roles_lookup!inner(code)')
+        .in('user_roles_lookup.code', ['platform_admin', 'admin', 'accountant'])
+
+      if (adminUsers?.length) {
+        const adminUserIds = [...new Set(adminUsers.map(a => a.user_id))]
+          .filter(id => id !== recipientUserId)
+
+        const adminCtaUrl = `${APP_URL()}/admin/subscriptions`
+        const adminResults = { notified: 0, emailed: 0, smsed: 0 }
+
+        for (const adminId of adminUserIds) {
+          // Get admin profile (decrypted)
+          const { data: adminProfile } = await sc
+            .from('user_profiles_secure')
+            .select('first_name, last_name, email, phone')
+            .eq('id', adminId)
+            .maybeSingle()
+
+          if (!adminProfile) continue
+
+          const adminDisplayName = adminProfile.first_name
+            ? `${adminProfile.first_name} ${adminProfile.last_name || ''}`.trim()
+            : 'Admin'
+
+          // In-app notification
+          try {
+            await sc.from('notifications').insert({
+              user_id: adminId, recipient_user_id: adminId,
+              type: 'subscription_payment_admin', notification_type: 'subscription_payment_admin',
+              title: `Subscription Payment — ${finalReceipt}`,
+              message: `${subscriberName} paid ${currencySymbol}${Number(finalAmount).toLocaleString('en-KE')} via ${finalMethod.replace(/_/g, ' ')} for subscription. Receipt: ${finalReceipt}. Please review and confirm.`,
+              reference_table: 'subscription_receipts', reference_id: inv.subscription_id,
+              reference_type: 'subscription_receipt', is_read: false,
+            })
+            adminResults.notified++
+          } catch (e) { console.error('[sub/payment-notify] admin notification failed:', e.message) }
+
+          // Email to admin
+          const adminEmail = adminProfile.email || null
+          if (adminEmail) {
+            try {
+              await sendAndQueueEmail(sc, {
+                to: [{ Email: adminEmail, Name: adminDisplayName }],
+                subject: `Payment Received: ${finalReceipt} — ${currencySymbol}${Number(finalAmount).toLocaleString('en-KE')} from ${subscriberName}`,
+                html: buildAdminPaymentAlertHtml({
+                  subscriberName, receiptNumber: finalReceipt,
+                  invoiceRef: inv.invoice_ref_no,
+                  amount: finalAmount, currencySymbol,
+                  paymentMethod: finalMethod,
+                  transactionRef: transaction_ref,
+                  ctaUrl: adminCtaUrl,
+                }),
+                text: `${BRAND}: ${subscriberName} paid ${currencySymbol}${Number(finalAmount).toLocaleString('en-KE')} via ${finalMethod}. Receipt: ${finalReceipt}. Invoice: ${inv.invoice_ref_no}. Please review at: ${adminCtaUrl}`,
+                referenceTable: 'subscription_receipts',
+                referenceId: inv.subscription_id,
+              })
+              adminResults.emailed++
+            } catch (e) { console.error('[sub/payment-notify] admin email failed:', e.message) }
+          }
+
+          // SMS to admin
+          const adminPhone = normalisePhone(adminProfile.phone)
+          if (adminPhone) {
+            try {
+              await sendAndQueueSms(sc, {
+                to: adminPhone, recipientName: adminDisplayName,
+                message: `${BRAND}: ${subscriberName} paid ${currencySymbol}${Number(finalAmount).toLocaleString('en-KE')} via ${finalMethod.replace(/_/g, ' ')}. Receipt: ${finalReceipt}. Please confirm at: ${adminCtaUrl}`,
+                referenceTable: 'subscription_receipts',
+                referenceId: inv.subscription_id,
+              })
+              adminResults.smsed++
+            } catch (e) { console.error('[sub/payment-notify] admin SMS failed:', e.message) }
+          }
+        }
+
+        results.admin_notified = adminResults.notified
+        results.admin_emailed = adminResults.emailed
+        results.admin_smsed = adminResults.smsed
+      }
+    } catch (e) {
+      console.error('[sub/payment-notify] admin notification block failed:', e.message)
     }
 
     return NextResponse.json({ success: true, receipt_number: finalReceipt, ...results })
