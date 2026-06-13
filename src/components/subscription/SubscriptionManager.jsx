@@ -13,7 +13,7 @@
  *   subscriberName  — display name for context
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
@@ -56,6 +56,25 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // Deep-link: ?view=invoices&invoice=UUID or ?view=receipts&receipt=UUID
   const initialView = searchParams?.get('view') || 'overview'
   const deepLinkedInvoice = searchParams?.get('invoice') || null
+  const deepLinkScrolled = useRef(false)
+
+  // Auto-scroll to deep-linked invoice after data loads
+  useEffect(() => {
+    if (deepLinkedInvoice && !loading && !deepLinkScrolled.current) {
+      deepLinkScrolled.current = true
+      // Small delay to ensure DOM has rendered the expanded card
+      setTimeout(() => {
+        const el = document.getElementById(`invoice-${deepLinkedInvoice}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Brief highlight flash
+          el.style.transition = 'box-shadow 0.3s ease'
+          el.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.4)'
+          setTimeout(() => { el.style.boxShadow = '' }, 2000)
+        }
+      }, 300)
+    }
+  }, [deepLinkedInvoice, loading])
 
   // State
   const [view, setView] = useState(initialView)
@@ -634,7 +653,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               }
 
               return (
-                <div key={inv.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div key={inv.id} id={`invoice-${inv.id}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                   <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)}
                     className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
                     <div className="flex items-center gap-4">
