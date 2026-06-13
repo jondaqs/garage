@@ -1446,8 +1446,9 @@ function InvoicesTab({ supabase }) {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [toast, setToast] = useState({ message: '', type: 'success' })
+  const [expandedId, setExpandedId] = useState(null)
   const pageSize = 15
- 
+
   // Payment form
   const [payingId, setPayingId] = useState(null)
   const [payMethod, setPayMethod] = useState('mpesa')
@@ -1455,41 +1456,33 @@ function InvoicesTab({ supabase }) {
   const [payRef, setPayRef] = useState('')
   const [payNotes, setPayNotes] = useState('')
   const [paying, setPaying] = useState(false)
- 
+
   useEffect(() => { loadInvoices() }, [statusFilter, page])
- 
+
   const loadInvoices = async () => {
     setLoading(true)
     try {
       let q = supabase.from('subscription_invoice_details')
         .select('*', { count: 'exact' })
-        .gt('total_amount', 0)   // ← exclude free ($0) invoices
+        .gt('total_amount', 0)
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
- 
       if (statusFilter !== 'all') q = q.eq('effective_status', statusFilter)
- 
       const { data, count, error } = await q
       if (error) throw error
       setInvoices(data || [])
       setTotal(count || 0)
-    } catch (e) {
-      console.error('Invoice load error:', e)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { console.error('Invoice load error:', e) }
+    finally { setLoading(false) }
   }
- 
+
   const handlePayment = async (invoiceId) => {
     if (!payAmount || parseFloat(payAmount) <= 0) { setToast({ message: 'Enter a valid amount', type: 'error' }); return }
     setPaying(true)
     try {
       const { data, error } = await supabase.rpc('record_subscription_payment', {
-        p_invoice_id: invoiceId,
-        p_amount: parseFloat(payAmount),
-        p_paid_via: payMethod,
-        p_transaction_id: payRef || null,
-        p_notes: payNotes || null,
+        p_invoice_id: invoiceId, p_amount: parseFloat(payAmount),
+        p_paid_via: payMethod, p_transaction_id: payRef || null, p_notes: payNotes || null,
       })
       if (error) throw error
       const result = typeof data === 'string' ? JSON.parse(data) : data
@@ -1498,173 +1491,152 @@ function InvoicesTab({ supabase }) {
       setTimeout(() => setToast({ message: '' }), 4000)
       setPayingId(null); setPayAmount(''); setPayRef(''); setPayNotes('')
       await loadInvoices()
-    } catch (e) {
-      setToast({ message: e.message, type: 'error' })
-    } finally {
-      setPaying(false)
-    }
+    } catch (e) { setToast({ message: e.message, type: 'error' }) }
+    finally { setPaying(false) }
   }
 
   const downloadInvoice = (inv) => {
     const html = buildSubscriptionInvoiceHtml({
-      invoiceRef: inv.invoice_ref_no,
-      subscriptionNumber: inv.subscription_number,
-      packageName: inv.package_name || 'Subscription',
-      subscriberName: inv.subscriber_name || null,
-      billingStart: inv.billing_period_start,
-      billingEnd: inv.billing_period_end,
-      issuedAt: inv.created_at,
-      dueDate: inv.due_date,
-      amountDue: inv.amount_due || inv.total_amount,
-      taxAmount: inv.tax_amount || 0,
-      totalAmount: inv.total_amount,
-      currencySymbol: inv.currency_symbol || '',
-      status: inv.effective_status || 'unpaid',
-      ctaUrl: '#',
+      invoiceRef: inv.invoice_ref_no, subscriptionNumber: inv.subscription_number,
+      packageName: inv.package_name || 'Subscription', subscriberName: inv.subscriber_name || null,
+      billingStart: inv.billing_period_start, billingEnd: inv.billing_period_end,
+      issuedAt: inv.created_at, dueDate: inv.due_date,
+      amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
+      totalAmount: inv.total_amount, grossAmount: inv.gross_amount || inv.total_amount,
+      upgradeCredit: Number(inv.upgrade_credit || 0), upgradeNotes: inv.upgrade_notes || null,
+      currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid', ctaUrl: '#',
     })
-    const w = window.open('', '_blank')
-    w.document.write(html)
-    w.document.close()
+    const w = window.open('', '_blank'); w.document.write(html); w.document.close()
   }
- 
+
   const filtered = invoices.filter(i => {
     if (!search) return true
     const q = search.toLowerCase()
-    return (i.invoice_ref_no || '').toLowerCase().includes(q)
-      || (i.subscription_number || '').toLowerCase().includes(q)
+    return (i.invoice_ref_no || '').toLowerCase().includes(q) || (i.subscription_number || '').toLowerCase().includes(q)
   })
- 
   const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
- 
+  const fmtA = (n, sym) => `${sym || ''}${Number(n || 0).toLocaleString()}`
+
   return (
     <div className="space-y-4">
       <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
- 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" placeholder="Search by invoice or subscription number…" value={search}
-            onChange={e => setSearch(e.target.value)} className={inp + ' pl-9'} />
+          <input type="text" placeholder="Search invoices…" value={search} onChange={e => setSearch(e.target.value)} className={inp + ' pl-9'} />
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }} className={inp + ' w-auto'}>
-          <option value="all">All statuses</option>
-          <option value="unpaid">Unpaid</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
+          <option value="all">All statuses</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
         </select>
       </div>
- 
-      {loading ? (
-        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
-      ) : (
+      {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div> : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Invoice</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Subscription</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Paid</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Balance</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Due</th>
-                  <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="text-right py-2.5 px-3 w-36" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={8} className="py-8 text-center text-gray-400 text-sm">No invoices found</td></tr>
-                ) : filtered.map(inv => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="py-2.5 px-3 font-mono text-xs text-gray-700">{inv.invoice_ref_no}</td>
-                    <td className="py-2.5 px-3 text-xs text-gray-600">{inv.subscription_number}</td>
-                    <td className="py-2.5 px-3 text-right text-xs font-medium">{inv.currency_symbol}{Number(inv.total_amount).toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-xs text-green-700">{inv.currency_symbol}{Number(inv.total_paid).toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-xs font-medium text-red-600">
-                      {Number(inv.balance_due) > 0 ? `${inv.currency_symbol}${Number(inv.balance_due).toLocaleString()}` : '—'}
-                    </td>
-                    <td className="py-2.5 px-3 text-xs text-gray-600">{fmtD(inv.due_date)}</td>
-                    <td className="py-2.5 px-3 text-center">
+          <div className="space-y-2">
+            {filtered.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+                <FileText size={36} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-sm text-gray-400">No invoices found</p>
+              </div>
+            ) : filtered.map(inv => {
+              const isExpanded = expandedId === inv.id
+              const isPaid = inv.effective_status === 'paid'
+              const hasCredit = Number(inv.upgrade_credit || 0) > 0
+              return (
+                <div key={inv.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <button onClick={() => setExpandedId(isExpanded ? null : inv.id)}
+                    className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isPaid ? 'bg-green-100' : 'bg-amber-100'}`}>
+                        <FileText size={14} className={isPaid ? 'text-green-600' : 'text-amber-600'} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{inv.invoice_ref_no}</p>
+                        <p className="text-[10px] text-gray-400">{inv.subscription_number} · {inv.package_name} · Due {fmtD(inv.due_date)}</p>
+                        {hasCredit && <p className="text-[10px] text-green-600 font-medium">↗ Upgrade credit: {fmtA(inv.upgrade_credit, inv.currency_symbol)}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">{fmtA(inv.total_amount, inv.currency_symbol)}</p>
+                        {!isPaid && Number(inv.balance_due) > 0 && <p className="text-[10px] text-red-500">Balance: {fmtA(inv.balance_due, inv.currency_symbol)}</p>}
+                      </div>
                       <StatusBadge code={inv.effective_status} />
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => downloadInvoice(inv)} title="Download Invoice"
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                          <Download size={14} />
+                      {isExpanded ? <ChevronDown size={14} className="text-gray-400 rotate-180" /> : <ChevronDown size={14} className="text-gray-400" />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        {hasCredit && <div><p className="text-xs text-gray-500">Package Price</p><p className="font-semibold">{fmtA(inv.gross_amount, inv.currency_symbol)}</p></div>}
+                        {hasCredit && <div><p className="text-xs text-green-600">Upgrade Credit</p><p className="font-semibold text-green-600">−{fmtA(inv.upgrade_credit, inv.currency_symbol)}</p></div>}
+                        <div><p className="text-xs text-gray-500">Amount Due</p><p className="font-semibold">{fmtA(inv.amount_due, inv.currency_symbol)}</p></div>
+                        <div><p className="text-xs text-gray-500">Tax</p><p className="font-semibold">{fmtA(inv.tax_amount, inv.currency_symbol)}</p></div>
+                        <div><p className="text-xs text-gray-500">Total Paid</p><p className="font-semibold text-green-700">{fmtA(inv.total_paid, inv.currency_symbol)}</p></div>
+                        <div><p className="text-xs text-gray-500">Period</p><p className="font-semibold">{fmtD(inv.billing_period_start)} – {fmtD(inv.billing_period_end)}</p></div>
+                      </div>
+
+                      {hasCredit && inv.upgrade_notes && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                          <p className="text-xs text-green-700">{inv.upgrade_notes}</p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadInvoice(inv)}
+                          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                          <Download size={14} /> Download Invoice
                         </button>
-                        {inv.effective_status !== 'paid' && (
+                        {!isPaid && (
                           <button onClick={() => { setPayingId(payingId === inv.id ? null : inv.id); setPayAmount(inv.balance_due?.toString()) }}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-                            {payingId === inv.id ? 'Cancel' : 'Record Payment'}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors">
+                            <DollarSign size={14} /> {payingId === inv.id ? 'Cancel' : 'Record Payment'}
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+                      {payingId === inv.id && (
+                        <div className="rounded-xl border border-gray-200 p-4 space-y-3 bg-gray-50">
+                          <div className="grid grid-cols-4 gap-2">
+                            {PAYMENT_METHODS_ADMIN.map(m => (
+                              <button key={m.value} onClick={() => setPayMethod(m.value)}
+                                className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-[10px] font-semibold transition-all ${payMethod === m.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+                                <m.icon size={14} /> {m.label}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Amount</label><input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Transaction Ref</label><input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. M-Pesa QXZ" className={inp} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Notes</label><input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} /></div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => handlePayment(inv.id)} disabled={paying}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50">
+                              {paying ? <Loader2 size={12} className="animate-spin" /> : <BadgeCheck size={12} />} Confirm Payment
+                            </button>
+                            <button onClick={() => setPayingId(null)} className="px-3 py-2 text-gray-500 text-xs">Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
- 
-          {/* Inline payment form */}
-          {payingId && (
-            <div className="rounded-2xl border border-gray-200 overflow-hidden">
-              <div className="bg-gray-900 px-5 py-3 flex items-center gap-2">
-                <DollarSign size={14} className="text-amber-400" />
-                <span className="text-white font-semibold text-sm">
-                  Record Payment for {invoices.find(i => i.id === payingId)?.invoice_ref_no}
-                </span>
-              </div>
-              <div className="p-5 space-y-4 bg-white">
-                <div className="grid grid-cols-4 gap-2">
-                  {PAYMENT_METHODS_ADMIN.map(m => (
-                    <button key={m.value} onClick={() => setPayMethod(m.value)}
-                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                        payMethod === m.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'
-                      }`}>
-                      <m.icon size={15} /> {m.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Amount</label>
-                    <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
-                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. M-Pesa QXZ12345" className={inp} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Notes</label>
-                    <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => handlePayment(payingId)} disabled={paying}
-                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                    {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Confirm Payment
-                  </button>
-                  <button onClick={() => setPayingId(null)} className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
-                </div>
-              </div>
-            </div>
-          )}
- 
           <Pagination page={page} pageSize={pageSize} totalCount={total} onPageChange={setPage} />
         </>
       )}
     </div>
   )
 }
- 
- 
+
+
 // ════════════════════════════════════════════════════════════════
 //  ADMIN RECEIPTS TAB (with confirmation workflow)
 // ════════════════════════════════════════════════════════════════
- 
+
 function ReceiptsTab({ supabase }) {
   const [receipts, setReceipts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1674,57 +1646,42 @@ function ReceiptsTab({ supabase }) {
   const [total, setTotal] = useState(0)
   const [toast, setToast] = useState({ message: '', type: 'success' })
   const [confirming, setConfirming] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
   const pageSize = 15
- 
+
   useEffect(() => { loadReceipts() }, [confirmFilter, page])
- 
+
   const loadReceipts = async () => {
     setLoading(true)
     try {
       let q = supabase.from('subscription_receipt_details')
         .select('*', { count: 'exact' })
-        .gt('amount_paid', 0)   // ← exclude free ($0) receipts
+        .gt('amount_paid', 0)
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
- 
       if (confirmFilter === 'unconfirmed') q = q.eq('confirmed', false)
       if (confirmFilter === 'confirmed') q = q.eq('confirmed', true)
- 
       const { data, count, error } = await q
       if (error) throw error
       setReceipts(data || [])
       setTotal(count || 0)
-    } catch (e) {
-      console.error('Receipts load error:', e)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { console.error('Receipts load error:', e) }
+    finally { setLoading(false) }
   }
 
   const downloadReceipt = (r) => {
     const html = buildSubscriptionReceiptHtml({
-      receiptNumber: r.receipt_number,
-      invoiceRef: r.invoice_ref_no || '—',
-      subscriptionNumber: r.subscription_number,
-      packageName: r.package_name || 'Subscription',
+      receiptNumber: r.receipt_number, invoiceRef: r.invoice_ref_no || '—',
+      subscriptionNumber: r.subscription_number, packageName: r.package_name || 'Subscription',
       subscriberName: r.subscriber_name || r.paid_by_name || null,
-      amountPaid: r.amount_paid,
-      amountDue: r.amount_paid,
-      taxAmount: 0,
-      totalInvoice: r.amount_paid,
-      paymentMethod: r.payment_method,
-      transactionRef: r.payment_ref_id || r.transaction_ref,
-      paidAt: r.issued_at,
-      confirmed: r.confirmed,
-      confirmedAt: r.confirmed_at,
-      currencySymbol: r.currency_symbol || '',
-      notes: r.notes,
+      amountPaid: r.amount_paid, amountDue: r.amount_paid, taxAmount: 0, totalInvoice: r.amount_paid,
+      paymentMethod: r.payment_method, transactionRef: r.payment_ref_id || r.transaction_ref,
+      paidAt: r.issued_at, confirmed: r.confirmed, confirmedAt: r.confirmed_at,
+      currencySymbol: r.currency_symbol || '', notes: r.notes,
     })
-    const w = window.open('', '_blank')
-    w.document.write(html)
-    w.document.close()
+    const w = window.open('', '_blank'); w.document.write(html); w.document.close()
   }
- 
+
   const handleConfirm = async (receiptId) => {
     if (!confirm('Confirm this payment has been received?')) return
     setConfirming(receiptId)
@@ -1733,124 +1690,109 @@ function ReceiptsTab({ supabase }) {
       if (error) throw error
       const result = typeof data === 'string' ? JSON.parse(data) : data
       if (!result.success) throw new Error(result.error)
+      // Update locally instead of full reload to avoid timeout
+      setReceipts(prev => prev.map(r => r.id === receiptId
+        ? { ...r, confirmed: true, confirmed_at: result.confirmed_at, confirmed_by_name: 'You' }
+        : r
+      ))
       setToast({ message: `Receipt ${result.receipt_number} confirmed`, type: 'success' })
       setTimeout(() => setToast({ message: '' }), 3000)
-      await loadReceipts()
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
-    } finally {
-      setConfirming(null)
-    }
+    } finally { setConfirming(null) }
   }
- 
-  const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
- 
+
+  const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+  const fmtDT = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+  const fmtA = (n, sym) => `${sym || ''}${Number(n || 0).toLocaleString()}`
+
   const filtered = receipts.filter(r => {
     if (!search) return true
     const q = search.toLowerCase()
-    return (r.receipt_number || '').toLowerCase().includes(q)
-      || (r.subscription_number || '').toLowerCase().includes(q)
-      || (r.paid_by_name || '').toLowerCase().includes(q)
-      || (r.payment_ref_id || '').toLowerCase().includes(q)
+    return (r.receipt_number || '').toLowerCase().includes(q) || (r.subscription_number || '').toLowerCase().includes(q)
+      || (r.paid_by_name || '').toLowerCase().includes(q) || (r.payment_ref_id || '').toLowerCase().includes(q)
   })
- 
   const unconfirmedCount = receipts.filter(r => !r.confirmed).length
- 
+
   return (
     <div className="space-y-4">
       <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
- 
       {unconfirmedCount > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-800">
           <Clock size={15} /> <strong>{unconfirmedCount}</strong> receipt{unconfirmedCount > 1 ? 's' : ''} awaiting confirmation
         </div>
       )}
- 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" placeholder="Search by receipt, subscription, payer, or ref…" value={search}
-            onChange={e => setSearch(e.target.value)} className={inp + ' pl-9'} />
+          <input type="text" placeholder="Search receipts…" value={search} onChange={e => setSearch(e.target.value)} className={inp + ' pl-9'} />
         </div>
         <select value={confirmFilter} onChange={e => { setConfirmFilter(e.target.value); setPage(1) }} className={inp + ' w-auto'}>
-          <option value="all">All receipts</option>
-          <option value="unconfirmed">Awaiting confirmation</option>
-          <option value="confirmed">Confirmed</option>
+          <option value="all">All receipts</option><option value="unconfirmed">Awaiting confirmation</option><option value="confirmed">Confirmed</option>
         </select>
       </div>
- 
-      {loading ? (
-        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
-      ) : (
+      {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div> : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Receipt</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Subscriber</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Paid By</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Method</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Ref</th>
-                  <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="text-right py-2.5 px-3 w-36" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={9} className="py-8 text-center text-gray-400 text-sm">No receipts found</td></tr>
-                ) : filtered.map(r => (
-                  <tr key={r.id} className={`hover:bg-gray-50 ${!r.confirmed ? 'bg-amber-50/30' : ''}`}>
-                    <td className="py-2.5 px-3 font-mono text-xs text-gray-700">{r.receipt_number}</td>
-                    <td className="py-2.5 px-3">
-                      <p className="text-xs font-medium text-gray-900">{r.subscriber_name || '—'}</p>
-                      <p className="text-[10px] text-gray-400 capitalize">{r.subscriber_type?.replace('_', ' ')}</p>
-                    </td>
-                    <td className="py-2.5 px-3 text-xs text-gray-600">{r.paid_by_name || '—'}</td>
-                    <td className="py-2.5 px-3 text-right text-xs font-medium">
-                      {r.currency_symbol}{Number(r.amount_paid).toLocaleString()}
-                      {r.change_given > 0 && (
-                        <p className="text-[10px] text-gray-400">Change: {r.currency_symbol}{Number(r.change_given).toLocaleString()}</p>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-xs text-gray-600 capitalize">{r.payment_method?.replace('_', ' ')}</td>
-                    <td className="py-2.5 px-3 text-xs font-mono text-gray-500">{r.payment_ref_id || r.transaction_ref || '—'}</td>
-                    <td className="py-2.5 px-3 text-xs text-gray-600">{fmtD(r.issued_at)}</td>
-                    <td className="py-2.5 px-3 text-center">
+          <div className="space-y-2">
+            {filtered.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+                <Receipt size={36} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-sm text-gray-400">No receipts found</p>
+              </div>
+            ) : filtered.map(r => {
+              const isExpanded = expandedId === r.id
+              return (
+                <div key={r.id} className={`bg-white rounded-xl border overflow-hidden shadow-sm ${!r.confirmed ? 'border-amber-200' : 'border-gray-200'}`}>
+                  <button onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                    className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${r.confirmed ? 'bg-green-100' : 'bg-amber-100'}`}>
+                        <Receipt size={14} className={r.confirmed ? 'text-green-600' : 'text-amber-600'} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{r.receipt_number}</p>
+                        <p className="text-[10px] text-gray-400">{r.subscription_number} · {fmtD(r.issued_at)} · {r.paid_by_name || '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-bold text-gray-900">{fmtA(r.amount_paid, r.currency_symbol)}</p>
                       {r.confirmed ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle size={10} /> Confirmed
-                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800"><CheckCircle size={10} /> Confirmed</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                          <Clock size={10} /> Pending
-                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800"><Clock size={10} /> Pending</span>
                       )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => downloadReceipt(r)} title="Download Receipt"
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors">
-                          <Download size={14} />
+                      {isExpanded ? <ChevronDown size={14} className="text-gray-400 rotate-180" /> : <ChevronDown size={14} className="text-gray-400" />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-5 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div><p className="text-xs text-gray-500">Subscriber</p><p className="font-semibold">{r.subscriber_name || '—'}</p><p className="text-[10px] text-gray-400 capitalize">{r.subscriber_type?.replace('_', ' ')}</p></div>
+                        <div><p className="text-xs text-gray-500">Payment Method</p><p className="font-semibold capitalize">{r.payment_method?.replace('_', ' ')}</p></div>
+                        <div><p className="text-xs text-gray-500">Transaction Ref</p><p className="font-semibold font-mono text-xs">{r.payment_ref_id || r.transaction_ref || '—'}</p></div>
+                        <div><p className="text-xs text-gray-500">Invoice</p><p className="font-semibold">{r.invoice_ref_no || '—'}</p></div>
+                        {r.change_given > 0 && <div><p className="text-xs text-gray-500">Change Given</p><p className="font-semibold">{fmtA(r.change_given, r.currency_symbol)}</p></div>}
+                        {r.confirmed_by_name && <div><p className="text-xs text-gray-500">Confirmed By</p><p className="font-semibold">{r.confirmed_by_name} · {fmtD(r.confirmed_at)}</p></div>}
+                      </div>
+                      {r.notes && <div className="bg-gray-50 rounded-lg p-2.5 text-xs text-gray-600">{r.notes}</div>}
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadReceipt(r)}
+                          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                          <Download size={14} /> Download Receipt
                         </button>
                         {!r.confirmed && (
                           <button onClick={() => handleConfirm(r.id)} disabled={confirming === r.id}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                            {confirming === r.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                            Confirm
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
+                            {confirming === r.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Confirm Receipt
                           </button>
                         )}
-                        {r.confirmed && r.confirmed_by_name && (
-                          <p className="text-[10px] text-gray-400">by {r.confirmed_by_name}</p>
-                        )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
           <Pagination page={page} pageSize={pageSize} totalCount={total} onPageChange={setPage} />
         </>
