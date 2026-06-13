@@ -35,6 +35,9 @@ const BRAND = 'GariCare'
  * @param {string} args.currencySymbol
  * @param {string} args.currencyCode
  * @param {string} [args.status]          - 'unpaid' | 'paid' | 'overdue'
+ * @param {number} [args.grossAmount]     - full price before credit
+ * @param {number} [args.upgradeCredit]   - credit from previous subscription
+ * @param {string} [args.upgradeNotes]    - explanation of the credit
  * @param {string} [args.ctaUrl]
  */
 export function buildSubscriptionInvoiceHtml({
@@ -55,6 +58,9 @@ export function buildSubscriptionInvoiceHtml({
   currencySymbol = '',
   currencyCode = '',
   status = 'unpaid',
+  grossAmount,
+  upgradeCredit = 0,
+  upgradeNotes,
   ctaUrl = '#',
 }) {
   const fmt  = (n) => `${currencySymbol}${Number(n || 0).toLocaleString('en-KE')}`
@@ -64,6 +70,25 @@ export function buildSubscriptionInvoiceHtml({
 
   const statusColor = status === 'paid' ? '#22c55e' : status === 'overdue' ? '#ef4444' : '#f59e0b'
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
+  const lineItemAmount = fmt(grossAmount || amountDue)
+  const hasCredit = upgradeCredit > 0
+
+  // Build credit line item row (or empty string)
+  const creditLineItemHtml = hasCredit ? `
+        <tr style="border-top:1px solid #f1f5f9;background:#f0fdf4;">
+          <td colspan="2" style="padding:10px 24px;color:#16a34a;font-size:13px;font-weight:600;">
+            ↗ Upgrade Credit
+            <span style="display:block;font-size:11px;font-weight:400;color:#64748b;margin-top:2px;">${upgradeNotes || 'Pro-rata credit from previous subscription'}</span>
+          </td>
+          <td style="padding:10px 24px;color:#16a34a;font-size:13px;font-weight:700;text-align:right;">−${fmt(upgradeCredit)}</td>
+        </tr>` : ''
+
+  // Build credit totals row (or empty string)
+  const creditTotalHtml = hasCredit ? `
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#16a34a;">Upgrade Credit</td>
+                <td style="padding:5px 0;font-size:13px;color:#16a34a;font-weight:600;text-align:right;">−${fmt(upgradeCredit)}</td>
+              </tr>` : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -159,8 +184,9 @@ export function buildSubscriptionInvoiceHtml({
           <td style="padding:10px 8px;color:#64748b;font-size:13px;text-align:center;">
             ${fmtD(billingStart)} – ${fmtD(billingEnd)}
           </td>
-          <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:600;text-align:right;">${fmt(amountDue)}</td>
+          <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:600;text-align:right;">${lineItemAmount}</td>
         </tr>
+        ${creditLineItemHtml}
       </table>
     </td>
   </tr>
@@ -175,8 +201,9 @@ export function buildSubscriptionInvoiceHtml({
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="padding:5px 0;font-size:13px;color:#64748b;">Subtotal</td>
-                <td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${fmt(amountDue)}</td>
+                <td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${lineItemAmount}</td>
               </tr>
+              ${creditTotalHtml}
               <tr>
                 <td style="padding:5px 0;font-size:13px;color:#64748b;">Tax</td>
                 <td style="padding:5px 0;font-size:13px;color:#1e293b;text-align:right;">${fmt(taxAmount)}</td>
