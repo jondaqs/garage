@@ -49,14 +49,52 @@ const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric'
 const fmt = (n, sym = '$') => `${sym}${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
-export default function SubscriptionManager({ subscriberType, subscriberId, subscriberName }) {
+// Error boundary to catch rendering crashes
+import React from 'react'
+class SubscriptionErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null, info: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) {
+    console.error('[SubscriptionManager] CRASH:', error, info)
+    this.setState({ info })
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 m-4">
+          <h3 className="text-red-800 font-bold text-sm mb-2">Subscription Manager Error</h3>
+          <pre className="text-red-600 text-xs whitespace-pre-wrap mb-2">{this.state.error.message}</pre>
+          <pre className="text-red-400 text-[10px] whitespace-pre-wrap max-h-40 overflow-auto">{this.state.error.stack}</pre>
+          <button onClick={() => this.setState({ error: null, info: null })}
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold">Retry</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+export default function SubscriptionManagerWrapper(props) {
+  return (
+    <SubscriptionErrorBoundary>
+      <SubscriptionManagerInner {...props} />
+    </SubscriptionErrorBoundary>
+  )
+}
+
+function SubscriptionManagerInner({ subscriberType, subscriberId, subscriberName }) {
   const supabase = createClient()
   const searchParams = useSearchParams()
 
-  // Deep-link: ?view=invoices&invoice=UUID or ?view=receipts&receipt=UUID
+  // Deep-link: ?view=invoices&invoice=UUID
   const initialView = searchParams?.get('view') || 'overview'
   const deepLinkedInvoice = searchParams?.get('invoice') || null
   const deepLinkScrolled = useRef(false)
+
+  // Debug: log component mount
+  useEffect(() => {
+    console.log('[SubscriptionManager] mounted', { subscriberType, subscriberId, initialView, deepLinkedInvoice })
+  }, [])
 
   // Auto-scroll to deep-linked invoice after data loads
   useEffect(() => {
@@ -106,6 +144,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // ── Load data ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true)
+    console.log('[SubscriptionManager] loadAll starting', { subscriberType, subscriberId })
     try {
       const subField = subscriberType === 'individual' ? 'user_id'
         : subscriberType === 'company' ? 'company_id' : 'service_provider_id'
@@ -113,10 +152,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       // Step 1: Fetch subscriptions, packages, invoices in parallel
       const [
         { data: subs, error: subsErr },
-        { data: pkgs },
-        { data: invs },
-        { data: trial },
-        { data: profile },
+        { data: pkgs, error: pkgsErr },
+        { data: invs, error: invsErr },
+        { data: trial, error: trialErr },
+        { data: profile, error: profileErr },
       ] = await Promise.all([
         supabase.from('subscription_details').select('*').eq(subField, subscriberId).order('created_at', { ascending: false }),
         supabase.from('subscription_package_listing').select('*')
@@ -131,6 +170,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             ? supabase.from('company_profiles_secure').select('name, email, phone').eq('id', subscriberId).maybeSingle()
             : supabase.from('service_providers_secure').select('name, email, phone').eq('id', subscriberId).maybeSingle(),
       ])
+
+      console.log('[SubscriptionManager] loadAll results', {
+        subs: subs?.length, subsErr,
+        pkgs: pkgs?.length, pkgsErr,
+        invs: invs?.length, invsErr,
+        trialErr, profileErr,
+      })
 
       if (subsErr) console.error('Subscriptions query error:', subsErr)
 
