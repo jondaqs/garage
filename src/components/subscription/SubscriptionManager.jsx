@@ -75,6 +75,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
 
+  // Subscriber profile (for invoice/receipt "Bill To")
+  const [subscriberProfile, setSubscriberProfile] = useState(null)
+
   // ── Load data ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -88,6 +91,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         { data: pkgs },
         { data: invs },
         { data: trial },
+        { data: profile },
       ] = await Promise.all([
         supabase.from('subscription_details').select('*').eq(subField, subscriberId).order('created_at', { ascending: false }),
         supabase.from('subscription_package_listing').select('*')
@@ -96,6 +100,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         supabase.rpc('check_trial_eligibility', {
           p_subscriber_type: subscriberType, p_subscriber_id: subscriberId,
         }),
+        subscriberType === 'individual'
+          ? supabase.from('user_profiles_secure').select('first_name, last_name, email, phone').eq('id', subscriberId).maybeSingle()
+          : subscriberType === 'company'
+            ? supabase.from('company_profiles_secure').select('name, email, phone').eq('id', subscriberId).maybeSingle()
+            : supabase.from('service_providers_secure').select('name, email, phone').eq('id', subscriberId).maybeSingle(),
       ])
 
       if (subsErr) console.error('Subscriptions query error:', subsErr)
@@ -104,6 +113,16 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setPackages(pkgs || [])
       setInvoices(invs || [])
       if (trial?.[0]) setTrialInfo(trial[0])
+
+      // Store subscriber profile for invoice/receipt "Bill To"
+      if (profile) {
+        const p = profile
+        setSubscriberProfile({
+          name: p.first_name ? `${p.first_name} ${p.last_name || ''}`.trim() : (p.name || null),
+          email: p.email || null,
+          phone: p.phone || null,
+        })
+      }
 
       // Step 2: Fetch receipts using subscription IDs (avoids .in([]) error)
       const subIds = (subs || []).map(s => s.id)
@@ -557,7 +576,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   invoiceRef: inv.invoice_ref_no,
                   subscriptionNumber: inv.subscription_number,
                   packageName: inv.package_name || 'Subscription',
-                  subscriberName: null,
+                  subscriberName: subscriberProfile?.name || null,
+                  subscriberEmail: subscriberProfile?.email || null,
+                  subscriberPhone: subscriberProfile?.phone || null,
                   billingStart: inv.billing_period_start,
                   billingEnd: inv.billing_period_end,
                   issuedAt: inv.created_at,
@@ -691,7 +712,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   invoiceRef: r.invoice_ref_no || r.subscription_number || '—',
                   subscriptionNumber: r.subscription_number,
                   packageName: r.package_name || 'Subscription',
-                  subscriberName: r.subscriber_name || r.paid_by_name || null,
+                  subscriberName: subscriberProfile?.name || r.subscriber_name || r.paid_by_name || null,
+                  subscriberEmail: subscriberProfile?.email || null,
+                  subscriberPhone: subscriberProfile?.phone || null,
                   amountPaid: r.amount_paid,
                   amountDue: r.amount_paid,
                   taxAmount: 0,
