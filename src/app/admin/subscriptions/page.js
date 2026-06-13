@@ -1498,7 +1498,10 @@ function InvoicesTab({ supabase }) {
   const downloadInvoice = (inv) => {
     const html = buildSubscriptionInvoiceHtml({
       invoiceRef: inv.invoice_ref_no, subscriptionNumber: inv.subscription_number,
-      packageName: inv.package_name || 'Subscription', subscriberName: inv.subscriber_name || null,
+      packageName: inv.package_name || 'Subscription',
+      subscriberName: inv.subscriber_name || null,
+      subscriberEmail: inv.subscriber_email || null,
+      subscriberPhone: inv.subscriber_phone || null,
       billingStart: inv.billing_period_start, billingEnd: inv.billing_period_end,
       issuedAt: inv.created_at, dueDate: inv.due_date,
       amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
@@ -1551,7 +1554,7 @@ function InvoicesTab({ supabase }) {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{inv.invoice_ref_no}</p>
-                        <p className="text-[10px] text-gray-400">{inv.subscription_number} · {inv.package_name} · Due {fmtD(inv.due_date)}</p>
+                        <p className="text-[10px] text-gray-400">{inv.subscriber_name && `${inv.subscriber_name} · `}{inv.subscription_number} · {inv.package_name} · Due {fmtD(inv.due_date)}</p>
                         {hasCredit && <p className="text-[10px] text-green-600 font-medium">↗ Upgrade credit: {fmtA(inv.upgrade_credit, inv.currency_symbol)}</p>}
                       </div>
                     </div>
@@ -1690,13 +1693,15 @@ function ReceiptsTab({ supabase }) {
       if (error) throw error
       const result = typeof data === 'string' ? JSON.parse(data) : data
       if (!result.success) throw new Error(result.error)
-      // Update locally instead of full reload to avoid timeout
+      // Instant local feedback
       setReceipts(prev => prev.map(r => r.id === receiptId
         ? { ...r, confirmed: true, confirmed_at: result.confirmed_at, confirmed_by_name: 'You' }
         : r
       ))
       setToast({ message: `Receipt ${result.receipt_number} confirmed`, type: 'success' })
       setTimeout(() => setToast({ message: '' }), 3000)
+      // Background reload for full data sync (view is now fast with JOINs)
+      loadReceipts()
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
     } finally { setConfirming(null) }
