@@ -17,7 +17,7 @@
 const BRAND = 'GariCare'
 
 /**
- * @param {object} args
+ * @param {object} args 
  * @param {string} args.invoiceRef
  * @param {string} args.subscriptionNumber
  * @param {string} args.packageName
