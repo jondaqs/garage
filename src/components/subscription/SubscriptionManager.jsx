@@ -200,14 +200,16 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
       // Build success message with credit info
       const subId = result?.subscription_id || data
-      let msg = 'Subscription created successfully!'
-      if (result?.upgrade_credit > 0) {
-        msg = `Upgraded successfully! A credit of ${fmt(result.upgrade_credit)} from your previous plan (${result.upgraded_from}) has been applied. ` +
-          (result.net_amount > 0
-            ? `Net amount due: ${fmt(result.net_amount)}.`
-            : `The upgrade is fully covered by your credit — no payment needed!`)
+      let msg = ''
+      if (result?.upgrade_credit > 0 && result?.net_amount > 0) {
+        msg = `Upgrade initiated! A credit of ${fmt(result.upgrade_credit)} from your previous plan (${result.upgraded_from}) has been applied. ` +
+          `Net amount due: ${fmt(result.net_amount)}. Your current plan stays active until payment is confirmed.`
+      } else if (result?.upgrade_credit > 0 && result?.net_amount === 0) {
+        msg = `Upgraded successfully! The credit from your previous plan (${result.upgraded_from}) fully covers the new package — no payment needed!`
+      } else if (result?.net_amount > 0) {
+        msg = 'Subscription created! Please pay the invoice below to activate your plan.'
       } else {
-        msg += ' Check your invoices below.'
+        msg = 'Subscription activated successfully!'
       }
       setSuccess(msg)
       setView('invoices')
