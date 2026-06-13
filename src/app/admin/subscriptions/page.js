@@ -1497,20 +1497,26 @@ function InvoicesTab({ supabase }) {
     finally { setPaying(false) }
   }
 
-  const buildInvArgs = (inv) => ({
-    invoiceRef: inv.invoice_ref_no, subscriptionNumber: inv.subscription_number,
-    packageName: inv.package_name || 'Subscription',
-    subscriberName: inv.subscriber_name || null,
-    subscriberEmail: inv.subscriber_email || null,
-    subscriberPhone: inv.subscriber_phone || null,
-    billingStart: inv.billing_period_start, billingEnd: inv.billing_period_end,
-    issuedAt: inv.created_at, dueDate: inv.due_date,
-    amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
-    totalAmount: inv.total_amount, grossAmount: inv.gross_amount || inv.total_amount,
-    upgradeCredit: Number(inv.upgrade_credit || 0), upgradeNotes: inv.upgrade_notes || null,
-    currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid',
-    ctaUrl: typeof window !== 'undefined' ? `${window.location.origin}/admin/subscriptions` : '#',
-  })
+  const buildInvArgs = (inv) => {
+    const subPath = inv.user_id ? '/dashboard/subscription'
+      : inv.company_id ? '/company/subscription'
+      : inv.service_provider_id ? '/provider/subscription'
+      : '/dashboard/subscription'
+    return {
+      invoiceRef: inv.invoice_ref_no, subscriptionNumber: inv.subscription_number,
+      packageName: inv.package_name || 'Subscription',
+      subscriberName: inv.subscriber_name || null,
+      subscriberEmail: inv.subscriber_email || null,
+      subscriberPhone: inv.subscriber_phone || null,
+      billingStart: inv.billing_period_start, billingEnd: inv.billing_period_end,
+      issuedAt: inv.created_at, dueDate: inv.due_date,
+      amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
+      totalAmount: inv.total_amount, grossAmount: inv.gross_amount || inv.total_amount,
+      upgradeCredit: Number(inv.upgrade_credit || 0), upgradeNotes: inv.upgrade_notes || null,
+      currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid',
+      ctaUrl: typeof window !== 'undefined' ? `${window.location.origin}${subPath}?view=invoices&invoice=${inv.id}` : '#',
+    }
+  }
 
   const viewInvoice = (inv) => {
     const w = window.open('', '_blank')
