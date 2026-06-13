@@ -1508,7 +1508,8 @@ function InvoicesTab({ supabase }) {
     amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
     totalAmount: inv.total_amount, grossAmount: inv.gross_amount || inv.total_amount,
     upgradeCredit: Number(inv.upgrade_credit || 0), upgradeNotes: inv.upgrade_notes || null,
-    currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid', ctaUrl: '#',
+    currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid',
+    ctaUrl: typeof window !== 'undefined' ? `${window.location.origin}/admin/subscriptions` : '#',
   })
 
   const viewInvoice = (inv) => {
@@ -1881,4 +1882,4 @@ export default function AdminSubscriptionsPage() {
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
         </div>
     )
-} 
+}

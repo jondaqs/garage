@@ -83,6 +83,12 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
 
+  // Subscription page path per subscriber type (used for invoice CTA URLs)
+  const subscriptionPath = subscriberType === 'individual' ? '/dashboard/subscription'
+    : subscriberType === 'company' ? '/company/subscription'
+    : subscriberType === 'service_provider' ? '/provider/subscription'
+    : '/dashboard/subscription'
+
   // Subscriber profile (for invoice/receipt "Bill To")
   const [subscriberProfile, setSubscriberProfile] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
@@ -645,7 +651,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   upgradeNotes: inv.upgrade_notes || null,
                   currencySymbol: inv.currency_symbol || '',
                   status: inv.effective_status || 'unpaid',
-                  ctaUrl: `${window.location.origin}/dashboard/subscription?view=invoices&invoice=${inv.id}`,
+                  ctaUrl: `${window.location.origin}${subscriptionPath}?view=invoices&invoice=${inv.id}`,
                 })
 
               const viewInvoice = () => {

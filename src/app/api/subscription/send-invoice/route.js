@@ -153,7 +153,12 @@ export async function POST(request) {
     const email = profile.email || null
     const subscriberName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'there'
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-    const ctaUrl = `${APP_URL()}/dashboard/subscription?view=invoices&invoice=${inv.id}`
+    // Build CTA URL based on subscriber type
+    const subPath = sub.user_id ? '/dashboard/subscription'
+      : sub.company_id ? '/company/subscription'
+      : sub.service_provider_id ? '/provider/subscription'
+      : '/dashboard/subscription'
+    const ctaUrl = `${APP_URL()}${subPath}?view=invoices&invoice=${inv.id}`
 
     const results = { notification: false, email_sent: false, sms_sent: false }
 

@@ -1,7 +1,7 @@
 // src/app/company/subscription/page.js
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 import SubscriptionManager from '@/components/subscription/SubscriptionManager'
@@ -75,11 +75,13 @@ export default function CompanySubscriptionPage() {
           Manage subscription for <strong>{company?.name}</strong> — plans, invoices, and payments.
         </p>
       </div>
-      <SubscriptionManager
-        subscriberType="company"
-        subscriberId={company.id}
-        subscriberName={company.name}
-      />
+      <Suspense fallback={<div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-600" size={24} /></div>}>
+        <SubscriptionManager
+          subscriberType="company"
+          subscriberId={company.id}
+          subscriberName={company.name}
+        />
+      </Suspense>
     </div>
   )
 }

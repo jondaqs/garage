@@ -179,7 +179,12 @@ export async function POST(request) {
     const email = profile.email || null
     const subscriberName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'there'
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
-    const ctaUrl = `${APP_URL()}/dashboard/subscription?view=receipts`
+    // Build CTA URL based on subscriber type
+    const subPath = sub?.user_id ? '/dashboard/subscription'
+      : sub?.company_id ? '/company/subscription'
+      : sub?.service_provider_id ? '/provider/subscription'
+      : '/dashboard/subscription'
+    const ctaUrl = `${APP_URL()}${subPath}?view=receipts`
     const finalAmount = amount_paid || inv.total_amount || 0
     const finalReceipt = receipt_number || 'N/A'
     const finalMethod = payment_method || 'payment'
