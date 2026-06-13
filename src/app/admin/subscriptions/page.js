@@ -8,9 +8,11 @@ import {
     CreditCard, Package, Percent, Gift, Calculator, Users, Building2, Wrench,
     Plus, Save, Trash2, X, CheckCircle, AlertCircle, Loader2, ToggleLeft, ToggleRight,
     ChevronDown, ChevronRight, Search, Filter, Eye, Ban, PlayCircle, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote
+    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
+import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
+import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
 
 const TABS = [
     { id: 'overview', label: 'Overview', icon: CreditCard },
@@ -1461,6 +1463,7 @@ function InvoicesTab({ supabase }) {
     try {
       let q = supabase.from('subscription_invoice_details')
         .select('*', { count: 'exact' })
+        .gt('total_amount', 0)   // ← exclude free ($0) invoices
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
  
@@ -1500,6 +1503,28 @@ function InvoicesTab({ supabase }) {
     } finally {
       setPaying(false)
     }
+  }
+
+  const downloadInvoice = (inv) => {
+    const html = buildSubscriptionInvoiceHtml({
+      invoiceRef: inv.invoice_ref_no,
+      subscriptionNumber: inv.subscription_number,
+      packageName: inv.package_name || 'Subscription',
+      subscriberName: inv.subscriber_name || null,
+      billingStart: inv.billing_period_start,
+      billingEnd: inv.billing_period_end,
+      issuedAt: inv.created_at,
+      dueDate: inv.due_date,
+      amountDue: inv.amount_due || inv.total_amount,
+      taxAmount: inv.tax_amount || 0,
+      totalAmount: inv.total_amount,
+      currencySymbol: inv.currency_symbol || '',
+      status: inv.effective_status || 'unpaid',
+      ctaUrl: '#',
+    })
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
   }
  
   const filtered = invoices.filter(i => {
@@ -1544,7 +1569,7 @@ function InvoicesTab({ supabase }) {
                   <th className="text-right py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Balance</th>
                   <th className="text-left py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Due</th>
                   <th className="text-center py-2.5 px-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="text-right py-2.5 px-3 w-28" />
+                  <th className="text-right py-2.5 px-3 w-36" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1564,12 +1589,18 @@ function InvoicesTab({ supabase }) {
                       <StatusBadge code={inv.effective_status} />
                     </td>
                     <td className="py-2.5 px-3 text-right">
-                      {inv.effective_status !== 'paid' && (
-                        <button onClick={() => { setPayingId(payingId === inv.id ? null : inv.id); setPayAmount(inv.balance_due?.toString()) }}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-                          {payingId === inv.id ? 'Cancel' : 'Record Payment'}
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => downloadInvoice(inv)} title="Download Invoice"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                          <Download size={14} />
                         </button>
-                      )}
+                        {inv.effective_status !== 'paid' && (
+                          <button onClick={() => { setPayingId(payingId === inv.id ? null : inv.id); setPayAmount(inv.balance_due?.toString()) }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                            {payingId === inv.id ? 'Cancel' : 'Record Payment'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1652,6 +1683,7 @@ function ReceiptsTab({ supabase }) {
     try {
       let q = supabase.from('subscription_receipt_details')
         .select('*', { count: 'exact' })
+        .gt('amount_paid', 0)   // ← exclude free ($0) receipts
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
  
@@ -1667,6 +1699,30 @@ function ReceiptsTab({ supabase }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const downloadReceipt = (r) => {
+    const html = buildSubscriptionReceiptHtml({
+      receiptNumber: r.receipt_number,
+      invoiceRef: r.invoice_ref_no || '—',
+      subscriptionNumber: r.subscription_number,
+      packageName: r.package_name || 'Subscription',
+      subscriberName: r.subscriber_name || r.paid_by_name || null,
+      amountPaid: r.amount_paid,
+      amountDue: r.amount_paid,
+      taxAmount: 0,
+      totalInvoice: r.amount_paid,
+      paymentMethod: r.payment_method,
+      transactionRef: r.payment_ref_id || r.transaction_ref,
+      paidAt: r.issued_at,
+      confirmed: r.confirmed,
+      confirmedAt: r.confirmed_at,
+      currencySymbol: r.currency_symbol || '',
+      notes: r.notes,
+    })
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
   }
  
   const handleConfirm = async (receiptId) => {
@@ -1774,16 +1830,22 @@ function ReceiptsTab({ supabase }) {
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-right">
-                      {!r.confirmed && (
-                        <button onClick={() => handleConfirm(r.id)} disabled={confirming === r.id}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {confirming === r.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                          Confirm
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => downloadReceipt(r)} title="Download Receipt"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors">
+                          <Download size={14} />
                         </button>
-                      )}
-                      {r.confirmed && r.confirmed_by_name && (
-                        <p className="text-[10px] text-gray-400">by {r.confirmed_by_name}</p>
-                      )}
+                        {!r.confirmed && (
+                          <button onClick={() => handleConfirm(r.id)} disabled={confirming === r.id}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                            {confirming === r.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                            Confirm
+                          </button>
+                        )}
+                        {r.confirmed && r.confirmed_by_name && (
+                          <p className="text-[10px] text-gray-400">by {r.confirmed_by_name}</p>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

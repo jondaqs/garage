@@ -21,6 +21,8 @@ import {
   ArrowRight, Clock, DollarSign, Send, Banknote, Building2,
   BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt
 } from 'lucide-react'
+import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
+import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
 
 const PAYMENT_METHODS = [
   { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
@@ -551,34 +553,24 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               const isPayingThis = payingInvoiceId === inv.id
 
               const downloadInvoice = () => {
+                const html = buildSubscriptionInvoiceHtml({
+                  invoiceRef: inv.invoice_ref_no,
+                  subscriptionNumber: inv.subscription_number,
+                  packageName: inv.package_name || 'Subscription',
+                  subscriberName: null,
+                  billingStart: inv.billing_period_start,
+                  billingEnd: inv.billing_period_end,
+                  issuedAt: inv.created_at,
+                  dueDate: inv.due_date,
+                  amountDue: inv.amount_due || inv.total_amount,
+                  taxAmount: inv.tax_amount || 0,
+                  totalAmount: inv.total_amount,
+                  currencySymbol: inv.currency_symbol || '',
+                  status: inv.effective_status || 'unpaid',
+                  ctaUrl: window.location.href,
+                })
                 const w = window.open('', '_blank')
-                w.document.write(`<!DOCTYPE html><html><head><title>Invoice ${inv.invoice_ref_no}</title>
-                <style>
-                  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:40px;color:#1a1a1a}
-                  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a1a1a;padding-bottom:20px;margin-bottom:30px}
-                  .header h1{font-size:28px;margin:0}.meta{text-align:right;font-size:13px;color:#666}.meta p{margin:2px 0}
-                  .grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px}
-                  .stitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:6px;font-weight:600}
-                  .section p{margin:2px 0;font-size:14px}
-                  table{width:100%;border-collapse:collapse;margin-bottom:30px}
-                  th{text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;background:#f5f5f5;border-bottom:2px solid #ddd}
-                  td{padding:10px 12px;font-size:14px;border-bottom:1px solid #eee}.tr{text-align:right}
-                  .totals{margin-left:auto;width:280px}.totals tr td{font-size:14px;padding:6px 12px}
-                  .grand{font-weight:700;font-size:18px;border-top:2px solid #1a1a1a}
-                  .footer{margin-top:40px;padding-top:20px;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center}
-                  @media print{button{display:none!important}}
-                </style></head><body>
-                <div style="text-align:right;margin-bottom:20px"><button onclick="window.print()" style="padding:8px 24px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">Print / Save as PDF</button></div>
-                <div class="header"><div><h1>INVOICE</h1><p style="color:#666;margin:4px 0;font-size:13px">GariCare Auto Services</p></div>
-                <div class="meta"><p><strong>${inv.invoice_ref_no}</strong></p><p>Issued: ${inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}) : '—'}</p><p>Due: ${inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}) : '—'}</p></div></div>
-                <div class="grid"><div><p class="stitle">Subscription</p><div class="section"><p>${inv.subscription_number || '—'}</p><p>${inv.package_name || ''}</p></div></div>
-                <div><p class="stitle">Period</p><div class="section"><p>${inv.billing_period_start ? new Date(inv.billing_period_start).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'}) : '—'} – ${inv.billing_period_end ? new Date(inv.billing_period_end).toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'numeric'}) : '—'}</p></div></div></div>
-                <table><thead><tr><th>Description</th><th class="tr">Amount</th></tr></thead><tbody>
-                <tr><td>Subscription fee</td><td class="tr">${inv.currency_symbol||''}${Number(inv.amount_due||inv.total_amount).toLocaleString()}</td></tr></tbody></table>
-                <table class="totals"><tr><td>Total</td><td class="tr">${inv.currency_symbol||''}${Number(inv.total_amount).toLocaleString()}</td></tr>
-                <tr><td>Paid</td><td class="tr">${inv.currency_symbol||''}${Number(inv.total_paid||0).toLocaleString()}</td></tr>
-                <tr class="grand"><td>Balance</td><td class="tr">${inv.currency_symbol||''}${Number(inv.balance_due||0).toLocaleString()}</td></tr></table>
-                <div class="footer"><p>Thank you for your business.</p></div></body></html>`)
+                w.document.write(html)
                 w.document.close()
               }
 
@@ -694,29 +686,26 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           ) : (
             receipts.filter(r => Number(r.amount_paid) > 0).map(r => {
               const downloadReceipt = () => {
+                const html = buildSubscriptionReceiptHtml({
+                  receiptNumber: r.receipt_number,
+                  invoiceRef: r.invoice_ref_no || r.subscription_number || '—',
+                  subscriptionNumber: r.subscription_number,
+                  packageName: r.package_name || 'Subscription',
+                  subscriberName: r.subscriber_name || r.paid_by_name || null,
+                  amountPaid: r.amount_paid,
+                  amountDue: r.amount_paid,
+                  taxAmount: 0,
+                  totalInvoice: r.amount_paid,
+                  paymentMethod: r.payment_method,
+                  transactionRef: r.payment_ref_id || r.transaction_ref,
+                  paidAt: r.issued_at,
+                  confirmed: r.confirmed,
+                  confirmedAt: r.confirmed_at,
+                  currencySymbol: r.currency_symbol || '',
+                  notes: r.notes,
+                })
                 const w = window.open('', '_blank')
-                w.document.write(`<!DOCTYPE html><html><head><title>Receipt ${r.receipt_number}</title>
-                <style>
-                  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:700px;margin:0 auto;padding:40px;color:#1a1a1a}
-                  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #10b981;padding-bottom:20px;margin-bottom:30px}
-                  .header h1{font-size:28px;margin:0;color:#065f46}.meta{text-align:right;font-size:13px;color:#666}.meta p{margin:2px 0}
-                  .amount-box{background:#f0fdf4;border:2px solid #bbf7d0;border-radius:12px;padding:24px;text-align:center;margin-bottom:30px}
-                  .amount-box .label{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.08em}
-                  .amount-box .value{font-size:36px;font-weight:800;color:#065f46;margin:8px 0 0}
-                  .grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px}
-                  .stitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:6px;font-weight:600}
-                  .section p{margin:2px 0;font-size:14px}
-                  .footer{margin-top:40px;padding-top:20px;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center}
-                  @media print{button{display:none!important}}
-                </style></head><body>
-                <div style="text-align:right;margin-bottom:20px"><button onclick="window.print()" style="padding:8px 24px;background:#065f46;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">Print / Save as PDF</button></div>
-                <div class="header"><div><h1>PAYMENT RECEIPT</h1><p style="color:#666;margin:4px 0;font-size:13px">GariCare Auto Services</p></div>
-                <div class="meta"><p><strong>${r.receipt_number}</strong></p><p>Date: ${r.issued_at ? new Date(r.issued_at).toLocaleDateString('en-KE',{day:'numeric',month:'long',year:'numeric'}) : '—'}</p>
-                <p>${r.confirmed ? '<span style="background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">Confirmed</span>' : '<span style="background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">Pending</span>'}</p></div></div>
-                <div class="amount-box"><p class="label">Amount Received</p><p class="value">${r.currency_symbol||''}${Number(r.amount_paid).toLocaleString()}</p></div>
-                <div class="grid"><div><p class="stitle">Payment Details</p><div class="section"><p>Method: ${(r.payment_method||'').replace('_',' ')}</p><p>Ref: ${r.payment_ref_id||r.transaction_ref||'—'}</p></div></div>
-                <div><p class="stitle">Subscription</p><div class="section"><p>${r.subscription_number||'—'}</p></div></div></div>
-                <div class="footer"><p>Thank you for your payment.</p></div></body></html>`)
+                w.document.write(html)
                 w.document.close()
               }
 
