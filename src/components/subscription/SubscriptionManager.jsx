@@ -191,6 +191,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     if (duplicate) {
       setError(`You already have an active subscription to ${pkg.name}. It expires on ${fmtD(duplicate.expiry_date)}.`)
       setTimeout(() => setError(''), 5000)
+      // Scroll to toast so user sees it
+      setTimeout(() => {
+        const el = document.getElementById('subscription-toast')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
       return
     }
 
@@ -246,6 +251,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setView('invoices')
       setTermsModal(null)
       await loadAll()
+      // Scroll to success toast
+      setTimeout(() => {
+        const el = document.getElementById('subscription-toast')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
       if (subId) {
         try {
           await fetch('/api/subscription/send-invoice', {
@@ -315,13 +325,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Alerts */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-2">
+        <div id="subscription-toast" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-2">
           <AlertCircle size={15} className="flex-shrink-0 mt-0.5" /> <p className="flex-1">{error}</p>
           <button onClick={() => setError('')}><X size={14} /></button>
         </div>
       )}
       {success && (
-        <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm flex items-start gap-2">
+        <div id="subscription-toast" className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm flex items-start gap-2">
           <CheckCircle size={15} className="flex-shrink-0 mt-0.5" /> <p className="flex-1">{success}</p>
           <button onClick={() => setSuccess('')}><X size={14} /></button>
         </div>
