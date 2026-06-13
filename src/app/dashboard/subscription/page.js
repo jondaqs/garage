@@ -1,7 +1,7 @@
 // src/app/dashboard/subscription/page.js
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 import SubscriptionManager from '@/components/subscription/SubscriptionManager'
@@ -41,11 +41,13 @@ export default function IndividualSubscriptionPage() {
           Manage your personal vehicle subscription plan, invoices, and payments.
         </p>
       </div>
-      <SubscriptionManager
-        subscriberType="individual"
-        subscriberId={profile.id}
-        subscriberName={profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : profile.username}
-      />
+      <Suspense fallback={<div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-600" size={24} /></div>}>
+        <SubscriptionManager
+          subscriberType="individual"
+          subscriberId={profile.id}
+          subscriberName={profile.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : profile.username}
+        />
+      </Suspense>
     </div>
   )
 }
