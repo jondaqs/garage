@@ -1721,21 +1721,22 @@ function ReceiptsTab({ supabase }) {
   }
 
   const handleConfirm = async (receiptId) => {
-    if (!confirm('Confirm this payment has been received?')) return
+    if (!confirm('Confirm this payment? This will activate the subscriber\'s plan.')) return
     setConfirming(receiptId)
     try {
       const { data, error } = await supabase.rpc('confirm_subscription_receipt', { p_receipt_id: receiptId })
       if (error) throw error
       const result = typeof data === 'string' ? JSON.parse(data) : data
       if (!result.success) throw new Error(result.error)
-      // Instant local feedback
       setReceipts(prev => prev.map(r => r.id === receiptId
         ? { ...r, confirmed: true, confirmed_at: result.confirmed_at, confirmed_by_name: 'You' }
         : r
       ))
-      setToast({ message: `Receipt ${result.receipt_number} confirmed`, type: 'success' })
-      setTimeout(() => setToast({ message: '' }), 3000)
-      // Background reload for full data sync (view is now fast with JOINs)
+      const msg = result.subscription_activated
+        ? `Receipt ${result.receipt_number} confirmed — subscription activated!`
+        : `Receipt ${result.receipt_number} confirmed`
+      setToast({ message: msg, type: 'success' })
+      setTimeout(() => setToast({ message: '' }), 4000)
       loadReceipts()
     } catch (e) {
       setToast({ message: e.message, type: 'error' })
