@@ -261,6 +261,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             invoice_id: payingInvoiceId,
+            receipt_id: result.receipt_id,
             receipt_number: result.receipt_number,
             amount_paid: result.amount_paid,
             payment_method: payMethod,

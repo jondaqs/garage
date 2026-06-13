@@ -135,7 +135,7 @@ export async function POST(request) {
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json().catch(() => ({}))
-    const { invoice_id, receipt_number, amount_paid, payment_method, transaction_ref } = body
+    const { invoice_id, receipt_id, receipt_number, amount_paid, payment_method, transaction_ref } = body
     if (!invoice_id) return NextResponse.json({ error: 'invoice_id required' }, { status: 400 })
 
     // Load invoice + subscription
@@ -261,7 +261,7 @@ export async function POST(request) {
         const adminUserIds = [...new Set(adminUsers.map(a => a.user_id))]
           .filter(id => id !== recipientUserId)
 
-        const adminCtaUrl = `${APP_URL()}/admin/subscriptions`
+        const adminCtaUrl = `${APP_URL()}/admin/subscriptions?tab=receipts${receipt_id ? '&receipt=' + receipt_id : ''}`
         const adminResults = { notified: 0, emailed: 0, smsed: 0 }
 
         for (const adminId of adminUserIds) {

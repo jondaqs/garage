@@ -1,7 +1,8 @@
 // src/app/admin/subscriptions/page.js
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
@@ -1664,7 +1665,7 @@ function InvoicesTab({ supabase }) {
 //  ADMIN RECEIPTS TAB (with confirmation workflow)
 // ════════════════════════════════════════════════════════════════
 
-function ReceiptsTab({ supabase }) {
+function ReceiptsTab({ supabase, deepLinkedReceipt }) {
   const [receipts, setReceipts] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmFilter, setConfirmFilter] = useState('all')
@@ -1673,9 +1674,26 @@ function ReceiptsTab({ supabase }) {
   const [total, setTotal] = useState(0)
   const [toast, setToast] = useState({ message: '', type: 'success' })
   const [confirming, setConfirming] = useState(null)
-  const [expandedId, setExpandedId] = useState(null)
+  const [expandedId, setExpandedId] = useState(deepLinkedReceipt)
   const [downloadingId, setDownloadingId] = useState(null)
+  const deepScrolled = useRef(false)
   const pageSize = 15
+
+  // Auto-scroll to deep-linked receipt
+  useEffect(() => {
+    if (deepLinkedReceipt && !loading && !deepScrolled.current) {
+      deepScrolled.current = true
+      setTimeout(() => {
+        const el = document.getElementById(`receipt-${deepLinkedReceipt}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.style.transition = 'box-shadow 0.3s ease'
+          el.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.4)'
+          setTimeout(() => { el.style.boxShadow = '' }, 2000)
+        }
+      }, 300)
+    }
+  }, [deepLinkedReceipt, loading])
 
   useEffect(() => { loadReceipts() }, [confirmFilter, page])
 
@@ -1783,7 +1801,7 @@ function ReceiptsTab({ supabase }) {
             ) : filtered.map(r => {
               const isExpanded = expandedId === r.id
               return (
-                <div key={r.id} className={`bg-white rounded-xl border overflow-hidden shadow-sm ${!r.confirmed ? 'border-amber-200' : 'border-gray-200'}`}>
+                <div key={r.id} id={`receipt-${r.id}`} className={`bg-white rounded-xl border overflow-hidden shadow-sm ${!r.confirmed ? 'border-amber-200' : 'border-gray-200'}`}>
                   <button onClick={() => setExpandedId(isExpanded ? null : r.id)}
                     className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
                     <div className="flex items-center gap-3">
@@ -1851,9 +1869,21 @@ function ReceiptsTab({ supabase }) {
 // ════════════════════════════════════════════════════════════════
 //  MAIN PAGE
 // ════════════════════════════════════════════════════════════════
-export default function AdminSubscriptionsPage() {
+
+export default function AdminSubscriptionsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-600" size={28} /></div>}>
+      <AdminSubscriptionsPage />
+    </Suspense>
+  )
+}
+
+function AdminSubscriptionsPage() {
     const supabase = createClient()
-    const [tab, setTab] = useState('overview')
+    const searchParams = useSearchParams()
+    const initialTab = searchParams?.get('tab') || 'overview'
+    const deepLinkedReceipt = searchParams?.get('receipt') || null
+    const [tab, setTab] = useState(initialTab)
 
     return (
         <div>
@@ -1885,7 +1915,7 @@ export default function AdminSubscriptionsPage() {
             {tab === 'trials' && <TrialConfigTab supabase={supabase} />}
             {tab === 'shops' && <ShopTiersTab supabase={supabase} />}
             {tab === 'invoices' && <InvoicesTab supabase={supabase} />}
-            {tab === 'receipts' && <ReceiptsTab supabase={supabase} />}
+            {tab === 'receipts' && <ReceiptsTab supabase={supabase} deepLinkedReceipt={deepLinkedReceipt} />}
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
         </div>
     )
