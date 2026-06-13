@@ -13,7 +13,7 @@
  *   subscriberName  — display name for context
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
@@ -50,7 +50,6 @@ const fmt = (n, sym = '$') => `${sym}${Number(n || 0).toLocaleString('en-KE', { 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
 // Error boundary to catch rendering crashes
-import React from 'react'
 class SubscriptionErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null, info: null } }
   static getDerivedStateFromError(error) { return { error } }
