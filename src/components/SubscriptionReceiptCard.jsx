@@ -1,6 +1,6 @@
 // src/components/SubscriptionReceiptCard.jsx
 'use client'
-console.log('[LOAD] SubscriptionReceiptCard')
+
 /**
  * SubscriptionReceiptCard
  *

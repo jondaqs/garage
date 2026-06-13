@@ -13,7 +13,7 @@
  *   - /api/subscription/send-invoice (email attachment)
  *   - SubscriptionManager (client-side download)
  */
-console.log('[LOAD] buildSubscriptionInvoiceHtml')
+
 const BRAND = 'GariCare'
 
 /**

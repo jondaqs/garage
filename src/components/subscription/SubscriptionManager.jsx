@@ -1,6 +1,6 @@
 // src/components/subscription/SubscriptionManager.jsx
 'use client'
-console.log('[LOAD] SubscriptionManager')
+
 /**
  * SubscriptionManager
  *
@@ -90,30 +90,7 @@ function SubscriptionManagerInner({ subscriberType, subscriberId, subscriberName
   const deepLinkedInvoice = searchParams?.get('invoice') || null
   const deepLinkScrolled = useRef(false)
 
-  // Debug: log component mount
-  useEffect(() => {
-    console.log('[SubscriptionManager] mounted', { subscriberType, subscriberId, initialView, deepLinkedInvoice })
-  }, [])
-
-  // Auto-scroll to deep-linked invoice after data loads
-  useEffect(() => {
-    if (deepLinkedInvoice && !loading && !deepLinkScrolled.current) {
-      deepLinkScrolled.current = true
-      // Small delay to ensure DOM has rendered the expanded card
-      setTimeout(() => {
-        const el = document.getElementById(`invoice-${deepLinkedInvoice}`)
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          // Brief highlight flash
-          el.style.transition = 'box-shadow 0.3s ease'
-          el.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.4)'
-          setTimeout(() => { el.style.boxShadow = '' }, 2000)
-        }
-      }, 300)
-    }
-  }, [deepLinkedInvoice, loading])
-
-  // State
+  // State (must be declared BEFORE any useEffect that references them)
   const [view, setView] = useState(initialView)
   const [subscriptions, setSubscriptions] = useState([])
   const [packages, setPackages] = useState([])
@@ -139,6 +116,27 @@ function SubscriptionManagerInner({ subscriberType, subscriberId, subscriberName
 
   // Subscriber profile (for invoice/receipt "Bill To")
   const [subscriberProfile, setSubscriberProfile] = useState(null)
+
+  // Debug: log component mount
+  useEffect(() => {
+    console.log('[SubscriptionManager] mounted', { subscriberType, subscriberId, initialView, deepLinkedInvoice })
+  }, [])
+
+  // Auto-scroll to deep-linked invoice after data loads
+  useEffect(() => {
+    if (deepLinkedInvoice && !loading && !deepLinkScrolled.current) {
+      deepLinkScrolled.current = true
+      setTimeout(() => {
+        const el = document.getElementById(`invoice-${deepLinkedInvoice}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.style.transition = 'box-shadow 0.3s ease'
+          el.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.4)'
+          setTimeout(() => { el.style.boxShadow = '' }, 2000)
+        }
+      }, 300)
+    }
+  }, [deepLinkedInvoice, loading])
 
   // ── Load data ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
