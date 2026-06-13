@@ -13,6 +13,7 @@ import {
 import Pagination from '@/components/admin/Pagination'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
+import { downloadHtmlAsPdf } from '@/lib/subscription/downloadHtmlAsPdf'
 
 const TABS = [
     { id: 'overview', label: 'Overview', icon: CreditCard },
@@ -1456,6 +1457,7 @@ function InvoicesTab({ supabase }) {
   const [payRef, setPayRef] = useState('')
   const [payNotes, setPayNotes] = useState('')
   const [paying, setPaying] = useState(false)
+  const [downloadingId, setDownloadingId] = useState(null)
 
   useEffect(() => { loadInvoices() }, [statusFilter, page])
 
@@ -1495,21 +1497,31 @@ function InvoicesTab({ supabase }) {
     finally { setPaying(false) }
   }
 
-  const downloadInvoice = (inv) => {
-    const html = buildSubscriptionInvoiceHtml({
-      invoiceRef: inv.invoice_ref_no, subscriptionNumber: inv.subscription_number,
-      packageName: inv.package_name || 'Subscription',
-      subscriberName: inv.subscriber_name || null,
-      subscriberEmail: inv.subscriber_email || null,
-      subscriberPhone: inv.subscriber_phone || null,
-      billingStart: inv.billing_period_start, billingEnd: inv.billing_period_end,
-      issuedAt: inv.created_at, dueDate: inv.due_date,
-      amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
-      totalAmount: inv.total_amount, grossAmount: inv.gross_amount || inv.total_amount,
-      upgradeCredit: Number(inv.upgrade_credit || 0), upgradeNotes: inv.upgrade_notes || null,
-      currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid', ctaUrl: '#',
-    })
-    const w = window.open('', '_blank'); w.document.write(html); w.document.close()
+  const buildInvArgs = (inv) => ({
+    invoiceRef: inv.invoice_ref_no, subscriptionNumber: inv.subscription_number,
+    packageName: inv.package_name || 'Subscription',
+    subscriberName: inv.subscriber_name || null,
+    subscriberEmail: inv.subscriber_email || null,
+    subscriberPhone: inv.subscriber_phone || null,
+    billingStart: inv.billing_period_start, billingEnd: inv.billing_period_end,
+    issuedAt: inv.created_at, dueDate: inv.due_date,
+    amountDue: inv.amount_due || inv.total_amount, taxAmount: inv.tax_amount || 0,
+    totalAmount: inv.total_amount, grossAmount: inv.gross_amount || inv.total_amount,
+    upgradeCredit: Number(inv.upgrade_credit || 0), upgradeNotes: inv.upgrade_notes || null,
+    currencySymbol: inv.currency_symbol || '', status: inv.effective_status || 'unpaid', ctaUrl: '#',
+  })
+
+  const viewInvoice = (inv) => {
+    const w = window.open('', '_blank')
+    w.document.write(buildSubscriptionInvoiceHtml({ ...buildInvArgs(inv), forPdf: false }))
+    w.document.close()
+  }
+
+  const downloadInvoice = async (inv) => {
+    setDownloadingId(inv.id)
+    try { await downloadHtmlAsPdf(buildSubscriptionInvoiceHtml({ ...buildInvArgs(inv), forPdf: true }), `Invoice-${inv.invoice_ref_no}`) }
+    catch (e) { console.error('PDF error:', e) }
+    finally { setDownloadingId(null) }
   }
 
   const filtered = invoices.filter(i => {
@@ -1586,9 +1598,14 @@ function InvoicesTab({ supabase }) {
                       )}
 
                       <div className="flex items-center gap-2">
-                        <button onClick={() => downloadInvoice(inv)}
-                          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                          <Download size={14} /> Download Invoice
+                        <button onClick={() => viewInvoice(inv)}
+                          className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                          <FileText size={14} /> View
+                        </button>
+                        <button onClick={() => downloadInvoice(inv)} disabled={downloadingId === inv.id}
+                          className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                          {downloadingId === inv.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={14} />}
+                          {downloadingId === inv.id ? 'PDF…' : 'PDF'}
                         </button>
                         {!isPaid && (
                           <button onClick={() => { setPayingId(payingId === inv.id ? null : inv.id); setPayAmount(inv.balance_due?.toString()) }}
@@ -1650,6 +1667,7 @@ function ReceiptsTab({ supabase }) {
   const [toast, setToast] = useState({ message: '', type: 'success' })
   const [confirming, setConfirming] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+  const [downloadingId, setDownloadingId] = useState(null)
   const pageSize = 15
 
   useEffect(() => { loadReceipts() }, [confirmFilter, page])
@@ -1672,17 +1690,27 @@ function ReceiptsTab({ supabase }) {
     finally { setLoading(false) }
   }
 
-  const downloadReceipt = (r) => {
-    const html = buildSubscriptionReceiptHtml({
-      receiptNumber: r.receipt_number, invoiceRef: r.invoice_ref_no || '—',
-      subscriptionNumber: r.subscription_number, packageName: r.package_name || 'Subscription',
-      subscriberName: r.subscriber_name || r.paid_by_name || null,
-      amountPaid: r.amount_paid, amountDue: r.amount_paid, taxAmount: 0, totalInvoice: r.amount_paid,
-      paymentMethod: r.payment_method, transactionRef: r.payment_ref_id || r.transaction_ref,
-      paidAt: r.issued_at, confirmed: r.confirmed, confirmedAt: r.confirmed_at,
-      currencySymbol: r.currency_symbol || '', notes: r.notes,
-    })
-    const w = window.open('', '_blank'); w.document.write(html); w.document.close()
+  const buildRcptArgs = (r) => ({
+    receiptNumber: r.receipt_number, invoiceRef: r.invoice_ref_no || '—',
+    subscriptionNumber: r.subscription_number, packageName: r.package_name || 'Subscription',
+    subscriberName: r.subscriber_name || r.paid_by_name || null,
+    amountPaid: r.amount_paid, amountDue: r.amount_paid, taxAmount: 0, totalInvoice: r.amount_paid,
+    paymentMethod: r.payment_method, transactionRef: r.payment_ref_id || r.transaction_ref,
+    paidAt: r.issued_at, confirmed: r.confirmed, confirmedAt: r.confirmed_at,
+    currencySymbol: r.currency_symbol || '', notes: r.notes,
+  })
+
+  const viewReceipt = (r) => {
+    const w = window.open('', '_blank')
+    w.document.write(buildSubscriptionReceiptHtml(buildRcptArgs(r)))
+    w.document.close()
+  }
+
+  const downloadReceipt = async (r) => {
+    setDownloadingId(r.id)
+    try { await downloadHtmlAsPdf(buildSubscriptionReceiptHtml(buildRcptArgs(r)), `Receipt-${r.receipt_number}`) }
+    catch (e) { console.error('PDF error:', e) }
+    finally { setDownloadingId(null) }
   }
 
   const handleConfirm = async (receiptId) => {
@@ -1782,9 +1810,14 @@ function ReceiptsTab({ supabase }) {
                       </div>
                       {r.notes && <div className="bg-gray-50 rounded-lg p-2.5 text-xs text-gray-600">{r.notes}</div>}
                       <div className="flex items-center gap-2">
-                        <button onClick={() => downloadReceipt(r)}
-                          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                          <Download size={14} /> Download Receipt
+                        <button onClick={() => viewReceipt(r)}
+                          className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                          <Receipt size={14} /> View
+                        </button>
+                        <button onClick={() => downloadReceipt(r)} disabled={downloadingId === r.id}
+                          className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                          {downloadingId === r.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={14} />}
+                          {downloadingId === r.id ? 'PDF…' : 'PDF'}
                         </button>
                         {!r.confirmed && (
                           <button onClick={() => handleConfirm(r.id)} disabled={confirming === r.id}
@@ -1848,4 +1881,4 @@ export default function AdminSubscriptionsPage() {
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
         </div>
     )
-}
+} 
