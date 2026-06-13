@@ -25,6 +25,7 @@ import {
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
 import { downloadHtmlAsPdf } from '@/lib/subscription/downloadHtmlAsPdf'
+import SubscriptionTermsModal from '@/components/subscription/SubscriptionTermsModal'
 
 const PAYMENT_METHODS = [
   { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
@@ -92,6 +93,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // Subscriber profile (for invoice/receipt "Bill To")
   const [subscriberProfile, setSubscriberProfile] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
+
+  // Terms & Conditions modal
+  const [termsModal, setTermsModal] = useState(null) // { packageId, packageName, packageCost, isUpgrade, upgradeCredit, currentPlan }
 
   // Auto-scroll to deep-linked invoice after data loads
   useEffect(() => {
@@ -177,20 +181,43 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
   // ── Subscribe to a package ─────────────────────────────────
   const handleSubscribe = async (packageId) => {
-    // Check for active subscription and warn about upgrade
-    const activePaid = subscriptions.find(s => s.is_currently_active && Number(s.package_cost) > 0)
     const pkg = packages.find(p => p.id === packageId)
-    let confirmMsg = `Subscribe to ${pkg?.name || 'this package'}?`
-    if (activePaid) {
-      const remaining = activePaid.days_until_expiry || 0
-      confirmMsg = `You have an active subscription (${activePaid.package_name}) with ${remaining} days remaining.\n\n` +
-        `Upgrading to ${pkg?.name || 'this package'} will:\n` +
-        `• Cancel your current plan\n` +
-        `• Apply a pro-rata credit for the ${remaining} unused days\n` +
-        `• Deduct that credit from the new invoice\n\n` +
-        `Continue with upgrade?`
+    if (!pkg) return
+
+    // Check for duplicate: already subscribed to the same package and still active
+    const duplicate = subscriptions.find(s =>
+      s.is_currently_active && s.package_id === packageId && !s.is_expired
+    )
+    if (duplicate) {
+      setError(`You already have an active subscription to ${pkg.name}. It expires on ${fmtD(duplicate.expiry_date)}.`)
+      setTimeout(() => setError(''), 5000)
+      return
     }
-    if (!confirm(confirmMsg)) return
+
+    // Check for active paid subscription (upgrade scenario)
+    const activePaid = subscriptions.find(s => s.is_currently_active && Number(s.package_cost) > 0)
+    let upgradeCredit = ''
+    if (activePaid) {
+      const totalDays = Math.max(Math.round((new Date(activePaid.expiry_date) - new Date(activePaid.start_date)) / 86400000), 1)
+      const remaining = Math.max(Math.round((new Date(activePaid.expiry_date) - new Date()) / 86400000), 0)
+      const credit = Math.min(((activePaid.package_cost / totalDays) * remaining).toFixed(2), pkg.cost)
+      upgradeCredit = fmt(credit)
+    }
+
+    // Show T&C modal instead of browser confirm
+    setTermsModal({
+      packageId,
+      packageName: pkg.name,
+      packageCost: `${pkg.currency_symbol}${Number(pkg.cost).toLocaleString()}`,
+      isUpgrade: !!activePaid,
+      upgradeCredit,
+      currentPlan: activePaid?.package_name || '',
+    })
+  }
+
+  const executeSubscribe = async () => {
+    if (!termsModal) return
+    const { packageId } = termsModal
     setSubscribing(true); setError(''); setSuccess('')
     try {
       const { data, error: rpcErr } = await supabase.rpc('create_subscription', {
@@ -203,7 +230,6 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       const result = typeof data === 'string' ? JSON.parse(data) : data
       if (result?.success === false) throw new Error(result.error)
 
-      // Build success message with credit info
       const subId = result?.subscription_id || data
       let msg = ''
       if (result?.upgrade_credit > 0 && result?.net_amount > 0) {
@@ -218,8 +244,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       }
       setSuccess(msg)
       setView('invoices')
+      setTermsModal(null)
       await loadAll()
-      // Send invoice notification (email + SMS) — non-blocking
       if (subId) {
         try {
           await fetch('/api/subscription/send-invoice', {
@@ -915,6 +941,19 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           )}
         </div>
       )}
+
+      {/* Terms & Conditions Modal */}
+      <SubscriptionTermsModal
+        isOpen={!!termsModal}
+        onClose={() => setTermsModal(null)}
+        onAccept={executeSubscribe}
+        packageName={termsModal?.packageName}
+        packageCost={termsModal?.packageCost}
+        isUpgrade={termsModal?.isUpgrade}
+        upgradeCredit={termsModal?.upgradeCredit}
+        currentPlan={termsModal?.currentPlan}
+        loading={subscribing}
+      />
     </div>
   )
 }
