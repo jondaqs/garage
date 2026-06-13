@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
@@ -50,9 +51,14 @@ const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ri
 
 export default function SubscriptionManager({ subscriberType, subscriberId, subscriberName }) {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+
+  // Deep-link: ?view=invoices&invoice=UUID or ?view=receipts&receipt=UUID
+  const initialView = searchParams?.get('view') || 'overview'
+  const deepLinkedInvoice = searchParams?.get('invoice') || null
 
   // State
-  const [view, setView] = useState('overview')  // overview | packages | invoice
+  const [view, setView] = useState(initialView)
   const [subscriptions, setSubscriptions] = useState([])
   const [packages, setPackages] = useState([])
   const [invoices, setInvoices] = useState([])
@@ -63,7 +69,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [selectedPeriod, setSelectedPeriod] = useState('monthly')
-  const [expandedInvoice, setExpandedInvoice] = useState(null)
+  const [expandedInvoice, setExpandedInvoice] = useState(deepLinkedInvoice)
 
   // Payment form
   const [payingInvoiceId, setPayingInvoiceId] = useState(null)
@@ -620,7 +626,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   upgradeNotes: inv.upgrade_notes || null,
                   currencySymbol: inv.currency_symbol || '',
                   status: inv.effective_status || 'unpaid',
-                  ctaUrl: window.location.href,
+                  ctaUrl: `${window.location.origin}/dashboard/subscription?view=invoices&invoice=${inv.id}`,
                 })
                 const w = window.open('', '_blank')
                 w.document.write(html)

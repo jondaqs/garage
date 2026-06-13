@@ -15,6 +15,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
+import { buildSubscriptionInvoiceHtml }        from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 
 const BRAND   = 'GariCare'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
@@ -157,7 +158,7 @@ export async function POST(request) {
 
     const subscriberName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'there'
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-    const ctaUrl = `${APP_URL()}/dashboard/subscription`
+    const ctaUrl = `${APP_URL()}/dashboard/subscription?view=invoices&invoice=${inv.id}`
 
     const results = { notification: false, email_sent: false, sms_sent: false }
 
