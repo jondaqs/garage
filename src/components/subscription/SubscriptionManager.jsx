@@ -616,16 +616,16 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           </div>
 
           {/* ── Shop selector for service providers ── */}
-          {subscriberType === 'service_provider' && providerShops.length > 0 && (
+          {subscriberType === 'service_provider' && (
             <div className="bg-white rounded-2xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Building2 size={16} className="text-blue-600" />
-                <p className="text-sm font-semibold text-gray-900">Your Shops</p>
+                <p className="text-sm font-semibold text-gray-900">Shop Capacity</p>
                 <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">1st shop free</span>
               </div>
               <p className="text-xs text-gray-500 mb-3">
                 Your first shop is included free with any plan. Additional shops are charged per-shop monthly.
-                Select how many shops to include in your subscription.
+                Select how many shops your subscription should cover — you can add shops up to this limit later.
               </p>
 
               {/* Shop count stepper */}
@@ -644,35 +644,41 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                     {selectedShopCount}
                   </span>
                   <button onClick={() => {
-                    const n = Math.min(providerShops.length, selectedShopCount + 1)
+                    const n = selectedShopCount + 1
                     setSelectedShopCount(n)
                     supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
                       if (data?.[0]) setShopAddon(data[0])
                       else if (data) setShopAddon(data)
                     })
-                  }} disabled={selectedShopCount >= providerShops.length}
-                    className="px-3 py-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors text-sm font-bold">+</button>
+                  }}
+                    className="px-3 py-2 text-gray-500 hover:bg-gray-100 transition-colors text-sm font-bold">+</button>
                 </div>
-                <p className="text-xs text-gray-500">
-                  of {providerShops.length} active shop{providerShops.length > 1 ? 's' : ''}
-                </p>
+                <div className="text-xs text-gray-500">
+                  <span>shop{selectedShopCount > 1 ? 's' : ''} in your plan</span>
+                  {providerShops.length > 0 && (
+                    <span className="text-gray-400"> · {providerShops.length} currently active</span>
+                  )}
+                </div>
               </div>
 
-              {/* Shop list */}
-              <div className="flex flex-wrap gap-2 mb-3">
-                {providerShops.map((shop, i) => (
-                  <span key={shop.id}
-                    className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${
-                      i < selectedShopCount
-                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
-                        : 'bg-gray-50 border-gray-200 text-gray-400'
-                    }`}>
-                    <Building2 size={11} />
-                    {shop.name}
-                    {i === 0 && <span className="text-[9px] font-bold text-green-600">(free)</span>}
-                  </span>
-                ))}
-              </div>
+              {/* Current shops */}
+              {providerShops.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {providerShops.map((shop, i) => (
+                    <span key={shop.id}
+                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border bg-blue-50 border-blue-200 text-blue-700 font-medium">
+                      <Building2 size={11} />
+                      {shop.name}
+                      {i === 0 && <span className="text-[9px] font-bold text-green-600">(free)</span>}
+                    </span>
+                  ))}
+                  {selectedShopCount > providerShops.length && (
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-dashed border-gray-300 text-gray-400">
+                      +{selectedShopCount - providerShops.length} future shop{selectedShopCount - providerShops.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Addon pricing summary */}
               {shopAddon && selectedShopCount > 1 && (
