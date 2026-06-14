@@ -609,6 +609,17 @@ function PricingTiersTab({ supabase }) {
         }
     }
 
+    const toggleTierActive = async (tier) => {
+        try {
+            const { error } = await supabase.from('subscription_pricing_tiers')
+                .update({ is_active: !tier.is_active }).eq('id', tier.id)
+            if (error) throw error
+            setToast({ message: `Tier "${tier.tier_name}" ${tier.is_active ? 'deactivated — will be skipped during package generation' : 'activated'}`, type: 'success' })
+            setTimeout(() => setToast({ message: '' }), 3000)
+            await loadAll()
+        } catch (e) { setToast({ message: e.message, type: 'error' }) }
+    }
+
     const createTier = async () => {
         if (!newTier.subscription_type_id || !newTier.tier_name || newTier.base_monthly_price === '') {
             setToast({ message: 'Subscription type, tier name, and base price are required', type: 'error' }); return
@@ -898,7 +909,7 @@ function PricingTiersTab({ supabase }) {
                                                 {t.is_upper_limit ? <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">FIXED</span> : '—'}
                                             </td>
                                             <td className="py-2 px-2 text-right" onClick={e => e.stopPropagation()}>
-                                                {isEditing && (
+                                                {isEditing ? (
                                                     <div className="flex items-center justify-end gap-1">
                                                         <button onClick={saveEdit} disabled={saving === editId}
                                                             className="p-1.5 text-green-700 hover:bg-green-50 rounded disabled:opacity-50">
@@ -908,6 +919,11 @@ function PricingTiersTab({ supabase }) {
                                                             <X size={13} />
                                                         </button>
                                                     </div>
+                                                ) : (
+                                                    <button onClick={() => toggleTierActive(t)} title={t.is_active ? 'Deactivate tier' : 'Activate tier'}
+                                                        className={`p-1.5 rounded transition-colors ${t.is_active ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}>
+                                                        {t.is_active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                                                    </button>
                                                 )}
                                             </td>
                                         </tr>
