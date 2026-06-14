@@ -217,10 +217,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     const pkg = packages.find(p => p.id === packageId)
     if (!pkg) return
 
-    // Check for duplicate: same package AND same shop count
+    // Check for duplicate: same package AND same shop count (0/null treated as 1 = default free shop)
     const duplicate = subscriptions.find(s =>
       s.is_currently_active && s.package_id === packageId && !s.is_expired
-      && (subscriberType !== 'service_provider' || Number(s.shop_count || 0) === selectedShopCount)
+      && (subscriberType !== 'service_provider' || Math.max(Number(s.shop_count || 0), 1) === selectedShopCount)
     )
     if (duplicate) {
       setError(`You already have an active subscription to ${pkg.name}${subscriberType === 'service_provider' ? ` with ${selectedShopCount} shop(s)` : ''}. It expires on ${fmtD(duplicate.expiry_date)}.`)
