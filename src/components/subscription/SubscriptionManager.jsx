@@ -93,6 +93,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // Subscriber profile (for invoice/receipt "Bill To")
   const [subscriberProfile, setSubscriberProfile] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
+  const [freeTier, setFreeTier] = useState(null) // Free tier data from DB
 
   // Terms & Conditions modal
   const [termsModal, setTermsModal] = useState(null) // { packageId, packageName, packageCost, isUpgrade, upgradeCredit, currentPlan }
@@ -148,7 +149,6 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setInvoices(invs || [])
       if (trial?.[0]) setTrialInfo(trial[0])
 
-      // Store subscriber profile for invoice/receipt "Bill To"
       if (profile) {
         const p = profile
         setSubscriberProfile({
@@ -156,6 +156,18 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           email: p.email || null,
           phone: p.phone || null,
         })
+      }
+
+      // Fetch free tier data for the standalone free card
+      if (subscriberType === 'individual') {
+        const { data: freeData } = await supabase
+          .from('subscription_pricing_overview')
+          .select('tier_name, description, features, max_vehicles_included, free_vehicle_count')
+          .eq('subscription_type', 'individual')
+          .eq('base_monthly_price', 0)
+          .eq('is_active', true)
+          .maybeSingle()
+        setFreeTier(freeData)
       }
 
       // Step 2: Fetch receipts using subscription IDs (avoids .in([]) error)
@@ -529,18 +541,18 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       {view === 'packages' && (
         <div className="space-y-4">
 
-          {/* ── Free tier card for individual (always visible, no period needed) ── */}
+          {/* ── Free tier card for individual (from DB, not hardcoded) ── */}
           {subscriberType === 'individual' && (
             <div className="rounded-2xl border border-green-200 bg-green-50/40 p-5">
               <div className="flex items-start justify-between flex-wrap gap-4">
                 <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg font-bold text-gray-900">Free</span>
+                    <span className="text-lg font-bold text-gray-900">{freeTier?.tier_name || 'Free'}</span>
                     <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">FOREVER FREE</span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3">Basic vehicle tracking for your first car — no payment needed.</p>
+                  <p className="text-xs text-gray-500 mb-3">{freeTier?.description || 'Basic vehicle tracking for your first car — no payment needed.'}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {['1 vehicle included', 'View service history', 'Basic notifications', 'Find nearby garages'].map((f, i) => (
+                    {((() => { try { return typeof freeTier?.features === 'string' ? JSON.parse(freeTier.features) : (freeTier?.features || ['1 vehicle included', 'View service history', 'Basic notifications', 'Find nearby garages']) } catch { return ['1 vehicle included', 'View service history', 'Basic notifications', 'Find nearby garages'] } })()).map((f, i) => (
                       <span key={i} className="inline-flex items-center gap-1 text-[11px] text-green-700 bg-green-100/60 px-2 py-0.5 rounded-full">
                         <Check size={10} /> {f}
                       </span>
@@ -549,7 +561,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                 </div>
                 <div className="text-right">
                   <p className="text-3xl font-black text-green-600">Free</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">1 vehicle · no expiry</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{freeTier?.max_vehicles_included || freeTier?.free_vehicle_count || 1} vehicle{(freeTier?.max_vehicles_included || 1) > 1 ? 's' : ''} · no expiry</p>
                 </div>
               </div>
             </div>
