@@ -540,6 +540,16 @@ function PricingTiersTab({ supabase }) {
     const [editData, setEditData] = useState({})
     const [saving, setSaving] = useState(null)
     const [toast, setToast] = useState({ message: '', type: 'success' })
+    const [showCreate, setShowCreate] = useState(false)
+    const [creating, setCreating] = useState(false)
+    const [newTier, setNewTier] = useState({
+        subscription_type_id: '', tier_code: '', tier_name: '', description: '',
+        base_monthly_price: '', min_vehicles: 0, max_vehicles: '',
+        min_staff: 0, max_staff: '', min_monthly_clients: 0, max_monthly_clients: '',
+        per_extra_vehicle_price: 0, per_extra_staff_price: 0, per_extra_client_price: 0,
+        currency_id: '', features_text: '', max_users_included: 1, max_vehicles_included: 1,
+        max_shops_included: 0, sort_order: 10, is_active: true, is_upper_limit: false,
+    })
 
     useEffect(() => { loadAll() }, [])
 
@@ -599,6 +609,61 @@ function PricingTiersTab({ supabase }) {
         }
     }
 
+    const createTier = async () => {
+        if (!newTier.subscription_type_id || !newTier.tier_name || newTier.base_monthly_price === '') {
+            setToast({ message: 'Subscription type, tier name, and base price are required', type: 'error' }); return
+        }
+        setCreating(true)
+        try {
+            // Auto-generate tier_code from type code + tier name
+            const typeCode = types.find(t => t.id === newTier.subscription_type_id)?.code || 'sub'
+            const tierCode = newTier.tier_code ||
+                (typeCode + '_' + newTier.tier_name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, ''))
+
+            // Parse features from text (one per line)
+            const features = newTier.features_text
+                ? newTier.features_text.split('\n').map(f => f.trim()).filter(Boolean)
+                : []
+
+            const row = {
+                subscription_type_id: newTier.subscription_type_id,
+                tier_code: tierCode,
+                tier_name: newTier.tier_name,
+                description: newTier.description || null,
+                base_monthly_price: Number(newTier.base_monthly_price),
+                min_vehicles: Number(newTier.min_vehicles) || 0,
+                max_vehicles: newTier.max_vehicles === '' ? null : Number(newTier.max_vehicles),
+                min_staff: Number(newTier.min_staff) || 0,
+                max_staff: newTier.max_staff === '' ? null : Number(newTier.max_staff),
+                min_monthly_clients: Number(newTier.min_monthly_clients) || 0,
+                max_monthly_clients: newTier.max_monthly_clients === '' ? null : Number(newTier.max_monthly_clients),
+                per_extra_vehicle_price: Number(newTier.per_extra_vehicle_price) || 0,
+                per_extra_staff_price: Number(newTier.per_extra_staff_price) || 0,
+                per_extra_client_price: Number(newTier.per_extra_client_price) || 0,
+                currency_id: newTier.currency_id || currencies[0]?.id,
+                features: JSON.stringify(features),
+                max_users_included: Number(newTier.max_users_included) || 1,
+                max_vehicles_included: Number(newTier.max_vehicles_included) || 1,
+                max_shops_included: Number(newTier.max_shops_included) || 0,
+                sort_order: Number(newTier.sort_order) || 10,
+                is_active: newTier.is_active,
+                is_upper_limit: newTier.is_upper_limit,
+            }
+
+            const { error } = await supabase.from('subscription_pricing_tiers').insert(row)
+            if (error) throw error
+            setShowCreate(false)
+            setNewTier(prev => ({ ...prev, tier_name: '', tier_code: '', description: '', base_monthly_price: '', features_text: '' }))
+            setToast({ message: `Tier "${row.tier_name}" created! Generate packages to make it available.`, type: 'success' })
+            setTimeout(() => setToast({ message: '' }), 4000)
+            await loadAll()
+        } catch (e) {
+            setToast({ message: e.message, type: 'error' })
+        } finally {
+            setCreating(false)
+        }
+    }
+
     const ed = (key, type = 'text') => editId ? (
         <input type={type} value={editData[key] ?? ''} onChange={e => setEditData(d => ({ ...d, [key]: e.target.value }))}
             className={inp + ' py-1 text-xs w-20'} />
@@ -619,6 +684,124 @@ function PricingTiersTab({ supabase }) {
 
             {Object.entries(grouped).map(([typeName, tierList]) => (
                 <Section key={typeName} title={`${typeName} tiers`} description="Click a row to edit pricing and ranges">
+
+            {/* Add Tier button */}
+            <div className="flex justify-between items-center mb-3">
+                <div />
+                <button onClick={() => { setShowCreate(!showCreate); setEditId(null) }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        showCreate ? 'bg-gray-200 text-gray-700' : 'bg-gray-900 text-white hover:bg-gray-800'}`}>
+                    {showCreate ? <X size={12} /> : <Plus size={12} />}
+                    {showCreate ? 'Cancel' : 'Add Tier'}
+                </button>
+            </div>
+
+            {/* Create Tier Form */}
+            {showCreate && (
+                <div className="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm mb-4">
+                    <div className="bg-gray-900 px-4 py-2.5 flex items-center gap-2">
+                        <Plus size={13} className="text-blue-400" />
+                        <span className="text-white font-semibold text-xs">New Pricing Tier</span>
+                    </div>
+                    <div className="p-4 space-y-3">
+                        <div className="grid grid-cols-3 gap-2">
+                            <div>
+                                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Type *</label>
+                                <select value={newTier.subscription_type_id} onChange={e => setNewTier(d => ({ ...d, subscription_type_id: e.target.value }))} className={inp + ' text-xs'}>
+                                    <option value="">Select…</option>
+                                    {types.map(t => <option key={t.id} value={t.id}>{t.display_name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Tier Name *</label>
+                                <input type="text" placeholder="e.g. Premium" value={newTier.tier_name}
+                                    onChange={e => setNewTier(d => ({ ...d, tier_name: e.target.value }))} className={inp + ' text-xs'} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Code (auto)</label>
+                                <input type="text" placeholder="Auto" value={newTier.tier_code}
+                                    onChange={e => setNewTier(d => ({ ...d, tier_code: e.target.value }))} className={inp + ' text-xs text-gray-400'} />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Description</label>
+                            <input type="text" placeholder="Short description" value={newTier.description}
+                                onChange={e => setNewTier(d => ({ ...d, description: e.target.value }))} className={inp + ' text-xs'} />
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                            <div>
+                                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Base Price/mo *</label>
+                                <input type="number" step="0.01" min="0" placeholder="0.00" value={newTier.base_monthly_price}
+                                    onChange={e => setNewTier(d => ({ ...d, base_monthly_price: e.target.value }))} className={inp + ' text-xs'} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Currency</label>
+                                <select value={newTier.currency_id} onChange={e => setNewTier(d => ({ ...d, currency_id: e.target.value }))} className={inp + ' text-xs'}>
+                                    <option value="">Default</option>
+                                    {currencies.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Sort Order</label>
+                                <input type="number" min="1" value={newTier.sort_order}
+                                    onChange={e => setNewTier(d => ({ ...d, sort_order: e.target.value }))} className={inp + ' text-xs'} />
+                            </div>
+                            <div className="flex items-end gap-3 pb-1">
+                                <label className="flex items-center gap-1 text-[10px] text-gray-600 cursor-pointer">
+                                    <input type="checkbox" checked={newTier.is_active} onChange={e => setNewTier(d => ({ ...d, is_active: e.target.checked }))}
+                                        className="w-3 h-3 rounded border-gray-300 text-blue-600" /> Active
+                                </label>
+                                <label className="flex items-center gap-1 text-[10px] text-gray-600 cursor-pointer">
+                                    <input type="checkbox" checked={newTier.is_upper_limit} onChange={e => setNewTier(d => ({ ...d, is_upper_limit: e.target.checked }))}
+                                        className="w-3 h-3 rounded border-gray-300 text-blue-600" /> Cap
+                                </label>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-6 gap-2">
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Min Veh.</label>
+                                <input type="number" min="0" value={newTier.min_vehicles} onChange={e => setNewTier(d => ({ ...d, min_vehicles: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Max Veh.</label>
+                                <input type="number" min="0" placeholder="∞" value={newTier.max_vehicles} onChange={e => setNewTier(d => ({ ...d, max_vehicles: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Min Staff</label>
+                                <input type="number" min="0" value={newTier.min_staff} onChange={e => setNewTier(d => ({ ...d, min_staff: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Max Staff</label>
+                                <input type="number" min="0" placeholder="∞" value={newTier.max_staff} onChange={e => setNewTier(d => ({ ...d, max_staff: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Min Clients</label>
+                                <input type="number" min="0" value={newTier.min_monthly_clients} onChange={e => setNewTier(d => ({ ...d, min_monthly_clients: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Max Clients</label>
+                                <input type="number" min="0" placeholder="∞" value={newTier.max_monthly_clients} onChange={e => setNewTier(d => ({ ...d, max_monthly_clients: e.target.value }))} className={inp + ' text-xs'} /></div>
+                        </div>
+                        <div className="grid grid-cols-6 gap-2">
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Per Veh.</label>
+                                <input type="number" step="0.01" min="0" value={newTier.per_extra_vehicle_price} onChange={e => setNewTier(d => ({ ...d, per_extra_vehicle_price: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Per Staff</label>
+                                <input type="number" step="0.01" min="0" value={newTier.per_extra_staff_price} onChange={e => setNewTier(d => ({ ...d, per_extra_staff_price: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Per Client</label>
+                                <input type="number" step="0.01" min="0" value={newTier.per_extra_client_price} onChange={e => setNewTier(d => ({ ...d, per_extra_client_price: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Users Incl.</label>
+                                <input type="number" min="0" value={newTier.max_users_included} onChange={e => setNewTier(d => ({ ...d, max_users_included: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Vehicles Incl.</label>
+                                <input type="number" min="0" value={newTier.max_vehicles_included} onChange={e => setNewTier(d => ({ ...d, max_vehicles_included: e.target.value }))} className={inp + ' text-xs'} /></div>
+                            <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Shops Incl.</label>
+                                <input type="number" min="0" value={newTier.max_shops_included} onChange={e => setNewTier(d => ({ ...d, max_shops_included: e.target.value }))} className={inp + ' text-xs'} /></div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Features (one per line)</label>
+                            <textarea rows={3} placeholder={"Budget tracking & limits\nExpense reports\nFull maintenance history"}
+                                value={newTier.features_text} onChange={e => setNewTier(d => ({ ...d, features_text: e.target.value }))}
+                                className={inp + ' text-xs resize-y'} />
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={createTier} disabled={creating}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50">
+                                {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                {creating ? 'Creating…' : 'Create Tier'}
+                            </button>
+                            <button onClick={() => setShowCreate(false)} className="px-3 py-2 text-gray-500 text-xs">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-xs">
                             <thead>
