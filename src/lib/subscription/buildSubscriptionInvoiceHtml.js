@@ -39,6 +39,8 @@ const BRAND = 'GariCare'
  * @param {number} [args.upgradeCredit]   - credit from previous subscription
  * @param {string} [args.upgradeNotes]    - explanation of the credit
  * @param {boolean} [args.forPdf]         - if true, removes clickable buttons (PDF is raster)
+ * @param {number} [args.shopCount]       - number of shops in subscription
+ * @param {number} [args.shopAddonAmount] - shop addon total for the period
  * @param {string} [args.ctaUrl]
  */
 export function buildSubscriptionInvoiceHtml({
@@ -63,6 +65,8 @@ export function buildSubscriptionInvoiceHtml({
   upgradeCredit = 0,
   upgradeNotes,
   forPdf = false,
+  shopCount = 0,
+  shopAddonAmount = 0,
   ctaUrl = '#',
 }) {
   const fmt  = (n) => `${currencySymbol}${Number(n || 0).toLocaleString('en-KE')}`
@@ -72,7 +76,22 @@ export function buildSubscriptionInvoiceHtml({
 
   const statusColor = status === 'paid' ? '#22c55e' : status === 'overdue' ? '#ef4444' : '#f59e0b'
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
-  const lineItemAmount = fmt(grossAmount || amountDue)
+  const hasShopAddon = shopCount > 1 && shopAddonAmount > 0
+  const baseAmount = hasShopAddon ? (grossAmount || amountDue) - shopAddonAmount : (grossAmount || amountDue)
+  const lineItemAmount = fmt(baseAmount)
+
+  // Shop addon line item
+  const shopLineItemHtml = hasShopAddon ? `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:500;">
+            Shop Addon
+            <span style="display:block;font-size:11px;color:#64748b;margin-top:1px;">${shopCount} shops (1 free + ${shopCount - 1} paid)</span>
+          </td>
+          <td style="padding:10px 8px;color:#64748b;font-size:13px;text-align:center;">
+            ${shopCount - 1} extra
+          </td>
+          <td style="padding:10px 24px;color:#3b82f6;font-size:13px;font-weight:600;text-align:right;">${fmt(shopAddonAmount)}</td>
+        </tr>` : ''
   // CTA section based on payment status + PDF mode
   const isPaid = status === 'paid'
   let ctaSection = ''
@@ -222,6 +241,7 @@ export function buildSubscriptionInvoiceHtml({
           </td>
           <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:600;text-align:right;">${lineItemAmount}</td>
         </tr>
+        ${shopLineItemHtml}
         ${creditLineItemHtml}
       </table>
     </td>
@@ -237,8 +257,16 @@ export function buildSubscriptionInvoiceHtml({
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="padding:5px 0;font-size:13px;color:#64748b;">Subtotal</td>
-                <td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${lineItemAmount}</td>
+                <td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${fmt(grossAmount || amountDue)}</td>
               </tr>
+              ${hasShopAddon ? `<tr>
+                <td style="padding:3px 0;font-size:11px;color:#94a3b8;padding-left:12px;">Base package</td>
+                <td style="padding:3px 0;font-size:11px;color:#94a3b8;text-align:right;">${lineItemAmount}</td>
+              </tr>
+              <tr>
+                <td style="padding:3px 0;font-size:11px;color:#3b82f6;padding-left:12px;">Shop addon (${shopCount - 1} extra)</td>
+                <td style="padding:3px 0;font-size:11px;color:#3b82f6;text-align:right;">${fmt(shopAddonAmount)}</td>
+              </tr>` : ''}
               ${creditTotalHtml}
               <tr>
                 <td style="padding:5px 0;font-size:13px;color:#64748b;">Tax</td>

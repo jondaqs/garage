@@ -217,12 +217,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     const pkg = packages.find(p => p.id === packageId)
     if (!pkg) return
 
-    // Check for duplicate: already subscribed to the same package and still active
+    // Check for duplicate: same package AND same shop count
     const duplicate = subscriptions.find(s =>
       s.is_currently_active && s.package_id === packageId && !s.is_expired
+      && (subscriberType !== 'service_provider' || Number(s.shop_count || 0) === selectedShopCount)
     )
     if (duplicate) {
-      setError(`You already have an active subscription to ${pkg.name}. It expires on ${fmtD(duplicate.expiry_date)}.`)
+      setError(`You already have an active subscription to ${pkg.name}${subscriberType === 'service_provider' ? ` with ${selectedShopCount} shop(s)` : ''}. It expires on ${fmtD(duplicate.expiry_date)}.`)
       setTimeout(() => setError(''), 5000)
       // Scroll to toast so user sees it
       setTimeout(() => {
@@ -818,6 +819,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   upgradeNotes: inv.upgrade_notes || null,
                   currencySymbol: inv.currency_symbol || '',
                   status: inv.effective_status || 'unpaid',
+                  shopCount: Number(inv.shop_count || 0),
+                  shopAddonAmount: Number(inv.shop_addon_amount || 0),
                   ctaUrl: `${window.location.origin}${subscriptionPath}?view=invoices&invoice=${inv.id}`,
                 })
 
