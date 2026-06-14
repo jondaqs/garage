@@ -263,6 +263,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         p_subscriber_id: subscriberId,
         p_package_id: packageId,
         p_auto_renew: false,
+        p_shop_count: subscriberType === 'service_provider' ? selectedShopCount : 0,
       })
       if (rpcErr) throw rpcErr
       const result = typeof data === 'string' ? JSON.parse(data) : data
@@ -404,9 +405,21 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             <div>
               <p className="text-xs text-gray-500 font-medium">Cost</p>
               <p className="text-sm font-semibold text-gray-900">
-                {activeSub.currency_symbol}{Number(activeSub.package_cost).toLocaleString()}
+                {activeSub.currency_symbol}{Number(Number(activeSub.package_cost) + Number(activeSub.shop_addon_amount || 0)).toLocaleString()}
               </p>
+              {Number(activeSub.shop_addon_amount) > 0 && (
+                <p className="text-[10px] text-blue-600">
+                  Base: {activeSub.currency_symbol}{Number(activeSub.package_cost).toLocaleString()} + Shops: {activeSub.currency_symbol}{Number(activeSub.shop_addon_amount).toLocaleString()}
+                </p>
+              )}
             </div>
+            {Number(activeSub.shop_count) > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Shops</p>
+                <p className="text-sm font-semibold text-gray-900">{activeSub.shop_count} shop{activeSub.shop_count > 1 ? 's' : ''}</p>
+                <p className="text-[10px] text-gray-400">1 free + {Math.max(0, activeSub.shop_count - 1)} paid</p>
+              </div>
+            )}
           </div>
         </div>
       )}
