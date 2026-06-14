@@ -94,6 +94,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [subscriberProfile, setSubscriberProfile] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
   const [freeTier, setFreeTier] = useState(null) // Free tier data from DB
+  const [providerShops, setProviderShops] = useState([]) // Provider's active shops
+  const [selectedShopCount, setSelectedShopCount] = useState(1)
+  const [shopAddon, setShopAddon] = useState(null) // Shop addon pricing from compute_shop_addon
 
   // Terms & Conditions modal
   const [termsModal, setTermsModal] = useState(null) // { packageId, packageName, packageCost, isUpgrade, upgradeCredit, currentPlan }
@@ -168,6 +171,24 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           .eq('is_active', true)
           .maybeSingle()
         setFreeTier(freeData)
+      }
+
+      // Fetch provider's shops for multi-shop selection
+      if (subscriberType === 'service_provider') {
+        const { data: shops } = await supabase
+          .from('shops')
+          .select('id, name, is_active, is_suspended')
+          .eq('service_provider_id', subscriberId)
+          .eq('is_active', true)
+          .eq('is_suspended', false)
+          .order('name')
+        setProviderShops(shops || [])
+        const shopCount = shops?.length || 1
+        setSelectedShopCount(shopCount)
+        // Compute shop addon pricing
+        const { data: addonData } = await supabase.rpc('compute_shop_addon', { p_shop_count: shopCount })
+        if (addonData?.[0]) setShopAddon(addonData[0])
+        else if (addonData) setShopAddon(addonData)
       }
 
       // Step 2: Fetch receipts using subscription IDs (avoids .in([]) error)
@@ -594,6 +615,78 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             ))}
           </div>
 
+          {/* ── Shop selector for service providers ── */}
+          {subscriberType === 'service_provider' && providerShops.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 size={16} className="text-blue-600" />
+                <p className="text-sm font-semibold text-gray-900">Your Shops</p>
+                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">1st shop free</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Your first shop is included free with any plan. Additional shops are charged per-shop monthly.
+                Select how many shops to include in your subscription.
+              </p>
+
+              {/* Shop count stepper */}
+              <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                  <button onClick={() => {
+                    const n = Math.max(1, selectedShopCount - 1)
+                    setSelectedShopCount(n)
+                    supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
+                      if (data?.[0]) setShopAddon(data[0])
+                      else if (data) setShopAddon(data)
+                    })
+                  }} disabled={selectedShopCount <= 1}
+                    className="px-3 py-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors text-sm font-bold">−</button>
+                  <span className="px-4 py-2 text-sm font-bold text-gray-900 border-x border-gray-200 min-w-[48px] text-center">
+                    {selectedShopCount}
+                  </span>
+                  <button onClick={() => {
+                    const n = Math.min(providerShops.length, selectedShopCount + 1)
+                    setSelectedShopCount(n)
+                    supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
+                      if (data?.[0]) setShopAddon(data[0])
+                      else if (data) setShopAddon(data)
+                    })
+                  }} disabled={selectedShopCount >= providerShops.length}
+                    className="px-3 py-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors text-sm font-bold">+</button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  of {providerShops.length} active shop{providerShops.length > 1 ? 's' : ''}
+                </p>
+              </div>
+
+              {/* Shop list */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {providerShops.map((shop, i) => (
+                  <span key={shop.id}
+                    className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${
+                      i < selectedShopCount
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
+                        : 'bg-gray-50 border-gray-200 text-gray-400'
+                    }`}>
+                    <Building2 size={11} />
+                    {shop.name}
+                    {i === 0 && <span className="text-[9px] font-bold text-green-600">(free)</span>}
+                  </span>
+                ))}
+              </div>
+
+              {/* Addon pricing summary */}
+              {shopAddon && selectedShopCount > 1 && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs">
+                  <div className="flex justify-between text-blue-700">
+                    <span>Shop addon ({shopAddon.billable_shops} extra × {shopAddon.is_flat_rate ? 'flat rate' : fmt(shopAddon.per_shop_price) + '/mo each'})</span>
+                    <span className="font-bold">+{fmt(shopAddon.shop_monthly_addon)}/mo</span>
+                  </div>
+                  <p className="text-blue-500 mt-1">This addon is added to each plan&apos;s base price below.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {packages.filter(p => p.billing_period_code === selectedPeriod && Number(p.cost) > 0).map(p => {
               const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
@@ -628,10 +721,15 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                       </div>
                     ) : (
                       <div>
-                        <span className="text-2xl font-black text-gray-900">{p.currency_symbol}{Number(p.cost).toLocaleString()}</span>
+                        <span className="text-2xl font-black text-gray-900">{p.currency_symbol}{Number(p.cost + (subscriberType === 'service_provider' && shopAddon ? shopAddon.shop_monthly_addon * (p.billing_period_duration || 1) : 0)).toLocaleString()}</span>
                         <span className="text-sm text-gray-400 ml-1">/{p.billing_period_name?.toLowerCase()}</span>
+                        {subscriberType === 'service_provider' && shopAddon && shopAddon.shop_monthly_addon > 0 && (
+                          <p className="text-[10px] text-blue-600 mt-0.5">
+                            Base: {p.currency_symbol}{Number(p.cost).toLocaleString()} + Shops: {p.currency_symbol}{Number(shopAddon.shop_monthly_addon * (p.billing_period_duration || 1)).toLocaleString()}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-400 mt-0.5">
-                          ≈ {p.currency_symbol}{Number(p.monthly_equivalent_cost).toFixed(2)}/mo
+                          ≈ {p.currency_symbol}{Number(p.monthly_equivalent_cost + (subscriberType === 'service_provider' && shopAddon ? shopAddon.shop_monthly_addon : 0)).toFixed(2)}/mo
                         </p>
                       </div>
                     )}
@@ -640,6 +738,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   <div className="flex gap-2 flex-wrap mb-3">
                     {p.max_vehicles && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_vehicles} vehicle{p.max_vehicles > 1 ? 's' : ''}</span>}
                     {p.max_users && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.max_users} users</span>}
+                    {p.max_shops && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded">{selectedShopCount} shop{selectedShopCount > 1 ? 's' : ''}</span>}
                   </div>
 
                   <ul className="flex-1 space-y-1.5 mb-4">
