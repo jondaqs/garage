@@ -702,35 +702,47 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
               {/* Shop count stepper */}
               <div className="flex items-center gap-4 mb-3">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
-                  <button onClick={() => {
-                    const n = Math.max(1, selectedShopCount - 1)
-                    setSelectedShopCount(n)
-                    supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
-                      if (data?.[0]) setShopAddon(data[0])
-                      else if (data) setShopAddon(data)
-                    })
-                  }} disabled={selectedShopCount <= 1}
-                    className="px-3 py-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors text-sm font-bold">−</button>
-                  <span className="px-4 py-2 text-sm font-bold text-gray-900 border-x border-gray-200 min-w-[48px] text-center">
-                    {selectedShopCount}
-                  </span>
-                  <button onClick={() => {
-                    const n = selectedShopCount + 1
-                    setSelectedShopCount(n)
-                    supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
-                      if (data?.[0]) setShopAddon(data[0])
-                      else if (data) setShopAddon(data)
-                    })
-                  }}
-                    className="px-3 py-2 text-gray-500 hover:bg-gray-100 transition-colors text-sm font-bold">+</button>
-                </div>
-                <div className="text-xs text-gray-500">
-                  <span>shop{selectedShopCount > 1 ? 's' : ''} in your plan</span>
-                  {providerShops.length > 0 && (
-                    <span className="text-gray-400"> · {providerShops.length} currently active</span>
-                  )}
-                </div>
+                {(() => {
+                  const activeSub = subscriptions.find(s => s.is_currently_active)
+                  const minShops = Math.max(Number(activeSub?.shop_count || 0), 1)
+                  const atMin = selectedShopCount <= minShops
+                  return (
+                    <>
+                      <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                        <button onClick={() => {
+                          const n = Math.max(minShops, selectedShopCount - 1)
+                          setSelectedShopCount(n)
+                          supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
+                            if (data?.[0]) setShopAddon(data[0])
+                            else if (data) setShopAddon(data)
+                          })
+                        }} disabled={atMin}
+                          className="px-3 py-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors text-sm font-bold">−</button>
+                        <span className="px-4 py-2 text-sm font-bold text-gray-900 border-x border-gray-200 min-w-[48px] text-center">
+                          {selectedShopCount}
+                        </span>
+                        <button onClick={() => {
+                          const n = selectedShopCount + 1
+                          setSelectedShopCount(n)
+                          supabase.rpc('compute_shop_addon', { p_shop_count: n }).then(({ data }) => {
+                            if (data?.[0]) setShopAddon(data[0])
+                            else if (data) setShopAddon(data)
+                          })
+                        }}
+                          className="px-3 py-2 text-gray-500 hover:bg-gray-100 transition-colors text-sm font-bold">+</button>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        <span>shop{selectedShopCount > 1 ? 's' : ''} in your plan</span>
+                        {providerShops.length > 0 && (
+                          <span className="text-gray-400"> · {providerShops.length} currently active</span>
+                        )}
+                        {activeSub && minShops > 1 && (
+                          <span className="text-amber-500 block text-[10px]">Min {minShops} shops (cannot reduce until plan expires)</span>
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Current shops */}
