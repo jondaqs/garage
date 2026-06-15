@@ -427,6 +427,34 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               </div>
             )}
           </div>
+
+          {/* Shop list for providers */}
+          {subscriberType === 'service_provider' && providerShops.length > 0 && (
+            <div className="px-6 pb-5">
+              <p className="text-xs text-gray-500 font-medium mb-2">Subscribed Shops</p>
+              <div className="flex flex-wrap gap-2">
+                {providerShops.map((shop, i) => (
+                  <span key={shop.id}
+                    className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${
+                      i < Math.max(Number(activeSub?.shop_count || 0), 1)
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
+                        : 'bg-gray-50 border-gray-200 text-gray-400'
+                    }`}>
+                    <Building2 size={11} />
+                    {shop.name}
+                    {i === 0 && <span className="text-[9px] font-bold text-green-600">(free)</span>}
+                    {i >= Math.max(Number(activeSub?.shop_count || 0), 1) && <span className="text-[9px] text-gray-400">(not covered)</span>}
+                  </span>
+                ))}
+              </div>
+              {providerShops.length > Math.max(Number(activeSub?.shop_count || 0), 1) && (
+                <p className="text-[10px] text-amber-600 mt-2">
+                  ⚠ You have {providerShops.length - Math.max(Number(activeSub?.shop_count || 0), 1)} shop(s) not covered by your current plan.
+                  Consider upgrading your shop count.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -889,24 +917,32 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
                       {/* Pricing breakdown */}
                       <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                        {(Number(inv.upgrade_credit) > 0 || Number(inv.shop_addon_amount) > 0) && inv.gross_amount && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Package Price</span>
-                            <span className="font-semibold">{fmt(Number(inv.gross_amount) - Number(inv.shop_addon_amount || 0), inv.currency_symbol)}</span>
-                          </div>
-                        )}
-                        {Number(inv.shop_addon_amount) > 0 && (
-                          <div className="flex justify-between text-sm text-blue-600">
-                            <span>Shop Addon ({inv.shop_count} shops · 1 free + {Math.max(0, inv.shop_count - 1)} paid)</span>
-                            <span className="font-semibold">{fmt(inv.shop_addon_amount, inv.currency_symbol)}</span>
-                          </div>
-                        )}
-                        {Number(inv.upgrade_credit) > 0 && (
-                          <div className="flex justify-between text-sm text-green-600">
-                            <span>Upgrade Credit</span>
-                            <span className="font-semibold">−{fmt(inv.upgrade_credit, inv.currency_symbol)}</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const isShopOnly = Number(inv.shop_addon_amount) > 0 && Number(inv.upgrade_credit || 0) === 0 && (inv.upgrade_notes || '').includes('Shop upgrade')
+                          return <>
+                            {!isShopOnly && (Number(inv.upgrade_credit) > 0 || Number(inv.shop_addon_amount) > 0) && inv.gross_amount && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Package Price</span>
+                                <span className="font-semibold">{fmt(Number(inv.gross_amount) - Number(inv.shop_addon_amount || 0), inv.currency_symbol)}</span>
+                              </div>
+                            )}
+                            {Number(inv.shop_addon_amount) > 0 && (
+                              <div className="flex justify-between text-sm text-blue-600">
+                                <span>{isShopOnly ? 'Shop Addon Upgrade' : 'Shop Addon'} ({inv.shop_count} shops · 1 free + {Math.max(0, inv.shop_count - 1)} paid)</span>
+                                <span className="font-semibold">{isShopOnly ? fmt(inv.amount_due, inv.currency_symbol) : fmt(inv.shop_addon_amount, inv.currency_symbol)}</span>
+                              </div>
+                            )}
+                            {isShopOnly && inv.upgrade_notes && (
+                              <p className="text-[10px] text-blue-500">{inv.upgrade_notes}</p>
+                            )}
+                            {Number(inv.upgrade_credit) > 0 && (
+                              <div className="flex justify-between text-sm text-green-600">
+                                <span>Upgrade Credit</span>
+                                <span className="font-semibold">−{fmt(inv.upgrade_credit, inv.currency_symbol)}</span>
+                              </div>
+                            )}
+                          </>
+                        })()}
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Amount Due</span>
                           <span className="font-semibold">{fmt(inv.amount_due, inv.currency_symbol)}</span>
