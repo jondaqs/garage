@@ -1544,10 +1544,51 @@ function CalculatorTab({ supabase }) {
                             {result.pricing?.shop_addon_monthly > 0 && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">Shop add-on</span>
-                                    <span className="font-mono text-gray-700">+{result.pricing?.currency_symbol || '$'}{Number(result.pricing?.shop_addon_monthly).toFixed(2)}</span>
+                                    <span className="font-mono text-gray-700">+{result.pricing?.currency_symbol || '$'}{Number(result.pricing?.shop_addon_monthly).toFixed(2)}/mo</span>
                                 </div>
                             )}
                         </div>
+
+                        {/* Custom pricing breakdown */}
+                        {result.custom_pricing && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle size={14} className="text-amber-600" />
+                                    <p className="text-xs font-semibold text-amber-800">Custom Pricing (no exact tier match)</p>
+                                </div>
+                                <p className="text-[10px] text-amber-600 mb-2">
+                                    Parameters exceed all defined tiers. Using <strong>{result.custom_pricing.base_tier}</strong> as base + per-extra surcharges.
+                                </p>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-amber-700">Base tier price</span>
+                                        <span className="font-mono text-amber-900">{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.base_tier_price).toFixed(2)}/mo</span>
+                                    </div>
+                                    {result.custom_pricing.extra_vehicles > 0 && (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-amber-700">+ {result.custom_pricing.extra_vehicles} extra vehicle(s) × {result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_vehicle_rate).toFixed(2)}</span>
+                                            <span className="font-mono text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_vehicle_cost).toFixed(2)}/mo</span>
+                                        </div>
+                                    )}
+                                    {result.custom_pricing.extra_staff > 0 && (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-amber-700">+ {result.custom_pricing.extra_staff} extra staff × {result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_staff_rate).toFixed(2)}</span>
+                                            <span className="font-mono text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_staff_cost).toFixed(2)}/mo</span>
+                                        </div>
+                                    )}
+                                    {result.custom_pricing.extra_clients > 0 && (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-amber-700">+ {result.custom_pricing.extra_clients} extra client(s) × {result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_client_rate).toFixed(2)}</span>
+                                            <span className="font-mono text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_client_cost).toFixed(2)}/mo</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-xs border-t border-amber-300 pt-1 mt-1">
+                                        <span className="font-semibold text-amber-900">Total extras</span>
+                                        <span className="font-mono font-semibold text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.total_extras).toFixed(2)}/mo</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div>
                             <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Metrics used</p>
