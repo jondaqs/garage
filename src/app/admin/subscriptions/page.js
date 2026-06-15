@@ -1395,15 +1395,17 @@ function CalculatorTab({ supabase }) {
             } else {
                 // Use RPC for auto-match or other types
                 // null subscriber_id → skips trial eligibility check (simulator mode)
-                const { data, error: rpcErr } = await supabase.rpc('compute_subscription_price', {
+                // Only pass metrics relevant to each subscriber type
+                const params = {
                     p_subscriber_type: type,
                     p_subscriber_id: null,
                     p_billing_period_code: period,
-                    p_vehicle_count: vehicles,
-                    p_staff_count: staff,
-                    p_monthly_client_count: clients,
-                    p_shop_count: shops,
-                })
+                    p_vehicle_count: (type === 'individual' || type === 'company') ? vehicles : 0,
+                    p_staff_count: (type === 'company' || type === 'service_provider') ? staff : 0,
+                    p_monthly_client_count: type === 'service_provider' ? clients : 0,
+                    p_shop_count: type === 'service_provider' ? shops : 0,
+                }
+                const { data, error: rpcErr } = await supabase.rpc('compute_subscription_price', params)
                 if (rpcErr) throw rpcErr
                 const r = typeof data === 'string' ? JSON.parse(data) : data
                 if (!r.success) throw new Error(r.error)
