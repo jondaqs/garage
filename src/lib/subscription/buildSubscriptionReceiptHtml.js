@@ -57,6 +57,8 @@ export function buildSubscriptionReceiptHtml({
   confirmed = false,
   confirmedAt,
   currencySymbol = '',
+  shopCount = 0,
+  shopAddonAmount = 0,
   notes,
 }) {
   const fmt  = (n) => `${currencySymbol}${Number(n || 0).toLocaleString('en-KE')}`
@@ -168,12 +170,30 @@ export function buildSubscriptionReceiptHtml({
           </tr>
         </thead>
         <tbody>
+          ${shopCount > 1 && shopAddonAmount > 0 ? `
+          <tr style="border-top:1px solid #f1f5f9;">
+            <td style="padding:9px 12px;color:#0f172a;font-weight:500;">${packageName}</td>
+            <td style="padding:9px 12px;text-align:right;color:#475569;">1</td>
+            <td style="padding:9px 12px;text-align:right;color:#475569;">${fmt(amountDue - shopAddonAmount)}</td>
+            <td style="padding:9px 12px;text-align:right;font-weight:700;color:#0f172a;">${fmt(amountDue - shopAddonAmount)}</td>
+          </tr>
+          <tr style="border-top:1px solid #f1f5f9;">
+            <td style="padding:9px 12px;color:#3b82f6;font-weight:500;">
+              Shop Addon
+              <span style="display:block;font-size:10px;color:#64748b;">${shopCount} shops (1 free + ${shopCount - 1} paid)</span>
+            </td>
+            <td style="padding:9px 12px;text-align:right;color:#475569;">${shopCount - 1}</td>
+            <td style="padding:9px 12px;text-align:right;color:#475569;">${fmt(shopAddonAmount / Math.max(shopCount - 1, 1))}</td>
+            <td style="padding:9px 12px;text-align:right;font-weight:700;color:#3b82f6;">${fmt(shopAddonAmount)}</td>
+          </tr>
+          ` : `
           <tr style="border-top:1px solid #f1f5f9;">
             <td style="padding:9px 12px;color:#0f172a;font-weight:500;">${packageName}</td>
             <td style="padding:9px 12px;text-align:right;color:#475569;">1</td>
             <td style="padding:9px 12px;text-align:right;color:#475569;">${fmt(amountDue)}</td>
             <td style="padding:9px 12px;text-align:right;font-weight:700;color:#0f172a;">${fmt(amountDue)}</td>
           </tr>
+          `}
         </tbody>
       </table>
     </div>
@@ -186,6 +206,14 @@ export function buildSubscriptionReceiptHtml({
         <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#64748b;">
           <span>Subtotal</span><span>${fmt(amountDue)}</span>
         </div>
+        ${shopCount > 1 && shopAddonAmount > 0 ? `
+        <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;color:#94a3b8;padding-left:8px;">
+          <span>Base package</span><span>${fmt(amountDue - shopAddonAmount)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;color:#3b82f6;padding-left:8px;">
+          <span>Shop addon (${shopCount - 1} extra)</span><span>${fmt(shopAddonAmount)}</span>
+        </div>
+        ` : ''}
         <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#64748b;">
           <span>Tax</span><span>${fmt(taxAmount)}</span>
         </div>

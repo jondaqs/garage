@@ -1110,6 +1110,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   confirmed: r.confirmed,
                   confirmedAt: r.confirmed_at,
                   currencySymbol: r.currency_symbol || '',
+                  shopCount: Number(r.shop_count || 0),
+                  shopAddonAmount: Number(r.shop_addon_amount || 0),
                   notes: r.notes,
                 })
 
