@@ -77,20 +77,21 @@ export function buildSubscriptionInvoiceHtml({
   const statusColor = status === 'paid' ? '#22c55e' : status === 'overdue' ? '#ef4444' : '#f59e0b'
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
   const hasShopAddon = shopCount > 1 && shopAddonAmount > 0
-  const baseAmount = hasShopAddon ? (grossAmount || amountDue) - shopAddonAmount : (grossAmount || amountDue)
+  const isShopOnlyUpgrade = hasShopAddon && upgradeCredit === 0 && !upgradeNotes?.includes('Upgrade credit from')
+  const baseAmount = isShopOnlyUpgrade ? 0 : (hasShopAddon ? (grossAmount || amountDue) - shopAddonAmount : (grossAmount || amountDue))
   const lineItemAmount = fmt(baseAmount)
 
   // Shop addon line item
   const shopLineItemHtml = hasShopAddon ? `
         <tr style="border-top:1px solid #f1f5f9;">
           <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:500;">
-            Shop Addon
-            <span style="display:block;font-size:11px;color:#64748b;margin-top:1px;">${shopCount} shops (1 free + ${shopCount - 1} paid)</span>
+            ${isShopOnlyUpgrade ? 'Shop Addon Upgrade' : 'Shop Addon'}
+            <span style="display:block;font-size:11px;color:#64748b;margin-top:1px;">${shopCount} shops (1 free + ${shopCount - 1} paid)${isShopOnlyUpgrade && upgradeNotes ? '<br>' + upgradeNotes : ''}</span>
           </td>
           <td style="padding:10px 8px;color:#64748b;font-size:13px;text-align:center;">
-            ${shopCount - 1} extra
+            ${isShopOnlyUpgrade ? 'prorated' : shopCount - 1 + ' extra'}
           </td>
-          <td style="padding:10px 24px;color:#3b82f6;font-size:13px;font-weight:600;text-align:right;">${fmt(shopAddonAmount)}</td>
+          <td style="padding:10px 24px;color:#3b82f6;font-size:13px;font-weight:600;text-align:right;">${fmt(amountDue)}</td>
         </tr>` : ''
   // CTA section based on payment status + PDF mode
   const isPaid = status === 'paid'
@@ -234,13 +235,13 @@ export function buildSubscriptionInvoiceHtml({
             SUBSCRIPTION
           </td>
         </tr>
-        <tr style="border-top:1px solid #f1f5f9;">
+        ${!isShopOnlyUpgrade ? `<tr style="border-top:1px solid #f1f5f9;">
           <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:500;">${packageName}</td>
           <td style="padding:10px 8px;color:#64748b;font-size:13px;text-align:center;">
             ${fmtD(billingStart)} – ${fmtD(billingEnd)}
           </td>
           <td style="padding:10px 24px;color:#1e293b;font-size:13px;font-weight:600;text-align:right;">${lineItemAmount}</td>
-        </tr>
+        </tr>` : ''}
         ${shopLineItemHtml}
         ${creditLineItemHtml}
       </table>
@@ -259,7 +260,7 @@ export function buildSubscriptionInvoiceHtml({
                 <td style="padding:5px 0;font-size:13px;color:#64748b;">Subtotal</td>
                 <td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${fmt(grossAmount || amountDue)}</td>
               </tr>
-              ${hasShopAddon ? `<tr>
+              ${hasShopAddon && !isShopOnlyUpgrade ? `<tr>
                 <td style="padding:3px 0;font-size:11px;color:#94a3b8;padding-left:12px;">Base package</td>
                 <td style="padding:3px 0;font-size:11px;color:#94a3b8;text-align:right;">${lineItemAmount}</td>
               </tr>

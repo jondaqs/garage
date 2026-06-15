@@ -20,7 +20,7 @@
  */
 
 import { useState } from 'react'
-import { X, AlertTriangle, ArrowUpRight, Shield, Clock, Ban, Check, Loader2 } from 'lucide-react'
+import { X, AlertTriangle, ArrowUpRight, Shield, Clock, Ban, Check, Loader2, Building2 } from 'lucide-react'
 
 export default function SubscriptionTermsModal({
   isOpen,
@@ -117,6 +117,22 @@ export default function SubscriptionTermsModal({
                   The remaining value of your current plan will be calculated pro-rata (based on unused days)
                   and credited towards the cost of the new plan. The credit cannot exceed the cost of the new plan
                   and cannot be withdrawn as cash.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Building2 size={15} className="text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Shop Addon (Service Providers)</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Your first shop is included free with any plan. Additional shops are charged per-shop.
+                  You may add shops to your existing plan at any time — you will only be charged the prorated
+                  difference for the remaining billing period. The base package price is not re-charged when
+                  adding shops. Shop addon charges are non-refundable and shop count cannot be reduced until
+                  your subscription period expires.
                 </p>
               </div>
             </div>
