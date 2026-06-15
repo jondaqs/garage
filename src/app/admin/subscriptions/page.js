@@ -1550,19 +1550,26 @@ function CalculatorTab({ supabase }) {
                         </div>
 
                         {/* Custom pricing breakdown */}
-                        {result.custom_pricing && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                        {result.custom_pricing && (() => {
+                            const hasExtras = Number(result.custom_pricing.total_extras) > 0
+                            return (
+                            <div className={`border rounded-lg p-4 space-y-3 ${hasExtras ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <AlertCircle size={14} className="text-amber-600" />
-                                    <p className="text-xs font-semibold text-amber-800">Custom Pricing (no exact tier match)</p>
+                                    <AlertCircle size={14} className={hasExtras ? 'text-amber-600' : 'text-blue-600'} />
+                                    <p className={`text-xs font-semibold ${hasExtras ? 'text-amber-800' : 'text-blue-800'}`}>
+                                        {hasExtras ? 'Custom Pricing (no exact tier match)' : 'Tier matched via fallback'}
+                                    </p>
                                 </div>
-                                <p className="text-[10px] text-amber-600">
-                                    Parameters exceed standard tier ranges. Best-fit tier: <strong>{result.custom_pricing.base_tier}</strong> with applicable per-extra surcharges.
+                                <p className={`text-[10px] ${hasExtras ? 'text-amber-600' : 'text-blue-600'}`}>
+                                    {hasExtras
+                                        ? <>Parameters exceed <strong>{result.custom_pricing.base_tier}</strong> tier ranges. Per-extra surcharges applied.</>
+                                        : <>No exact tier boundary match. <strong>{result.custom_pricing.base_tier}</strong> selected as best fit — no surcharges needed.</>
+                                    }
                                 </p>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-xs">
-                                        <span className="text-amber-700">Base tier price</span>
-                                        <span className="font-mono text-amber-900">{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.base_tier_price).toFixed(2)}/mo</span>
+                                        <span className={hasExtras ? 'text-amber-700' : 'text-blue-700'}>Base tier price</span>
+                                        <span className={`font-mono ${hasExtras ? 'text-amber-900' : 'text-blue-900'}`}>{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.base_tier_price).toFixed(2)}/mo</span>
                                     </div>
                                     {result.custom_pricing.extra_vehicles > 0 && (
                                         <div className="flex justify-between text-xs">
@@ -1582,10 +1589,12 @@ function CalculatorTab({ supabase }) {
                                             <span className="font-mono text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.extra_client_cost).toFixed(2)}/mo</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between text-xs border-t border-amber-300 pt-1 mt-1">
-                                        <span className="font-semibold text-amber-900">Total extras</span>
-                                        <span className="font-mono font-semibold text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.total_extras).toFixed(2)}/mo</span>
-                                    </div>
+                                    {hasExtras && (
+                                        <div className="flex justify-between text-xs border-t border-amber-300 pt-1 mt-1">
+                                            <span className="font-semibold text-amber-900">Total extras</span>
+                                            <span className="font-mono font-semibold text-amber-900">+{result.pricing?.currency_symbol || '$'}{Number(result.custom_pricing.total_extras).toFixed(2)}/mo</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* All tiers comparison */}
@@ -1641,7 +1650,8 @@ function CalculatorTab({ supabase }) {
                                     </div>
                                 )}
                             </div>
-                        )}
+                            )
+                        })()}
 
                         <div>
                             <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Metrics used</p>
