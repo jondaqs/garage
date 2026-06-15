@@ -1557,7 +1557,7 @@ function CalculatorTab({ supabase }) {
                                     <p className="text-xs font-semibold text-amber-800">Custom Pricing (no exact tier match)</p>
                                 </div>
                                 <p className="text-[10px] text-amber-600 mb-2">
-                                    Parameters exceed all defined tiers. Using <strong>{result.custom_pricing.base_tier}</strong> as base + per-extra surcharges.
+                                    Parameters cross tier boundaries. Best-fit tier: <strong>{result.custom_pricing.base_tier}</strong> (cheapest base + extras combination).
                                 </p>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-xs">
