@@ -1394,10 +1394,13 @@ function CalculatorTab({ supabase }) {
                 })
             } else {
                 // Use RPC for auto-match or other types
-                const dummyId = '00000000-0000-0000-0000-000000000000'
+                //const dummyId = '00000000-0000-0000-0000-000000000000'
+                // Pass null subscriber_id — metric overrides make this a simulator call.
+//              // A dummy UUID would trigger check_trial_eligibility (0 vehicles = free tier),
+//              // which zeroes out all pricing. Null skips the trial check entirely.
                 const { data, error: rpcErr } = await supabase.rpc('compute_subscription_price', {
                     p_subscriber_type: type,
-                    p_subscriber_id: dummyId,
+                    p_subscriber_id: null,
                     p_billing_period_code: period,
                     p_vehicle_count: vehicles,
                     p_staff_count: staff,
