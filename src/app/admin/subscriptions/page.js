@@ -2201,4 +2201,4 @@ function AdminSubscriptionsPage() {
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
         </div>
     )
-}
+} 
