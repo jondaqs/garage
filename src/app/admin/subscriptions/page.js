@@ -1394,10 +1394,7 @@ function CalculatorTab({ supabase }) {
                 })
             } else {
                 // Use RPC for auto-match or other types
-                //const dummyId = '00000000-0000-0000-0000-000000000000'
-                // Pass null subscriber_id — metric overrides make this a simulator call.
-//              // A dummy UUID would trigger check_trial_eligibility (0 vehicles = free tier),
-//              // which zeroes out all pricing. Null skips the trial check entirely.
+                // null subscriber_id → skips trial eligibility check (simulator mode)
                 const { data, error: rpcErr } = await supabase.rpc('compute_subscription_price', {
                     p_subscriber_type: type,
                     p_subscriber_id: null,
@@ -1560,7 +1557,7 @@ function CalculatorTab({ supabase }) {
                                     <p className="text-xs font-semibold text-amber-800">Custom Pricing (no exact tier match)</p>
                                 </div>
                                 <p className="text-[10px] text-amber-600">
-                                    Parameters cross tier boundaries. Best-fit tier: <strong>{result.custom_pricing.base_tier}</strong> (cheapest base + extras combination).
+                                    Parameters exceed standard tier ranges. Best-fit tier: <strong>{result.custom_pricing.base_tier}</strong> with applicable per-extra surcharges.
                                 </p>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-xs">
@@ -1605,29 +1602,40 @@ function CalculatorTab({ supabase }) {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {result.custom_pricing.all_evaluations.map((e, i) => (
-                                                    <tr key={i} className={e.is_winner ? 'bg-green-50 font-semibold' : ''}>
+                                                {result.custom_pricing.all_evaluations.map((e, i) => {
+                                                    const skipped = e.can_price_extras === false
+                                                    return (
+                                                    <tr key={i} className={e.is_winner ? 'bg-green-50 font-semibold' : skipped ? 'opacity-40' : ''}>
                                                         <td className="p-1 text-amber-900">
-                                                            {e.tier} {e.is_winner && <span className="text-green-600">✓</span>}
+                                                            {skipped ? <span className="line-through">{e.tier}</span> : e.tier}
+                                                            {e.is_winner && <span className="text-green-600 ml-1">✓</span>}
+                                                            {skipped && <span className="text-red-400 ml-1 no-underline" title="Per-extra rate is $0 for a needed dimension">⊘</span>}
                                                         </td>
                                                         <td className="p-1 text-right text-amber-700 font-mono">{Number(e.base).toFixed(2)}</td>
                                                         <td className="p-1 text-right text-amber-700 font-mono">
-                                                            {Number(e.extra_cost) > 0 ? `+${Number(e.extra_cost).toFixed(2)}` : '—'}
-                                                            {(e.extra_staff > 0 || e.extra_clients > 0 || e.extra_vehicles > 0) && (
-                                                                <span className="text-amber-500 ml-1">
-                                                                    ({[
-                                                                        e.extra_staff > 0 ? `${e.extra_staff}s` : '',
-                                                                        e.extra_clients > 0 ? `${e.extra_clients}c` : '',
-                                                                        e.extra_vehicles > 0 ? `${e.extra_vehicles}v` : '',
-                                                                    ].filter(Boolean).join('+')})
-                                                                </span>
+                                                            {skipped ? (
+                                                                <span className="text-red-400 italic">n/a</span>
+                                                            ) : (
+                                                                <>
+                                                                    {Number(e.extra_cost) > 0 ? `+${Number(e.extra_cost).toFixed(2)}` : '—'}
+                                                                    {(e.extra_staff > 0 || e.extra_clients > 0 || e.extra_vehicles > 0) && (
+                                                                        <span className="text-amber-500 ml-1">
+                                                                            ({[
+                                                                                e.extra_staff > 0 ? `${e.extra_staff}s` : '',
+                                                                                e.extra_clients > 0 ? `${e.extra_clients}c` : '',
+                                                                                e.extra_vehicles > 0 ? `${e.extra_vehicles}v` : '',
+                                                                            ].filter(Boolean).join('+')})
+                                                                        </span>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </td>
-                                                        <td className={`p-1 text-right font-mono ${e.is_winner ? 'text-green-700' : 'text-amber-900'}`}>
-                                                            {Number(e.total).toFixed(2)}
+                                                        <td className={`p-1 text-right font-mono ${e.is_winner ? 'text-green-700' : skipped ? 'text-red-400' : 'text-amber-900'}`}>
+                                                            {skipped ? '—' : Number(e.total).toFixed(2)}
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                    )
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -2204,4 +2212,4 @@ function AdminSubscriptionsPage() {
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
         </div>
     )
-} 
+}
