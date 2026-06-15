@@ -183,7 +183,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           .eq('is_suspended', false)
           .order('name')
         setProviderShops(shops || [])
-        const shopCount = shops?.length || 1
+        // Default shop count: use active subscription's shop_count if available, else actual shop count
+        const activeSub = (subs || []).find(s => s.is_currently_active)
+        const subShopCount = Math.max(Number(activeSub?.shop_count || 0), 1)
+        const actualShopCount = Math.max(shops?.length || 0, 1)
+        const shopCount = subShopCount > 1 ? subShopCount : actualShopCount
         setSelectedShopCount(shopCount)
         // Compute shop addon pricing
         const { data: addonData } = await supabase.rpc('compute_shop_addon', { p_shop_count: shopCount })
@@ -429,21 +433,37 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           </div>
 
           {/* Shop list for providers */}
-          {subscriberType === 'service_provider' && providerShops.length > 0 && (
+          {subscriberType === 'service_provider' && (
             <div className="px-6 pb-5">
-              <p className="text-xs text-gray-500 font-medium mb-2">Subscribed Shops</p>
+              <p className="text-xs text-gray-500 font-medium mb-2">
+                Subscribed Shops
+                <span className="text-gray-400 ml-1">
+                  ({providerShops.length} active of {Math.max(Number(activeSub?.shop_count || 0), 1)} capacity)
+                </span>
+              </p>
               <div className="flex flex-wrap gap-2">
-                {providerShops.map((shop, i) => (
-                  <span key={shop.id}
-                    className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${
-                      i < Math.max(Number(activeSub?.shop_count || 0), 1)
-                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
-                        : 'bg-gray-50 border-gray-200 text-gray-400'
-                    }`}>
+                {/* Actual shops */}
+                {providerShops.map((shop, i) => {
+                  const capacity = Math.max(Number(activeSub?.shop_count || 0), 1)
+                  const isCovered = i < capacity
+                  return (
+                    <span key={shop.id}
+                      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${
+                        isCovered ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium' : 'bg-red-50 border-red-200 text-red-600'
+                      }`}>
+                      <Building2 size={11} />
+                      {shop.name}
+                      {i === 0 && <span className="text-[9px] font-bold text-green-600">(free)</span>}
+                      {!isCovered && <span className="text-[9px]">(not covered)</span>}
+                    </span>
+                  )
+                })}
+                {/* Available empty slots */}
+                {Array.from({ length: Math.max(0, Math.max(Number(activeSub?.shop_count || 0), 1) - providerShops.length) }).map((_, i) => (
+                  <span key={`slot-${i}`}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-dashed border-gray-300 text-gray-400">
                     <Building2 size={11} />
-                    {shop.name}
-                    {i === 0 && <span className="text-[9px] font-bold text-green-600">(free)</span>}
-                    {i >= Math.max(Number(activeSub?.shop_count || 0), 1) && <span className="text-[9px] text-gray-400">(not covered)</span>}
+                    Available slot
                   </span>
                 ))}
               </div>
@@ -451,6 +471,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                 <p className="text-[10px] text-amber-600 mt-2">
                   ⚠ You have {providerShops.length - Math.max(Number(activeSub?.shop_count || 0), 1)} shop(s) not covered by your current plan.
                   Consider upgrading your shop count.
+                </p>
+              )}
+              {providerShops.length < Math.max(Number(activeSub?.shop_count || 0), 1) && (
+                <p className="text-[10px] text-blue-500 mt-2">
+                  You can add {Math.max(Number(activeSub?.shop_count || 0), 1) - providerShops.length} more shop(s) within your current plan.
                 </p>
               )}
             </div>
