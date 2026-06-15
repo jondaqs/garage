@@ -272,7 +272,12 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
       const subId = result?.subscription_id || data
       let msg = ''
-      if (result?.upgrade_credit > 0 && result?.net_amount > 0) {
+      if (result?.upgraded_from === null && result?.upgrade_notes?.includes('Shop upgrade')) {
+        // Shop-only upgrade
+        msg = result.net_amount > 0
+          ? `Shop count updated! ${result.upgrade_notes} Invoice of ${fmt(result.net_amount)} created for the additional shop(s).`
+          : 'Shop count updated! No additional charge.'
+      } else if (result?.upgrade_credit > 0 && result?.net_amount > 0) {
         msg = `Upgrade initiated! A credit of ${fmt(result.upgrade_credit)} from your previous plan (${result.upgraded_from}) has been applied. ` +
           `Net amount due: ${fmt(result.net_amount)}. Your current plan stays active until payment is confirmed.`
       } else if (result?.upgrade_credit > 0 && result?.net_amount === 0) {
@@ -884,10 +889,16 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
                       {/* Pricing breakdown */}
                       <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                        {Number(inv.upgrade_credit) > 0 && inv.gross_amount && (
+                        {(Number(inv.upgrade_credit) > 0 || Number(inv.shop_addon_amount) > 0) && inv.gross_amount && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Package Price</span>
-                            <span className="font-semibold">{fmt(inv.gross_amount, inv.currency_symbol)}</span>
+                            <span className="font-semibold">{fmt(Number(inv.gross_amount) - Number(inv.shop_addon_amount || 0), inv.currency_symbol)}</span>
+                          </div>
+                        )}
+                        {Number(inv.shop_addon_amount) > 0 && (
+                          <div className="flex justify-between text-sm text-blue-600">
+                            <span>Shop Addon ({inv.shop_count} shops · 1 free + {Math.max(0, inv.shop_count - 1)} paid)</span>
+                            <span className="font-semibold">{fmt(inv.shop_addon_amount, inv.currency_symbol)}</span>
                           </div>
                         )}
                         {Number(inv.upgrade_credit) > 0 && (
