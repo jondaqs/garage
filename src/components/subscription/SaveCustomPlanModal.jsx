@@ -116,7 +116,7 @@ export default function SaveCustomPlanModal({
         p_subscriber_type: subscriberType,
         p_target_entity_id: selectedEntity.id,
         p_base_monthly_price: Number(pricing.monthly_total || pricing.base_monthly_price || 0),
-        p_currency_id: r.tier?.currency_id || null,
+        p_currency_code: pricing.currency_code || 'KES',
         p_features: r.tier?.features || [],
         p_vehicle_count: r.metrics?.vehicles || 0,
         p_staff_count: r.metrics?.staff || 0,
