@@ -3,8 +3,9 @@
  *
  * Called client-side after submit_subscription_ticket RPC succeeds.
  * Sends notification to platform admins via email + SMS.
+ * Pattern matches /api/subscription/payment-notify exactly.
  *
- * Body: { ticket_id, ticket_number, entity_name, subscriber_type, subject }
+ * Body: { ticket_id, ticket_number, entity_name, subscriber_type, subject, description }
  */
 
 import { createClient }                        from '@/lib/supabase/server'
@@ -59,7 +60,7 @@ function buildTicketEmailHtml({ adminName, ticketNumber, entityName, subscriberT
         </tr>
         ${description ? `<tr>
           <td style="padding:6px 0;color:#64748b;font-size:13px;vertical-align:top;">Details</td>
-          <td style="padding:6px 0;color:#475569;font-size:13px;line-height:1.5;">${description.substring(0, 300)}${description.length > 300 ? '…' : ''}</td>
+          <td style="padding:6px 0;color:#475569;font-size:13px;line-height:1.5;">${description.substring(0, 300)}${description.length > 300 ? '...' : ''}</td>
         </tr>` : ''}
       </table>
     </div>
@@ -69,9 +70,7 @@ function buildTicketEmailHtml({ adminName, ticketNumber, entityName, subscriberT
         View Ticket in Dashboard
       </a>
     </div>
-    <p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">
-      This is an automated message from ${BRAND}. Please review the request promptly.
-    </p>
+    <p style="margin:12px 0 0;font-size:11px;color:#999;text-align:center">Log in to the admin panel to review this request.</p>
   </td></tr>
 </table>
 </td></tr>
@@ -93,57 +92,59 @@ export async function POST(req) {
     }
 
     const sc = getServiceClient()
-    const results = { notified: 0, emails_sent: 0, sms_sent: 0 }
     const typeLabel = subscriber_type === 'company' ? 'Company' : 'Service Provider'
     const ctaUrl = `${APP_URL()}/admin/subscriptions?tab=tickets&ticket=${ticket_id}`
+    const results = { notified: 0, emails_sent: 0, sms_sent: 0 }
 
-    // Find platform admins
-    const { data: admins } = await sc
-      .from('user_profiles')
-      .select(`
-        id, auth_user_id,
-        first_name_enc, last_name_enc, email_enc, phone_enc
-      `)
-      .in('id',
-        (await sc.rpc('get_admin_user_ids')).data || []
-      )
+    // ── Find admin user IDs (same pattern as payment-notify) ──
+    const { data: adminUsers } = await sc
+      .from('user_roles')
+      .select('user_id, user_roles_lookup!inner(code)')
+      .in('user_roles_lookup.code', ['platform_admin', 'admin', 'accountant'])
 
-    // Fallback: if get_admin_user_ids doesn't exist, try direct query
-    let adminList = admins
-    if (!adminList || adminList.length === 0) {
-      const { data: fallback } = await sc
-        .from('user_profiles_secure')
-        .select('id, auth_user_id, first_name, last_name, email, phone')
-        .in('id',
-          ((await sc.from('user_roles').select('user_id, roles!inner(name)').eq('roles.name', 'platform_admin')).data || [])
-            .map(r => r.user_id)
-        )
-      adminList = (fallback || []).map(a => ({
-        id: a.id,
-        auth_user_id: a.auth_user_id,
-        first_name: a.first_name,
-        last_name: a.last_name,
-        email: a.email,
-        phone: a.phone,
-      }))
+    if (!adminUsers?.length) {
+      console.warn('[ticket-notify] no admin users found')
+      return NextResponse.json({ success: true, ...results, warning: 'No admin users found' })
     }
 
-    // Decrypt PII if needed (secure view already decrypts)
-    for (const admin of (adminList || [])) {
-      const name = admin.first_name
-        ? `${admin.first_name} ${admin.last_name || ''}`.trim()
-        : 'Admin'
-      const email = admin.email
-      const phone = normalisePhone(admin.phone)
+    const adminUserIds = [...new Set(adminUsers.map(a => a.user_id))]
 
-      // Email
-      if (email) {
+    for (const adminId of adminUserIds) {
+      // Get admin profile (decrypted via secure view)
+      const { data: adminProfile } = await sc
+        .from('user_profiles_secure')
+        .select('first_name, last_name, email, phone')
+        .eq('id', adminId)
+        .maybeSingle()
+
+      if (!adminProfile) continue
+
+      const adminDisplayName = adminProfile.first_name
+        ? `${adminProfile.first_name} ${adminProfile.last_name || ''}`.trim()
+        : 'Admin'
+
+      // ── In-app notification ──
+      try {
+        await sc.from('notifications').insert({
+          user_id: adminId, recipient_user_id: adminId,
+          type: 'subscription_ticket', notification_type: 'subscription_ticket',
+          title: `New Subscription Ticket \u00b7 ${ticket_number}`,
+          message: `${entity_name} (${typeLabel}) submitted a custom package request: "${subject}"`,
+          reference_table: 'subscription_tickets', reference_id: ticket_id,
+          reference_type: 'subscription_ticket', is_read: false,
+        })
+        results.notified++
+      } catch (e) { console.error('[ticket-notify] notification failed:', e.message) }
+
+      // ── Email ──
+      const adminEmail = adminProfile.email || null
+      if (adminEmail) {
         try {
           await sendAndQueueEmail(sc, {
-            to: [{ Email: email, Name: name }],
-            subject: `[${BRAND}] New Subscription Ticket ${ticket_number} — ${entity_name}`,
+            to: [{ Email: adminEmail, Name: adminDisplayName }],
+            subject: `[${BRAND}] New Subscription Ticket ${ticket_number} \u2014 ${entity_name}`,
             html: buildTicketEmailHtml({
-              adminName: name, ticketNumber: ticket_number,
+              adminName: adminDisplayName, ticketNumber: ticket_number,
               entityName: entity_name, subscriberType: subscriber_type,
               subject: subject || 'Custom package request',
               description: description || '', ctaUrl,
@@ -153,28 +154,22 @@ export async function POST(req) {
             referenceId: ticket_id,
           })
           results.emails_sent++
-        } catch (e) {
-          console.error('[ticket-notify] email failed:', e.message)
-        }
+        } catch (e) { console.error('[ticket-notify] email failed:', e.message) }
       }
 
-      // SMS
-      if (phone) {
+      // ── SMS ──
+      const adminPhone = normalisePhone(adminProfile.phone)
+      if (adminPhone) {
         try {
           const r = await sendAndQueueSms(sc, {
-            to: phone,
-            recipientName: name,
-            message: `${BRAND}: New subscription ticket ${ticket_number} from ${entity_name}. Subject: "${(subject || '').substring(0, 60)}". Review in admin dashboard.`,
+            to: adminPhone, recipientName: adminDisplayName,
+            message: `${BRAND}: New subscription ticket ${ticket_number} from ${entity_name}. Subject: "${(subject || '').substring(0, 60)}". Please review in admin dashboard.`,
             referenceTable: 'subscription_tickets',
             referenceId: ticket_id,
           })
           if (r?.sent) results.sms_sent++
-        } catch (e) {
-          console.error('[ticket-notify] SMS failed:', e.message)
-        }
+        } catch (e) { console.error('[ticket-notify] SMS failed:', e.message) }
       }
-
-      results.notified++
     }
 
     return NextResponse.json({ success: true, ...results })
