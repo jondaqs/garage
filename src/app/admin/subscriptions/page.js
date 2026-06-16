@@ -1505,7 +1505,7 @@ function CalculatorTab({ supabase }) {
                                 Number of vehicles
                             </label>
                             <input type="number" min={0} value={vehicles} onChange={e => setVehicles(Number(e.target.value))}
-                                className={inp} />
+                                onWheel={e => e.currentTarget.blur()} className={inp} />
                         </div>
                     )}
 
@@ -1530,7 +1530,7 @@ function CalculatorTab({ supabase }) {
                         <div>
                             <label className="text-xs font-medium text-gray-700 block mb-1">Number of staff</label>
                             <input type="number" min={0} value={staff} onChange={e => setStaff(Number(e.target.value))}
-                                className={inp} />
+                                onWheel={e => e.currentTarget.blur()} className={inp} />
                         </div>
                     )}
 
@@ -1539,12 +1539,12 @@ function CalculatorTab({ supabase }) {
                             <div>
                                 <label className="text-xs font-medium text-gray-700 block mb-1">Monthly clients</label>
                                 <input type="number" min={0} value={clients} onChange={e => setClients(Number(e.target.value))}
-                                    className={inp} />
+                                    onWheel={e => e.currentTarget.blur()} className={inp} />
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-700 block mb-1">Number of shops</label>
                                 <input type="number" min={1} value={shops} onChange={e => setShops(Number(e.target.value))}
-                                    className={inp} />
+                                    onWheel={e => e.currentTarget.blur()} className={inp} />
                                 <p className="text-[10px] text-gray-400 mt-1">1st shop included free</p>
                             </div>
                         </>
