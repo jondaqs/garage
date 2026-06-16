@@ -1791,8 +1791,11 @@ function CalculatorTab({ supabase }) {
                             </div>
                         )}
 
-                        {/* Save as Custom Plan — only for company / service_provider */}
-                        {type !== 'individual' && (
+                        {/* Save as Custom Plan — only for company / service_provider,
+                            and only when pricing is genuinely custom (has extras).
+                            If the fallback matched a standard tier with 0 extras,
+                            the standard packages already cover it — no custom plan needed. */}
+                        {type !== 'individual' && !(result.custom_pricing && Number(result.custom_pricing.total_extras) === 0) && (
                             <div className="pt-2 border-t border-gray-100 mt-2">
                                 <button
                                     onClick={() => setShowSaveModal(true)}
