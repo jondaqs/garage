@@ -9,7 +9,7 @@ import {
     CreditCard, Package, Percent, Gift, Calculator, Users, Building2, Wrench,
     Plus, Save, Trash2, X, CheckCircle, AlertCircle, Loader2, ToggleLeft, ToggleRight,
     ChevronDown, ChevronRight, Search, Filter, Eye, Ban, PlayCircle, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles
+    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles, MessageSquarePlus
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 import SaveCustomPlanModal from '@/components/subscription/SaveCustomPlanModal'
@@ -28,6 +28,7 @@ const TABS = [
     { id: 'invoices',  label: 'Invoices',  icon: FileText },
     { id: 'receipts',  label: 'Receipts',  icon: Receipt || CreditCard },
     { id: 'calculator', label: 'Price Calculator', icon: Calculator },
+    { id: 'tickets', label: 'Tickets', icon: MessageSquarePlus },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -2269,6 +2270,180 @@ function ReceiptsTab({ supabase, deepLinkedReceipt }) {
 }
 
 
+
+// ════════════════════════════════════════════════════════════════
+//  ADMIN TICKETS TAB
+// ════════════════════════════════════════════════════════════════
+function AdminTicketsTab({ supabase }) {
+    const [tickets, setTickets] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [statusFilter, setStatusFilter] = useState('all')
+    const [toast, setToast] = useState({ message: '', type: 'success' })
+    const [expandedId, setExpandedId] = useState(null)
+    const [adminNotes, setAdminNotes] = useState('')
+    const [updatingId, setUpdatingId] = useState(null)
+
+    useEffect(() => { loadTickets() }, [])
+
+    const loadTickets = async () => {
+        setLoading(true)
+        const { data, error } = await supabase
+            .from('subscription_tickets')
+            .select('*')
+            .order('created_at', { ascending: false })
+        if (!error) setTickets(data || [])
+        setLoading(false)
+    }
+
+    const updateTicket = async (id, updates) => {
+        setUpdatingId(id)
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            const { data: profile } = await supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+            const { error } = await supabase.from('subscription_tickets')
+                .update({ ...updates, handled_by: profile?.id, handled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+                .eq('id', id)
+            if (error) throw error
+            setToast({ message: 'Ticket updated', type: 'success' })
+            setTimeout(() => setToast({ message: '' }), 3000)
+            setExpandedId(null)
+            setAdminNotes('')
+            await loadTickets()
+        } catch (e) {
+            setToast({ message: e.message, type: 'error' })
+        } finally {
+            setUpdatingId(null)
+        }
+    }
+
+    if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+
+    const statusColors = {
+        open: 'bg-yellow-100 text-yellow-800',
+        in_review: 'bg-blue-100 text-blue-800',
+        resolved: 'bg-green-100 text-green-800',
+        declined: 'bg-red-100 text-red-800',
+        cancelled: 'bg-gray-100 text-gray-600',
+    }
+
+    const filtered = statusFilter === 'all' ? tickets : tickets.filter(t => t.status === statusFilter)
+    const counts = tickets.reduce((a, t) => { a[t.status] = (a[t.status] || 0) + 1; return a }, {})
+
+    return (
+        <div className="space-y-4">
+            <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
+
+            <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-sm text-gray-500">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</p>
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-[11px] flex-wrap">
+                    {['all', 'open', 'in_review', 'resolved', 'declined'].map(s => (
+                        <button key={s} onClick={() => setStatusFilter(s)}
+                            className={`px-2 py-1 rounded-md transition-colors ${statusFilter === s ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                            {s === 'all' ? 'All' : s.replace(/_/g, ' ')} {s !== 'all' && counts[s] ? `(${counts[s]})` : ''}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {filtered.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+                    <MessageSquarePlus size={40} className="mx-auto text-gray-300 mb-3" />
+                    <p className="text-sm text-gray-500">{statusFilter === 'all' ? 'No tickets yet.' : `No ${statusFilter.replace(/_/g, ' ')} tickets.`}</p>
+                </div>
+            ) : (
+                filtered.map(t => {
+                    const isExpanded = expandedId === t.id
+                    return (
+                    <div key={t.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="p-5 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => { setExpandedId(isExpanded ? null : t.id); setAdminNotes(t.admin_notes || '') }}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                        <span className="font-mono text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{t.ticket_number}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${statusColors[t.status] || 'bg-gray-100'}`}>
+                                            {t.status.replace(/_/g, ' ')}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                            {t.subscriber_type === 'company' ? <Building2 size={10} /> : <Wrench size={10} />}
+                                            {t.subscriber_type}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-gray-900 truncate">{t.subject}</h3>
+                                    {!isExpanded && <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xl">{t.description}</p>}
+                                </div>
+                                <p className="text-[10px] text-gray-400 whitespace-nowrap">{new Date(t.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                            </div>
+                        </div>
+
+                        {isExpanded && (
+                            <div className="border-t border-gray-100 p-5 space-y-4 bg-gray-50/50">
+                                <div>
+                                    <p className="text-xs font-medium text-gray-500 uppercase mb-1">Description</p>
+                                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{t.description}</p>
+                                </div>
+
+                                {(t.requested_vehicles || t.requested_staff || t.requested_monthly_clients || t.requested_shops || t.requested_billing_period) && (
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-500 uppercase mb-1">Requested Metrics</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {t.requested_vehicles && <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">{t.requested_vehicles} vehicles</span>}
+                                            {t.requested_staff && <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">{t.requested_staff} staff</span>}
+                                            {t.requested_monthly_clients && <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">{t.requested_monthly_clients} clients/mo</span>}
+                                            {t.requested_shops && <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">{t.requested_shops} shops</span>}
+                                            {t.requested_billing_period && <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded capitalize">{t.requested_billing_period.replace(/_/g, ' ')}</span>}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Admin response area */}
+                                <div>
+                                    <p className="text-xs font-medium text-gray-500 uppercase mb-1">Admin Notes</p>
+                                    <textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)}
+                                        placeholder="Add a response or internal notes..."
+                                        rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" />
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {t.status === 'open' && (
+                                        <button onClick={() => updateTicket(t.id, { status: 'in_review', admin_notes: adminNotes })}
+                                            disabled={updatingId === t.id}
+                                            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1">
+                                            {updatingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Mark In Review
+                                        </button>
+                                    )}
+                                    {(t.status === 'open' || t.status === 'in_review') && (
+                                        <>
+                                            <button onClick={() => updateTicket(t.id, { status: 'resolved', admin_notes: adminNotes, resolution: 'resolved' })}
+                                                disabled={updatingId === t.id}
+                                                className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1">
+                                                {updatingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Resolve
+                                            </button>
+                                            <button onClick={() => updateTicket(t.id, { status: 'declined', admin_notes: adminNotes, resolution: 'declined' })}
+                                                disabled={updatingId === t.id}
+                                                className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-lg hover:bg-red-200 disabled:opacity-50 flex items-center gap-1">
+                                                {updatingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />} Decline
+                                            </button>
+                                        </>
+                                    )}
+                                    {adminNotes !== (t.admin_notes || '') && (
+                                        <button onClick={() => updateTicket(t.id, { admin_notes: adminNotes })}
+                                            disabled={updatingId === t.id}
+                                            className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300 disabled:opacity-50 flex items-center gap-1">
+                                            <Save size={12} /> Save Notes
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    )
+                })
+            )}
+        </div>
+    )
+}
+
+
 // ════════════════════════════════════════════════════════════════
 //  MAIN PAGE
 // ════════════════════════════════════════════════════════════════
@@ -2320,6 +2495,7 @@ function AdminSubscriptionsPage() {
             {tab === 'invoices' && <InvoicesTab supabase={supabase} />}
             {tab === 'receipts' && <ReceiptsTab supabase={supabase} deepLinkedReceipt={deepLinkedReceipt} />}
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
+            {tab === 'tickets' && <AdminTicketsTab supabase={supabase} />}
         </div>
     )
 }

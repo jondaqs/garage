@@ -20,12 +20,13 @@ import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
   Package, CreditCard, FileText, CheckCircle, AlertCircle, Loader2,
   ArrowRight, Clock, DollarSign, Send, Banknote, Building2,
-  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt
+  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus
 } from 'lucide-react'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
 import { downloadHtmlAsPdf } from '@/lib/subscription/downloadHtmlAsPdf'
 import SubscriptionTermsModal from '@/components/subscription/SubscriptionTermsModal'
+import SubscriptionTicketModal from '@/components/subscription/SubscriptionTicketModal'
 
 const PAYMENT_METHODS = [
   { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
@@ -97,6 +98,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [providerShops, setProviderShops] = useState([]) // Provider's active shops
   const [selectedShopCount, setSelectedShopCount] = useState(1)
   const [shopAddon, setShopAddon] = useState(null) // Shop addon pricing from compute_shop_addon
+  const [showTicketModal, setShowTicketModal] = useState(false)
+  const [tickets, setTickets] = useState([])
 
   // Terms & Conditions modal
   const [termsModal, setTermsModal] = useState(null) // { packageId, packageName, packageCost, isUpgrade, upgradeCredit, currentPlan }
@@ -151,6 +154,17 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setPackages(pkgs || [])
       setInvoices(invs || [])
       if (trial?.[0]) setTrialInfo(trial[0])
+
+      // Fetch subscription tickets (company/provider only)
+      if (subscriberType !== 'individual') {
+        const ticketField = subscriberType === 'company' ? 'company_id' : 'service_provider_id'
+        const { data: tix } = await supabase
+          .from('subscription_tickets')
+          .select('*')
+          .eq(ticketField, subscriberId)
+          .order('created_at', { ascending: false })
+        setTickets(tix || [])
+      }
 
       if (profile) {
         const p = profile
@@ -503,6 +517,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           { id: 'packages', label: 'Browse Plans', icon: Package },
           { id: 'invoices',  label: 'Invoices',  icon: FileText },
           { id: 'receipts',  label: 'Receipts',  icon: Receipt },
+          ...(subscriberType !== 'individual' ? [{ id: 'tickets', label: 'Tickets', icon: MessageSquarePlus }] : []),
         ].map(t => (
           <button key={t.id} onClick={() => setView(t.id)}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
@@ -860,6 +875,92 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           {packages.filter(p => p.billing_period_code === selectedPeriod && Number(p.cost) > 0).length === 0 && (
             <p className="text-center text-sm text-gray-400 py-8">No paid packages available for this period. Try another billing cycle.</p>
           )}
+
+          {/* Custom package request note */}
+          {subscriberType !== 'individual' && (
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4 mt-4 flex items-start gap-3">
+              <MessageSquarePlus size={18} className="text-purple-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm text-gray-800">
+                  Need a plan tailored to your specific requirements?{' '}
+                  <button onClick={() => setShowTicketModal(true)}
+                    className="text-purple-700 font-semibold underline underline-offset-2 hover:text-purple-900 transition-colors">
+                    Request a custom package
+                  </button>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Describe your needs and our team will create a customized subscription plan for you.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ TICKETS ═══ */}
+      {view === 'tickets' && subscriberType !== 'individual' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</p>
+            <button onClick={() => setShowTicketModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors">
+              <MessageSquarePlus size={14} /> New Request
+            </button>
+          </div>
+
+          {tickets.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+              <MessageSquarePlus size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-gray-500">No tickets yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Submit a request for a custom subscription package.</p>
+            </div>
+          ) : (
+            tickets.map(t => {
+              const statusColors = {
+                open: 'bg-yellow-100 text-yellow-800',
+                in_review: 'bg-blue-100 text-blue-800',
+                resolved: 'bg-green-100 text-green-800',
+                declined: 'bg-red-100 text-red-800',
+                cancelled: 'bg-gray-100 text-gray-600',
+              }
+              return (
+                <div key={t.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{t.ticket_number}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${statusColors[t.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {t.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-900">{t.subject}</h3>
+                    </div>
+                    <p className="text-[10px] text-gray-400 whitespace-nowrap">{fmtD(t.created_at)}</p>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">{t.description}</p>
+
+                  {/* Requested metrics */}
+                  {(t.requested_vehicles || t.requested_staff || t.requested_monthly_clients || t.requested_shops || t.requested_billing_period) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {t.requested_vehicles && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t.requested_vehicles} vehicles</span>}
+                      {t.requested_staff && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t.requested_staff} staff</span>}
+                      {t.requested_monthly_clients && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t.requested_monthly_clients} clients/mo</span>}
+                      {t.requested_shops && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t.requested_shops} shops</span>}
+                      {t.requested_billing_period && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded capitalize">{t.requested_billing_period.replace(/_/g, ' ')}</span>}
+                    </div>
+                  )}
+
+                  {/* Admin response */}
+                  {t.admin_notes && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                      <p className="text-[10px] text-blue-500 font-medium uppercase mb-1">Admin Response</p>
+                      <p className="text-xs text-blue-800">{t.admin_notes}</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
       )}
 
@@ -1190,6 +1291,23 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         currentPlan={termsModal?.currentPlan}
         loading={subscribing}
       />
+
+      {subscriberType !== 'individual' && (
+        <SubscriptionTicketModal
+          isOpen={showTicketModal}
+          onClose={() => setShowTicketModal(false)}
+          onSubmitted={(res) => {
+            // Refresh tickets list
+            const ticketField = subscriberType === 'company' ? 'company_id' : 'service_provider_id'
+            supabase.from('subscription_tickets').select('*').eq(ticketField, subscriberId)
+              .order('created_at', { ascending: false }).then(({ data }) => setTickets(data || []))
+          }}
+          supabase={supabase}
+          subscriberType={subscriberType}
+          subscriberId={subscriberId}
+          subscriberName={subscriberName}
+        />
+      )}
     </div>
   )
 }
