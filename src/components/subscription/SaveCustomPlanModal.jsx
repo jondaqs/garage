@@ -135,6 +135,22 @@ export default function SaveCustomPlanModal({
 
       setSaveResult(result)
       if (onSaved) onSaved(result)
+
+      // Notify the target entity (owner + admin/accountant) — fire-and-forget
+      fetch('/api/subscription/custom-plan-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscriber_type: subscriberType,
+          target_entity_id: selectedEntity.id,
+          target_entity_name: selectedEntity.name,
+          tier_name: result.tier_name || result.package_name_prefix,
+          tier_code: result.tier_code,
+          base_monthly_price: Number(pricing.monthly_total || pricing.base_monthly_price || 0),
+          packages_created: result.packages_created,
+          batch_id: result.batch_id,
+        }),
+      }).catch(e => console.warn('[custom-plan-notify] fire-and-forget failed:', e.message))
     } catch (e) {
       setError(e.message || 'Failed to save custom plan')
     } finally {
