@@ -9,9 +9,10 @@ import {
     CreditCard, Package, Percent, Gift, Calculator, Users, Building2, Wrench,
     Plus, Save, Trash2, X, CheckCircle, AlertCircle, Loader2, ToggleLeft, ToggleRight,
     ChevronDown, ChevronRight, Search, Filter, Eye, Ban, PlayCircle, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download
+    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
+import SaveCustomPlanModal from '@/components/subscription/SaveCustomPlanModal'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
 import { downloadHtmlAsPdf } from '@/lib/subscription/downloadHtmlAsPdf'
@@ -398,6 +399,7 @@ function PackagesTab({ supabase }) {
     const [loading, setLoading] = useState(true)
     const [generating, setGenerating] = useState(false)
     const [toast, setToast] = useState({ message: '', type: 'success' })
+    const [customFilter, setCustomFilter] = useState('all') // 'all' | 'standard' | 'custom'
 
     useEffect(() => { loadPackages() }, [])
 
@@ -440,18 +442,42 @@ function PackagesTab({ supabase }) {
     if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
 
     const grouped = packages.reduce((acc, p) => {
+        // Apply custom filter
+        if (customFilter === 'standard' && p.is_custom) return acc
+        if (customFilter === 'custom' && !p.is_custom) return acc
         const key = p.subscription_type_name
         if (!acc[key]) acc[key] = []
         acc[key].push(p)
         return acc
     }, {})
 
+    const customCount = packages.filter(p => p.is_custom).length
+    const standardCount = packages.length - customCount
+
     return (
         <div className="space-y-4">
             <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
 
-            <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">{packages.length} active packages</p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500">{packages.length} packages</p>
+                    {customCount > 0 && (
+                        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-[11px]">
+                            <button onClick={() => setCustomFilter('all')}
+                                className={`px-2 py-1 rounded-md transition-colors ${customFilter === 'all' ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                                All
+                            </button>
+                            <button onClick={() => setCustomFilter('standard')}
+                                className={`px-2 py-1 rounded-md transition-colors ${customFilter === 'standard' ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                                Standard ({standardCount})
+                            </button>
+                            <button onClick={() => setCustomFilter('custom')}
+                                className={`px-2 py-1 rounded-md transition-colors ${customFilter === 'custom' ? 'bg-white shadow text-purple-700 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <span className="inline-flex items-center gap-1"><Sparkles size={10} /> Custom ({customCount})</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
                 <button onClick={generateBatch} disabled={generating}
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
                     {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
@@ -479,14 +505,21 @@ function PackagesTab({ supabase }) {
                                     const isBasicPlus = (p.name || '').toLowerCase().includes('basic plus')
                                     const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
                                     return (
-                                    <tr key={p.id} className={`hover:bg-gray-50 ${isFree ? 'bg-green-50/30' : isBasicPlus ? 'bg-blue-50/30' : ''}`}>
+                                    <tr key={p.id} className={`hover:bg-gray-50 ${isFree ? 'bg-green-50/30' : isBasicPlus ? 'bg-blue-50/30' : p.is_custom ? 'bg-purple-50/20' : ''}`}>
                                         <td className="py-2 px-3">
                                             <div className="flex items-center gap-1.5">
                                                 <span className="text-gray-900 font-medium text-xs">{p.name}</span>
                                                 {isFree && <span className="text-[9px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">FREE</span>}
                                                 {isBasicPlus && <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">BASIC PLUS</span>}
+                                                {p.is_custom && <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5"><Sparkles size={8} />CUSTOM</span>}
                                             </div>
-                                            {p.description && <p className="text-[10px] text-gray-400 mt-0.5 max-w-[240px] truncate" title={p.description}>{p.description}</p>}
+                                            {p.is_custom && p.target_entity_name && (
+                                                <p className="text-[10px] text-purple-500 mt-0.5 flex items-center gap-1">
+                                                    {p.target_entity_type === 'company' ? <Building2 size={9} /> : <Wrench size={9} />}
+                                                    {p.target_entity_name}
+                                                </p>
+                                            )}
+                                            {p.description && !p.is_custom && <p className="text-[10px] text-gray-400 mt-0.5 max-w-[240px] truncate" title={p.description}>{p.description}</p>}
                                             {features.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-1">
                                                     {features.slice(0, 3).map((f, fi) => (
@@ -542,6 +575,7 @@ function PricingTiersTab({ supabase }) {
     const [toast, setToast] = useState({ message: '', type: 'success' })
     const [showCreate, setShowCreate] = useState(false)
     const [creating, setCreating] = useState(false)
+    const [customFilter, setCustomFilter] = useState('all') // 'all' | 'standard' | 'custom'
     const [newTier, setNewTier] = useState({
         subscription_type_id: '', tier_code: '', tier_name: '', description: '',
         base_monthly_price: '', min_vehicles: 0, max_vehicles: '',
@@ -682,7 +716,12 @@ function PricingTiersTab({ supabase }) {
 
     if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
 
+    const customCount = tiers.filter(t => t.is_custom).length
+    const standardCount = tiers.length - customCount
+
     const grouped = tiers.reduce((acc, t) => {
+        if (customFilter === 'standard' && t.is_custom) return acc
+        if (customFilter === 'custom' && !t.is_custom) return acc
         const key = getTypeName(t.subscription_type_id)
         if (!acc[key]) acc[key] = []
         acc[key].push(t)
@@ -692,6 +731,26 @@ function PricingTiersTab({ supabase }) {
     return (
         <div className="space-y-4">
             <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '' })} />
+
+            {customCount > 0 && (
+                <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500">{tiers.length} tiers</p>
+                    <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-[11px]">
+                        <button onClick={() => setCustomFilter('all')}
+                            className={`px-2 py-1 rounded-md transition-colors ${customFilter === 'all' ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                            All
+                        </button>
+                        <button onClick={() => setCustomFilter('standard')}
+                            className={`px-2 py-1 rounded-md transition-colors ${customFilter === 'standard' ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                            Standard ({standardCount})
+                        </button>
+                        <button onClick={() => setCustomFilter('custom')}
+                            className={`px-2 py-1 rounded-md transition-colors ${customFilter === 'custom' ? 'bg-white shadow text-purple-700 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                            <span className="inline-flex items-center gap-1"><Sparkles size={10} /> Custom ({customCount})</span>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {Object.entries(grouped).map(([typeName, tierList]) => (
                 <Section key={typeName} title={`${typeName} tiers`} description="Click a row to edit pricing and ranges">
@@ -836,15 +895,22 @@ function PricingTiersTab({ supabase }) {
                                     const isBasicPlus = (t.tier_code || '').includes('basic_plus')
                                     const features = (() => { try { return typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || []) } catch { return [] } })()
                                     return (
-                                        <tr key={t.id} className={`hover:bg-gray-50 cursor-pointer ${isEditing ? 'bg-blue-50' : ''} ${!t.is_active ? 'opacity-50' : ''}`}
-                                            onClick={() => !isEditing && startEdit(t)}>
+                                        <tr key={t.id} className={`hover:bg-gray-50 cursor-pointer ${isEditing ? 'bg-blue-50' : ''} ${!t.is_active ? 'opacity-50' : ''} ${t.is_custom ? 'bg-purple-50/20' : ''}`}
+                                            onClick={() => !isEditing && !t.is_custom && startEdit(t)}>
                                             <td className="py-2 px-2">
                                                 <div className="flex items-center gap-1.5">
                                                     <p className="font-medium text-gray-900">{isEditing ? ed('tier_name') : t.tier_name}</p>
                                                     {isFree && <span className="text-[9px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">FREE</span>}
                                                     {isBasicPlus && <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">BASIC PLUS</span>}
+                                                    {t.is_custom && <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5"><Sparkles size={8} />CUSTOM</span>}
                                                 </div>
                                                 <p className="text-[10px] text-gray-400">{t.tier_code}</p>
+                                                {t.is_custom && t.target_entity_id && (
+                                                    <p className="text-[10px] text-purple-500 mt-0.5 flex items-center gap-1">
+                                                        {t.target_entity_type === 'company' ? <Building2 size={9} /> : <Wrench size={9} />}
+                                                        {t.notes || t.target_entity_type}
+                                                    </p>
+                                                )}
                                                 {isEditing ? (
                                                     <input type="text" value={editData.description ?? ''} onChange={e => setEditData(d => ({ ...d, description: e.target.value }))}
                                                         className={inp + ' py-1 text-xs mt-1'} placeholder="Description" />
@@ -1342,6 +1408,8 @@ function CalculatorTab({ supabase }) {
     const [result, setResult] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [showSaveModal, setShowSaveModal] = useState(false)
+    const [savedPlan, setSavedPlan] = useState(null)
     // Tier selector for individual
     const [indTiers, setIndTiers] = useState([])
     const [selectedTier, setSelectedTier] = useState('auto')
@@ -1722,6 +1790,23 @@ function CalculatorTab({ supabase }) {
                                 </div>
                             </div>
                         )}
+
+                        {/* Save as Custom Plan — only for company / service_provider */}
+                        {type !== 'individual' && (
+                            <div className="pt-2 border-t border-gray-100 mt-2">
+                                <button
+                                    onClick={() => setShowSaveModal(true)}
+                                    className="w-full py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Sparkles size={16} /> Save as Custom Plan
+                                </button>
+                                {savedPlan && (
+                                    <p className="text-[10px] text-green-600 text-center mt-1.5 flex items-center justify-center gap-1">
+                                        <CheckCircle size={10} /> Last saved: {savedPlan.package_name_prefix}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-12 text-gray-300">
@@ -1730,6 +1815,16 @@ function CalculatorTab({ supabase }) {
                     </div>
                 )}
             </Section>
+
+            {/* Save Custom Plan Modal */}
+            <SaveCustomPlanModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                onSaved={(res) => setSavedPlan(res)}
+                supabase={supabase}
+                subscriberType={type}
+                calculatorResult={result}
+            />
         </div>
     )
 }

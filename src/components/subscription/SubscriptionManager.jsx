@@ -782,12 +782,19 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
               const isBasicPlus = (p.name || '').toLowerCase().includes('basic plus')
               const isRecommended = isBasicPlus
+              const isCustomPlan = p.is_custom === true
               const hasActiveTrial = isBasicPlus && trialInfo?.is_eligible && trialInfo?.trial_months > 0
               return (
                 <div key={p.id} className={`rounded-xl border p-5 flex flex-col shadow-sm hover:shadow-md transition-all ${
-                  isRecommended ? 'border-blue-300 bg-blue-50/30 ring-1 ring-blue-200' : 'border-gray-200 bg-white'
+                  isCustomPlan ? 'border-purple-300 bg-purple-50/30 ring-1 ring-purple-200'
+                  : isRecommended ? 'border-blue-300 bg-blue-50/30 ring-1 ring-blue-200' : 'border-gray-200 bg-white'
                 }`}>
-                  {isRecommended && (
+                  {isCustomPlan && (
+                    <span className="self-start inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 mb-3">
+                      <Sparkles size={10} /> CUSTOM PLAN
+                    </span>
+                  )}
+                  {isRecommended && !isCustomPlan && (
                     <span className="self-start inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 mb-3">
                       <Sparkles size={10} /> RECOMMENDED
                     </span>
