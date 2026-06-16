@@ -101,7 +101,7 @@ export async function POST(req) {
 
     // Determine the subscription page URL for the entity type
     const subPage = subscriber_type === 'company' ? 'company' : 'provider'
-    const ctaUrl = `${APP_URL()}/${subPage}/subscription`
+    const ctaUrl = `${APP_URL()}/${subPage}/subscription?view=packages`
 
     // ── Gather recipient user IDs: owner + admin/accountant staff ──
     const recipientUserIds = new Set()
