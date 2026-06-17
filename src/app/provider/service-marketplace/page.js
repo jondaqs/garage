@@ -45,15 +45,19 @@ function ProviderMarketplaceContent() {
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [respondingTo, setRespondingTo] = useState(null)
+  const [profileId, setProfileId] = useState(null)
 
   const loadBrowse = useCallback(async (initial = false) => {
     if (initial) setLoadingBrowse(true); else setRefreshingBrowse(true)
-    const { data } = await supabase.from('service_broadcasts')
+    // Exclude this user's own broadcasts so providers only see others' requests
+    let query = supabase.from('service_broadcasts')
       .select('*').eq('status', 'open').eq('is_hidden', false)
       .order('created_at', { ascending: false })
+    if (profileId) query = query.neq('posted_by', profileId)
+    const { data } = await query
     setAllBroadcasts(data || [])
     if (initial) setLoadingBrowse(false); else setRefreshingBrowse(false)
-  }, [supabase])
+  }, [supabase, profileId])
 
   const loadMyResponses = useCallback(async (initial = false) => {
     if (initial) setLoadingResponses(true); else setRefreshingResponses(true)
@@ -74,10 +78,21 @@ function ProviderMarketplaceContent() {
   }, [supabase])
 
   useEffect(() => {
-    loadBrowse(true)
+    // Resolve profile first, then load data
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+          .then(({ data }) => { if (data) setProfileId(data.id) })
+      }
+    })
     loadMyResponses(true)
     loadMyBroadcasts()
-  }, [loadBrowse, loadMyResponses, loadMyBroadcasts])
+  }, [supabase, loadMyResponses, loadMyBroadcasts])
+
+  // Load browse after profileId is resolved (so the .neq filter works)
+  useEffect(() => {
+    if (profileId) loadBrowse(true)
+  }, [profileId, loadBrowse])
 
   const filteredBrowse = searchQuery
     ? allBroadcasts.filter(b =>
