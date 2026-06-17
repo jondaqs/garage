@@ -37,7 +37,7 @@ const PRIORITY_COLORS = {
   p5_basic:    'bg-gray-100 text-gray-700 border-gray-200',
 }
 
-export default function SupportTicketModal({ isOpen, onClose, onSubmitted, supabase }) {
+export default function SupportTicketModal({ isOpen, onClose, onSubmitted, supabase, contextType }) {
   const [category, setCategory] = useState('')
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
@@ -64,6 +64,7 @@ export default function SupportTicketModal({ isOpen, onClose, onSubmitted, supab
         p_category: category,
         p_subject: subject.trim(),
         p_description: description.trim(),
+        p_context_type: contextType || null,
       })
       if (rpcErr) throw rpcErr
       const res = typeof data === 'string' ? JSON.parse(data) : data

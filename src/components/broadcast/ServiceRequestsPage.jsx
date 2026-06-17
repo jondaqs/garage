@@ -41,6 +41,7 @@ function ServiceRequestsContent({ subscriberType, entityId }) {
     // Scope to entity when viewing company/provider member context
     if (entityId && subscriberType === 'company') query = query.eq('company_id', entityId)
     else if (entityId && subscriberType === 'service_provider') query = query.eq('service_provider_id', entityId)
+    else if (!entityId && subscriberType === 'individual') query = query.eq('poster_type', 'individual')
     const { data } = await query
     setBroadcasts(data || [])
     if (initial) setLoading(false); else setRefreshing(false)
@@ -90,7 +91,7 @@ function ServiceRequestsContent({ subscriberType, entityId }) {
   if (loading) return (
     <div className="max-w-4xl mx-auto">
       <div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={28} /></div>
-      <CreateBroadcastModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => load()} supabase={supabase} />
+      <CreateBroadcastModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => load()} supabase={supabase} contextType={subscriberType} />
     </div>
   )
 
@@ -209,7 +210,7 @@ function ServiceRequestsContent({ subscriberType, entityId }) {
         </div>
       )}
 
-      <CreateBroadcastModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => load()} supabase={supabase} />
+      <CreateBroadcastModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => load()} supabase={supabase} contextType={subscriberType} />
     </div>
   )
 }

@@ -147,7 +147,7 @@ export default function SupportPageContent({ subscriberType, entityId }) {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={28} /></div>
-        <SupportTicketModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => loadTickets()} supabase={supabase} />
+        <SupportTicketModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => loadTickets()} supabase={supabase} contextType={subscriberType} />
       </div>
     )
   }
@@ -317,6 +317,7 @@ export default function SupportPageContent({ subscriberType, entityId }) {
         onClose={() => setShowModal(false)}
         onSubmitted={() => loadTickets()}
         supabase={supabase}
+        contextType={subscriberType}
       />
     </div>
   )

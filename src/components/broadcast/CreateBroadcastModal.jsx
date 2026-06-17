@@ -11,7 +11,7 @@ const CATEGORIES = [
   'Inspection', 'Parts Supply', 'Detailing', 'Equipment Rental', 'Other',
 ]
 
-export default function CreateBroadcastModal({ isOpen, onClose, onSubmitted, supabase }) {
+export default function CreateBroadcastModal({ isOpen, onClose, onSubmitted, supabase, contextType }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
@@ -45,6 +45,7 @@ export default function CreateBroadcastModal({ isOpen, onClose, onSubmitted, sup
         p_budget_estimate: budget || null,
         p_urgency: urgency,
         p_preferred_start: preferredStart || null,
+        p_context_type: contextType || null,
       })
       if (rpcErr) throw rpcErr
       const res = typeof data === 'string' ? JSON.parse(data) : data

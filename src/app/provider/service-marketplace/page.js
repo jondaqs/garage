@@ -338,7 +338,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
 
       {/* Modals */}
       <CreateBroadcastModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}
-        onSubmitted={() => { loadMyBroadcasts(); loadBrowse() }} supabase={supabase} />
+        onSubmitted={() => { loadMyBroadcasts(); loadBrowse() }} supabase={supabase} contextType="service_provider" />
       <RespondToBroadcastModal isOpen={!!respondingTo} onClose={() => setRespondingTo(null)}
         onSubmitted={() => { loadMyResponses(); loadBrowse() }} supabase={supabase} broadcast={respondingTo} />
     </div>
