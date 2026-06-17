@@ -11,6 +11,7 @@ import {
   ExternalLink,
   CreditCard,
   LifeBuoy,
+  Megaphone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ADMIN_ROLES, PERMISSIONS, ADMIN_ROLE_CODES, getHighestAdminRole } from '@/lib/admin/permissions'
@@ -221,6 +222,19 @@ export default function AdminSidebar() {
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-300 group-hover:text-white">
                   Support Tickets
+                </p>
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={() => router.push('/admin/service-broadcasts')}
+            className="w-full group block"
+          >
+            <div className="flex items-center">
+              <Megaphone className="inline-block h-5 w-5 text-gray-400 group-hover:text-gray-300" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-300 group-hover:text-white">
+                  Service Broadcasts
                 </p>
               </div>
             </div>
