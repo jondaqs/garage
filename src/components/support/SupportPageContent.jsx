@@ -1,22 +1,10 @@
 // src/components/support/SupportPageContent.jsx
 'use client'
 
-/**
- * SupportPageContent
- *
- * Shared support ticket list + detail view used by:
- *   /dashboard/support  (individual)
- *   /company/support    (company)
- *   /provider/support   (provider)
- *
- * Props:
- *   subscriberType  - 'individual' | 'company' | 'service_provider'
- */
-
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  LifeBuoy, Plus, Loader2, ChevronDown, ChevronUp, Send,
+  LifeBuoy, Plus, Loader2, ChevronDown, ChevronUp, Send, RefreshCw,
   Clock, AlertCircle, CheckCircle, XCircle, MessageSquare,
 } from 'lucide-react'
 import SupportTicketModal from '@/components/support/SupportTicketModal'
@@ -50,7 +38,8 @@ function fmtDate(d) {
 export default function SupportPageContent({ subscriberType }) {
   const supabase = createClient()
   const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -62,19 +51,20 @@ export default function SupportPageContent({ subscriberType }) {
   const [sendingMessage, setSendingMessage] = useState(false)
   const [profileId, setProfileId] = useState(null)
 
-  const loadTickets = useCallback(async () => {
-    setLoading(true)
+  const loadTickets = useCallback(async (isInitial = false) => {
+    if (isInitial) setInitialLoading(true)
+    else setRefreshing(true)
     const { data } = await supabase
       .from('support_tickets')
       .select('*')
       .order('created_at', { ascending: false })
     setTickets(data || [])
-    setLoading(false)
+    if (isInitial) setInitialLoading(false)
+    else setRefreshing(false)
   }, [supabase])
 
   useEffect(() => {
-    loadTickets()
-    // Get profile id for message sender check
+    loadTickets(true)
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
@@ -135,8 +125,14 @@ export default function SupportPageContent({ subscriberType }) {
 
   const activeCounts = tickets.filter(t => ['open', 'assigned', 'in_progress', 'waiting_on_user'].includes(t.status)).length
 
-  if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={28} /></div>
+  // Initial loading — show spinner but always render modal below
+  if (initialLoading) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={28} /></div>
+        <SupportTicketModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmitted={() => loadTickets()} supabase={supabase} />
+      </div>
+    )
   }
 
   return (
@@ -149,10 +145,16 @@ export default function SupportPageContent({ subscriberType }) {
           </h1>
           <p className="text-sm text-gray-500 mt-1">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''} · {activeCounts} active</p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
-          <Plus size={16} /> New Ticket
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => loadTickets()} disabled={refreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          </button>
+          <button onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+            <Plus size={16} /> New Ticket
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -292,7 +294,7 @@ export default function SupportPageContent({ subscriberType }) {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal — always rendered, never unmounted by loading state */}
       <SupportTicketModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
