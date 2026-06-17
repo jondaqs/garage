@@ -19,7 +19,7 @@ const POSTER_ICON = { individual: User, company: Building2, service_provider: Wr
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' }
 
-function ProviderMarketplaceContent() {
+function ProviderMarketplaceContent({ providerIdProp }) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const initialView = searchParams?.get('view') || 'browse'
@@ -46,18 +46,20 @@ function ProviderMarketplaceContent() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [respondingTo, setRespondingTo] = useState(null)
   const [profileId, setProfileId] = useState(null)
+  const [providerId, setProviderId] = useState(providerIdProp || null)
 
   const loadBrowse = useCallback(async (initial = false) => {
     if (initial) setLoadingBrowse(true); else setRefreshingBrowse(true)
-    // Exclude this user's own broadcasts so providers only see others' requests
+    // Exclude this user's own broadcasts AND their provider's broadcasts
     let query = supabase.from('service_broadcasts')
       .select('*').eq('status', 'open').eq('is_hidden', false)
       .order('created_at', { ascending: false })
     if (profileId) query = query.neq('posted_by', profileId)
+    if (providerId) query = query.neq('service_provider_id', providerId)
     const { data } = await query
     setAllBroadcasts(data || [])
     if (initial) setLoadingBrowse(false); else setRefreshingBrowse(false)
-  }, [supabase, profileId])
+  }, [supabase, profileId, providerId])
 
   const loadMyResponses = useCallback(async (initial = false) => {
     if (initial) setLoadingResponses(true); else setRefreshingResponses(true)
@@ -78,21 +80,38 @@ function ProviderMarketplaceContent() {
   }, [supabase])
 
   useEffect(() => {
-    // Resolve profile first, then load data
+    // Resolve profile + provider ID, then load data
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
-          .then(({ data }) => { if (data) setProfileId(data.id) })
+          .then(({ data }) => {
+            if (data) {
+              setProfileId(data.id)
+              // Also resolve provider ID if not passed as prop
+              if (!providerIdProp) {
+                // Check owner first
+                supabase.from('service_providers').select('id').eq('owner_user_id', data.id).eq('is_active', true).limit(1).maybeSingle()
+                  .then(({ data: sp }) => {
+                    if (sp) { setProviderId(sp.id) }
+                    else {
+                      // Check staff membership
+                      supabase.from('service_provider_users').select('service_provider_id').eq('user_id', data.id).eq('is_active', true).limit(1).maybeSingle()
+                        .then(({ data: spu }) => { if (spu) setProviderId(spu.service_provider_id) })
+                    }
+                  })
+              }
+            }
+          })
       }
     })
     loadMyResponses(true)
     loadMyBroadcasts()
-  }, [supabase, loadMyResponses, loadMyBroadcasts])
+  }, [supabase, loadMyResponses, loadMyBroadcasts, providerIdProp])
 
-  // Load browse after profileId is resolved (so the .neq filter works)
+  // Load browse after profileId + providerId are resolved
   useEffect(() => {
     if (profileId) loadBrowse(true)
-  }, [profileId, loadBrowse])
+  }, [profileId, providerId, loadBrowse])
 
   const filteredBrowse = searchQuery
     ? allBroadcasts.filter(b =>
@@ -318,10 +337,10 @@ function ProviderMarketplaceContent() {
   )
 }
 
-export default function ProviderMarketplacePage() {
+export default function ProviderMarketplacePage({ providerIdProp }) {
   return (
     <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={28} /></div>}>
-      <ProviderMarketplaceContent />
+      <ProviderMarketplaceContent providerIdProp={providerIdProp} />
     </Suspense>
   )
 }

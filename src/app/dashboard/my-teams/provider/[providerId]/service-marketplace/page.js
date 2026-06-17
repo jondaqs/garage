@@ -2,11 +2,30 @@
 'use client'
 import { useParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
-import ProviderMarketplacePage from '@/app/provider/service-marketplace/page'
 
-// Re-uses the provider marketplace page — the RPC functions resolve the provider
-// from the caller's auth context, so the providerId param is for sidebar routing only.
+// Dynamic import to avoid circular dependency — the marketplace page
+// exports ProviderMarketplaceContent which accepts providerIdProp
+import dynamic from 'next/dynamic'
+const ProviderMarketplacePage = dynamic(
+  () => import('@/app/provider/service-marketplace/page'),
+  { loading: () => <div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={28} /></div> }
+)
+
+function Content() {
+  const { providerId } = useParams()
+  // The ProviderMarketplacePage wrapper renders ProviderMarketplaceContent
+  // which now accepts providerIdProp via the exported wrapper
+  return <ProviderMarketplacePage providerIdProp={providerId} />
+}
+
 export default function ProviderMemberMarketplacePage() {
-  return <ProviderMarketplacePage />
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={28} /></div>}>
+      <Content />
+    </Suspense>
+  )
 }
