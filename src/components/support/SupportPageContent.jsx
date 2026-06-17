@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   LifeBuoy, Plus, Loader2, ChevronDown, ChevronUp, Send, RefreshCw,
@@ -37,6 +38,8 @@ function fmtDate(d) {
 
 export default function SupportPageContent({ subscriberType }) {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const deepLinkedTicket = searchParams?.get('ticket') || null
   const [tickets, setTickets] = useState([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -72,6 +75,18 @@ export default function SupportPageContent({ subscriberType }) {
       }
     })
   }, [loadTickets, supabase])
+
+  // Auto-expand deep-linked ticket from email CTA
+  useEffect(() => {
+    if (deepLinkedTicket && !initialLoading && tickets.length > 0) {
+      const found = tickets.find(t => t.id === deepLinkedTicket)
+      if (found) {
+        setExpandedId(found.id)
+        setStatusFilter('all') // ensure filter doesn't hide the ticket
+        loadMessages(found.id)
+      }
+    }
+  }, [deepLinkedTicket, initialLoading, tickets])
 
   const loadMessages = async (ticketId) => {
     setLoadingMessages(true)

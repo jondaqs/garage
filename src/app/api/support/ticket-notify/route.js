@@ -216,7 +216,7 @@ export async function POST(req) {
             priorityLabel: priority_label, priorityCode: priority_code,
             category, subject, description, entityName: entity_name,
             subscriberType: subscriber_type,
-            ctaUrl: `${APP_URL()}/${subPage}/support`,
+            ctaUrl: `${APP_URL()}/${subPage}/support?ticket=${ticket_id}`,
             isSubmitter: true,
           }),
           text: `${BRAND}: Your support ticket ${ticket_number} has been received. Priority: ${priority_label}. We'll get back to you soon.`,
