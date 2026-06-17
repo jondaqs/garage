@@ -22,7 +22,7 @@ const STATUS_COLORS = { open: 'bg-green-100 text-green-800', in_review: 'bg-blue
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' }
 
-function ServiceRequestsContent({ subscriberType }) {
+function ServiceRequestsContent({ subscriberType, entityId }) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const deepLinked = searchParams?.get('broadcast') || null
@@ -37,11 +37,14 @@ function ServiceRequestsContent({ subscriberType }) {
 
   const load = useCallback(async (initial = false) => {
     if (initial) setLoading(true); else setRefreshing(true)
-    const { data } = await supabase.from('service_broadcasts')
-      .select('*').order('created_at', { ascending: false })
+    let query = supabase.from('service_broadcasts').select('*').order('created_at', { ascending: false })
+    // Scope to entity when viewing company/provider member context
+    if (entityId && subscriberType === 'company') query = query.eq('company_id', entityId)
+    else if (entityId && subscriberType === 'service_provider') query = query.eq('service_provider_id', entityId)
+    const { data } = await query
     setBroadcasts(data || [])
     if (initial) setLoading(false); else setRefreshing(false)
-  }, [supabase])
+  }, [supabase, entityId, subscriberType])
 
   useEffect(() => { load(true) }, [load])
   useEffect(() => {
@@ -211,10 +214,10 @@ function ServiceRequestsContent({ subscriberType }) {
   )
 }
 
-export default function ServiceRequestsPage({ subscriberType }) {
+export default function ServiceRequestsPage({ subscriberType, entityId }) {
   return (
     <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={28} /></div>}>
-      <ServiceRequestsContent subscriberType={subscriberType} />
+      <ServiceRequestsContent subscriberType={subscriberType} entityId={entityId} />
     </Suspense>
   )
 }

@@ -36,7 +36,7 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function SupportPageContent({ subscriberType }) {
+export default function SupportPageContent({ subscriberType, entityId }) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const deepLinkedTicket = searchParams?.get('ticket') || null
@@ -57,14 +57,16 @@ export default function SupportPageContent({ subscriberType }) {
   const loadTickets = useCallback(async (isInitial = false) => {
     if (isInitial) setInitialLoading(true)
     else setRefreshing(true)
-    const { data } = await supabase
-      .from('support_tickets')
-      .select('*')
-      .order('created_at', { ascending: false })
+    let query = supabase.from('support_tickets').select('*').order('created_at', { ascending: false })
+    // Scope to entity when viewing company/provider member context
+    if (entityId && subscriberType === 'company') query = query.eq('company_id', entityId)
+    else if (entityId && subscriberType === 'service_provider') query = query.eq('service_provider_id', entityId)
+    else if (subscriberType === 'individual') query = query.eq('subscriber_type', 'individual')
+    const { data } = await query
     setTickets(data || [])
     if (isInitial) setInitialLoading(false)
     else setRefreshing(false)
-  }, [supabase])
+  }, [supabase, entityId, subscriberType])
 
   useEffect(() => {
     loadTickets(true)

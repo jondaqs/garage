@@ -600,6 +600,8 @@ export default function Sidebar({ user }) {
       { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // budget access has its own rules — see filter below
       { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
       { icon: CreditCard,   label: 'Subscription', path: `/company/subscription`,   everyone: false },
+      { icon: LifeBuoy,     label: 'Support',      path: `${base}/support`,           everyone: true },
+      { icon: Megaphone,    label: 'Service Requests', path: `${base}/service-requests`, everyone: true },
     ]
     // Filter out restricted items for users who don't qualify.
     //   • Most admin-only rows show only to is_admin
@@ -1008,6 +1010,18 @@ export default function Sidebar({ user }) {
                           path:  `/dashboard/my-teams/provider/${m.providerId}/revenue`,
                         }} />
                       )}
+                      {/* Support — scoped to this provider */}
+                      <NavItem key={`${m.providerId}-support`} compact item={{
+                        icon:  LifeBuoy,
+                        label: 'Support',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/support`,
+                      }} />
+                      {/* Service Marketplace — owner/admin can respond to broadcasts */}
+                      <NavItem key={`${m.providerId}-marketplace`} compact item={{
+                        icon:  Megaphone,
+                        label: 'Marketplace',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/service-marketplace`,
+                      }} />
                       {/* Chat for this provider lives below Assigned Work Orders
                           in the shared block — keeps the provider-membership
                           quick-look (Overview only) tight, and groups all chat
