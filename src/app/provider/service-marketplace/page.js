@@ -47,6 +47,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   const [respondingTo, setRespondingTo] = useState(null)
   const [profileId, setProfileId] = useState(null)
   const [providerId, setProviderId] = useState(providerIdProp || null)
+  const [identityReady, setIdentityReady] = useState(!!providerIdProp) // skip resolution if prop provided
 
   const loadBrowse = useCallback(async (initial = false) => {
     if (initial) setLoadingBrowse(true); else setRefreshingBrowse(true)
@@ -80,38 +81,45 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   }, [supabase])
 
   useEffect(() => {
-    // Resolve profile + provider ID, then load data
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
-          .then(({ data }) => {
-            if (data) {
-              setProfileId(data.id)
-              // Also resolve provider ID if not passed as prop
-              if (!providerIdProp) {
-                // Check owner first
-                supabase.from('service_providers').select('id').eq('owner_user_id', data.id).eq('is_active', true).limit(1).maybeSingle()
-                  .then(({ data: sp }) => {
-                    if (sp) { setProviderId(sp.id) }
-                    else {
-                      // Check staff membership
-                      supabase.from('service_provider_users').select('service_provider_id').eq('user_id', data.id).eq('is_active', true).limit(1).maybeSingle()
-                        .then(({ data: spu }) => { if (spu) setProviderId(spu.service_provider_id) })
-                    }
-                  })
-              }
-            }
-          })
+    // Resolve profile + provider ID together before any browse load
+    const resolve = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setIdentityReady(true); return }
+
+      const { data: profile } = await supabase
+        .from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      if (!profile) { setIdentityReady(true); return }
+
+      setProfileId(profile.id)
+
+      // Resolve provider ID if not passed as prop
+      if (!providerIdProp) {
+        // Check owner first
+        const { data: sp } = await supabase
+          .from('service_providers').select('id')
+          .eq('owner_user_id', profile.id).eq('is_active', true).limit(1).maybeSingle()
+        if (sp) {
+          setProviderId(sp.id)
+        } else {
+          // Check staff membership
+          const { data: spu } = await supabase
+            .from('service_provider_users').select('service_provider_id')
+            .eq('user_id', profile.id).eq('is_active', true).limit(1).maybeSingle()
+          if (spu) setProviderId(spu.service_provider_id)
+        }
       }
-    })
+
+      setIdentityReady(true)
+    }
+    resolve()
     loadMyResponses(true)
     loadMyBroadcasts()
   }, [supabase, loadMyResponses, loadMyBroadcasts, providerIdProp])
 
-  // Load browse after profileId + providerId are resolved
+  // Load browse ONLY after identity is fully resolved (no flash of unfiltered data)
   useEffect(() => {
-    if (profileId) loadBrowse(true)
-  }, [profileId, providerId, loadBrowse])
+    if (identityReady) loadBrowse(true)
+  }, [identityReady, loadBrowse])
 
   const filteredBrowse = searchQuery
     ? allBroadcasts.filter(b =>
