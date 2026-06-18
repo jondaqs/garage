@@ -40,6 +40,7 @@ export default function ProfilePage() {
           phone: user.user_metadata.phone || '',
           gender: user.user_metadata.gender || '',
           dateOfBirth: user.user_metadata.date_of_birth || '',
+          country: user.user_metadata.country || '',
         })
       }
 
@@ -154,7 +155,7 @@ export default function ProfilePage() {
         setAvatarUploading(false)
       }
 
-      // 2. Update auth user metadata
+      // 2. Update auth user metadata (includes country)
       const { error: authErr } = await supabase.auth.updateUser({
         data: {
           first_name: profileForm.firstName,
@@ -162,17 +163,16 @@ export default function ProfilePage() {
           phone: profileForm.phone,
           gender: profileForm.gender,
           date_of_birth: profileForm.dateOfBirth,
+          country: profileForm.country || null,
         }
       })
       if (authErr) throw authErr
 
-      // 3. Update country in user_profiles
+      // 3. Also update country directly on user_profiles (trigger encrypts it)
       if (profileId) {
-        const { error: profileErr } = await supabase
-          .from('user_profiles')
-          .update({ country: profileForm.country || null, updated_at: new Date().toISOString() })
+        await supabase.from('user_profiles')
+          .update({ country: profileForm.country || null })
           .eq('id', profileId)
-        if (profileErr) throw profileErr
       }
 
       // Clean up state
