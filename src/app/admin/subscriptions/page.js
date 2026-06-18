@@ -76,13 +76,16 @@ function StatCard({ label, value, icon: Icon, color = 'blue', subtext, trend }) 
 }
 
 // ─── Section wrapper ────────────────────────────────────────────
-function Section({ title, description, actions, children }) {
+function Section({ title, description, actions, children, icon: Icon }) {
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <div className="flex items-start justify-between mb-4">
-                <div>
-                    <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-                    {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
+            <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                    {Icon && <Icon size={16} className="text-gray-400" />}
+                    <div>
+                        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+                        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+                    </div>
                 </div>
                 {actions && <div className="flex gap-2">{actions}</div>}
             </div>
@@ -270,7 +273,7 @@ function OverviewTab({ supabase }) {
                 <StatCard label="Overdue invoices" value={stats.overdueInvoices} icon={AlertCircle} color="red" />
             </div>
             <Section title="Active subscriptions by type" description="Distribution across subscriber types">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-blue-50 rounded-lg p-4 text-center">
                         <Users size={20} className="mx-auto text-blue-600 mb-1" />
                         <p className="text-2xl font-bold text-blue-900">{stats.byType.individual}</p>
@@ -859,7 +862,7 @@ function PricingTiersTab({ supabase }) {
                         <span className="text-white font-semibold text-xs">New Pricing Tier</span>
                     </div>
                     <div className="p-4 space-y-3">
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <div>
                                 <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Type *</label>
                                 <select value={newTier.subscription_type_id} onChange={e => setNewTier(d => ({ ...d, subscription_type_id: e.target.value }))} className={inp + ' text-xs'}>
@@ -883,7 +886,7 @@ function PricingTiersTab({ supabase }) {
                             <input type="text" placeholder="Short description" value={newTier.description}
                                 onChange={e => setNewTier(d => ({ ...d, description: e.target.value }))} className={inp + ' text-xs'} />
                         </div>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             <div>
                                 <label className="text-[10px] font-semibold text-gray-500 uppercase block mb-1">Base Price/mo *</label>
                                 <input type="number" step="0.01" min="0" placeholder="0.00" value={newTier.base_monthly_price}
@@ -912,7 +915,7 @@ function PricingTiersTab({ supabase }) {
                                 </label>
                             </div>
                         </div>
-                        <div className="grid grid-cols-6 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Min Veh.</label>
                                 <input type="number" min="0" value={newTier.min_vehicles} onChange={e => setNewTier(d => ({ ...d, min_vehicles: e.target.value }))} className={inp + ' text-xs'} /></div>
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Max Veh.</label>
@@ -926,7 +929,7 @@ function PricingTiersTab({ supabase }) {
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Max Clients</label>
                                 <input type="number" min="0" placeholder="∞" value={newTier.max_monthly_clients} onChange={e => setNewTier(d => ({ ...d, max_monthly_clients: e.target.value }))} className={inp + ' text-xs'} /></div>
                         </div>
-                        <div className="grid grid-cols-6 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Per Veh.</label>
                                 <input type="number" step="0.01" min="0" value={newTier.per_extra_vehicle_price} onChange={e => setNewTier(d => ({ ...d, per_extra_vehicle_price: e.target.value }))} className={inp + ' text-xs'} /></div>
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Per Staff</label>
@@ -2113,7 +2116,7 @@ function InvoicesTab({ supabase }) {
 
                       {payingId === inv.id && (
                         <div className="rounded-xl border border-gray-200 p-4 space-y-3 bg-gray-50">
-                          <div className="grid grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {PAYMENT_METHODS_ADMIN.map(m => (
                               <button key={m.value} onClick={() => setPayMethod(m.value)}
                                 className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-[10px] font-semibold transition-all ${payMethod === m.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
@@ -2121,7 +2124,7 @@ function InvoicesTab({ supabase }) {
                               </button>
                             ))}
                           </div>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Amount</label><input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} /></div>
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Transaction Ref</label><input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. M-Pesa QXZ" className={inp} /></div>
                             <div><label className="text-[10px] font-semibold text-gray-500 block mb-1">Notes</label><input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} /></div>
@@ -2568,17 +2571,19 @@ function AdminSubscriptionsPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl flex-wrap mb-6">
+            <div className="overflow-x-auto -mx-4 px-4 mb-6">
+                <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit min-w-full">
                 {TABS.map(t => {
                     const Icon = t.icon
                     return (
                         <button key={t.id} onClick={() => setTab(t.id)}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors min-w-fit ${tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                 }`}>
-                            <Icon size={14} /> {t.label}
+                            <Icon size={14} /> <span className="hidden sm:inline">{t.label}</span>
                         </button>
                     )
                 })}
+                </div>
             </div>
 
             {/* Tab content */}
