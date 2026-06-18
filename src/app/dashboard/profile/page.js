@@ -22,7 +22,9 @@ export default function ProfilePage() {
     phone: '',
     gender: '',
     dateOfBirth: '',
+    country: '',
   })
+  const [availableCountries, setAvailableCountries] = useState([])
 
   useEffect(() => {
     const load = async () => {
@@ -41,10 +43,10 @@ export default function ProfilePage() {
         })
       }
 
-      // Load profile picture URL from user_profiles
+      // Load profile picture URL and country from user_profiles
       const { data: profile } = await supabase
         .from('user_profiles_secure')
-        .select('id, profile_picture_url')
+        .select('id, profile_picture_url, country')
         .eq('auth_user_id', user.id)
         .single()
 
@@ -53,7 +55,19 @@ export default function ProfilePage() {
         if (profile.profile_picture_url) {
           setAvatarUrl(profile.profile_picture_url)
         }
+        if (profile.country) {
+          setProfileForm(prev => ({ ...prev, country: profile.country }))
+        }
       }
+
+      // Load available countries from currencies table
+      const { data: countries } = await supabase
+        .from('currencies')
+        .select('country, code, symbol')
+        .eq('is_active', true)
+        .not('country', 'is', null)
+        .order('country')
+      setAvailableCountries(countries || [])
     }
     load()
   }, [supabase])
@@ -151,6 +165,15 @@ export default function ProfilePage() {
         }
       })
       if (authErr) throw authErr
+
+      // 3. Update country in user_profiles
+      if (profileId) {
+        const { error: profileErr } = await supabase
+          .from('user_profiles')
+          .update({ country: profileForm.country || null, updated_at: new Date().toISOString() })
+          .eq('id', profileId)
+        if (profileErr) throw profileErr
+      }
 
       // Clean up state
       setAvatarUrl(newAvatarUrl)
@@ -300,6 +323,24 @@ export default function ProfilePage() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
               />
             </div>
+          </div>
+
+          {/* ── Country ── */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Country
+            </label>
+            <select
+              value={profileForm.country}
+              onChange={(e) => setProfileForm({...profileForm, country: e.target.value})}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select country</option>
+              {availableCountries.map(c => (
+                <option key={c.country} value={c.country}>{c.country} ({c.code})</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Used to determine your preferred currency for pricing display.</p>
           </div>
 
           {/* ── Submit ── */}

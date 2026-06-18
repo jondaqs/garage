@@ -174,13 +174,20 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         setTickets(tix || [])
       }
 
-      // Fetch currencies and auto-detect user's preferred currency
+      // Fetch currencies and determine user's preferred currency
       const { data: currData } = await supabase
-        .from('currencies').select('id, code, symbol, display_name')
+        .from('currencies').select('id, code, symbol, display_name, country')
         .eq('is_active', true).order('code')
       setAvailableCurrencies(currData || [])
 
-      // For providers: use their currency_id if set
+      // Currency detection chain:
+      // 1. Provider: currency_id field (direct)
+      // 2. User profile: country → currencies.country → code
+      // 3. Company profile: country → currencies.country → code
+      // 4. Browser timezone detection
+      // 5. Default USD
+      let resolved = false
+
       if (subscriberType === 'service_provider' && subscriberId) {
         const { data: sp } = await supabase
           .from('service_providers').select('currency_id, currencies(code, symbol)')
@@ -188,14 +195,45 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         if (sp?.currencies?.code) {
           setDisplayCurrency(sp.currencies.code)
           setDisplaySymbol(sp.currencies.symbol || sp.currencies.code)
-        } else {
-          // Auto-detect from browser
-          const { currencyCode: detected } = detectCurrencyFromBrowser()
-          const match = matchCurrencyInList(detected, currData || [])
-          if (match) { setDisplayCurrency(match.code); setDisplaySymbol(match.symbol || match.code) }
+          resolved = true
         }
-      } else {
-        // Individual/company: auto-detect from browser
+      }
+
+      // Check user_profiles.country (for individual or any user)
+      if (!resolved) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          const { data: userProfile } = await supabase
+            .from('user_profiles').select('country')
+            .eq('auth_user_id', authUser.id).maybeSingle()
+          if (userProfile?.country) {
+            const match = (currData || []).find(c => c.country === userProfile.country)
+            if (match) {
+              setDisplayCurrency(match.code)
+              setDisplaySymbol(match.symbol || match.code)
+              resolved = true
+            }
+          }
+        }
+      }
+
+      // Check company_profiles.country (for company context)
+      if (!resolved && subscriberType === 'company' && subscriberId) {
+        const { data: comp } = await supabase
+          .from('company_profiles').select('country')
+          .eq('id', subscriberId).maybeSingle()
+        if (comp?.country) {
+          const match = (currData || []).find(c => c.country === comp.country)
+          if (match) {
+            setDisplayCurrency(match.code)
+            setDisplaySymbol(match.symbol || match.code)
+            resolved = true
+          }
+        }
+      }
+
+      // Fallback: browser timezone detection
+      if (!resolved) {
         const { currencyCode: detected } = detectCurrencyFromBrowser()
         const match = matchCurrencyInList(detected, currData || [])
         if (match) { setDisplayCurrency(match.code); setDisplaySymbol(match.symbol || match.code) }
