@@ -36,7 +36,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   const [myResponses, setMyResponses] = useState([])
   const [loadingResponses, setLoadingResponses] = useState(true)
   const [refreshingResponses, setRefreshingResponses] = useState(false)
-  const [responseExpanded, setResponseExpanded] = useState(null)
+  const [responseExpanded, setResponseExpanded] = useState(searchParams?.get('response') || null)
 
   // My broadcasts (provider posting their own needs)
   const [myBroadcasts, setMyBroadcasts] = useState([])

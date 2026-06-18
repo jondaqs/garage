@@ -138,7 +138,7 @@ export async function POST(req) {
                 html: buildEmailHtml({
                   recipientName: p.name,
                   bodyText: `Congratulations! Your proposal for "<strong>${body.broadcast_title}</strong>" has been accepted. Contact the requester to coordinate next steps.`,
-                  ctaLabel: 'View Details', ctaUrl: `${APP_URL()}/provider/service-marketplace?view=responses`,
+                  ctaLabel: 'View Details', ctaUrl: `${APP_URL()}/provider/service-marketplace?view=responses&response=${body.response_id}`,
                   accentColor: '#059669',
                 }),
                 text: `${BRAND}: Your proposal for "${body.broadcast_title}" was accepted! View details in your dashboard.`,
