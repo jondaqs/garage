@@ -73,12 +73,14 @@ function ProviderMarketplaceContent({ providerIdProp }) {
 
   const loadMyBroadcasts = useCallback(async () => {
     setLoadingMyBroadcasts(true)
-    const { data } = await supabase.from('service_broadcasts')
-      .select('*').order('created_at', { ascending: false })
-    // Filter to only this user's broadcasts (RLS handles but we refine client-side)
+    let query = supabase.from('service_broadcasts')
+      .select('*').eq('poster_type', 'service_provider')
+      .order('created_at', { ascending: false })
+    if (providerId) query = query.eq('service_provider_id', providerId)
+    const { data } = await query
     setMyBroadcasts(data || [])
     setLoadingMyBroadcasts(false)
-  }, [supabase])
+  }, [supabase, providerId])
 
   useEffect(() => {
     // Resolve profile + provider ID together before any browse load
@@ -118,8 +120,11 @@ function ProviderMarketplaceContent({ providerIdProp }) {
 
   // Load browse ONLY after identity is fully resolved (no flash of unfiltered data)
   useEffect(() => {
-    if (identityReady) loadBrowse(true)
-  }, [identityReady, loadBrowse])
+    if (identityReady) {
+      loadBrowse(true)
+      loadMyBroadcasts()  // also reload with providerId filter
+    }
+  }, [identityReady, loadBrowse, loadMyBroadcasts])
 
   const filteredBrowse = searchQuery
     ? allBroadcasts.filter(b =>
