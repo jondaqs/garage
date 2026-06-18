@@ -41,7 +41,7 @@ function Toast({ message, type, onDismiss }) {
 // ════════════════════════════════════════════════════════════════
 //  TICKETS TAB
 // ════════════════════════════════════════════════════════════════
-function TicketsView({ supabase }) {
+function TicketsView({ supabase, deepLinkedTicket }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -71,6 +71,21 @@ function TicketsView({ supabase }) {
         .then(({ data }) => { if (data) setProfileId(data.id) })
     })
   }, [loadTickets, supabase])
+
+  // Auto-expand deep-linked ticket from email CTA
+  useEffect(() => {
+    if (deepLinkedTicket && !loading && tickets.length > 0) {
+      const found = tickets.find(t => t.id === deepLinkedTicket)
+      if (found) {
+        setExpandedId(found.id)
+        setStatusFilter('all')
+        setPriorityFilter('all')
+        setAdminNotes(found.admin_notes || '')
+        setResolutionNotes(found.resolution_notes || '')
+        loadMessages(found.id)
+      }
+    }
+  }, [deepLinkedTicket, loading, tickets])
 
   const loadMessages = async (ticketId) => {
     setLoadingMessages(true)
@@ -418,6 +433,7 @@ function AdminSupportPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const [tab, setTab] = useState(searchParams?.get('tab') || 'tickets')
+  const deepLinkedTicket = searchParams?.get('ticket') || null
 
   const TABS = [
     { id: 'tickets', label: 'All Tickets', icon: LifeBuoy },
@@ -448,7 +464,7 @@ function AdminSupportPage() {
         })}
       </div>
 
-      {tab === 'tickets' && <TicketsView supabase={supabase} />}
+      {tab === 'tickets' && <TicketsView supabase={supabase} deepLinkedTicket={deepLinkedTicket} />}
       {tab === 'routing' && <RoutingConfigView supabase={supabase} />}
     </div>
   )

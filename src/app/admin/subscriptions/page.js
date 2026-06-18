@@ -2274,7 +2274,7 @@ function ReceiptsTab({ supabase, deepLinkedReceipt }) {
 // ════════════════════════════════════════════════════════════════
 //  ADMIN TICKETS TAB
 // ════════════════════════════════════════════════════════════════
-function AdminTicketsTab({ supabase }) {
+function AdminTicketsTab({ supabase, deepLinkedTicket }) {
     const [tickets, setTickets] = useState([])
     const [loading, setLoading] = useState(true)
     const [statusFilter, setStatusFilter] = useState('all')
@@ -2284,6 +2284,18 @@ function AdminTicketsTab({ supabase }) {
     const [updatingId, setUpdatingId] = useState(null)
 
     useEffect(() => { loadTickets() }, [])
+
+    // Auto-expand deep-linked ticket from email CTA
+    useEffect(() => {
+        if (deepLinkedTicket && !loading && tickets.length > 0) {
+            const found = tickets.find(t => t.id === deepLinkedTicket)
+            if (found) {
+                setExpandedId(found.id)
+                setStatusFilter('all')
+                setAdminNotes(found.admin_notes || '')
+            }
+        }
+    }, [deepLinkedTicket, loading, tickets])
 
     const loadTickets = async () => {
         setLoading(true)
@@ -2461,7 +2473,8 @@ function AdminSubscriptionsPage() {
     const searchParams = useSearchParams()
     const initialTab = searchParams?.get('tab') || 'overview'
     const deepLinkedReceipt = searchParams?.get('receipt') || null
-    const [tab, setTab] = useState(initialTab)
+    const deepLinkedTicket = searchParams?.get('ticket') || null
+    const [tab, setTab] = useState(deepLinkedTicket ? 'tickets' : initialTab)
 
     return (
         <div>
@@ -2495,7 +2508,7 @@ function AdminSubscriptionsPage() {
             {tab === 'invoices' && <InvoicesTab supabase={supabase} />}
             {tab === 'receipts' && <ReceiptsTab supabase={supabase} deepLinkedReceipt={deepLinkedReceipt} />}
             {tab === 'calculator' && <CalculatorTab supabase={supabase} />}
-            {tab === 'tickets' && <AdminTicketsTab supabase={supabase} />}
+            {tab === 'tickets' && <AdminTicketsTab supabase={supabase} deepLinkedTicket={deepLinkedTicket} />}
         </div>
     )
 }
