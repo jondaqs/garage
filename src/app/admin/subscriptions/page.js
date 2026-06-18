@@ -9,7 +9,7 @@ import {
     CreditCard, Package, Percent, Gift, Calculator, Users, Building2, Wrench,
     Plus, Save, Trash2, X, CheckCircle, AlertCircle, Loader2, ToggleLeft, ToggleRight,
     ChevronDown, ChevronRight, Search, Filter, Eye, Ban, PlayCircle, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles, MessageSquarePlus
+    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles, MessageSquarePlus, Globe
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 import SaveCustomPlanModal from '@/components/subscription/SaveCustomPlanModal'
@@ -120,6 +120,85 @@ function Toast({ message, type = 'success', onDismiss }) {
 // ════════════════════════════════════════════════════════════════
 //  OVERVIEW TAB
 // ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+//  EXCHANGE RATE REFRESH (used in OverviewTab)
+// ════════════════════════════════════════════════════════════════
+function ExchangeRateRefresh({ supabase }) {
+    const [refreshing, setRefreshing] = useState(false)
+    const [result, setResult] = useState(null)
+    const [rates, setRates] = useState([])
+    const [loadingRates, setLoadingRates] = useState(true)
+
+    useEffect(() => {
+        supabase.from('exchange_rates')
+            .select('*, base:currencies!exchange_rates_base_currency_id_fkey(code, symbol), quote:currencies!exchange_rates_quote_currency_id_fkey(code, symbol)')
+            .order('fetched_at', { ascending: false })
+            .limit(20)
+            .then(({ data }) => { setRates(data || []); setLoadingRates(false) })
+    }, [supabase, result])
+
+    const handleRefresh = async () => {
+        setRefreshing(true); setResult(null)
+        try {
+            const resp = await fetch('/api/admin/refresh-exchange-rates', { method: 'POST' })
+            const data = await resp.json()
+            setResult(data)
+        } catch (e) {
+            setResult({ success: false, error: e.message })
+        } finally { setRefreshing(false) }
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <p className="text-sm text-gray-500">
+                    Fetch live USD exchange rates for all active currencies and cache them in the database.
+                </p>
+                <button onClick={handleRefresh} disabled={refreshing}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    {refreshing ? <><Loader2 size={14} className="animate-spin" /> Refreshing...</> : <><RefreshCw size={14} /> Refresh Rates</>}
+                </button>
+            </div>
+
+            {result && (
+                <div className={`rounded-lg p-4 text-sm ${result.success ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
+                    {result.success ? (
+                        <p>{result.updated} currencies updated · {result.skipped} skipped · Source: {result.source} · {new Date(result.refreshed_at).toLocaleString()}</p>
+                    ) : (
+                        <p>{result.error}</p>
+                    )}
+                </div>
+            )}
+
+            {/* Recent cached rates */}
+            {loadingRates ? <Loader2 size={16} className="animate-spin text-gray-400" /> : rates.length > 0 && (
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="bg-gray-50 text-gray-600 uppercase text-[10px]">
+                                <th className="text-left p-2.5">Pair</th>
+                                <th className="text-right p-2.5">Rate</th>
+                                <th className="text-left p-2.5">Source</th>
+                                <th className="text-right p-2.5">Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rates.map(r => (
+                                <tr key={r.id} className="border-t border-gray-100">
+                                    <td className="p-2.5 font-mono font-medium text-gray-900">{r.base?.code} → {r.quote?.code}</td>
+                                    <td className="p-2.5 text-right font-mono text-gray-700">{Number(r.rate).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                                    <td className="p-2.5 text-gray-500">{r.source}</td>
+                                    <td className="p-2.5 text-right text-gray-400">{new Date(r.fetched_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
+
 function OverviewTab({ supabase }) {
     const [stats, setStats] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -208,6 +287,11 @@ function OverviewTab({ supabase }) {
                         <p className="text-xs text-teal-600 font-medium">Service Provider</p>
                     </div>
                 </div>
+            </Section>
+
+            {/* Exchange Rate Management */}
+            <Section title="Exchange Rates" icon={Globe}>
+                <ExchangeRateRefresh supabase={supabase} />
             </Section>
         </div>
     )

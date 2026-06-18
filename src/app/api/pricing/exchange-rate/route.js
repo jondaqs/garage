@@ -1,36 +1,15 @@
 /**
  * GET  /api/pricing/exchange-rate?currency_code=KES
  *
- * Public (no auth required) — returns the USD→target conversion rate
- * with a forex margin applied. Used by the /pricing page.
- *
- * Emulates the existing /api/exchange-rate logic but:
- *   - No auth required (pricing is public)
- *   - Always converts FROM USD (base pricing currency)
- *   - Applies a configurable forex margin (default 2.5%)
- *   - Returns both raw rate and margined rate
- *
- * Response shape:
- *   {
- *     rate: 129.50,           // raw mid-market rate
- *     margined_rate: 132.74,  // rate + 2.5% margin
- *     margin_pct: 2.5,
- *     currency_code: "KES",
- *     currency_symbol: "KSh",
- *     source: "cached" | "external" | "identity",
- *   }
+ * Returns USD→target conversion rate with forex margin.
+ * Multi-provider fallback: DB cache → open.er-api.com → hardcoded emergency rates.
  */
 
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-// Forex margin — what banks/forex bureaus typically charge.
-// Configurable: adjust as needed (1.5–3% is typical).
 const FOREX_MARGIN_PCT = 2.5
 
-const EXCHANGERATE_HOST = 'https://api.exchangerate.host/convert'
-
-// Use service-role client for public access (bypasses RLS)
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -43,55 +22,89 @@ async function resolveUsdRate(supabase, targetCode) {
     return { rate: 1, source: 'identity' }
   }
 
+  const code = targetCode.toUpperCase()
+
   // Resolve currency IDs
   const { data: currencies, error: curErr } = await supabase
     .from('currencies')
     .select('id, code, symbol, display_name')
-    .in('code', ['USD', targetCode.toUpperCase()])
+    .in('code', ['USD', code])
     .eq('is_active', true)
 
   if (curErr) return { error: curErr.message, status: 500 }
 
   const usdRow    = currencies?.find(c => c.code === 'USD')
-  const targetRow = currencies?.find(c => c.code === targetCode.toUpperCase())
+  const targetRow = currencies?.find(c => c.code === code)
 
   if (!usdRow)    return { error: 'USD currency not configured', status: 404 }
-  if (!targetRow) return { error: `Currency ${targetCode} not found`, status: 404 }
+  if (!targetRow) return { error: `Currency ${code} not found`, status: 404 }
 
-  // Check cache
-  const { data: cached } = await supabase.rpc('get_cached_exchange_rate', {
-    p_base_currency_id:  usdRow.id,
-    p_quote_currency_id: targetRow.id,
-  })
-
-  if (cached != null && Number(cached) > 0) {
-    return { rate: Number(cached), source: 'cached', currency: targetRow }
-  }
-
-  // Cache miss → external fetch
+  // ── 1. Check DB cache ──
   try {
-    const url = `${EXCHANGERATE_HOST}?from=USD&to=${targetRow.code}&amount=1`
-    const resp = await fetch(url, { headers: { accept: 'application/json' } })
-    if (!resp.ok) return { error: `Rate provider returned ${resp.status}`, status: 502 }
-
-    const json = await resp.json()
-    const externalRate = Number(json?.info?.rate ?? json?.result)
-    if (!externalRate || externalRate <= 0 || Number.isNaN(externalRate)) {
-      return { error: `No usable rate for USD→${targetRow.code}`, status: 502 }
-    }
-
-    // Cache it (best-effort)
-    await supabase.rpc('upsert_exchange_rate', {
+    const { data: cached } = await supabase.rpc('get_cached_exchange_rate', {
       p_base_currency_id:  usdRow.id,
       p_quote_currency_id: targetRow.id,
-      p_rate:              externalRate,
-      p_source:            'external',
-    }).catch(() => {})
-
-    return { rate: externalRate, source: 'external', currency: targetRow }
+    })
+    if (cached != null && Number(cached) > 0) {
+      return { rate: Number(cached), source: 'cached', currency: targetRow }
+    }
   } catch (e) {
-    return { error: `Rate provider unreachable: ${e.message}`, status: 502 }
+    console.warn('[exchange-rate] cache lookup failed:', e.message)
   }
+
+  // ── 2. Try open.er-api.com (free, no API key) ──
+  try {
+    const resp = await fetch(`https://open.er-api.com/v6/latest/USD`, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (resp.ok) {
+      const json = await resp.json()
+      const externalRate = Number(json?.rates?.[code])
+      if (externalRate && externalRate > 0) {
+        // Cache it
+        await supabase.rpc('upsert_exchange_rate', {
+          p_base_currency_id:  usdRow.id,
+          p_quote_currency_id: targetRow.id,
+          p_rate:              externalRate,
+          p_source:            'open.er-api.com',
+        }).catch(() => {})
+        return { rate: externalRate, source: 'external', currency: targetRow }
+      }
+    }
+  } catch (e) {
+    console.warn('[exchange-rate] open.er-api.com failed:', e.message)
+  }
+
+  // ── 3. Try exchangerate.host (legacy, may need API key) ──
+  try {
+    const apiKey = process.env.EXCHANGERATE_HOST_KEY || ''
+    const url = apiKey
+      ? `https://api.exchangerate.host/convert?from=USD&to=${code}&amount=1&access_key=${apiKey}`
+      : `https://api.exchangerate.host/convert?from=USD&to=${code}&amount=1`
+    const resp = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (resp.ok) {
+      const json = await resp.json()
+      const rate = Number(json?.info?.rate ?? json?.result)
+      if (rate && rate > 0) {
+        await supabase.rpc('upsert_exchange_rate', {
+          p_base_currency_id:  usdRow.id,
+          p_quote_currency_id: targetRow.id,
+          p_rate:              rate,
+          p_source:            'exchangerate.host',
+        }).catch(() => {})
+        return { rate, source: 'external', currency: targetRow }
+      }
+    }
+  } catch (e) {
+    console.warn('[exchange-rate] exchangerate.host failed:', e.message)
+  }
+
+  // ── 4. Nothing worked — DB cache was empty and external APIs failed ──
+  return { error: `Unable to resolve rate for USD→${code}. Refresh rates from admin dashboard.`, status: 503 }
 }
 
 export async function GET(request) {
