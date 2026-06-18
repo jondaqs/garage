@@ -20,13 +20,14 @@ import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
   Package, CreditCard, FileText, CheckCircle, AlertCircle, Loader2,
   ArrowRight, Clock, DollarSign, Send, Banknote, Building2,
-  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus
+  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus, Globe
 } from 'lucide-react'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
 import { downloadHtmlAsPdf } from '@/lib/subscription/downloadHtmlAsPdf'
 import SubscriptionTermsModal from '@/components/subscription/SubscriptionTermsModal'
 import SubscriptionTicketModal from '@/components/subscription/SubscriptionTicketModal'
+import { detectCurrencyFromBrowser, matchCurrencyInList } from '@/lib/currency/detectCurrency'
 
 const PAYMENT_METHODS = [
   { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
@@ -101,6 +102,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [tickets, setTickets] = useState([])
 
+  // Currency conversion for Browse Plans
+  const [availableCurrencies, setAvailableCurrencies] = useState([])
+  const [displayCurrency, setDisplayCurrency] = useState('USD')
+  const [displaySymbol, setDisplaySymbol] = useState('$')
+  const [convRate, setConvRate] = useState(1)
+  const [rateLoading, setRateLoading] = useState(false)
+
   // Terms & Conditions modal
   const [termsModal, setTermsModal] = useState(null) // { packageId, packageName, packageCost, isUpgrade, upgradeCredit, currentPlan }
 
@@ -166,6 +174,33 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         setTickets(tix || [])
       }
 
+      // Fetch currencies and auto-detect user's preferred currency
+      const { data: currData } = await supabase
+        .from('currencies').select('id, code, symbol, display_name')
+        .eq('is_active', true).order('code')
+      setAvailableCurrencies(currData || [])
+
+      // For providers: use their currency_id if set
+      if (subscriberType === 'service_provider' && subscriberId) {
+        const { data: sp } = await supabase
+          .from('service_providers').select('currency_id, currencies(code, symbol)')
+          .eq('id', subscriberId).maybeSingle()
+        if (sp?.currencies?.code) {
+          setDisplayCurrency(sp.currencies.code)
+          setDisplaySymbol(sp.currencies.symbol || sp.currencies.code)
+        } else {
+          // Auto-detect from browser
+          const { currencyCode: detected } = detectCurrencyFromBrowser()
+          const match = matchCurrencyInList(detected, currData || [])
+          if (match) { setDisplayCurrency(match.code); setDisplaySymbol(match.symbol || match.code) }
+        }
+      } else {
+        // Individual/company: auto-detect from browser
+        const { currencyCode: detected } = detectCurrencyFromBrowser()
+        const match = matchCurrencyInList(detected, currData || [])
+        if (match) { setDisplayCurrency(match.code); setDisplaySymbol(match.symbol || match.code) }
+      }
+
       if (profile) {
         const p = profile
         setSubscriberProfile({
@@ -229,6 +264,32 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   }, [subscriberId, subscriberType])
 
   useEffect(() => { if (subscriberId) loadAll() }, [loadAll, subscriberId])
+
+  // Fetch exchange rate when display currency changes
+  useEffect(() => {
+    if (displayCurrency === 'USD') { setConvRate(1); setDisplaySymbol('$'); return }
+    const fetchRate = async () => {
+      setRateLoading(true)
+      try {
+        const resp = await fetch(`/api/pricing/exchange-rate?currency_code=${displayCurrency}`)
+        if (!resp.ok) throw new Error('Rate unavailable')
+        const data = await resp.json()
+        setConvRate(data.margined_rate || 1)
+        setDisplaySymbol(data.currency_symbol || displayCurrency)
+      } catch (e) {
+        console.error('Currency rate error:', e)
+        setConvRate(1); setDisplaySymbol('$'); setDisplayCurrency('USD')
+      } finally { setRateLoading(false) }
+    }
+    fetchRate()
+  }, [displayCurrency])
+
+  // Convert a price for display
+  const cv = (amount) => {
+    if (convRate === 1 || !amount) return Number(amount || 0)
+    return Math.round(Number(amount) * convRate * 100) / 100
+  }
+  const fmtC = (amount) => `${displaySymbol}${cv(amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   // ── Subscribe to a package ─────────────────────────────────
   const handleSubscribe = async (packageId) => {
@@ -702,6 +763,20 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             ))}
           </div>
 
+          {/* Currency selector */}
+          {availableCurrencies.length > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <Globe size={14} className="text-gray-400" />
+              <select value={displayCurrency} onChange={e => setDisplayCurrency(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                {availableCurrencies.map(c => (
+                  <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.display_name}</option>
+                ))}
+              </select>
+              {rateLoading && <Loader2 size={12} className="animate-spin text-gray-400" />}
+            </div>
+          )}
+
           {/* ── Shop selector for service providers ── */}
           {subscriberType === 'service_provider' && (
             <div className="bg-white rounded-2xl border border-gray-200 p-5">
@@ -826,22 +901,22 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                     {hasActiveTrial ? (
                       <div>
                         <span className="text-2xl font-black text-green-600">Free</span>
-                        <span className="text-sm text-gray-400 ml-2 line-through">{p.currency_symbol}{Number(p.cost).toLocaleString()}</span>
+                        <span className="text-sm text-gray-400 ml-2 line-through">{displaySymbol}{cv(p.cost).toLocaleString()}</span>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          Free for {trialInfo.trial_months} months, then {p.currency_symbol}{Number(p.monthly_equivalent_cost).toFixed(2)}/mo
+                          Free for {trialInfo.trial_months} months, then {displaySymbol}{cv(p.monthly_equivalent_cost).toFixed(2)}/mo
                         </p>
                       </div>
                     ) : (
                       <div>
-                        <span className="text-2xl font-black text-gray-900">{p.currency_symbol}{Number(p.cost + (subscriberType === 'service_provider' && shopAddon ? shopAddon.shop_monthly_addon * (p.billing_period_duration || 1) : 0)).toLocaleString()}</span>
+                        <span className="text-2xl font-black text-gray-900">{displaySymbol}{cv(p.cost + (subscriberType === 'service_provider' && shopAddon ? shopAddon.shop_monthly_addon * (p.billing_period_duration || 1) : 0)).toLocaleString()}</span>
                         <span className="text-sm text-gray-400 ml-1">/{p.billing_period_name?.toLowerCase()}</span>
                         {subscriberType === 'service_provider' && shopAddon && shopAddon.shop_monthly_addon > 0 && (
                           <p className="text-[10px] text-blue-600 mt-0.5">
-                            Base: {p.currency_symbol}{Number(p.cost).toLocaleString()} + Shops: {p.currency_symbol}{Number(shopAddon.shop_monthly_addon * (p.billing_period_duration || 1)).toLocaleString()}
+                            Base: {displaySymbol}{cv(p.cost).toLocaleString()} + Shops: {displaySymbol}{cv(shopAddon.shop_monthly_addon * (p.billing_period_duration || 1)).toLocaleString()}
                           </p>
                         )}
                         <p className="text-xs text-gray-400 mt-0.5">
-                          ≈ {p.currency_symbol}{Number(p.monthly_equivalent_cost + (subscriberType === 'service_provider' && shopAddon ? shopAddon.shop_monthly_addon : 0)).toFixed(2)}/mo
+                          ≈ {displaySymbol}{cv(p.monthly_equivalent_cost + (subscriberType === 'service_provider' && shopAddon ? shopAddon.shop_monthly_addon : 0)).toFixed(2)}/mo
                         </p>
                       </div>
                     )}

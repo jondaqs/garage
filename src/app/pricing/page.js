@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Car, ArrowRight, User, Building2, Wrench, Loader2, Globe, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { detectCurrencyFromBrowser, matchCurrencyInList } from '@/lib/currency/detectCurrency'
 import IndividualPricing from '@/components/pricing/IndividualPricing'
 import CompanyPricing from '@/components/pricing/CompanyPricing'
 import ProviderPricing from '@/components/pricing/ProviderPricing'
@@ -87,6 +88,13 @@ export default function PricingPage() {
         const configs = {}
         ;(trialData || []).forEach(c => { configs[c.subscription_type] = c })
         setTrialConfigs(configs)
+
+        // Auto-detect currency from browser timezone
+        const { currencyCode: detected } = detectCurrencyFromBrowser()
+        if (detected && detected !== 'USD' && currData?.length) {
+          const match = matchCurrencyInList(detected, currData)
+          if (match) setSelectedCurrency(match.code)
+        }
       } catch (e) {
         console.error('Pricing load error:', e)
       } finally {
