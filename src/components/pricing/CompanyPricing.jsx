@@ -25,7 +25,7 @@ export default function CompanyPricing({ tiers = [], period, trialConfig }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(tiers.length, 4)}, 1fr)`, gap: 20, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20, alignItems: 'stretch' }}>
         {tiers.map(t => {
           const isPop = t.tier_code === popular?.tier_code
           const price = t[`${period}_price`] ?? t.monthly_price ?? t.base_monthly_price

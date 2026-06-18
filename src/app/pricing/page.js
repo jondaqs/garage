@@ -77,7 +77,7 @@ export default function PricingPage() {
       setLoading(true)
       try {
         const [{ data: tierData }, { data: trialData }, { data: shopData }, { data: currData }] = await Promise.all([
-          supabase.from('subscription_pricing_overview').select('*').eq('is_active', true),
+          supabase.from('subscription_pricing_overview').select('*').eq('is_active', true).eq('is_custom', false),
           supabase.from('subscription_trial_overview').select('*'),
           supabase.from('subscription_shop_tiers_overview').select('*').eq('is_active', true).order('sort_order'),
           supabase.from('currencies').select('id, code, symbol, display_name').eq('is_active', true).order('code'),
@@ -167,12 +167,19 @@ export default function PricingPage() {
           font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
         }
         .gc-nav-link:hover { background: rgba(255,255,255,0.08) !important; color: #fff !important; }
+        @media (max-width: 640px) {
+          .gc-hero-title { font-size: 28px !important; }
+          .gc-hero-sub { font-size: 14px !important; }
+          .gc-pricing-nav-links { display: none !important; }
+          .gc-pricing-tab-desc { display: none; }
+          .gc-pricing-footer { padding: 20px 16px !important; flex-direction: column !important; text-align: center; }
+        }
       `}</style>
 
       <div className="gc-root" style={{
         minHeight: '100vh',
         background: 'linear-gradient(145deg, #0a0a0a 0%, #141414 50%, #0d0d0d 100%)',
-        color: '#fff',
+        color: '#fff', overflowX: 'hidden',
       }}>
         <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.6 }} />
 
@@ -191,7 +198,7 @@ export default function PricingPage() {
             </div>
             <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>GariCare</span>
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="gc-pricing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {[
               { label: 'About Us', path: '/about', active: false },
               { label: 'Pricing',  path: '/pricing', active: true },
@@ -213,7 +220,7 @@ export default function PricingPage() {
 
         {/* ── HERO ── */}
         <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '64px 24px 20px', maxWidth: 720, margin: '0 auto' }}>
-          <h1 className="gc-display" style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.025em', margin: '0 0 16px' }}>
+          <h1 className="gc-display gc-hero-title" style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.025em', margin: '0 0 16px' }}>
             Simple, transparent pricing
           </h1>
           <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.55)', maxWidth: 520, margin: '0 auto', lineHeight: 1.6 }}>
@@ -288,6 +295,7 @@ export default function PricingPage() {
             display: 'flex', justifyContent: 'center', gap: 6,
             background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 6,
             marginBottom: 32, maxWidth: 560, margin: '0 auto 32px',
+            flexWrap: 'wrap',
           }}>
             {TABS.map(t => {
               const Icon = t.icon
@@ -303,7 +311,7 @@ export default function PricingPage() {
                 }}>
                   <Icon size={18} />
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 400 }}>{t.label}</span>
-                  <span style={{ fontSize: 10, color: active ? `${t.accent}99` : 'rgba(255,255,255,0.3)' }}>{t.desc}</span>
+                  <span className="gc-pricing-tab-desc" style={{ fontSize: 10, color: active ? `${t.accent}99` : 'rgba(255,255,255,0.3)' }}>{t.desc}</span>
                 </button>
               )
             })}
@@ -359,7 +367,7 @@ export default function PricingPage() {
         </div>
 
         {/* ── FOOTER ── */}
-        <footer style={{
+        <footer className="gc-pricing-footer" style={{
           position: 'relative', zIndex: 1, borderTop: '1px solid rgba(255,255,255,0.06)',
           padding: '24px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexWrap: 'wrap', gap: 12,

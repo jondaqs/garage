@@ -15,7 +15,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
   const popularCode = basicPlusTier?.tier_code || (tiers.length >= 2 ? tiers[1]?.tier_code : null)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(tiers.length, 4)}, 1fr)`, gap: 20, alignItems: 'stretch' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20, alignItems: 'stretch' }}>
       {tiers.map((t, i) => {
         const isPop = t.tier_code === popularCode
         const price = t[`${period}_price`] ?? t.monthly_price ?? t.base_monthly_price

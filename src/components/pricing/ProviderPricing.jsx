@@ -25,7 +25,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(tiers.length, 4)}, 1fr)`, gap: 20, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20, alignItems: 'stretch' }}>
         {tiers.map(t => {
           const isPop = t.tier_code === popular?.tier_code
           const price = t[`${period}_price`] ?? t.monthly_price ?? t.base_monthly_price
@@ -177,10 +177,10 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
                 </p>
                 <p style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0 }}>
                   {s.is_upper_limit
-                    ? `$${Number(s.flat_monthly_price || 0).toFixed(0)} flat`
+                    ? `${s.currency_symbol || '$'}${Number(s.flat_monthly_price || 0).toFixed(0)} flat`
                     : Number(s.per_shop_monthly_price) === 0
                       ? 'Free'
-                      : `$${Number(s.per_shop_monthly_price).toFixed(2)}/shop`}
+                      : `${s.currency_symbol || '$'}${Number(s.per_shop_monthly_price).toFixed(2)}/shop`}
                 </p>
               </div>
             ))}
