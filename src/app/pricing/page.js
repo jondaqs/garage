@@ -49,9 +49,10 @@ export default function PricingPage() {
   const [conversionRate, setConversionRate] = useState(1)
   const [convSymbol, setConvSymbol] = useState('$')
   const [marginPct, setMarginPct] = useState(0)
-  const [rateLoading, setRateLoading] = useState(false)
+  const [rateLoading, setRateLoading] = useState(true)
   const [rateSource, setRateSource] = useState('identity')
   const [showCurrDropdown, setShowCurrDropdown] = useState(false)
+  const [currencyReady, setCurrencyReady] = useState(false)
 
   // Animated grid
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function PricingPage() {
   useEffect(() => {
     if (selectedCurrency === 'USD') {
       setConversionRate(1); setConvSymbol('$'); setMarginPct(0); setRateSource('identity')
+      setRateLoading(false); setCurrencyReady(true)
       return
     }
     const fetchRate = async () => {
@@ -122,10 +124,9 @@ export default function PricingPage() {
         setRateSource(data.source)
       } catch (e) {
         console.error('Rate fetch error:', e)
-        // Fall back to USD
         setConversionRate(1); setConvSymbol('$'); setMarginPct(0)
       } finally {
-        setRateLoading(false)
+        setRateLoading(false); setCurrencyReady(true)
       }
     }
     fetchRate()
@@ -345,10 +346,9 @@ export default function PricingPage() {
 
           {/* ── PRICING CARDS ── */}
           <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 60 }}>
-            {loading ? (
+            {(loading || !currencyReady) ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
                 <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: currentTab?.accent || '#fff' }} />
-                <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
               </div>
             ) : (
               <>

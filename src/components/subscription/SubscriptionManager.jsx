@@ -107,7 +107,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const [displaySymbol, setDisplaySymbol] = useState('$')
   const [convRate, setConvRate] = useState(1)
-  const [rateLoading, setRateLoading] = useState(false)
+  const [rateLoading, setRateLoading] = useState(true)
+  const [currencyReady, setCurrencyReady] = useState(false)
 
   // Terms & Conditions modal
   const [termsModal, setTermsModal] = useState(null) // { packageId, packageName, packageCost, isUpgrade, upgradeCredit, currentPlan }
@@ -305,7 +306,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
   // Fetch exchange rate when display currency changes
   useEffect(() => {
-    if (displayCurrency === 'USD') { setConvRate(1); setDisplaySymbol('$'); return }
+    if (displayCurrency === 'USD') { setConvRate(1); setDisplaySymbol('$'); setRateLoading(false); setCurrencyReady(true); return }
     const fetchRate = async () => {
       setRateLoading(true)
       try {
@@ -317,7 +318,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       } catch (e) {
         console.error('Currency rate error:', e)
         setConvRate(1); setDisplaySymbol('$'); setDisplayCurrency('USD')
-      } finally { setRateLoading(false) }
+      } finally { setRateLoading(false); setCurrencyReady(true) }
     }
     fetchRate()
   }, [displayCurrency])
@@ -905,6 +906,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             </div>
           )}
 
+          {!currencyReady ? (
+            <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-blue-500" /></div>
+          ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {packages.filter(p => p.billing_period_code === selectedPeriod && Number(p.cost) > 0).map(p => {
               const features = (() => { try { return typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || []) } catch { return [] } })()
@@ -1006,6 +1011,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                 </p>
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
       )}
