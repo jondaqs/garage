@@ -99,7 +99,7 @@ export default function PricingPage() {
         }
         setSelectedCurrency(resolvedCurrency)
 
-        // Fetch exchange rate inline (before setting loading=false)
+        // Fetch exchange rate inline (before showing content)
         if (resolvedCurrency !== 'USD') {
           try {
             const resp = await fetch(`/api/pricing/exchange-rate?currency_code=${resolvedCurrency}`)
@@ -114,9 +114,11 @@ export default function PricingPage() {
             console.error('Initial rate fetch error:', e)
           }
         }
+        setRateLoading(false)
         setCurrencyReady(true)
       } catch (e) {
         console.error('Pricing load error:', e)
+        setRateLoading(false)
         setCurrencyReady(true)
       } finally {
         setLoading(false)
@@ -125,9 +127,13 @@ export default function PricingPage() {
     load()
   }, [])
 
+  const initialRateDone = useRef(false)
+
   // Fetch exchange rate when user manually changes currency via dropdown
   useEffect(() => {
-    if (!currencyReady) return // initial load handles the first rate fetch
+    if (!currencyReady) return
+    // Skip the first trigger — the data load already fetched the rate inline
+    if (!initialRateDone.current) { initialRateDone.current = true; return }
     if (selectedCurrency === 'USD') {
       setConversionRate(1); setConvSymbol('$'); setMarginPct(0); setRateSource('identity')
       setRateLoading(false)
