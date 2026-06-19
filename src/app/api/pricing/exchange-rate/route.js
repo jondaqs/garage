@@ -2,7 +2,7 @@
  * GET  /api/pricing/exchange-rate?currency_code=KES
  *
  * Returns USD→target conversion rate with forex margin.
- * Multi-provider fallback: DB cache → open.er-api.com → hardcoded emergency rates.
+ * Fallback chain: DB cache (RPC) → open.er-api.com → exchangerate.host → 503
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -23,88 +23,129 @@ async function resolveUsdRate(supabase, targetCode) {
   }
 
   const code = targetCode.toUpperCase()
+  const errors = [] // collect debug info
 
-  // Resolve currency IDs
+  // Resolve currency records
   const { data: currencies, error: curErr } = await supabase
     .from('currencies')
     .select('id, code, symbol, display_name')
     .in('code', ['USD', code])
     .eq('is_active', true)
 
-  if (curErr) return { error: curErr.message, status: 500 }
+  if (curErr) {
+    return { error: `Currency lookup failed: ${curErr.message}`, status: 500 }
+  }
 
   const usdRow    = currencies?.find(c => c.code === 'USD')
   const targetRow = currencies?.find(c => c.code === code)
 
-  if (!usdRow)    return { error: 'USD currency not configured', status: 404 }
-  if (!targetRow) return { error: `Currency ${code} not found`, status: 404 }
+  if (!usdRow)    return { error: 'USD currency not configured in database', status: 404 }
+  if (!targetRow) return { error: `Currency ${code} not found in database`, status: 404 }
 
-  // ── 1. Check DB cache ──
+  // ── 1. Check DB cache via RPC ──
   try {
-    const { data: cached } = await supabase.rpc('get_cached_exchange_rate', {
+    const { data: cached, error: cacheErr } = await supabase.rpc('get_cached_exchange_rate', {
       p_base_currency_id:  usdRow.id,
       p_quote_currency_id: targetRow.id,
     })
-    if (cached != null && Number(cached) > 0) {
+    if (cacheErr) {
+      errors.push(`cache_rpc: ${cacheErr.message}`)
+      console.warn('[exchange-rate] cache RPC error:', cacheErr.message)
+    } else if (cached != null && Number(cached) > 0) {
+      console.log(`[exchange-rate] cache hit: USD→${code} = ${cached}`)
       return { rate: Number(cached), source: 'cached', currency: targetRow }
+    } else {
+      errors.push('cache_rpc: returned null or 0')
     }
   } catch (e) {
-    console.warn('[exchange-rate] cache lookup failed:', e.message)
+    errors.push(`cache_rpc_exception: ${e.message}`)
+    console.warn('[exchange-rate] cache RPC exception:', e.message)
   }
 
-  // ── 2. Try open.er-api.com (free, no API key) ──
+  // ── 2. Try open.er-api.com (free, no key) ──
   try {
-    const resp = await fetch(`https://open.er-api.com/v6/latest/USD`, {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    const resp = await fetch('https://open.er-api.com/v6/latest/USD', {
       headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(5000),
+      signal: controller.signal,
     })
+    clearTimeout(timeout)
+
     if (resp.ok) {
       const json = await resp.json()
       const externalRate = Number(json?.rates?.[code])
       if (externalRate && externalRate > 0) {
-        // Cache it
-        await supabase.rpc('upsert_exchange_rate', {
-          p_base_currency_id:  usdRow.id,
-          p_quote_currency_id: targetRow.id,
-          p_rate:              externalRate,
-          p_source:            'open.er-api.com',
-        }).catch(() => {})
+        console.log(`[exchange-rate] open.er-api: USD→${code} = ${externalRate}`)
+        // Cache via RPC
+        try {
+          await supabase.rpc('upsert_exchange_rate', {
+            p_base_currency_id:  usdRow.id,
+            p_quote_currency_id: targetRow.id,
+            p_rate:              externalRate,
+            p_source:            'open.er-api.com',
+          })
+        } catch (ce) { console.warn('[exchange-rate] cache upsert failed:', ce.message) }
         return { rate: externalRate, source: 'external', currency: targetRow }
+      } else {
+        errors.push(`open_er_api: no rate for ${code} in response`)
       }
+    } else {
+      errors.push(`open_er_api: HTTP ${resp.status}`)
+      console.warn('[exchange-rate] open.er-api status:', resp.status)
     }
   } catch (e) {
-    console.warn('[exchange-rate] open.er-api.com failed:', e.message)
+    errors.push(`open_er_api: ${e.message}`)
+    console.warn('[exchange-rate] open.er-api failed:', e.message)
   }
 
-  // ── 3. Try exchangerate.host (legacy, may need API key) ──
+  // ── 3. Try exchangerate.host ──
   try {
     const apiKey = process.env.EXCHANGERATE_HOST_KEY || ''
     const url = apiKey
       ? `https://api.exchangerate.host/convert?from=USD&to=${code}&amount=1&access_key=${apiKey}`
       : `https://api.exchangerate.host/convert?from=USD&to=${code}&amount=1`
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
     const resp = await fetch(url, {
       headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(5000),
+      signal: controller.signal,
     })
+    clearTimeout(timeout)
+
     if (resp.ok) {
       const json = await resp.json()
-      const rate = Number(json?.info?.rate ?? json?.result)
+      const rate = Number(json?.info?.rate ?? json?.result ?? json?.rates?.[code])
       if (rate && rate > 0) {
-        await supabase.rpc('upsert_exchange_rate', {
-          p_base_currency_id:  usdRow.id,
-          p_quote_currency_id: targetRow.id,
-          p_rate:              rate,
-          p_source:            'exchangerate.host',
-        }).catch(() => {})
+        console.log(`[exchange-rate] exchangerate.host: USD→${code} = ${rate}`)
+        try {
+          await supabase.rpc('upsert_exchange_rate', {
+            p_base_currency_id:  usdRow.id,
+            p_quote_currency_id: targetRow.id,
+            p_rate:              rate,
+            p_source:            'exchangerate.host',
+          })
+        } catch (ce) { console.warn('[exchange-rate] cache upsert failed:', ce.message) }
         return { rate, source: 'external', currency: targetRow }
+      } else {
+        errors.push(`exchangerate_host: parsed rate is ${rate}, raw: ${JSON.stringify(json).substring(0, 150)}`)
+        console.warn('[exchange-rate] exchangerate.host no valid rate:', JSON.stringify(json).substring(0, 200))
       }
+    } else {
+      errors.push(`exchangerate_host: HTTP ${resp.status}`)
+      console.warn('[exchange-rate] exchangerate.host status:', resp.status)
     }
   } catch (e) {
+    errors.push(`exchangerate_host: ${e.message}`)
     console.warn('[exchange-rate] exchangerate.host failed:', e.message)
   }
 
-  // ── 4. Nothing worked — DB cache was empty and external APIs failed ──
-  return { error: `Unable to resolve rate for USD→${code}. Refresh rates from admin dashboard.`, status: 503 }
+  // ── 4. All failed — return debug info ──
+  console.error(`[exchange-rate] ALL SOURCES FAILED for USD→${code}:`, errors)
+  return {
+    error: `Unable to resolve rate for USD→${code}. Refresh rates from admin dashboard. Debug: ${errors.join(' | ')}`,
+    status: 503,
+  }
 }
 
 export async function GET(request) {
@@ -126,16 +167,16 @@ export async function GET(request) {
     const marginedRate = result.rate * (1 + FOREX_MARGIN_PCT / 100)
 
     return NextResponse.json({
-      rate:           Math.round(result.rate * 10000) / 10000,
-      margined_rate:  Math.round(marginedRate * 10000) / 10000,
-      margin_pct:     FOREX_MARGIN_PCT,
-      currency_code:  result.currency?.code || targetCode.toUpperCase(),
+      rate:            Math.round(result.rate * 10000) / 10000,
+      margined_rate:   Math.round(marginedRate * 10000) / 10000,
+      margin_pct:      FOREX_MARGIN_PCT,
+      currency_code:   result.currency?.code || targetCode.toUpperCase(),
       currency_symbol: result.currency?.symbol || '',
-      display_name:   result.currency?.display_name || '',
-      source:         result.source,
+      display_name:    result.currency?.display_name || '',
+      source:          result.source,
     })
   } catch (err) {
     console.error('GET /api/pricing/exchange-rate error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
