@@ -92,12 +92,32 @@ export default function PricingPage() {
 
         // Auto-detect currency from browser timezone
         const { currencyCode: detected } = detectCurrencyFromBrowser()
+        let resolvedCurrency = 'USD'
         if (detected && detected !== 'USD' && currData?.length) {
           const match = matchCurrencyInList(detected, currData)
-          if (match) setSelectedCurrency(match.code)
+          if (match) resolvedCurrency = match.code
         }
+        setSelectedCurrency(resolvedCurrency)
+
+        // Fetch exchange rate inline (before setting loading=false)
+        if (resolvedCurrency !== 'USD') {
+          try {
+            const resp = await fetch(`/api/pricing/exchange-rate?currency_code=${resolvedCurrency}`)
+            if (resp.ok) {
+              const rateData = await resp.json()
+              setConversionRate(rateData.margined_rate)
+              setConvSymbol(rateData.currency_symbol || resolvedCurrency)
+              setMarginPct(rateData.margin_pct)
+              setRateSource(rateData.source)
+            }
+          } catch (e) {
+            console.error('Initial rate fetch error:', e)
+          }
+        }
+        setCurrencyReady(true)
       } catch (e) {
         console.error('Pricing load error:', e)
+        setCurrencyReady(true)
       } finally {
         setLoading(false)
       }
@@ -105,11 +125,12 @@ export default function PricingPage() {
     load()
   }, [])
 
-  // Fetch exchange rate when currency changes
+  // Fetch exchange rate when user manually changes currency via dropdown
   useEffect(() => {
+    if (!currencyReady) return // initial load handles the first rate fetch
     if (selectedCurrency === 'USD') {
       setConversionRate(1); setConvSymbol('$'); setMarginPct(0); setRateSource('identity')
-      setRateLoading(false); setCurrencyReady(true)
+      setRateLoading(false)
       return
     }
     const fetchRate = async () => {
@@ -126,7 +147,7 @@ export default function PricingPage() {
         console.error('Rate fetch error:', e)
         setConversionRate(1); setConvSymbol('$'); setMarginPct(0)
       } finally {
-        setRateLoading(false); setCurrencyReady(true)
+        setRateLoading(false)
       }
     }
     fetchRate()
