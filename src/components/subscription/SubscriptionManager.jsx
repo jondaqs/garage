@@ -204,7 +204,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         const { data: { user: authUser } } = await supabase.auth.getUser()
         if (authUser) {
           const { data: userProfile } = await supabase
-            .from('user_profiles').select('country')
+            .from('user_profiles_secure').select('country')
             .eq('auth_user_id', authUser.id).maybeSingle()
           if (userProfile?.country) {
             const match = (currData || []).find(c => c.country === userProfile.country)
@@ -322,10 +322,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     fetchRate()
   }, [displayCurrency])
 
-  // Convert a price for display
+  // Convert a price for display (always rounds UP — never show less than actual cost)
   const cv = (amount) => {
     if (convRate === 1 || !amount) return Number(amount || 0)
-    return Math.round(Number(amount) * convRate * 100) / 100
+    return Math.ceil(Number(amount) * convRate)
   }
   const fmtC = (amount) => `${displaySymbol}${cv(amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 

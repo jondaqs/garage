@@ -92,10 +92,10 @@ export function useCurrencyDetection({ overrideCurrencyCode, currencies = [], ba
     fetchRate()
   }, [currencyCode, baseCurrency])
 
-  // Convert a single price value
+  // Convert a single price value (always rounds UP)
   const convert = useCallback((amount) => {
     if (conversionRate === 1 || !amount) return Number(amount || 0)
-    return Math.round(Number(amount) * conversionRate * 100) / 100
+    return Math.ceil(Number(amount) * conversionRate)
   }, [conversionRate])
 
   // Format a price with the currency symbol
@@ -109,7 +109,7 @@ export function useCurrencyDetection({ overrideCurrencyCode, currencies = [], ba
     if (conversionRate === 1) return { ...obj, currency_symbol: currencySymbol }
     const converted = { ...obj, currency_symbol: currencySymbol }
     fields.forEach(f => {
-      if (converted[f] != null) converted[f] = Math.round(Number(converted[f]) * conversionRate * 100) / 100
+      if (converted[f] != null) converted[f] = Math.ceil(Number(converted[f]) * conversionRate)
     })
     return converted
   }, [conversionRate, currencySymbol])

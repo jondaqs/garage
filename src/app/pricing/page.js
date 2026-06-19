@@ -136,7 +136,7 @@ export default function PricingPage() {
     if (conversionRate === 1) return { ...t, currency_symbol: '$' }
     const converted = { ...t, currency_symbol: convSymbol }
     PRICE_FIELDS.forEach(f => {
-      if (converted[f] != null) converted[f] = Math.round(Number(converted[f]) * conversionRate * 100) / 100
+      if (converted[f] != null) converted[f] = Math.ceil(Number(converted[f]) * conversionRate)
     })
     return converted
   })
@@ -146,8 +146,8 @@ export default function PricingPage() {
     if (conversionRate === 1) return s
     return {
       ...s,
-      per_shop_monthly_price: Math.round(Number(s.per_shop_monthly_price || 0) * conversionRate * 100) / 100,
-      flat_monthly_price: Math.round(Number(s.flat_monthly_price || 0) * conversionRate * 100) / 100,
+      per_shop_monthly_price: Math.ceil(Number(s.per_shop_monthly_price || 0) * conversionRate),
+      flat_monthly_price: Math.ceil(Number(s.flat_monthly_price || 0) * conversionRate),
       currency_symbol: convSymbol,
     }
   })
