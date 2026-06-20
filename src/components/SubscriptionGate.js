@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Lock, ArrowRight, Sparkles } from 'lucide-react'
+import { Lock, ArrowRight, Sparkles, ShieldOff, LifeBuoy } from 'lucide-react'
 import Link from 'next/link'
 import useTrialStatus from '@/hooks/useTrialStatus'
 import TrialBanner from '@/components/TrialBanner'
@@ -14,6 +14,7 @@ import TrialBanner from '@/components/TrialBanner'
  *
  * Behaviour:
  *   • Active subscription → render children, no banner
+ *   • Suspended sub       → full-page lock with suspension notice
  *   • On trial           → render children with TrialBanner at top
  *   • Trial expired      → full-page lock overlay with upgrade prompt
  *   • Free tier (vehicle-count only, no time trial) → treat like expired
@@ -34,6 +35,7 @@ export default function SubscriptionGate({
   const {
     loading,
     hasActiveSubscription,
+    isSuspended,
     isOnTrial,
     isTrialExpired,
     trialEndsAt,
@@ -55,6 +57,57 @@ export default function SubscriptionGate({
   // ── Active subscription → full access, no banner ────────────────────────
   if (hasActiveSubscription) {
     return <>{children}</>
+  }
+
+  // ── Suspended subscription → lock with suspension notice ────────────────
+  if (isSuspended) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-16 md:py-24 px-6 text-center">
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-red-50 flex items-center justify-center mb-6">
+            <ShieldOff className="text-red-400" size={32} />
+          </div>
+
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">
+            Your subscription has been suspended
+          </h2>
+
+          <p className="text-gray-500 text-sm max-w-md mb-2">
+            Access to {featureName.toLowerCase()} and other premium features is
+            temporarily unavailable while your subscription is suspended.
+          </p>
+
+          <p className="text-gray-400 text-sm max-w-md mb-8">
+            If you believe this is an error or need assistance, please contact
+            our support team to resolve the issue and restore your access.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <Link
+              href="/dashboard/support"
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors shadow-sm"
+            >
+              <LifeBuoy size={16} />
+              Contact Support
+            </Link>
+
+            <Link
+              href="/dashboard/subscription"
+              className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              View Subscription
+            </Link>
+
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // ── On trial → show page with trial banner at top ───────────────────────

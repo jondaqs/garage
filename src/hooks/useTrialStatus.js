@@ -14,6 +14,8 @@ import { createClient } from '@/lib/supabase/client'
  *   loading              – true while data is being fetched
  *   profileId            – user_profiles.id (null until loaded)
  *   hasActiveSubscription – user has a non-expired, active subscription
+ *   isSuspended          – user has a subscription that is currently suspended
+ *   suspendedSubNote     – admin note/reason from the suspended subscription
  *   isOnTrial            – user is within the 3-month Basic trial window
  *   isTrialExpired       – trial window has passed and no subscription exists
  *   trialEndsAt          – Date | null  (end of trial)
@@ -27,6 +29,8 @@ export default function useTrialStatus() {
   const [loading, setLoading]                           = useState(true)
   const [profileId, setProfileId]                       = useState(null)
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
+  const [isSuspended, setIsSuspended]                   = useState(false)
+  const [suspendedSubNote, setSuspendedSubNote]         = useState('')
   const [isOnTrial, setIsOnTrial]                       = useState(false)
   const [isTrialExpired, setIsTrialExpired]             = useState(false)
   const [trialEndsAt, setTrialEndsAt]                   = useState(null)
@@ -65,13 +69,38 @@ export default function useTrialStatus() {
 
       if (activeSubs && activeSubs.length > 0) {
         setHasActiveSubscription(true)
+        setIsSuspended(false)
         setIsOnTrial(false)
         setIsTrialExpired(false)
         setLoading(false)
         return
       }
 
-      // 4. No active subscription — call trial eligibility RPC
+      // 3b. Check for a suspended subscription
+      const { data: suspendedSubs } = await supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          notes,
+          expiry_date,
+          status:subscription_statuses!inner(code)
+        `)
+        .eq('user_id', profile.id)
+        .eq('subscription_statuses.code', 'suspended')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+
+      if (suspendedSubs && suspendedSubs.length > 0) {
+        setIsSuspended(true)
+        setSuspendedSubNote(suspendedSubs[0].notes || '')
+        setHasActiveSubscription(false)
+        setIsOnTrial(false)
+        setIsTrialExpired(false)
+        setLoading(false)
+        return
+      }
+
+      // 4. No active or suspended subscription — call trial eligibility RPC
       const { data: trialRows, error: trialErr } = await supabase
         .rpc('check_trial_eligibility', {
           p_subscriber_type: 'individual',
@@ -141,6 +170,8 @@ export default function useTrialStatus() {
     loading,
     profileId,
     hasActiveSubscription,
+    isSuspended,
+    suspendedSubNote,
     isOnTrial,
     isTrialExpired,
     trialEndsAt,

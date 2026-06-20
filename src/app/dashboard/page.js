@@ -4,7 +4,7 @@ import PendingInvitationsCard from '@/components/PendingInvitationsCard'
 import PendingCompanyInvitationsCard from '@/components/PendingCompanyInvitationsCard'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Car, Calendar, BarChart3, DollarSign, Plus, ChevronDown, ChevronUp, RotateCcw, AlertCircle, ArrowRight, ShieldAlert } from 'lucide-react'
+import { Car, Calendar, BarChart3, DollarSign, Plus, ChevronDown, ChevronUp, RotateCcw, AlertCircle, ArrowRight, ShieldAlert, ShieldOff, LifeBuoy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import MobileHeader from '../../components/MobileHeader'
@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const {
     loading: trialLoading,
     isOnTrial,
+    isSuspended,
     trialEndsAt,
     daysRemaining,
     hasActiveSubscription,
@@ -261,6 +262,18 @@ export default function DashboardPage() {
           />
         )}
 
+        {isSuspended && (
+          <Link href="/dashboard/support"
+            className="flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+            <ShieldOff size={18} className="text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-800">Subscription suspended</p>
+              <p className="text-xs text-red-600 mt-0.5">Premium features are unavailable. Tap to contact support.</p>
+            </div>
+            <ArrowRight size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+          </Link>
+        )}
+
         {/* Vehicles */}
         <section>
           <div className="flex justify-between items-center mb-4">
@@ -384,6 +397,28 @@ export default function DashboardPage() {
             daysRemaining={daysRemaining}
             trialEndsAt={trialEndsAt}
           />
+        )}
+
+        {isSuspended && (
+          <div className="flex items-center gap-4 p-4 mb-6 rounded-xl border border-red-300 bg-red-50">
+            <div className="p-2 rounded-lg bg-red-100">
+              <ShieldOff size={20} className="text-red-500" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-red-800">Your subscription has been suspended</p>
+              <p className="text-sm text-red-600 mt-0.5">
+                Access to premium features (budget, reports, reminders, history) is temporarily unavailable.
+                Contact support to resolve this.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/support"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <LifeBuoy size={14} />
+              Contact Support
+            </Link>
+          </div>
         )}
 
         {/* Stats strip — 1 real stat + 3 navigation cards */}
