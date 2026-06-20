@@ -19,6 +19,7 @@ import {
   DollarSign, Plus, Edit2, Trash2, AlertCircle, CheckCircle,
   Car, ChevronDown, ChevronUp, Calendar, TrendingUp, Coins, RefreshCw,
 } from 'lucide-react'
+import SubscriptionGate from '@/components/SubscriptionGate'
 
 const fmtCurrency = (amount, currency) => {
   const symbol = currency?.symbol || currency?.code || 'KES'
@@ -308,6 +309,10 @@ export default function UserBudgetPage() {
   )
 
   return (
+    <SubscriptionGate
+      featureName="Budget & Spend"
+      featureDescription="Set spending limits, track per-vehicle costs, and monitor your maintenance budget."
+    >
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -707,5 +712,6 @@ export default function UserBudgetPage() {
         </div>
       )}
     </div>
+    </SubscriptionGate>
   )
 }

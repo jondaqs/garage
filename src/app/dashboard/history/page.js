@@ -8,6 +8,7 @@ import {
   AlertCircle, Calendar, Gauge, FileText,
   CheckCircle, Clock, MapPin
 } from 'lucide-react'
+import SubscriptionGate from '@/components/SubscriptionGate'
 
 // Colour + label per event_type
 const EVENT_CONFIG = {
@@ -104,6 +105,10 @@ export default function HistoryPage() {
   )
 
   return (
+    <SubscriptionGate
+      featureName="Service History"
+      featureDescription="View the full service timeline and maintenance records across all your vehicles."
+    >
     <div className="max-w-3xl mx-auto space-y-5">
 
       {/* Header */}
@@ -300,5 +305,6 @@ export default function HistoryPage() {
         </>
       )}
     </div>
+    </SubscriptionGate>
   )
 }

@@ -28,6 +28,7 @@ import {
   BarChart3, Wrench, AlertCircle, ClipboardList, Store,
   Car, Clock, DollarSign,
 } from 'lucide-react'
+import SubscriptionGate from '@/components/SubscriptionGate'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 const dayMs = 1000 * 60 * 60 * 24
@@ -261,6 +262,10 @@ export default function UserReportsPage() {
   )
 
   return (
+    <SubscriptionGate
+      featureName="Service Reports"
+      featureDescription="View work orders, provider analytics, vehicle utilization, and downtime metrics."
+    >
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
@@ -535,5 +540,6 @@ export default function UserReportsPage() {
 
       </div>
     </div>
+    </SubscriptionGate>
   )
 }

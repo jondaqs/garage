@@ -11,6 +11,8 @@ import MobileHeader from '../../components/MobileHeader'
 import MobileVehicleCard from '../../components/MobileVehicleCard'
 import MobileQuickActions from '../../components/MobileQuickActions'
 import MobileBottomNav from '../../components/MobileBottomNav'
+import TrialBanner from '@/components/TrialBanner'
+import useTrialStatus from '@/hooks/useTrialStatus'
 
 
 
@@ -29,6 +31,14 @@ export default function DashboardPage() {
   const [loadingInactive, setLoadingInactive]   = useState(false)
   const [actionError, setActionError]           = useState(null)
   const [show2faBanner, setShow2faBanner]       = useState(false)
+
+  const {
+    loading: trialLoading,
+    isOnTrial,
+    trialEndsAt,
+    daysRemaining,
+    hasActiveSubscription,
+  } = useTrialStatus()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -243,6 +253,14 @@ export default function DashboardPage() {
           </Link>
         )}
 
+        {isOnTrial && !hasActiveSubscription && (
+          <TrialBanner
+            daysRemaining={daysRemaining}
+            trialEndsAt={trialEndsAt}
+            compact
+          />
+        )}
+
         {/* Vehicles */}
         <section>
           <div className="flex justify-between items-center mb-4">
@@ -359,6 +377,13 @@ export default function DashboardPage() {
             </div>
             <ArrowRight size={16} className="text-blue-400 flex-shrink-0" />
           </Link>
+        )}
+
+        {isOnTrial && !hasActiveSubscription && (
+          <TrialBanner
+            daysRemaining={daysRemaining}
+            trialEndsAt={trialEndsAt}
+          />
         )}
 
         {/* Stats strip — 1 real stat + 3 navigation cards */}

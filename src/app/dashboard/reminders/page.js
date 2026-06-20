@@ -7,6 +7,7 @@ import {
   Bell, BellOff, Calendar, Gauge, Car,
   CheckCircle, AlertCircle, Loader2, ChevronRight, Plus
 } from 'lucide-react'
+import SubscriptionGate from '@/components/SubscriptionGate'
 
 const PRIORITY_COLORS = {
   low:    'border-gray-200 bg-white',
@@ -97,6 +98,10 @@ export default function RemindersPage() {
   )
 
   return (
+    <SubscriptionGate
+      featureName="Reminders"
+      featureDescription="Get notified about upcoming maintenance, service due dates, and scheduled inspections."
+    >
     <div className="max-w-2xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -288,5 +293,6 @@ export default function RemindersPage() {
         </details>
       )}
     </div>
+    </SubscriptionGate>
   )
 }
