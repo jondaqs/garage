@@ -12,19 +12,21 @@ import TrialBanner from '@/components/TrialBanner'
  * Wraps feature pages that require at least a Basic trial:
  *   budget · reports · reminders · history
  *
- * Behaviour:
- *   • Active subscription → render children, no banner
- *   • Suspended sub       → full-page lock with suspension notice
- *   • On trial           → render children with TrialBanner at top
- *   • Trial expired      → full-page lock overlay with upgrade prompt
- *   • Free tier (vehicle-count only, no time trial) → treat like expired
- *     for these premium features
- *   • Loading            → skeleton
+ * Access matrix (columns only apply when no active subscription):
+ *   ┌─────────────────────┬──────────────────────────────────────────────┐
+ *   │ Active subscription │ full access (trial state is irrelevant)     │
+ *   ├─────────────────────┼──────────────┬───────────────┬──────────────┤
+ *   │ No active sub       │ Trial active │ Trial expired │ Free-tier    │
+ *   ├─────────────────────┼──────────────┼───────────────┼──────────────┤
+ *   │ Suspended sub       │ trial banner │ suspended     │ suspended    │
+ *   │                     │ + suspension │ lock screen   │ lock screen  │
+ *   │                     │   notice     │               │              │
+ *   │ No subscription     │ trial banner │ subscribe     │ subscribe    │
+ *   │                     │              │ lock screen   │ lock screen  │
+ *   └─────────────────────┴──────────────┴───────────────┴──────────────┘
  *
- * Props:
- *   featureName – human label e.g. "Budget & Spend"
- *   featureDescription – one-liner explaining what the feature does
- *   children    – the page content to render when access is granted
+ * NOTE: This is a UI gate only. Server-side enforcement uses
+ * has_premium_access() in RLS policies and RPC guards.
  */
 export default function SubscriptionGate({
   featureName = 'This feature',
@@ -59,7 +61,50 @@ export default function SubscriptionGate({
     return <>{children}</>
   }
 
-  // ── Suspended subscription → lock with suspension notice ────────────────
+  // ── Trial still active → access granted (free-tier fallback) ────────────
+  //    If also suspended, show both the suspension notice and trial banner
+  if (isOnTrial) {
+    return (
+      <>
+        {isSuspended && (
+          <div className="flex items-start gap-3 p-3 md:p-4 mb-4 md:mb-6 rounded-xl border border-red-300 bg-red-50">
+            <ShieldOff size={18} className="text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-red-800">Your subscription has been suspended</p>
+              <p className="text-xs md:text-sm text-red-600 mt-0.5">
+                You still have trial access to {featureName.toLowerCase()} until the trial ends.
+                Contact support to resolve the suspension.
+              </p>
+            </div>
+            <Link href="/dashboard/support"
+              className="hidden md:inline-flex flex-shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-100 transition-colors">
+              <LifeBuoy size={12} /> Support
+            </Link>
+          </div>
+        )}
+        {/* Desktop trial banner */}
+        <div className="hidden md:block">
+          <TrialBanner
+            daysRemaining={daysRemaining}
+            trialEndsAt={trialEndsAt}
+            featureName={featureName}
+          />
+        </div>
+        {/* Mobile trial banner */}
+        <div className="md:hidden mb-4">
+          <TrialBanner
+            daysRemaining={daysRemaining}
+            trialEndsAt={trialEndsAt}
+            featureName={featureName}
+            compact
+          />
+        </div>
+        {children}
+      </>
+    )
+  }
+
+  // ── Trial expired (or free-tier) + suspended → suspension lock screen ───
   if (isSuspended) {
     return (
       <div className="max-w-6xl mx-auto">
@@ -74,12 +119,12 @@ export default function SubscriptionGate({
 
           <p className="text-gray-500 text-sm max-w-md mb-2">
             Access to {featureName.toLowerCase()} and other premium features is
-            temporarily unavailable while your subscription is suspended.
+            unavailable while your subscription is suspended and your free trial has ended.
           </p>
 
           <p className="text-gray-400 text-sm max-w-md mb-8">
-            If you believe this is an error or need assistance, please contact
-            our support team to resolve the issue and restore your access.
+            Contact support to resolve the suspension, or subscribe to a new plan
+            to regain access.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -110,36 +155,9 @@ export default function SubscriptionGate({
     )
   }
 
-  // ── On trial → show page with trial banner at top ───────────────────────
-  if (isOnTrial) {
-    return (
-      <>
-        {/* Desktop banner */}
-        <div className="hidden md:block">
-          <TrialBanner
-            daysRemaining={daysRemaining}
-            trialEndsAt={trialEndsAt}
-            featureName={featureName}
-          />
-        </div>
-        {/* Mobile banner */}
-        <div className="md:hidden mb-4">
-          <TrialBanner
-            daysRemaining={daysRemaining}
-            trialEndsAt={trialEndsAt}
-            featureName={featureName}
-            compact
-          />
-        </div>
-        {children}
-      </>
-    )
-  }
-
-  // ── Trial expired / free-tier user → lock screen ────────────────────────
+  // ── Trial expired / free-tier, no suspension → subscribe lock screen ────
   return (
     <div className="max-w-6xl mx-auto">
-      {/* The restrictive overlay */}
       <div className="flex flex-col items-center justify-center py-16 md:py-24 px-6 text-center">
         <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
           <Lock className="text-gray-400" size={32} />
@@ -178,7 +196,6 @@ export default function SubscriptionGate({
           </button>
         </div>
 
-        {/* Feature highlights to motivate upgrade */}
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full">
           {[
             { title: 'Budget Tracking', desc: 'Set limits and monitor vehicle spending' },
