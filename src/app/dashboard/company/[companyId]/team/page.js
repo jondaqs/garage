@@ -7,6 +7,9 @@ import {
   Users, AlertCircle, Shield, UserCheck, Pencil,
   Check, X, Settings, Loader2, UserPlus, Mail
 } from 'lucide-react'
+import useCompanyAccess from '@/hooks/useCompanyAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 const ROLE_OPTIONS = [
   { value: 'driver',        label: 'Driver'        },
@@ -50,6 +53,7 @@ export default function MemberTeamPage() {
   const [inviteError, setInviteError] = useState('')
   const [inviteSuccess,setInviteSuccess] = useState('')
   const [rolesForm,   setRolesForm]   = useState({})
+  const access = useCompanyAccess(companyId)
   const [savingRoles, setSavingRoles] = useState(false)
   const [rolesError,  setRolesError]  = useState('')
 
@@ -227,12 +231,16 @@ export default function MemberTeamPage() {
           </p>
         </div>
         {canInvite && (
+          <CompanyWriteGate canWrite={access.canWrite} state={access.state}>
           <button onClick={() => { setShowInvite(true); setInviteError(''); setInviteSuccess('') }}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
             <UserPlus className="w-4 h-4" /> Invite Member
           </button>
+          </CompanyWriteGate>
         )}
       </div>
+
+      {!access.loading && <CompanyAccessBanner {...access} companyId={companyId} />}
 
       {members.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
@@ -347,6 +355,7 @@ export default function MemberTeamPage() {
                             </button>
                           </div>
                         ) : (
+                          <CompanyWriteGate canWrite={access.canWrite} state={access.state} inline>
                           <div className="flex items-center gap-2">
                             <button onClick={() => startEdit(m)}
                               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50">
@@ -357,6 +366,7 @@ export default function MemberTeamPage() {
                               <Settings className="w-3 h-3" /> Manage Roles
                             </button>
                           </div>
+                          </CompanyWriteGate>
                         )}
                       </td>
                     )}

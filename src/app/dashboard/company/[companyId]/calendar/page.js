@@ -10,6 +10,7 @@ import {
   Car, Loader2, Building2
 } from 'lucide-react'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
 
 const localizer = momentLocalizer(moment)
 
@@ -227,6 +228,7 @@ export default function MemberCompanyCalendarPage() {
   )
 
   return (
+    <CompanySubscriptionGate companyId={companyId} featureName="Fleet Calendar">
     <div className="space-y-4">
 
       {/* Header */}
@@ -362,5 +364,6 @@ export default function MemberCompanyCalendarPage() {
       )}
 
     </div>
+    </CompanySubscriptionGate>
   )
 }

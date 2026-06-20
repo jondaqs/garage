@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCompanyWrite } from '@/lib/guards/companyAccess'
 
 // Get single vehicle
 export async function GET(request, { params }) {
@@ -55,7 +56,7 @@ export async function PUT(request, { params }) {
 
     const { data: companyUser } = await supabase
       .from('company_users')
-      .select('is_admin')
+      .select('company_id, is_admin')
       .eq('user_id', userProfile.id)
       .single()
 
@@ -64,6 +65,10 @@ export async function PUT(request, { params }) {
         error: 'Only admins can update vehicles' 
       }, { status: 403 })
     }
+
+    // ◀ SUBSCRIPTION GUARD
+    const denied = await requireCompanyWrite(supabase, companyUser.company_id)
+    if (denied) return denied
 
     // Get vehicle ID from ownership
     const { data: ownership } = await supabase
@@ -135,6 +140,10 @@ export async function DELETE(request, { params }) {
         error: 'Only admins can remove vehicles' 
       }, { status: 403 })
     }
+
+    // ◀ SUBSCRIPTION GUARD
+    const denied = await requireCompanyWrite(supabase, companyUser.company_id)
+    if (denied) return denied
 
     // Delete ownership (this removes from fleet but keeps vehicle record)
     const { error: deleteError } = await supabase

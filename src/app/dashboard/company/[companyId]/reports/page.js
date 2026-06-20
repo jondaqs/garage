@@ -29,6 +29,7 @@ import {
   BarChart3, Wrench, Users, AlertCircle, ClipboardList, Store,
   Lock, Car, Clock, DollarSign,
 } from 'lucide-react'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 const dayMs = 1000 * 60 * 60 * 24
@@ -322,6 +323,7 @@ export default function CompanyReportsDashboardPage() {
   )
 
   return (
+    <CompanySubscriptionGate companyId={companyId} featureName="Reports">
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
@@ -633,5 +635,6 @@ export default function CompanyReportsDashboardPage() {
 
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }

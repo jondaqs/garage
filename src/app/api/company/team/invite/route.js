@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { sendCompanyInviteEmail } from '@/lib/email/sendCompanyInviteEmail'
+import { requireCanAddStaff } from '@/lib/guards/companyAccess'
 
 export async function POST(request) {
   try {
@@ -54,6 +55,10 @@ export async function POST(request) {
     if (!companyId) {
       return NextResponse.json({ error: 'Not authorized to invite members' }, { status: 403 })
     }
+
+    // ◀ SUBSCRIPTION + STAFF LIMIT GUARD
+    const staffDenied = await requireCanAddStaff(supabase, companyId)
+    if (staffDenied) return staffDenied
 
     // Generate invitation token
     const inviteToken = Math.random().toString(36).substring(2) + Date.now().toString(36)

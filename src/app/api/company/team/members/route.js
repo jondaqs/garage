@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireCompanyWrite } from '@/lib/guards/companyAccess'
 
 // Service role client — bypasses RLS for reading other users' profiles
 // Used only server-side, never exposed to the browser
@@ -155,6 +156,10 @@ export async function PUT(request) {
         error: 'Only company owners or admins can update team members'
       }, { status: 403 })
     }
+
+    // ◀ SUBSCRIPTION GUARD
+    const denied = await requireCompanyWrite(supabase, companyId)
+    if (denied) return denied
 
     const updateData = {}
     if (body.staffRole)                        updateData.staff_role = body.staffRole

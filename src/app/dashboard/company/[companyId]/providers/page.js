@@ -27,6 +27,7 @@ import {
   Building2, ChevronDown, ChevronUp, AlertCircle
 } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
 
 const ITEMS_PER_PAGE = 12
 
@@ -241,6 +242,7 @@ export default function CompanyMemberProvidersPage() {
   }
 
   return (
+    <CompanySubscriptionGate companyId={companyId} featureName="Find Providers">
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
@@ -442,6 +444,7 @@ export default function CompanyMemberProvidersPage() {
         )}
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }
 

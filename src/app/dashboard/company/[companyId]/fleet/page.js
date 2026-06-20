@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Truck, Plus, Calendar, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import useCompanyAccess from '@/hooks/useCompanyAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 export default function MemberFleetPage() {
   const { companyId } = useParams()
@@ -15,6 +18,7 @@ export default function MemberFleetPage() {
   const [page,       setPage]       = useState(1)
   const [pageSize,   setPageSize]   = useState(5)
   const [membership, setMembership] = useState(null)
+  const access = useCompanyAccess(companyId)
   // Set of vehicle ids that currently have a pending deletion request.
   // Used to badge cards as "pending deletion" so members see the state.
   const [pendingIds, setPendingIds] = useState(() => new Set())
@@ -105,6 +109,7 @@ export default function MemberFleetPage() {
           </p>
         </div>
         {canManageFleet && (
+          <CompanyWriteGate canWrite={access.canWrite} state={access.state}>
           <Link
             href={`/dashboard/company/${companyId}/fleet/add`}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -112,8 +117,11 @@ export default function MemberFleetPage() {
             <Plus className="w-4 h-4" />
             Add Vehicle
           </Link>
+          </CompanyWriteGate>
         )}
       </div>
+
+      {!access.loading && <CompanyAccessBanner {...access} companyId={companyId} />}
 
       {fleet.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">

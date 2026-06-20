@@ -26,6 +26,7 @@ import {
   Send, MessageSquare, Search, Loader2, CheckCheck, Check,
   ArrowLeft, XCircle, AlertCircle, Building2, RefreshCw,
 } from 'lucide-react'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
 
 export default function CompanyMemberChatPage() {
   const router       = useRouter()
@@ -450,6 +451,7 @@ export default function CompanyMemberChatPage() {
   }
 
   return (
+    <CompanySubscriptionGate companyId={companyId} featureName="Chat">
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
       {/* ── Conversation list ─────────────────────────────────────────── */}
@@ -728,5 +730,6 @@ export default function CompanyMemberChatPage() {
         )}
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }

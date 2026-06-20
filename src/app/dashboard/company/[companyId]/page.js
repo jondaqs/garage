@@ -9,6 +9,8 @@ import {
   DollarSign, AlertCircle, CheckCircle, Clock,
   BarChart3,
 } from 'lucide-react'
+import useCompanyAccess from '@/hooks/useCompanyAccess'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 export default function MemberCompanyOverviewPage() {
   const { companyId } = useParams()
@@ -19,6 +21,7 @@ export default function MemberCompanyOverviewPage() {
   const [stats,       setStats]       = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
+  const access = useCompanyAccess(companyId)
 
   useEffect(() => { fetchData() }, [companyId])
 
@@ -173,6 +176,18 @@ export default function MemberCompanyOverviewPage() {
           )}
         </div>
       </div>
+
+      {/* Subscription / trial banner */}
+      {!access.loading && (
+        <>
+          <div className="hidden md:block">
+            <CompanyAccessBanner {...access} companyId={companyId} />
+          </div>
+          <div className="md:hidden mb-4">
+            <CompanyAccessBanner {...access} companyId={companyId} compact />
+          </div>
+        </>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

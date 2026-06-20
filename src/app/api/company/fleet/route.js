@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireCanAddVehicle } from '@/lib/guards/companyAccess'
 import { piiHmacRaw } from '@/lib/pii'
 
 // Get company fleet
@@ -149,6 +150,10 @@ export async function POST(request) {
     if (!isAdmin) {
       return NextResponse.json({ error: 'Only company admins can add vehicles' }, { status: 403 })
     }
+
+    // ◀ SUBSCRIPTION + VEHICLE LIMIT GUARD
+    const vehicleDenied = await requireCanAddVehicle(supabase, companyId)
+    if (vehicleDenied) return vehicleDenied
 
     const plateNumber = body.plateNumber || body.licensePlate
 

@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, AlertCircle, Truck, Plus, ChevronRight, Loader2, BadgeCheck } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
+import useCompanyAccess from '@/hooks/useCompanyAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 const STATUS_COLORS = {
   pending:     'bg-yellow-100 text-yellow-800',
@@ -21,6 +24,7 @@ export default function MemberBookingsPage() {
 
   const [bookings,   setBookings]   = useState([])
   const [membership, setMembership] = useState(null)
+  const access = useCompanyAccess(companyId)
   const [filter,     setFilter]     = useState('all')
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
@@ -130,13 +134,17 @@ export default function MemberBookingsPage() {
           <p className="text-sm text-gray-500 mt-1">Fleet service bookings</p>
         </div>
         {(membership?.can_manage_fleet || membership?.is_admin) && (
+          <CompanyWriteGate canWrite={access.canWrite} state={access.state}>
           <button
             onClick={() => router.push(`/dashboard/company/${companyId}/bookings/book`)}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Book Service
           </button>
+          </CompanyWriteGate>
         )}
       </div>
+
+      {!access.loading && <CompanyAccessBanner {...access} companyId={companyId} />}
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">

@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import CompanyRemindersView from '@/components/company/CompanyRemindersView'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
 
 /**
  * Company-member reminders page.
@@ -14,5 +15,9 @@ import CompanyRemindersView from '@/components/company/CompanyRemindersView'
  */
 export default function CompanyRemindersMemberPage() {
   const { companyId } = useParams()
-  return <CompanyRemindersView basePath={`/dashboard/company/${companyId}`} />
+  return (
+    <CompanySubscriptionGate companyId={companyId} featureName="Reminders">
+      <CompanyRemindersView basePath={`/dashboard/company/${companyId}`} />
+    </CompanySubscriptionGate>
+  )
 }
