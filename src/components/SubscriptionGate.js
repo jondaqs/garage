@@ -9,23 +9,13 @@ import TrialBanner from '@/components/TrialBanner'
 /**
  * SubscriptionGate
  *
- * Wraps feature pages that require at least a Basic trial:
- *   budget · reports · reminders · history
+ * Deny-by-default wrapper for premium feature pages.
  *
- * Access matrix (columns only apply when no active subscription):
- *   ┌─────────────────────┬──────────────────────────────────────────────┐
- *   │ Active subscription │ full access (trial state is irrelevant)     │
- *   ├─────────────────────┼──────────────┬───────────────┬──────────────┤
- *   │ No active sub       │ Trial active │ Trial expired │ Free-tier    │
- *   ├─────────────────────┼──────────────┼───────────────┼──────────────┤
- *   │ Suspended sub       │ trial banner │ suspended     │ suspended    │
- *   │                     │ + suspension │ lock screen   │ lock screen  │
- *   │                     │   notice     │               │              │
- *   │ No subscription     │ trial banner │ subscribe     │ subscribe    │
- *   │                     │              │ lock screen   │ lock screen  │
- *   └─────────────────────┴──────────────┴───────────────┴──────────────┘
+ * The single gate: canAccessPremium (from useTrialStatus)
+ *   true  → render children (with optional banners)
+ *   false → render lock screen (variant depends on reason flags)
  *
- * NOTE: This is a UI gate only. Server-side enforcement uses
+ * NOTE: This is a UI gate. Server-side enforcement uses
  * has_premium_access() in RLS policies and RPC guards.
  */
 export default function SubscriptionGate({
@@ -36,13 +26,12 @@ export default function SubscriptionGate({
   const router = useRouter()
   const {
     loading,
+    canAccessPremium,
     hasActiveSubscription,
     isSuspended,
     isOnTrial,
-    isTrialExpired,
     trialEndsAt,
     daysRemaining,
-    isFreeUser,
   } = useTrialStatus()
 
   // ── Loading skeleton ────────────────────────────────────────────────────
@@ -56,14 +45,16 @@ export default function SubscriptionGate({
     )
   }
 
-  // ── Active subscription → full access, no banner ────────────────────────
-  if (hasActiveSubscription) {
-    return <>{children}</>
-  }
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ACCESS GRANTED — canAccessPremium is true
+  // ═══════════════════════════════════════════════════════════════════════
+  if (canAccessPremium) {
+    // Active subscription → clean render, no banners
+    if (hasActiveSubscription) {
+      return <>{children}</>
+    }
 
-  // ── Trial still active → access granted (free-tier fallback) ────────────
-  //    If also suspended, show both the suspension notice and trial banner
-  if (isOnTrial) {
+    // On trial → show banners + children
     return (
       <>
         {isSuspended && (
@@ -104,7 +95,12 @@ export default function SubscriptionGate({
     )
   }
 
-  // ── Trial expired (or free-tier) + suspended → suspension lock screen ───
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ACCESS DENIED — canAccessPremium is false
+  //  Choose the appropriate lock screen based on reason
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Suspended + no trial → suspension lock screen ─────────────────────
   if (isSuspended) {
     return (
       <div className="max-w-6xl mx-auto">
@@ -128,25 +124,16 @@ export default function SubscriptionGate({
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            <Link
-              href="/dashboard/support"
-              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors shadow-sm"
-            >
-              <LifeBuoy size={16} />
-              Contact Support
+            <Link href="/dashboard/support"
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors shadow-sm">
+              <LifeBuoy size={16} /> Contact Support
             </Link>
-
-            <Link
-              href="/dashboard/subscription"
-              className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-            >
+            <Link href="/dashboard/subscription"
+              className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
               View Subscription
             </Link>
-
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-            >
+            <button onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
               Back to Dashboard
             </button>
           </div>
@@ -155,7 +142,7 @@ export default function SubscriptionGate({
     )
   }
 
-  // ── Trial expired / free-tier, no suspension → subscribe lock screen ────
+  // ── Default: trial expired / free tier / no subscription → subscribe ──
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-col items-center justify-center py-16 md:py-24 px-6 text-center">
@@ -179,19 +166,12 @@ export default function SubscriptionGate({
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          <Link
-            href="/dashboard/subscription"
-            className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Sparkles size={16} />
-            View Subscription Plans
-            <ArrowRight size={16} />
+          <Link href="/dashboard/subscription"
+            className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
+            <Sparkles size={16} /> View Subscription Plans <ArrowRight size={16} />
           </Link>
-
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={() => router.push('/dashboard')}
+            className="inline-flex items-center gap-1 px-5 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
             Back to Dashboard
           </button>
         </div>
@@ -202,10 +182,8 @@ export default function SubscriptionGate({
             { title: 'Service Reports', desc: 'Work orders, providers, and downtime analytics' },
             { title: 'Smart Reminders', desc: 'Never miss scheduled maintenance again' },
           ].map((item) => (
-            <div
-              key={item.title}
-              className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-left"
-            >
+            <div key={item.title}
+              className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-left">
               <p className="text-sm font-semibold text-gray-700 mb-1">{item.title}</p>
               <p className="text-xs text-gray-500">{item.desc}</p>
             </div>

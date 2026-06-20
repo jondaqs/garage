@@ -6,35 +6,36 @@ import { createClient } from '@/lib/supabase/client'
 /**
  * useTrialStatus
  *
- * Resolves the current individual user's trial / subscription state.
+ * Deny-by-default approach: canAccessPremium is false until
+ * explicitly set true by one of two conditions:
+ *   1. Active non-expired subscription exists
+ *   2. check_trial_eligibility returns eligible WITH a future expiry date
  *
- * Priority logic:
- *   1. Active subscription → full access, nothing else matters
- *   2. No active subscription → check for suspended sub (sets flag)
- *      THEN always evaluate trial eligibility (free-tier fallback)
- *   3. The consumer (SubscriptionGate) decides access based on
- *      the combination of isSuspended + trial state
- *
- * On suspension the user falls back to free-tier rules:
- *   • Trial still active   → access with trial banner (+ suspension notice)
- *   • Trial expired        → no access (suspension lock screen)
+ * Free-tier (eligible by vehicle count, no time limit) does NOT
+ * grant premium access — canAccessPremium stays false.
  */
 export default function useTrialStatus() {
   const supabase = createClient()
 
-  const [loading, setLoading]                           = useState(true)
-  const [profileId, setProfileId]                       = useState(null)
+  const [loading, setLoading]                             = useState(true)
+  const [profileId, setProfileId]                         = useState(null)
+  // ── Access decision (deny by default) ──
+  const [canAccessPremium, setCanAccessPremium]           = useState(false)
+  // ── Reason flags (informational, not gatekeeping) ──
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
-  const [isSuspended, setIsSuspended]                   = useState(false)
-  const [suspendedSubNote, setSuspendedSubNote]         = useState('')
-  const [isOnTrial, setIsOnTrial]                       = useState(false)
-  const [isTrialExpired, setIsTrialExpired]             = useState(false)
-  const [trialEndsAt, setTrialEndsAt]                   = useState(null)
-  const [trialMessage, setTrialMessage]                 = useState('')
-  const [daysRemaining, setDaysRemaining]               = useState(0)
-  const [isFreeUser, setIsFreeUser]                     = useState(false)
+  const [isSuspended, setIsSuspended]                     = useState(false)
+  const [suspendedSubNote, setSuspendedSubNote]           = useState('')
+  const [isOnTrial, setIsOnTrial]                         = useState(false)
+  const [isTrialExpired, setIsTrialExpired]               = useState(false)
+  const [trialEndsAt, setTrialEndsAt]                     = useState(null)
+  const [trialMessage, setTrialMessage]                   = useState('')
+  const [daysRemaining, setDaysRemaining]                 = useState(0)
+  const [isFreeUser, setIsFreeUser]                       = useState(false)
 
   const resolve = useCallback(async () => {
+    // Reset to deny-by-default on each evaluation
+    let access = false
+
     try {
       // 1. Get auth user
       const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -50,8 +51,7 @@ export default function useTrialStatus() {
       if (!profile) { setLoading(false); return }
       setProfileId(profile.id)
 
-      // 3. Fetch the user's subscriptions in a single query
-      //    sorted by expiry_date desc so the most current plan comes first
+      // 3. Fetch all user subscriptions in one query
       const today = new Date().toISOString().split('T')[0]
 
       const { data: userSubs } = await supabase
@@ -67,31 +67,30 @@ export default function useTrialStatus() {
         .eq('user_id', profile.id)
         .order('expiry_date', { ascending: false })
 
-      // Categorise — "current" means the plan period hasn't expired
       const activeSub = (userSubs || []).find(
         s => s.subscription_statuses?.code === 'active'
           && s.expiry_date >= today
       )
-
-      // Only a non-expired suspended subscription counts as "current".
-      // If a sub was suspended AND its expiry_date has passed, the plan
-      // period is over — it's historical and shouldn't block or banner.
       const suspendedSub = (userSubs || []).find(
         s => s.subscription_statuses?.code === 'suspended'
           && s.expiry_date >= today
       )
 
-      // ── Active subscription → full access, done ─────────────────────────
+      // ── Active subscription → premium access granted ───────────────────
       if (activeSub) {
         setHasActiveSubscription(true)
         setIsSuspended(false)
         setIsOnTrial(false)
         setIsTrialExpired(false)
-        setLoading(false)
-        return
+        setIsFreeUser(false)
+        access = true
+        return // finally block sets canAccessPremium + loading
       }
 
-      // ── Suspended flag (does NOT short-circuit — trial still evaluated) ─
+      // ── No active subscription ─────────────────────────────────────────
+      setHasActiveSubscription(false)
+
+      // Set suspended flag (informational — doesn't grant/deny by itself)
       if (suspendedSub) {
         setIsSuspended(true)
         setSuspendedSubNote(suspendedSub.notes || '')
@@ -100,9 +99,7 @@ export default function useTrialStatus() {
         setSuspendedSubNote('')
       }
 
-      // ── 4. No active subscription — evaluate trial / free-tier ──────────
-      setHasActiveSubscription(false)
-
+      // ── 4. Evaluate trial eligibility ──────────────────────────────────
       const { data: trialRows, error: trialErr } = await supabase
         .rpc('check_trial_eligibility', {
           p_subscriber_type: 'individual',
@@ -110,60 +107,53 @@ export default function useTrialStatus() {
         })
 
       if (trialErr || !trialRows || trialRows.length === 0) {
-        // Fallback: calculate from profile created_at + 3 months
-        const created = new Date(profile.created_at)
-        const trialEnd = new Date(created)
-        trialEnd.setMonth(trialEnd.getMonth() + 3)
-        const now = new Date()
-
-        if (now <= trialEnd) {
-          setIsOnTrial(true)
-          setIsTrialExpired(false)
-          setTrialEndsAt(trialEnd)
-          const diffDays = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
-          setDaysRemaining(Math.max(0, diffDays))
-          setTrialMessage(`Basic trial active — free until ${trialEnd.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}`)
-        } else {
-          setIsOnTrial(false)
-          setIsTrialExpired(true)
-          setDaysRemaining(0)
-        }
-        setLoading(false)
+        // RPC failed — deny access, mark trial expired
+        setIsOnTrial(false)
+        setIsTrialExpired(true)
+        setIsFreeUser(false)
+        setDaysRemaining(0)
+        access = false
         return
       }
 
       const trial = trialRows[0]
       setTrialMessage(trial.reason || '')
 
-      if (trial.trial_expires_at) {
+      if (trial.is_eligible && trial.trial_expires_at) {
+        // ── Time-based trial active (Basic Plus trial) ─────────────────
         const trialEnd = new Date(trial.trial_expires_at)
-        setTrialEndsAt(trialEnd)
-
         const now = new Date()
         const diffDays = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
-        setDaysRemaining(Math.max(0, diffDays))
-      }
 
-      if (trial.is_eligible) {
-        if (trial.trial_expires_at) {
-          // Within time-based trial window
-          setIsOnTrial(true)
-          setIsTrialExpired(false)
-        } else {
-          // Permanent free tier (vehicle count only, no time limit)
-          setIsFreeUser(true)
-          setIsOnTrial(false)
-          setIsTrialExpired(false)
-        }
+        setIsOnTrial(true)
+        setIsTrialExpired(false)
+        setIsFreeUser(false)
+        setTrialEndsAt(trialEnd)
+        setDaysRemaining(Math.max(0, diffDays))
+        access = true // trial grants premium access
+
+      } else if (trial.is_eligible && !trial.trial_expires_at) {
+        // ── Permanent free tier (vehicle count only) ───────────────────
+        // Eligible to USE the platform but NOT premium features
+        setIsFreeUser(true)
+        setIsOnTrial(false)
+        setIsTrialExpired(false)
+        setDaysRemaining(0)
+        access = false // free tier does NOT grant premium access
+
       } else {
-        // Trial expired or never existed
+        // ── Not eligible (trial expired or over vehicle limit) ─────────
         setIsOnTrial(false)
         setIsTrialExpired(true)
+        setIsFreeUser(false)
         setDaysRemaining(0)
+        access = false
       }
     } catch (err) {
       console.error('useTrialStatus error:', err)
+      access = false // deny on error
     } finally {
+      setCanAccessPremium(access)
       setLoading(false)
     }
   }, [supabase])
@@ -173,6 +163,7 @@ export default function useTrialStatus() {
   return {
     loading,
     profileId,
+    canAccessPremium,
     hasActiveSubscription,
     isSuspended,
     suspendedSubNote,
