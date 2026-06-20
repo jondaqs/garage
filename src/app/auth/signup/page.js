@@ -32,11 +32,12 @@ function SignupForm() {
   // Turnstile CAPTCHA
   const [turnstileToken, setTurnstileToken] = useState('')
   const turnstileRef = useRef(null)
+  const turnstileWidgetId = useRef(null)
 
   const resetTurnstile = useCallback(() => {
     setTurnstileToken('')
-    if (window.turnstile && turnstileRef.current) {
-      window.turnstile.reset(turnstileRef.current)
+    if (window.turnstile && turnstileWidgetId.current != null) {
+      window.turnstile.reset(turnstileWidgetId.current)
     }
   }, [])
 
@@ -48,6 +49,47 @@ function SignupForm() {
     return () => {
       window.removeEventListener('turnstile-success', onSuccess)
       window.removeEventListener('turnstile-expired', onExpired)
+    }
+  }, [])
+
+  // Manually render Turnstile on mount — auto-render only fires once
+  // when the script first loads; client-side navigation skips it.
+  useEffect(() => {
+    const el = turnstileRef.current
+    if (!el) return
+    let pollTimer = null
+
+    const renderWidget = () => {
+      if (!window.turnstile || !el) return
+      if (el.querySelector('iframe')) return
+      turnstileWidgetId.current = window.turnstile.render(el, {
+        sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+        callback: (token) => {
+          window.__turnstileToken = token
+          window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }))
+        },
+        'expired-callback': () => {
+          window.__turnstileToken = ''
+          window.dispatchEvent(new CustomEvent('turnstile-expired'))
+        },
+        theme: 'light',
+      })
+    }
+
+    if (window.turnstile) {
+      renderWidget()
+    } else {
+      pollTimer = setInterval(() => {
+        if (window.turnstile) { clearInterval(pollTimer); pollTimer = null; renderWidget() }
+      }, 150)
+    }
+
+    return () => {
+      if (pollTimer) clearInterval(pollTimer)
+      if (window.turnstile && turnstileWidgetId.current != null) {
+        try { window.turnstile.remove(turnstileWidgetId.current) } catch {}
+        turnstileWidgetId.current = null
+      }
     }
   }, [])
 

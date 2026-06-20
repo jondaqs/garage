@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, Eye, EyeOff, Phone, User, Chrome } from 'lucide-react'
+import Script from 'next/script'
 
 export default function AuthenticationStep({ 
   nextStep, 
@@ -25,17 +26,87 @@ export default function AuthenticationStep({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // ── Turnstile CAPTCHA ──────────────────────────────────────────────────
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef(null)
+  const turnstileWidgetId = useRef(null)
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken('')
+    if (window.turnstile && turnstileWidgetId.current != null) {
+      window.turnstile.reset(turnstileWidgetId.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onSuccess = (e) => setTurnstileToken(e.detail)
+    const onExpired = () => setTurnstileToken('')
+    window.addEventListener('turnstile-success', onSuccess)
+    window.addEventListener('turnstile-expired', onExpired)
+    return () => {
+      window.removeEventListener('turnstile-success', onSuccess)
+      window.removeEventListener('turnstile-expired', onExpired)
+    }
+  }, [])
+
+  // Manually render Turnstile on mount — auto-render only fires once
+  // when the script first loads; client-side navigation skips it.
+  useEffect(() => {
+    const el = turnstileRef.current
+    if (!el) return
+    let pollTimer = null
+
+    const renderWidget = () => {
+      if (!window.turnstile || !el) return
+      if (el.querySelector('iframe')) return
+      turnstileWidgetId.current = window.turnstile.render(el, {
+        sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+        callback: (token) => {
+          window.__turnstileToken = token
+          window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }))
+        },
+        'expired-callback': () => {
+          window.__turnstileToken = ''
+          window.dispatchEvent(new CustomEvent('turnstile-expired'))
+        },
+        theme: 'light',
+      })
+    }
+
+    if (window.turnstile) {
+      renderWidget()
+    } else {
+      pollTimer = setInterval(() => {
+        if (window.turnstile) { clearInterval(pollTimer); pollTimer = null; renderWidget() }
+      }, 150)
+    }
+
+    return () => {
+      if (pollTimer) clearInterval(pollTimer)
+      if (window.turnstile && turnstileWidgetId.current != null) {
+        try { window.turnstile.remove(turnstileWidgetId.current) } catch {}
+        turnstileWidgetId.current = null
+      }
+    }
+  }, [])
+
   const handleSignup = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
+    if (!turnstileToken) {
+      setError('Please complete the security check.')
+      setLoading(false)
+      return
+    }
+
     try {
-      // Sign up the user
       const { data: authData, error: signupError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          captchaToken: turnstileToken,
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/provider-signup`,
           data: {
             first_name: formData.firstName,
@@ -48,19 +119,13 @@ export default function AuthenticationStep({
       if (signupError) throw signupError
 
       if (authData.user) {
-        // Check if email confirmation is required
         if (!authData.user.email_confirmed_at) {
-          // Email not confirmed yet
           setError('')
           alert('✅ Account created! Please check your email to verify your account before continuing.')
-          // Don't proceed - user needs to verify email first
           setLoading(false)
           return
         }
 
-        // Email is confirmed (or confirmation not required)
-        // Profile should already exist from trigger - fetch it
-        // Wait a moment for trigger to complete
         await new Promise(resolve => setTimeout(resolve, 500))
 
         const { data: profile, error: profileError } = await supabase
@@ -71,8 +136,6 @@ export default function AuthenticationStep({
 
         if (profileError) {
           console.error('Profile fetch error:', profileError)
-          // Profile doesn't exist yet (trigger might have failed)
-          // Show helpful error
           throw new Error('Profile creation failed. Please contact support or try again.')
         }
 
@@ -85,6 +148,7 @@ export default function AuthenticationStep({
       }
     } catch (err) {
       setError(err.message)
+      resetTurnstile()
     } finally {
       setLoading(false)
     }
@@ -95,16 +159,22 @@ export default function AuthenticationStep({
     setLoading(true)
     setError('')
 
+    if (!turnstileToken) {
+      setError('Please complete the security check.')
+      setLoading(false)
+      return
+    }
+
     try {
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        options: { captchaToken: turnstileToken }
       })
 
       if (loginError) throw loginError
 
       if (data.user) {
-        // Get user profile
         const { data: profile, error: profileError } = await supabase
           .from('user_profiles_secure')
           .select('*')
@@ -120,6 +190,7 @@ export default function AuthenticationStep({
       }
     } catch (err) {
       setError(err.message)
+      resetTurnstile()
     } finally {
       setLoading(false)
     }
@@ -284,6 +355,35 @@ export default function AuthenticationStep({
             {error}
           </div>
         )}
+
+        {/* Cloudflare Turnstile CAPTCHA */}
+        <div className="mb-4 flex justify-center">
+          <div
+            ref={turnstileRef}
+            className="cf-turnstile"
+            data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+            data-callback="onTurnstileSuccess"
+            data-expired-callback="onTurnstileExpired"
+            data-theme="light"
+          />
+        </div>
+
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          strategy="afterInteractive"
+        />
+        <Script id="turnstile-callbacks-provider-auth" strategy="afterInteractive">
+          {`
+            window.onTurnstileSuccess = function(token) {
+              window.__turnstileToken = token;
+              window.dispatchEvent(new CustomEvent('turnstile-success', { detail: token }));
+            };
+            window.onTurnstileExpired = function() {
+              window.__turnstileToken = '';
+              window.dispatchEvent(new CustomEvent('turnstile-expired'));
+            };
+          `}
+        </Script>
 
         <button
           type="submit"
