@@ -184,13 +184,6 @@ export default function SupportTicketModal({ isOpen, onClose, onSubmitted, supab
                   rows={5} className={inp + ' resize-none'} />
               </div>
 
-              {/* ── Priority note ── */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-                <p className="text-[11px] text-slate-600">
-                  <strong>Priority</strong> is automatically assigned based on your subscription plan. Higher-tier subscribers receive faster response times.
-                </p>
-              </div>
-
               {error && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-lg px-3 py-2">
                   <AlertCircle size={14} className="shrink-0" />
