@@ -11,6 +11,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import useCompanyAccess from '@/hooks/useCompanyAccess'
 
 export default function Sidebar({ user }) {
   const router   = useRouter()
@@ -28,6 +29,7 @@ export default function Sidebar({ user }) {
   const activeItemRef = useRef(null)
   const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }
   const [companyNavOpen,  setCompanyNavOpen]  = useState(true)       // expanded by default
+  const companyAccess = useCompanyAccess(companyMembership?.id)
   const [membershipLoading, setMembershipLoading] = useState(true)
   const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory, can_chat }]
   const [providerNavOpen, setProviderNavOpen] = useState({})         // { [providerId]: bool }
@@ -739,6 +741,11 @@ export default function Sidebar({ user }) {
             >
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                 My Company
+                {!companyAccess.loading && !companyAccess.canWrite && (
+                  <span className="ml-1.5 text-[9px] normal-case tracking-normal px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                    Inactive
+                  </span>
+                )}
               </p>
               {companyNavOpen
                 ? <ChevronDown size={14} className="text-gray-400" />
@@ -854,10 +861,24 @@ export default function Sidebar({ user }) {
                   </div>
                 )}
 
+                {/* Subscription warning */}
+                {!companyAccess.loading && !companyAccess.canWrite && (
+                  <div className="mx-1 mb-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
+                    <CreditCard size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-700 leading-snug">
+                      {companyAccess.state === 'suspended'
+                        ? 'Subscription suspended — view-only mode.'
+                        : 'Trial ended — subscribe for full access.'}
+                    </p>
+                  </div>
+                )}
+
                 {/* Company nav items */}
+                <div className={!companyAccess.loading && !companyAccess.canWrite ? 'opacity-60' : ''}>
                 {companyNavItems(companyMembership).map(item => (
                   <NavItem key={item.path} item={item} compact />
                 ))}
+                </div>
               </>
             )}
           </div>

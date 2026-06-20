@@ -5,11 +5,15 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Truck, Plus, Calendar, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertCircle
 } from 'lucide-react'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 const supabase = createClient()
 
 export default function FleetPage() {
   const [fleet, setFleet] = useState([])
+  const ownerAccess = useOwnerCompanyAccess()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
   // Set of vehicle_ids with a pending deletion request.
@@ -142,6 +146,7 @@ export default function FleetPage() {
             {fleet.length} vehicle{fleet.length !== 1 ? 's' : ''} registered
           </p>
         </div>
+        <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
         <Link
           href="/company/fleet/add"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -149,7 +154,10 @@ export default function FleetPage() {
           <Plus className="w-4 h-4" />
           Add Vehicle
         </Link>
+        </CompanyWriteGate>
       </div>
+
+      {!ownerAccess.loading && <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />}
 
       {actionError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2">
@@ -163,6 +171,7 @@ export default function FleetPage() {
           <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles in your fleet</h3>
           <p className="text-gray-500 mb-6">Get started by adding your first vehicle</p>
+          <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
           <Link
             href="/company/fleet/add"
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
@@ -170,6 +179,7 @@ export default function FleetPage() {
             <Plus className="w-4 h-4" />
             Add Your First Vehicle
           </Link>
+          </CompanyWriteGate>
         </div>
       ) : (
         <>

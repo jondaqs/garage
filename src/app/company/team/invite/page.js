@@ -5,9 +5,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { piiHmac } from '@/lib/pii';
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate';
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess';
 
 export default function InviteTeamMemberPage() {
   const router = useRouter();
+  const ownerAccess = useOwnerCompanyAccess();
   
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -220,6 +223,7 @@ export default function InviteTeamMemberPage() {
   };
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Invite Team Members">
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
@@ -438,5 +442,6 @@ export default function InviteTeamMemberPage() {
         </div>
       </div>
     </div>
+    </CompanySubscriptionGate>
   );
 }

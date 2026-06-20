@@ -7,10 +7,13 @@ import {
   Truck, Users, Calendar, DollarSign, ClipboardList,
   Plus, Wrench, AlertCircle, TrendingUp, Bell
 } from 'lucide-react'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 export default function CompanyDashboard() {
   const router = useRouter()
   const [companyId, setCompanyId] = useState(null)
+  const ownerAccess = useOwnerCompanyAccess()
   const [company, setCompany] = useState(null)
   const [stats, setStats] = useState({
     totalVehicles: 0,
@@ -314,6 +317,18 @@ export default function CompanyDashboard() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Subscription / trial banner */}
+      {!ownerAccess.loading && (
+        <>
+          <div className="hidden md:block">
+            <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />
+          </div>
+          <div className="md:hidden">
+            <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} compact />
+          </div>
+        </>
       )}
 
       {/* Stat cards */}

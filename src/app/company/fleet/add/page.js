@@ -5,12 +5,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 // ✅ Client outside component — preserves session across renders
 const supabase = createClient()
 
 export default function AddFleetVehiclePage() {
   const router = useRouter()
+  const ownerAccess = useOwnerCompanyAccess()
 
   const [user, setUser]           = useState(null)
   const [profileId, setProfileId] = useState(null)
@@ -194,6 +197,7 @@ export default function AddFleetVehiclePage() {
 
   // ── Main form ─────────────────────────────────────────────────────────────
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Add Fleet Vehicle">
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
@@ -376,5 +380,6 @@ export default function AddFleetVehiclePage() {
         </div>
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }

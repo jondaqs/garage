@@ -29,11 +29,14 @@ import {
   Send, MessageSquare, Search, Loader2, CheckCheck, Check,
   ArrowLeft, XCircle, CheckCircle, AlertCircle, Building2, RefreshCw,
 } from 'lucide-react'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 export default function CompanyOwnerChatPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const supabase     = createClient()
+  const ownerAccess = useOwnerCompanyAccess()
 
   const [profile,        setProfile]        = useState(null)
   const [company,        setCompany]        = useState(null)        // { id, name }
@@ -453,6 +456,7 @@ export default function CompanyOwnerChatPage() {
   }
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Chat">
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
       {/* ── Conversation list ─────────────────────────────────────────── */}
@@ -741,5 +745,6 @@ export default function CompanyOwnerChatPage() {
         )}
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }

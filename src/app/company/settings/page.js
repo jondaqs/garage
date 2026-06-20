@@ -8,6 +8,9 @@ import {
   FileText, Upload, Trash2, ExternalLink, RefreshCw,
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 // Tabs — Documents only shown to owner (filtered in render)
 const ALL_TABS = [
@@ -80,6 +83,7 @@ export default function CompanySettingsPage() {
   const [isOwner,   setIsOwner]   = useState(false)
   const [status,    setStatus]    = useState(null)
   const [companyId, setCompanyId] = useState(null)
+  const ownerAccess = useOwnerCompanyAccess()
 
   const [company, setCompany] = useState({
     name: '', bio: '', website: '', phone: '',
@@ -529,6 +533,8 @@ export default function CompanySettingsPage() {
         </div>
       )}
 
+      {!ownerAccess.loading && <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />}
+
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-sm">
           <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
@@ -717,11 +723,13 @@ export default function CompanySettingsPage() {
 
           {isOwner && (
             <div className="pt-3 border-t border-gray-100 flex justify-end">
+              <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
               <button onClick={saveCompany} disabled={saving || !company.name.trim()}
                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Save &amp; Submit for Review
               </button>
+              </CompanyWriteGate>
             </div>
           )}
         </div>

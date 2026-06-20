@@ -9,6 +9,8 @@ import {
   Building2, ChevronDown, ChevronUp
 } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 const ITEMS_PER_PAGE = 12
 
@@ -17,6 +19,7 @@ export default function ProvidersPage() {
   const supabase = createClient()
 
   const [providers,   setProviders]   = useState([])
+  const ownerAccess = useOwnerCompanyAccess()
   const [types,       setTypes]       = useState([])
   const [loading,     setLoading]     = useState(true)
   const [viewMode,    setViewMode]    = useState('list') // 'list' | 'map'
@@ -163,6 +166,7 @@ export default function ProvidersPage() {
   }
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Find Providers">
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
@@ -354,6 +358,7 @@ export default function ProvidersPage() {
         )}
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }
 

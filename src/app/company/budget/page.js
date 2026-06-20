@@ -16,6 +16,8 @@ import {
   DollarSign, Plus, Edit2, Trash2, AlertCircle, CheckCircle,
   Car, ChevronDown, ChevronUp, Calendar, TrendingUp, Coins, RefreshCw,
 } from 'lucide-react'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 const fmtCurrency = (amount, currency) => {
   const symbol = currency?.symbol || currency?.code || 'KES'
@@ -26,6 +28,7 @@ export default function CompanyBudgetPage() {
   const supabase = createClient()
 
   const [budget,        setBudget]        = useState(null)
+  const ownerAccess = useOwnerCompanyAccess()
   const [history,       setHistory]       = useState([])
   const [fleetSpend,    setFleetSpend]    = useState(null)
   const [otherCurrency, setOtherCurrency] = useState([])  // for current period
@@ -343,6 +346,7 @@ export default function CompanyBudgetPage() {
   )
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Budget Management">
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -747,5 +751,6 @@ export default function CompanyBudgetPage() {
         </div>
       )}
     </div>
+    </CompanySubscriptionGate>
   )
 }

@@ -11,12 +11,15 @@ import { Search, Star, MapPin, Truck, ArrowLeft, Calendar, CalendarDays, X, Chec
 import VerificationScore from '@/components/VerificationScore'
 import Link from 'next/link'
 import ProviderDetailModal from '@/components/ProviderDetailModal'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 const supabase = createClient()
 
 export default function CompanyBookServicePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const ownerAccess = useOwnerCompanyAccess()
 
   const [providers, setProviders]           = useState([])
   const [fleetVehicles, setFleetVehicles]   = useState([])
@@ -157,6 +160,7 @@ export default function CompanyBookServicePage() {
   )
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Book Service">
     <div className="max-w-4xl mx-auto space-y-6">
 
       {/* Header */}
@@ -363,5 +367,6 @@ export default function CompanyBookServicePage() {
         />
       )}
     </div>
+    </CompanySubscriptionGate>
   )
 }

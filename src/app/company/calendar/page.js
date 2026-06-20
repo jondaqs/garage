@@ -10,6 +10,8 @@ import {
   Car, Truck, ChevronDown, Loader2
 } from 'lucide-react'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 const localizer = momentLocalizer(moment)
 
@@ -35,6 +37,7 @@ export default function CompanyCalendarPage() {
   const supabase = createClient()
 
   const [bookings,    setBookings]    = useState([])
+  const ownerAccess = useOwnerCompanyAccess()
   const [workOrders,  setWorkOrders]  = useState([])
   const [vehicles,    setVehicles]    = useState([])   // fleet vehicles for filter
   const [loading,     setLoading]     = useState(true)
@@ -265,6 +268,7 @@ export default function CompanyCalendarPage() {
   )
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Fleet Calendar">
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
 
       {/* Header */}
@@ -404,5 +408,6 @@ export default function CompanyCalendarPage() {
         </div>
       )}
     </div>
+    </CompanySubscriptionGate>
   )
 }

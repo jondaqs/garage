@@ -31,6 +31,8 @@ import {
   BarChart3, Wrench, Users, AlertCircle, ClipboardList, Store,
   Car, Clock, DollarSign,
 } from 'lucide-react'
+import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 const dayMs = 1000 * 60 * 60 * 24
@@ -53,6 +55,7 @@ export default function CompanyReportsPage() {
   const supabase = createClient()
 
   const [loading,        setLoading]        = useState(true)
+  const ownerAccess = useOwnerCompanyAccess()
   const [error,          setError]          = useState(null)
 
   const [bookingStats,   setBookingStats]   = useState([])
@@ -293,6 +296,7 @@ export default function CompanyReportsPage() {
   )
 
   return (
+    <CompanySubscriptionGate companyId={ownerAccess.companyId} featureName="Reports">
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
@@ -604,5 +608,6 @@ export default function CompanyReportsPage() {
 
       </div>
     </div>
+    </CompanySubscriptionGate>
   )
 }

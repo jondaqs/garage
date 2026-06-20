@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Calendar, Truck, Wrench, ChevronLeft, ChevronRight, BadgeCheck } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
+import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 // Status code → display config
 // BUG 1.6 FIX: status is stored via status_id FK to booking_statuses.
@@ -20,6 +23,7 @@ const FILTER_OPTIONS = ['all', 'pending', 'confirmed', 'in_progress', 'completed
 
 export default function CompanyBookingsPage() {
   const [bookings, setBookings] = useState([])
+  const ownerAccess = useOwnerCompanyAccess()
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -166,6 +170,7 @@ export default function CompanyBookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Company Bookings</h1>
           <p className="text-sm text-gray-500 mt-1">{bookings.length} booking{bookings.length !== 1 ? 's' : ''}</p>
         </div>
+        <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
         <Link
           href="/company/bookings/book"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -173,7 +178,10 @@ export default function CompanyBookingsPage() {
           <Plus className="w-4 h-4" />
           Book Service
         </Link>
+        </CompanyWriteGate>
       </div>
+
+      {!ownerAccess.loading && <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />}
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
