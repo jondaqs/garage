@@ -347,9 +347,10 @@ function SubscriptionsListTab({ supabase }) {
             if (action === 'approve') fn = 'approve_subscription'
             else if (action === 'suspend') fn = 'suspend_subscription'
             else if (action === 'cancel') fn = 'cancel_subscription'
+            else if (action === 'reactivate') fn = 'reactivate_subscription'
 
             const params = { p_subscription_id: subId }
-            if (action !== 'approve') params.p_reason = `Admin action: ${action}`
+            if (action !== 'approve' && action !== 'reactivate') params.p_reason = `Admin action: ${action}`
 
             const { error } = await supabase.rpc(fn, params)
             if (error) throw error
@@ -456,6 +457,12 @@ function SubscriptionsListTab({ supabase }) {
                                                     <button onClick={() => doAction(s.id, 'suspend')} disabled={acting === s.id}
                                                         className="p-1.5 text-yellow-700 hover:bg-yellow-50 rounded disabled:opacity-50" title="Suspend">
                                                         <Ban size={14} />
+                                                    </button>
+                                                )}
+                                                {s.status_code === 'suspended' && (
+                                                    <button onClick={() => doAction(s.id, 'reactivate')} disabled={acting === s.id}
+                                                        className="p-1.5 text-green-700 hover:bg-green-50 rounded disabled:opacity-50" title="Reactivate">
+                                                        {acting === s.id ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
                                                     </button>
                                                 )}
                                                 {!['cancelled', 'blocked'].includes(s.status_code) && (
