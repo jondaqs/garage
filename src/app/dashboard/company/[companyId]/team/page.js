@@ -182,22 +182,21 @@ export default function MemberTeamPage() {
     if (!inviteForm.email.trim()) { setInviteError('Email is required'); return }
     setInviting(true); setInviteError('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
-      const { data: invData, error: invErr } = await supabase.from('company_invitations').insert({
-        company_id: companyId, invited_by: profile.id,
-        email: inviteForm.email.trim(), first_name: inviteForm.firstName.trim() || null,
-        last_name: inviteForm.lastName.trim() || null, phone: inviteForm.phone.trim() || null,
-        staff_role: inviteForm.role, is_admin: inviteForm.isAdmin,
-        status: 'pending', expires_at: new Date(Date.now() + 7*24*60*60*1000).toISOString(),
-      }).select('id').single()
-      if (invErr) throw invErr
-      await fetch('/api/company/team/invite', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteForm.email.trim(), firstName: inviteForm.firstName.trim(),
-          lastName: inviteForm.lastName.trim(), phone: inviteForm.phone.trim(),
-          role: inviteForm.role, isAdmin: inviteForm.isAdmin, invitationId: invData.id, companyId }),
+      const res = await fetch('/api/company/team/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: inviteForm.email.trim(),
+          firstName: inviteForm.firstName.trim(),
+          lastName: inviteForm.lastName.trim(),
+          phone: inviteForm.phone.trim(),
+          role: inviteForm.role,
+          isAdmin: inviteForm.isAdmin,
+          companyId,
+        }),
       })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to send invitation')
       setInviteSuccess('Invitation sent to ' + inviteForm.email)
       setInviteForm({ email: '', firstName: '', lastName: '', phone: '', role: 'driver', isAdmin: false })
       setTimeout(() => { setShowInvite(false); setInviteSuccess('') }, 2500)
