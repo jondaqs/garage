@@ -332,8 +332,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
   // Format an invoice/receipt amount — show in display currency when different
   const fmtInv = (amount, invSymbol, invCode) => {
-    if (!amount || Number(amount) === 0) return fmt(0, invSymbol || displaySymbol)
-    if (invCode === displayCurrency || convRate === 1) return fmt(amount, invSymbol)
+    const sym = invSymbol || displaySymbol || ''
+    if (invCode === displayCurrency || convRate === 1) return fmt(amount, sym)
     return fmtC(amount)
   }
   // Whether the invoice currency differs from display currency
