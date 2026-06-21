@@ -538,11 +538,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             <div>
               <p className="text-xs text-gray-500 font-medium">Cost</p>
               <p className="text-sm font-semibold text-gray-900">
-                {activeSub.currency_symbol}{Number(Number(activeSub.package_cost) + Number(activeSub.shop_addon_amount || 0)).toLocaleString()}
+                {fmtInv(Number(activeSub.package_cost) + Number(activeSub.shop_addon_amount || 0), activeSub.currency_symbol, activeSub.currency_code)}
               </p>
               {Number(activeSub.shop_addon_amount) > 0 && (
                 <p className="text-[10px] text-blue-600">
-                  Base: {activeSub.currency_symbol}{Number(activeSub.package_cost).toLocaleString()} + Shops: {activeSub.currency_symbol}{Number(activeSub.shop_addon_amount).toLocaleString()}
+                  Base: {fmtInv(activeSub.package_cost, activeSub.currency_symbol, activeSub.currency_code)} + Shops: {fmtInv(activeSub.shop_addon_amount, activeSub.currency_symbol, activeSub.currency_code)}
                 </p>
               )}
             </div>
@@ -678,7 +678,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                   <div className="bg-white rounded-xl border border-gray-200 p-4">
                     <p className="text-xs text-gray-500 font-medium">Total paid</p>
                     <p className="text-2xl font-bold text-green-700 mt-1">
-                      {activeSub.currency_symbol}{invoices.reduce((sum, i) => sum + Number(i.total_paid || 0), 0).toLocaleString()}
+                      {fmtInv(invoices.reduce((sum, i) => sum + Number(i.total_paid || 0), 0), activeSub.currency_symbol, activeSub.currency_code)}
                     </p>
                   </div>
                 </div>
