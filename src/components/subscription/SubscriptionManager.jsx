@@ -50,7 +50,7 @@ const STATUS_COLORS = {
 }
 
 const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-const fmt = (n, sym = '$') => `${sym}${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmt = (n, sym = '') => `${sym}${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
 export default function SubscriptionManager({ subscriberType, subscriberId, subscriberName }) {
@@ -330,6 +330,15 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   }
   const fmtC = (amount) => `${displaySymbol}${cv(amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+  // Format an invoice/receipt amount — show in display currency when different
+  const fmtInv = (amount, invSymbol, invCode) => {
+    if (!amount || Number(amount) === 0) return fmt(0, invSymbol || displaySymbol)
+    if (invCode === displayCurrency || convRate === 1) return fmt(amount, invSymbol)
+    return fmtC(amount)
+  }
+  // Whether the invoice currency differs from display currency
+  const invConverted = (invCode) => invCode && invCode !== displayCurrency && convRate !== 1
+
   // ── Subscribe to a package ─────────────────────────────────
   const handleSubscribe = async (packageId) => {
     const pkg = packages.find(p => p.id === packageId)
@@ -365,7 +374,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     setTermsModal({
       packageId,
       packageName: pkg.name,
-      packageCost: `${pkg.currency_symbol}${Number(pkg.cost).toLocaleString()}`,
+      packageCost: `${displaySymbol}${cv(pkg.cost).toLocaleString()}`,
       isUpgrade: !!activePaid,
       upgradeCredit,
       currentPlan: activePaid?.package_name || '',
@@ -393,11 +402,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       if (result?.upgraded_from === null && result?.upgrade_notes?.includes('Shop upgrade')) {
         // Shop-only upgrade
         msg = result.net_amount > 0
-          ? `Shop count updated! ${result.upgrade_notes} Invoice of ${fmt(result.net_amount)} created for the additional shop(s).`
+          ? `Shop count updated! ${result.upgrade_notes} Invoice of ${fmt(result.net_amount, displaySymbol)} created for the additional shop(s).`
           : 'Shop count updated! No additional charge.'
       } else if (result?.upgrade_credit > 0 && result?.net_amount > 0) {
-        msg = `Upgrade initiated! A credit of ${fmt(result.upgrade_credit)} from your previous plan (${result.upgraded_from}) has been applied. ` +
-          `Net amount due: ${fmt(result.net_amount)}. Your current plan stays active until payment is confirmed.`
+        msg = `Upgrade initiated! A credit of ${fmt(result.upgrade_credit, displaySymbol)} from your previous plan (${result.upgraded_from}) has been applied. ` +
+          `Net amount due: ${fmt(result.net_amount, displaySymbol)}. Your current plan stays active until payment is confirmed.`
       } else if (result?.upgrade_credit > 0 && result?.net_amount === 0) {
         msg = `Upgraded successfully! The credit from your previous plan (${result.upgraded_from}) fully covers the new package — no payment needed!`
       } else if (result?.net_amount > 0) {
@@ -897,8 +906,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               {shopAddon && selectedShopCount > 1 && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs">
                   <div className="flex justify-between text-blue-700">
-                    <span>Shop addon ({shopAddon.billable_shops} extra × {shopAddon.is_flat_rate ? 'flat rate' : fmt(shopAddon.per_shop_price) + '/mo each'})</span>
-                    <span className="font-bold">+{fmt(shopAddon.shop_monthly_addon)}/mo</span>
+                    <span>Shop addon ({shopAddon.billable_shops} extra × {shopAddon.is_flat_rate ? 'flat rate' : fmt(shopAddon.per_shop_price, displaySymbol) + '/mo each'})</span>
+                    <span className="font-bold">+{fmt(shopAddon.shop_monthly_addon, displaySymbol)}/mo</span>
                   </div>
                   <p className="text-blue-500 mt-1">This addon is added to each plan&apos;s base price below.</p>
                 </div>
@@ -1148,15 +1157,18 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         <p className="text-sm font-semibold text-gray-900">{inv.invoice_ref_no}</p>
                         <p className="text-xs text-gray-500">{inv.package_name && `${inv.package_name} · `}Due: {fmtD(inv.due_date)} · {inv.subscription_number}</p>
                         {Number(inv.upgrade_credit) > 0 && (
-                          <p className="text-[10px] text-green-600 font-medium mt-0.5">↗ Upgrade credit: {fmt(inv.upgrade_credit, inv.currency_symbol)}</p>
+                          <p className="text-[10px] text-green-600 font-medium mt-0.5">↗ Upgrade credit: {fmtInv(inv.upgrade_credit, inv.currency_symbol, inv.currency_code)}</p>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">{fmt(inv.total_amount, inv.currency_symbol)}</p>
+                        <p className="text-sm font-bold text-gray-900">{fmtInv(inv.total_amount, inv.currency_symbol, inv.currency_code)}</p>
+                        {invConverted(inv.currency_code) && (
+                          <p className="text-[10px] text-gray-400">{fmt(inv.total_amount, inv.currency_symbol)} original</p>
+                        )}
                         {!isPaid && inv.balance_due > 0 && (
-                          <p className="text-xs text-red-500">Balance: {fmt(inv.balance_due, inv.currency_symbol)}</p>
+                          <p className="text-xs text-red-500">Balance: {fmtInv(inv.balance_due, inv.currency_symbol, inv.currency_code)}</p>
                         )}
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.effective_status] || 'bg-gray-100'}`}>
@@ -1188,13 +1200,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                             {!isShopOnly && (Number(inv.upgrade_credit) > 0 || Number(inv.shop_addon_amount) > 0) && inv.gross_amount && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Package Price</span>
-                                <span className="font-semibold">{fmt(Number(inv.gross_amount) - Number(inv.shop_addon_amount || 0), inv.currency_symbol)}</span>
+                                <span className="font-semibold">{fmtInv(Number(inv.gross_amount) - Number(inv.shop_addon_amount || 0), inv.currency_symbol, inv.currency_code)}</span>
                               </div>
                             )}
                             {Number(inv.shop_addon_amount) > 0 && (
                               <div className="flex justify-between text-sm text-blue-600">
                                 <span>{isShopOnly ? 'Shop Addon Upgrade' : 'Shop Addon'} ({inv.shop_count} shops · 1 free + {Math.max(0, inv.shop_count - 1)} paid)</span>
-                                <span className="font-semibold">{isShopOnly ? fmt(inv.amount_due, inv.currency_symbol) : fmt(inv.shop_addon_amount, inv.currency_symbol)}</span>
+                                <span className="font-semibold">{isShopOnly ? fmtInv(inv.amount_due, inv.currency_symbol, inv.currency_code) : fmtInv(inv.shop_addon_amount, inv.currency_symbol, inv.currency_code)}</span>
                               </div>
                             )}
                             {isShopOnly && inv.upgrade_notes && (
@@ -1203,31 +1215,31 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                             {Number(inv.upgrade_credit) > 0 && (
                               <div className="flex justify-between text-sm text-green-600">
                                 <span>Upgrade Credit</span>
-                                <span className="font-semibold">−{fmt(inv.upgrade_credit, inv.currency_symbol)}</span>
+                                <span className="font-semibold">−{fmtInv(inv.upgrade_credit, inv.currency_symbol, inv.currency_code)}</span>
                               </div>
                             )}
                           </>
                         })()}
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Amount Due</span>
-                          <span className="font-semibold">{fmt(inv.amount_due, inv.currency_symbol)}</span>
+                          <span className="font-semibold">{fmtInv(inv.amount_due, inv.currency_symbol, inv.currency_code)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Tax</span>
-                          <span className="font-semibold">{fmt(inv.tax_amount, inv.currency_symbol)}</span>
+                          <span className="font-semibold">{fmtInv(inv.tax_amount, inv.currency_symbol, inv.currency_code)}</span>
                         </div>
                         <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
                           <span className="font-bold text-gray-900">Total</span>
-                          <span className="font-bold text-gray-900">{fmt(inv.total_amount, inv.currency_symbol)}</span>
+                          <span className="font-bold text-gray-900">{fmtInv(inv.total_amount, inv.currency_symbol, inv.currency_code)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-green-700">Total Paid</span>
-                          <span className="font-semibold text-green-700">{fmt(inv.total_paid, inv.currency_symbol)}</span>
+                          <span className="font-semibold text-green-700">{fmtInv(inv.total_paid, inv.currency_symbol, inv.currency_code)}</span>
                         </div>
                         {Number(inv.balance_due) > 0 && (
                           <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
                             <span className="font-bold text-red-600">Balance Due</span>
-                            <span className="font-bold text-red-600">{fmt(inv.balance_due, inv.currency_symbol)}</span>
+                            <span className="font-bold text-red-600">{fmtInv(inv.balance_due, inv.currency_symbol, inv.currency_code)}</span>
                           </div>
                         )}
                       </div>
@@ -1371,9 +1383,12 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">{fmt(r.amount_paid, r.currency_symbol)}</p>
+                        <p className="text-sm font-bold text-gray-900">{fmtInv(r.amount_paid, r.currency_symbol, r.currency_code)}</p>
+                        {invConverted(r.currency_code) && (
+                          <p className="text-[10px] text-gray-400">{fmt(r.amount_paid, r.currency_symbol)} original</p>
+                        )}
                         {Number(r.change_given) > 0 && (
-                          <p className="text-[10px] text-gray-400">Change: {fmt(r.change_given, r.currency_symbol)}</p>
+                          <p className="text-[10px] text-gray-400">Change: {fmtInv(r.change_given, r.currency_symbol, r.currency_code)}</p>
                         )}
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${r.confirmed ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>

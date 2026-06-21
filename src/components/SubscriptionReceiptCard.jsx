@@ -33,7 +33,7 @@ const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', {
   day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
 }) : '—'
 
-const fmt = (n, sym = '$') => `${sym}${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmt = (n, sym = '') => `${sym}${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function SubscriptionReceiptCard({ receipt, canConfirm = false, onConfirmed, currency }) {
   const supabase = createClient()
@@ -44,7 +44,7 @@ export default function SubscriptionReceiptCard({ receipt, canConfirm = false, o
 
   const MethodIcon = METHOD_ICONS[receipt.payment_method] || CreditCard
   const isConfirmed = receipt.confirmed
-  const sym = currency?.symbol || receipt.currency_symbol || '$'
+  const sym = currency?.symbol || receipt.currency_symbol || ''
 
   const handleConfirm = async () => {
     if (!confirm('Confirm this subscription payment has been received?')) return
