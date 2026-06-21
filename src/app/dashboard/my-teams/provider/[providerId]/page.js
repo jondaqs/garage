@@ -1,849 +1,1229 @@
+// → Drop this file at: src/components/Sidebar.js
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import {
-  ArrowLeft, Building2, Users, Wrench, ClipboardList,
-  Phone, Mail, MapPin, Shield, CheckCircle, AlertCircle,
-  Loader2, Award, Calendar, CalendarDays, ChevronRight, FileText, Plus,
-  Send, Receipt, AlertTriangle, RefreshCw, Car, Filter,
-  Clock, ChevronDown, MessageSquare
+  Car, User, Plus, Calendar, CalendarDays, History, Bell,
+  Settings, LogOut, Menu, X, Users, Building2,
+  Truck, DollarSign, BarChart3, ChevronDown, ChevronRight,
+  AlertCircle, Wrench, ClipboardList, Search, MessageSquare,
+  MessageCircle, UserCheck, Package, Shield, CreditCard, LifeBuoy, Megaphone
 } from 'lucide-react'
+import { useRouter, usePathname } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import useCompanyAccess from '@/hooks/useCompanyAccess'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const STATUS_COLORS = {
-  intake: 'bg-gray-100 text-gray-600',
-  assigned: 'bg-blue-100 text-blue-700',
-  diagnosing: 'bg-purple-100 text-purple-700',
-  services_estimates: 'bg-blue-100 text-blue-700',
-  internal_review: 'bg-violet-100 text-violet-700',
-  awaiting_approval: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-cyan-100 text-cyan-700',
-  in_progress: 'bg-orange-100 text-orange-700',
-  quality_check: 'bg-indigo-100 text-indigo-700',
-  rework: 'bg-red-100 text-red-700',
-  completed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-red-100 text-red-500',
-  closed: 'bg-gray-100 text-gray-500',
-}
-
-const WO_FILTER_OPTIONS = [
-  { value: 'action', label: 'Needs action' },
-  { value: 'all', label: 'All active' },
-  { value: 'internal_review', label: 'Estimate review' },
-  { value: 'awaiting_approval', label: 'Awaiting approval' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'quality_check', label: 'Quality check' },
-  { value: 'in_progress', label: 'In progress' },
-]
-
-const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'work-orders', label: 'Work Orders' },
-]
-
-function getActionNeeded(wo, canSendEstimates, canSendInvoice) {
-  const code = wo.status?.code
-  if (code === 'internal_review' && canSendEstimates)
-    return {
-      label: 'Review & send estimate',
-      icon: Send,
-      color: 'bg-violet-100 text-violet-800 border-violet-300',
-      urgent: true,
-    }
-  if ((code === 'completed' || code === 'quality_check') && canSendInvoice)
-    return {
-      label: code === 'completed' ? 'Generate & send invoice' : 'Invoice ready to generate',
-      icon: FileText,
-      color: 'bg-green-100 text-green-800 border-green-300',
-      urgent: code === 'completed',
-    }
-  return null
-}
-
-// ── WorkOrdersPanel ───────────────────────────────────────────────────────────
-function WorkOrdersPanel({ providerId, canSendEstimates, canSendInvoice, canApproveWork }) {
-  const router = useRouter()
+export default function Sidebar({ user }) {
+  const router   = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
+  // ── All state declared up front ──────────────────────────────────────────
+  // The useEffect blocks below reference some of this state in their dependency
+  // arrays. Because const declarations are NOT hoisted (TDZ), they MUST be
+  // declared before any useEffect that names them, or the first render will
+  // throw a ReferenceError.
+  const [remindersCount, setRemindersCount] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [profileId,      setProfileId]      = useState(null)
+  const [mobileOpen,      setMobileOpen]      = useState(false)
+  const activeItemRef = useRef(null)
+  const [companyMembership, setCompanyMembership] = useState(null)   // { id, name, status, is_admin, staff_role }
+  const [companyNavOpen,  setCompanyNavOpen]  = useState(true)       // expanded by default
+  const companyAccess = useCompanyAccess(companyMembership?.id)
+  const [membershipLoading, setMembershipLoading] = useState(true)
+  const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory, can_chat }]
+  const [providerNavOpen, setProviderNavOpen] = useState({})         // { [providerId]: bool }
+  const [providerAccessMap, setProviderAccessMap] = useState({})     // { [providerId]: { canWrite, state } }
+  const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number } — customer chat unread
+  const [providerPeerUnreadByProviderId, setProviderPeerUnreadByProviderId] = useState({}) // { [providerId]: number } — peer chat unread (provider-to-provider)
+  const [companyUnread, setCompanyUnread] = useState(0)
+  const [woActionCount,        setWoActionCount]        = useState(0)
+  const [companyWoActionCount,  setCompanyWoActionCount] = useState(0)
+  const [isAdminUser,           setIsAdminUser]          = useState(false)
+  // Phase: per-provider upcoming-bookings count for the Calendar badge.
+  // Keyed by providerId: { '<uuid>': <count>, ... }
+  const [providerUpcomingByProvider, setProviderUpcomingByProvider] = useState({})
+  // Pending bookings (status='pending') per provider — drives the Bookings badge.
+  const [providerPendingByProvider, setProviderPendingByProvider] = useState({})
 
-  const [workOrders, setWorkOrders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState('action')
-  const [showFilter, setShowFilter] = useState(false)
-  const [error, setError] = useState('')
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    else setRefreshing(true)
-    setError('')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: result, error: rpcErr } = await supabase.rpc(
-        'get_provider_member_work_orders', { p_user_id: user.id }
-      )
-      if (rpcErr) throw rpcErr
-      const all = (result?.work_orders || []).filter(w => w.provider?.id === providerId)
-      setWorkOrders(all)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [providerId])
-
-  useEffect(() => { load() }, [load])
-
-  const actionWOs = workOrders.filter(w =>
-    getActionNeeded(w, canSendEstimates, canSendInvoice) !== null
-  )
-  const filtered = filter === 'action' ? actionWOs
-    : filter === 'all' ? workOrders
-      : workOrders.filter(w => w.status?.code === filter)
-
-  if (loading) return (
-    <div className="flex justify-center py-10">
-      <Loader2 className="animate-spin text-gray-400" size={28} />
-    </div>
-  )
-
-  return (
-    <div className="space-y-4">
-
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {actionWOs.length > 0 && (
-          <button
-            onClick={() => setFilter('action')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${filter === 'action'
-                ? 'bg-red-600 text-white border-red-600'
-                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-              }`}
-          >
-            <AlertTriangle size={13} />
-            {actionWOs.length} need{actionWOs.length === 1 ? 's' : ''} action
-          </button>
-        )}
-        <span className="text-xs text-gray-400">{workOrders.length} total</span>
-
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => load(true)}
-            disabled={refreshing}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          </button>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowFilter(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-            >
-              <Filter size={13} />
-              {WO_FILTER_OPTIONS.find(f => f.value === filter)?.label || 'Filter'}
-              <ChevronDown size={13} />
-            </button>
-            {showFilter && (
-              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
-                {WO_FILTER_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => { setFilter(opt.value); setShowFilter(false) }}
-                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${filter === opt.value ? 'font-semibold text-blue-700 bg-blue-50' : 'text-gray-700'
-                      }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* New Walk-In Work Order — only visible when member has WO access.
-          Routes to the member-side walk-in flow (Phase 2). */}
-          {canApproveWork && (
-            <button
-              onClick={() => router.push(`/dashboard/my-teams/provider/${providerId}/work-orders/new`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex-shrink-0"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">New Walk-In Work Order</span>
-              <span className="sm:hidden">Walk-In</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-sm text-red-700">
-          <AlertCircle size={15} /> {error}
-        </div>
-      )}
-
-      {/* Empty states */}
-      {workOrders.length === 0 && (
-        <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-200">
-          <ClipboardList className="mx-auto text-gray-300 mb-2" size={36} />
-          <p className="text-sm font-medium text-gray-500">No active work orders</p>
-          <p className="text-xs text-gray-400 mt-1">Work orders for this provider will appear here.</p>
-        </div>
-      )}
-
-      {workOrders.length > 0 && filtered.length === 0 && (
-        <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
-          <CheckCircle className="mx-auto text-gray-300 mb-2" size={30} />
-          <p className="text-sm font-medium text-gray-500">
-            {filter === 'action' ? 'No pending actions — all caught up!' : 'No work orders match this filter'}
-          </p>
-          <button onClick={() => setFilter('all')} className="mt-2 text-xs text-blue-600 hover:underline">
-            View all
-          </button>
-        </div>
-      )}
-
-      {/* WO cards */}
-      <div className="space-y-3">
-        {filtered.map(wo => {
-          const action = getActionNeeded(wo, canSendEstimates, canSendInvoice)
-          const ActionIcon = action?.icon
-          return (
-            <div
-              key={wo.id}
-              className={`bg-white rounded-xl border shadow-sm overflow-hidden ${action?.urgent ? 'border-l-4 border-l-violet-500 border-gray-200' : 'border-gray-200'
-                }`}
-            >
-              {action && (
-                <div className={`px-4 py-2 flex items-center gap-2 text-xs font-semibold border-b ${action.color}`}>
-                  {ActionIcon && <ActionIcon size={13} />}
-                  {action.label}
-                  <span className="ml-auto opacity-60">Open to act →</span>
-                </div>
-              )}
-
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-gray-900 text-sm">{wo.work_order_number}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[wo.status?.code] || 'bg-gray-100 text-gray-600'}`}>
-                        {wo.status?.display_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-600">
-                      <Car size={12} className="flex-shrink-0" />
-                      <span className="font-medium">{wo.vehicle?.plate_number}</span>
-                      {wo.vehicle?.make && (
-                        <span className="text-gray-400 text-xs">· {wo.vehicle.make} {wo.vehicle.model || ''}</span>
-                      )}
-                    </div>
-                    {wo.problem_description && (
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-1 italic">"{wo.problem_description}"</p>
-                    )}
-                  </div>
-                  {wo.total_amount > 0 && (
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs text-gray-400">Est. total</p>
-                      <p className="text-sm font-semibold text-gray-900">KES {Number(wo.total_amount).toLocaleString()}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Clock size={11} />
-                    {new Date(wo.opened_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                  <button
-                    onClick={() => router.push(`/dashboard/my-teams/work-order/${wo.id}`)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${action?.urgent
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                      }`}
-                  >
-                    {action ? 'Open & act' : 'View'}
-                    <ChevronRight size={13} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
-export default function ProviderOverviewPage() {
-  const router = useRouter()
-  const params = useParams()
-  const supabase = createClient()
-
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState('overview')
-
-  const load = useCallback(async () => {
-    try {
-      setError('')
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // ── 1. Profile ────────────────────────────────────────────────────────
+  // ── Resolve profile once on mount; share across loaders ─────────────────
+  useEffect(() => {
+    const resolve = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
       const { data: profile } = await supabase
         .from('user_profiles_secure')
-        .select('id, first_name, last_name')
+        .select('id, user_roles(role:user_roles_lookup(code))')
+        .eq('auth_user_id', authUser.id).single()
+      if (profile) {
+        setProfileId(profile.id)
+        // Check if this user also has an admin role
+        const codes = profile.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+        const adminCodes = ['platform_admin', 'admin', 'moderator', 'support', 'reviewer']
+        setIsAdminUser(codes.some(c => adminCodes.includes(c)))
+      }
+    }
+    resolve()
+  }, [])
+
+  // ── Loaders (now keyed off profileId) ───────────────────────────────────
+  const loadUnreadMessages = useCallback(async () => {
+    if (!profileId) return
+    try {
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('user_unread_count')
+        .eq('user_id', profileId)
+        .is('company_id', null)
+        .eq('status', 'open')
+      const total = (convs || []).reduce((s, c) => s + (c.user_unread_count || 0), 0)
+      setUnreadMessages(total)
+    } catch {}
+  }, [profileId])
+
+  const loadRemindersCount = useCallback(async () => {
+    if (!profileId) return
+    try {
+      const { count } = await supabase
+        .from('reminders')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profileId)
+        .eq('is_active', true)
+      setRemindersCount(count || 0)
+    } catch {}
+  }, [profileId])
+
+  // ── Personal WO action count ────────────────────────────────────────────
+  // Counts work orders where the user needs to take action:
+  // awaiting_approval (estimate approval), checkout submitted but not
+  // accepted, or invoice sent/overdue and unpaid.
+  const loadWoActionCount = useCallback(async () => {
+    if (!profileId) return
+    try {
+      // Get vehicles owned personally
+      const { data: owned } = await supabase
+        .from('vehicle_ownership').select('vehicle_id')
+        .eq('owner_user_id', profileId).is('owner_company_id', null)
+      const vehicleIds = (owned || []).map(o => o.vehicle_id)
+      if (vehicleIds.length === 0) { setWoActionCount(0); return }
+
+      // awaiting_approval
+      const { data: statuses } = await supabase
+        .from('work_order_statuses').select('id, code')
+        .in('code', ['awaiting_approval'])
+      const awaitingId = statuses?.find(s => s.code === 'awaiting_approval')?.id
+
+      let count = 0
+      if (awaitingId) {
+        const { count: c } = await supabase
+          .from('work_orders_secure').select('id', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds).eq('status_id', awaitingId)
+        count += (c || 0)
+      }
+
+      // checkout submitted but not accepted
+      const { count: checkoutCount } = await supabase
+        .from('work_orders_secure').select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('checkout_requested', true)
+        .not('checkout_request_satisfied', 'eq', true)
+        .not('checkout_declined', 'eq', true)
+      count += (checkoutCount || 0)
+
+      // invoices sent/overdue and unpaid
+      const { data: woIds } = await supabase
+        .from('work_orders_secure').select('id').in('vehicle_id', vehicleIds)
+      if (woIds?.length) {
+        const { count: invCount } = await supabase
+          .from('invoices').select('id', { count: 'exact', head: true })
+          .in('work_order_id', woIds.map(w => w.id))
+          .in('status', ['sent', 'overdue'])
+          .is('paid_at', null)
+        count += (invCount || 0)
+      }
+
+      setWoActionCount(count)
+    } catch {}
+  }, [profileId])
+
+  // ── Company fleet WO action count ───────────────────────────────────────
+  const loadCompanyWoActionCount = useCallback(async () => {
+    if (!companyMembership) { setCompanyWoActionCount(0); return }
+    try {
+      const companyId = companyMembership.id
+      const { data: fleet } = await supabase
+        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', companyId)
+      const vehicleIds = (fleet || []).map(f => f.vehicle_id)
+      if (vehicleIds.length === 0) { setCompanyWoActionCount(0); return }
+
+      const { data: statuses } = await supabase
+        .from('work_order_statuses').select('id, code')
+        .in('code', ['awaiting_approval'])
+      const awaitingId = statuses?.find(s => s.code === 'awaiting_approval')?.id
+
+      let count = 0
+      if (awaitingId) {
+        const { count: c } = await supabase
+          .from('work_orders_secure').select('id', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds).eq('status_id', awaitingId)
+        count += (c || 0)
+      }
+
+      const { count: checkoutCount } = await supabase
+        .from('work_orders_secure').select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('checkout_requested', true)
+        .not('checkout_request_satisfied', 'eq', true)
+        .not('checkout_declined', 'eq', true)
+      count += (checkoutCount || 0)
+
+      const { data: woIds } = await supabase
+        .from('work_orders_secure').select('id').in('vehicle_id', vehicleIds)
+      if (woIds?.length) {
+        const { count: invCount } = await supabase
+          .from('invoices').select('id', { count: 'exact', head: true })
+          .in('work_order_id', woIds.map(w => w.id))
+          .in('status', ['sent', 'overdue'])
+          .is('paid_at', null)
+        count += (invCount || 0)
+      }
+
+      setCompanyWoActionCount(count)
+    } catch {}
+  }, [companyMembership])
+
+  // ── Reload + realtime: fire when profile id becomes known ───────────────
+  useEffect(() => {
+    if (!profileId) return
+    loadUnreadMessages()
+    loadRemindersCount()
+    loadWoActionCount()
+
+    // Subscribe to conversation changes so the message badge updates live.
+    // Filter is on user_id (personal chats only — matches loadUnreadMessages
+    // scope, which excludes company chats).
+    const convChannel = supabase
+      .channel(`sidebar-convs-${profileId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `user_id=eq.${profileId}`,
+      }, () => loadUnreadMessages())
+      .subscribe()
+
+    // Reminders change less often, but we still want them fresh — listen on
+    // INSERT/UPDATE/DELETE keyed on the user.
+    const remindChannel = supabase
+      .channel(`sidebar-reminders-${profileId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'reminders',
+        filter: `user_id=eq.${profileId}`,
+      }, () => loadRemindersCount())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(convChannel)
+      supabase.removeChannel(remindChannel)
+    }
+  }, [profileId, loadUnreadMessages, loadRemindersCount, loadWoActionCount])
+
+  // ── Per-provider unread chat counts (Service Provider Membership) ───────
+  // For each provider this user has can_chat on, sum provider_unread_count
+  // across that provider's open conversations and stash by providerId. The
+  // sidebar Chat row for each provider then renders its own badge.
+  useEffect(() => {
+    const chattableProviders = mechanicMemberships.filter(m => m.can_chat)
+    if (chattableProviders.length === 0) {
+      setProviderUnreadByProviderId({})
+      return
+    }
+
+    const loadOne = async (providerId) => {
+      const { data } = await supabase
+        .from('conversations')
+        .select('provider_unread_count')
+        .eq('service_provider_id', providerId)
+        .eq('status', 'open')
+      const total = (data || []).reduce((s, c) => s + (c.provider_unread_count || 0), 0)
+      setProviderUnreadByProviderId(prev => ({ ...prev, [providerId]: total }))
+    }
+
+    // Initial loads
+    chattableProviders.forEach(m => loadOne(m.providerId))
+
+    // One realtime channel per provider — postgres-changes filters don't
+    // support IN(), so we subscribe per id. The channel triggers the loader
+    // for just that provider on any conversation change.
+    const channels = chattableProviders.map(m => {
+      return supabase
+        .channel(`sidebar-spu-convs-${m.providerId}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'conversations',
+          filter: `service_provider_id=eq.${m.providerId}`,
+        }, () => loadOne(m.providerId))
+        .subscribe()
+    })
+
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
+  // We intentionally only depend on the list of chattable provider IDs (as a
+  // stable string), not the entire mechanicMemberships array, so unrelated
+  // re-renders don't tear the channels down.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mechanicMemberships.filter(m => m.can_chat).map(m => m.providerId).sort().join(',')])
+
+  // ── Per-provider PEER unread (Provider Chats — provider-to-provider) ────
+  // Each chat-able membership gets its own peer-chat inbox at
+  //   /dashboard/my-teams/provider/<providerId>/peer-chat
+  // and a matching badge in the sidebar. Two filtered queries per provider —
+  // one where we're the initiator, one where we're the recipient — summed
+  // into a single counter. Realtime: two channels per provider matching the
+  // filtered queries.
+  useEffect(() => {
+    const chattableProviders = mechanicMemberships.filter(m => m.can_chat)
+    if (chattableProviders.length === 0) {
+      setProviderPeerUnreadByProviderId({})
+      return
+    }
+
+    const loadOne = async (providerId) => {
+      const [{ data: asInit }, { data: asRecip }] = await Promise.all([
+        supabase
+          .from('peer_conversations')
+          .select('initiator_unread_count')
+          .eq('initiator_provider_id', providerId)
+          .eq('status', 'open'),
+        supabase
+          .from('peer_conversations')
+          .select('recipient_unread_count')
+          .eq('recipient_provider_id', providerId)
+          .eq('status', 'open'),
+      ])
+      const t1 = (asInit  || []).reduce((s, c) => s + (c.initiator_unread_count || 0), 0)
+      const t2 = (asRecip || []).reduce((s, c) => s + (c.recipient_unread_count || 0), 0)
+      setProviderPeerUnreadByProviderId(prev => ({ ...prev, [providerId]: t1 + t2 }))
+    }
+
+    chattableProviders.forEach(m => loadOne(m.providerId))
+
+    const channels = []
+    chattableProviders.forEach(m => {
+      channels.push(
+        supabase
+          .channel(`sidebar-peer-init-${m.providerId}`)
+          .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'peer_conversations',
+            filter: `initiator_provider_id=eq.${m.providerId}`,
+          }, () => loadOne(m.providerId))
+          .subscribe(),
+        supabase
+          .channel(`sidebar-peer-recip-${m.providerId}`)
+          .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'peer_conversations',
+            filter: `recipient_provider_id=eq.${m.providerId}`,
+          }, () => loadOne(m.providerId))
+          .subscribe()
+      )
+    })
+
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mechanicMemberships.filter(m => m.can_chat).map(m => m.providerId).sort().join(',')])
+
+  // ── Per-provider subscription access (for Inactive badge) ─────────────
+  useEffect(() => {
+    if (mechanicMemberships.length === 0) return
+    const fetchAccess = async () => {
+      const map = {}
+      for (const m of mechanicMemberships) {
+        try {
+          const { data } = await supabase.rpc('check_provider_access', {
+            p_provider_id: m.providerId,
+          })
+          if (data) map[m.providerId] = { canWrite: data.can_write === true, state: data.state }
+        } catch {}
+      }
+      setProviderAccessMap(map)
+    }
+    fetchAccess()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mechanicMemberships.map(m => m.providerId).sort().join(',')])
+
+  // ── Company unread chat count (My Company section) ──────────────────────
+  // Same pattern as the per-provider counts above, but there's only ever one
+  // company per user so we keep it as a scalar.
+  useEffect(() => {
+    const id = companyMembership?.id
+    if (!id) { setCompanyUnread(0); return }
+
+    const load = async () => {
+      const { data } = await supabase
+        .from('conversations')
+        .select('company_unread_count')
+        .eq('company_id', id)
+        .eq('status', 'open')
+      const total = (data || []).reduce((s, c) => s + (c.company_unread_count || 0), 0)
+      setCompanyUnread(total)
+    }
+    load()
+
+    const channel = supabase
+      .channel(`sidebar-company-convs-${id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `company_id=eq.${id}`,
+      }, () => load())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [companyMembership?.id])
+
+  // ── Company fleet WO action count ─────────────────────────────────────
+  useEffect(() => {
+    loadCompanyWoActionCount()
+  }, [loadCompanyWoActionCount])
+
+  // ── Fetch company membership once on mount ────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    fetchMembership()
+  }, [user])
+
+  // Re-fetch when invitation is accepted (event dispatched from my-teams page)
+  useEffect(() => {
+    const handler = () => { if (user) fetchMembership() }
+    window.addEventListener('spu-membership-updated', handler)
+    return () => window.removeEventListener('spu-membership-updated', handler)
+  }, [user])
+
+  // Scroll the active nav item into view when the route changes
+  useEffect(() => {
+    // Small delay to let the DOM settle after accordion expansions
+    const t = setTimeout(() => {
+      activeItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [pathname])
+
+  const fetchMembership = async () => {
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles_secure')
+        .select('id')
         .eq('auth_user_id', user.id)
         .single()
-      if (!profile) throw new Error('Profile not found')
 
-      // ── 2. SPU membership ─────────────────────────────────────────────────
-      const { data: spuRow, error: spuErr } = await supabase
-        .from('service_provider_users')
-        .select('id, role, is_verified, is_active, joined_at, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat')
-        .eq('user_id', profile.id)
-        .eq('service_provider_id', params.providerId)
-        .eq('is_active', true)
-        .maybeSingle()
-      if (spuErr) throw spuErr
-      if (!spuRow) throw new Error('You are not a member of this service provider.')
+      if (!profile) return
 
-      // ── 3. Mechanic record ────────────────────────────────────────────────
-      const { data: mechanic } = await supabase
-        .from('mechanics')
-        .select('id, role, specialization, experience_years, is_verified, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat')
+      // Single query: company_users joined with company_profiles
+      // Covers members added via invitation (respond-invitation route) or auto-accept trigger
+      const { data: membership } = await supabase
+        .from('company_users')
+        .select(`
+          is_admin,
+          staff_role,
+          is_active,
+          can_approve_work, can_manage_team, can_manage_fleet,
+          can_approve_estimates, can_approve_checkout, can_approve_payment, can_chat,
+          company:company_profiles_secure(id, name, status)
+        `)
         .eq('user_id', profile.id)
-        .eq('service_provider_id', params.providerId)
         .eq('is_active', true)
         .maybeSingle()
 
-      const memberRecord = {
-        created_at: spuRow.joined_at,
-        ...spuRow,
-        mechanic_id: mechanic?.id || null,
-        specialization: mechanic?.specialization || null,
-        experience_years: mechanic?.experience_years || null,
-        can_approve_work: !!(spuRow.can_approve_work || mechanic?.can_approve_work),
-        can_manage_inventory: !!(spuRow.can_manage_inventory || mechanic?.can_manage_inventory),
-        can_manage_team: !!(spuRow.can_manage_team || mechanic?.can_manage_team),
-        can_send_estimates: !!(spuRow.can_send_estimates || mechanic?.can_send_estimates),
-        can_send_invoice: !!(spuRow.can_send_invoice || mechanic?.can_send_invoice),
-        can_chat: !!(spuRow.can_chat || mechanic?.can_chat),
-        is_verified: !!(spuRow.is_verified || mechanic?.is_verified),
-      }
-
-      // ── 4. Provider details ───────────────────────────────────────────────
-      const { data: provider, error: provErr } = await supabase
-        .from('service_providers_secure')
-        .select('id, name, phone, email, description, years_in_operation, is_verified, status, owner_user_id')
-        .eq('id', params.providerId)
-        .single()
-      if (provErr) throw provErr
-
-      // ── 5. Team count ─────────────────────────────────────────────────────
-      const { count: teamCount } = await supabase
-        .from('service_provider_users')
-        .select('id', { count: 'exact', head: true })
-        .eq('service_provider_id', params.providerId)
-        .eq('is_active', true)
-
-      // ── 6. Owner name ─────────────────────────────────────────────────────
-      let ownerName = 'Unknown'
-      if (provider.owner_user_id) {
-        const { data: op } = await supabase
-          .from('user_profiles_secure')
-          .select('first_name, last_name')
-          .eq('id', provider.owner_user_id)
-          .maybeSingle()
-        if (op) ownerName = `${op.first_name || ''} ${op.last_name || ''}`.trim() || 'Unknown'
-      }
-
-      // ── 7. Assigned WOs (mechanic self) ───────────────────────────────────
-      const { data: woResult } = await supabase.rpc(
-        'get_mechanic_assigned_work_orders', { p_mechanic_user_id: user.id }
-      )
-      const assignedWOs = woResult?.work_orders || []
-      const pendingWOs = assignedWOs.filter(w => w.mechanic_assignment_status === 'pending')
-      const activeWOs = assignedWOs.filter(w => w.mechanic_assignment_status === 'acknowledged')
-
-      // ── 8. Provider-wide WOs (admin/accountant/can_send) ──────────────────
-      const isAdminRole = ['service_provider_owner', 'admin', 'accountant'].includes(spuRow.role)
-      const canSendEst = memberRecord.can_send_estimates || isAdminRole
-      const canSendInv = memberRecord.can_send_invoice || isAdminRole
-      let allProviderWOs = []
-      if (isAdminRole || canSendEst || canSendInv) {
-        const { data: spuWOs } = await supabase.rpc(
-          'get_provider_member_work_orders', { p_user_id: user.id }
-        )
-        allProviderWOs = (spuWOs?.work_orders || []).filter(w => w.provider?.id === params.providerId)
-      }
-
-      const reviewWOs = allProviderWOs.filter(w => w.status?.code === 'internal_review')
-      const invoiceWOs = allProviderWOs.filter(w => ['completed', 'quality_check'].includes(w.status?.code))
-      const actionCount = allProviderWOs.filter(w => getActionNeeded(w, canSendEst, canSendInv) !== null).length
-
-      // ── 9. Shops ──────────────────────────────────────────────────────────
-      const { data: shops } = await supabase
-        .from('shops_secure')
-        .select('id, name, town, county, street, phone')
-        .eq('service_provider_id', params.providerId)
-        .eq('is_active', true)
-        .limit(3)
-
-      // ── 10. Calendar counters (today / next 7 days, live statuses) ───────
-      // Bookings RLS already permits this member to read their provider's
-      // bookings, so a single client-side query is enough.
-      let calendarTodayCount = 0
-      let calendarUpcomingCount = 0
-      try {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const in7 = new Date(today)
-        in7.setDate(in7.getDate() + 7)
-        const todayStr = today.toISOString().slice(0, 10)
-        const in7Str = in7.toISOString().slice(0, 10)
-
-        const { data: liveStatuses } = await supabase
-          .from('booking_statuses').select('id, code')
-          .in('code', ['pending', 'confirmed', 'in_progress'])
-        const liveIds = (liveStatuses || []).map(s => s.id)
-
-        if (liveIds.length > 0) {
-          const { data: liveBookings } = await supabase
-            .from('bookings_secure')
-            .select('id, booking_date')
-            .eq('service_provider_id', params.providerId)
-            .in('status_id', liveIds)
-            .gte('booking_date', todayStr)
-            .lte('booking_date', in7Str)
-
-          calendarUpcomingCount = (liveBookings || []).length
-          calendarTodayCount = (liveBookings || [])
-            .filter(b => b.booking_date === todayStr).length
+      if (membership?.company) {
+        setCompanyMembership({
+          id:                   membership.company.id,
+          name:                 membership.company.name,
+          status:               membership.company.status,
+          is_admin:             membership.is_admin,
+          staff_role:           membership.staff_role,
+          can_approve_work:     !!membership.can_approve_work,
+          can_manage_team:      !!membership.can_manage_team,
+          can_manage_fleet:     !!membership.can_manage_fleet,
+          can_approve_estimates:!!membership.can_approve_estimates,
+          can_approve_checkout: !!membership.can_approve_checkout,
+          can_approve_payment:  !!membership.can_approve_payment,
+          can_chat:             !!membership.can_chat,
+        })
+        // Auto-open company section if we're already on a company page
+        if (pathname.includes('/dashboard/company/')) {
+          setCompanyNavOpen(true)
         }
-      } catch (e) {
-        console.warn('Calendar counters load failed (non-fatal):', e.message)
+      }
+    } catch (err) {
+      console.error('Sidebar membership fetch error:', err)
+    } finally {
+      setMembershipLoading(false)
+    }
+
+    // ── Fetch mechanic (service provider team) memberships ─────────────────
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles_secure').select('id').eq('auth_user_id', user.id).single()
+      if (!profile) return
+
+      // 1. Fetch service_provider_users (all roles)
+      const { data: spuRows, error: spuErr } = await supabase
+        .from('service_provider_users')
+        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat, service_provider:service_providers_secure(id, name)')
+        .eq('user_id', profile.id)
+        .eq('is_active', true)
+
+      if (spuErr) {
+        console.error('SPU fetch error:', spuErr)
       }
 
-      setData({
-        provider,
-        mechanic: memberRecord,
-        ownerName,
-        teamCount: teamCount || 0,
-        assignedWOs,
-        pendingWOs,
-        activeWOs,
-        allProviderWOs,
-        reviewWOs,
-        invoiceWOs,
-        actionCount,
-        isAdminRole,
-        canSendEst,
-        canSendInv,
-        shops: shops || [],
-        calendarTodayCount,
-        calendarUpcomingCount,
-      })
+      if (spuRows?.length) {
+        // 2. Fetch mechanic records for this user separately
+        const providerIds = spuRows.map(r => r.service_provider_id)
+        const { data: mechRows } = await supabase
+          .from('mechanics')
+          .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat')
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .in('service_provider_id', providerIds)
+
+        // Index mechanic rows by provider_id for O(1) lookup
+        const mechByProvider = {}
+        ;(mechRows || []).forEach(m => { mechByProvider[m.service_provider_id] = m })
+
+        setMechanicMemberships(spuRows.map(m => {
+          const mech = mechByProvider[m.service_provider_id] || null
+          return {
+            spuId:               m.id,
+            mechanicId:          mech?.id || null,
+            providerId:          m.service_provider?.id || m.service_provider_id,
+            providerName:        m.service_provider?.name || 'Unknown Garage',
+            role:                m.role || 'mechanic',
+            // If a mechanic record exists, the user is also on the floor as a mechanic.
+            // Surface its role separately when it differs from the SPU role (e.g. SPU=manager, mech=senior_mechanic).
+            mechanicRole:        mech?.role || null,
+            hasMechanicRecord:   !!mech,
+            // Merge SPU + mechanic permissions — either source grants the badge
+            can_approve_work:    !!(m.can_approve_work     || mech?.can_approve_work),
+            can_manage_inventory:!!(m.can_manage_inventory || mech?.can_manage_inventory),
+            can_manage_team:     !!(m.can_manage_team      || mech?.can_manage_team),
+            can_send_estimates:  !!(m.can_send_estimates   || mech?.can_send_estimates),
+            can_send_invoice:    !!(m.can_send_invoice     || mech?.can_send_invoice),
+            can_chat:            !!(m.can_chat             || mech?.can_chat),
+          }
+        }))
+
+        // ── Per-provider upcoming-bookings counts (next 7 days, live) AND
+        //    pending-bookings counts (status='pending') 
+        // Drives the badges next to the per-provider Calendar + Bookings entries.
+        try {
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const in7 = new Date(today)
+          in7.setDate(in7.getDate() + 7)
+          const todayStr = today.toISOString().slice(0, 10)
+          const in7Str   = in7.toISOString().slice(0, 10)
+          const { data: allStatuses } = await supabase
+            .from('booking_statuses').select('id, code')
+            .in('code', ['pending', 'confirmed', 'in_progress'])
+          const statusByCode = {}
+          ;(allStatuses || []).forEach(s => { statusByCode[s.code] = s.id })
+          const liveIds = Object.values(statusByCode)
+          const pendingId = statusByCode['pending']
+
+          if (liveIds.length > 0 && providerIds.length > 0) {
+            // Single query covers both badges — we'll partition the rows in JS.
+            const { data: liveBookings } = await supabase
+              .from('bookings_secure')
+              .select('id, service_provider_id, status_id, booking_date')
+              .in('service_provider_id', providerIds)
+              .in('status_id', liveIds)
+
+            const upCounts  = {}
+            const penCounts = {}
+            ;(liveBookings || []).forEach(b => {
+              // Upcoming-7-days: any live status, date within window
+              if (b.booking_date >= todayStr && b.booking_date <= in7Str) {
+                upCounts[b.service_provider_id] = (upCounts[b.service_provider_id] || 0) + 1
+              }
+              // Pending: only the 'pending' status (no date filter — pending is pending)
+              if (pendingId && b.status_id === pendingId) {
+                penCounts[b.service_provider_id] = (penCounts[b.service_provider_id] || 0) + 1
+              }
+            })
+            setProviderUpcomingByProvider(upCounts)
+            setProviderPendingByProvider(penCounts)
+          }
+        } catch (e) {
+          console.error('Sidebar member booking-counts fetch error:', e)
+        }
+
+        // Auto-open if already on my-teams path
+        if (pathname.includes('/dashboard/my-teams')) {
+          const openState = {}
+          spuRows.forEach(m => { openState[m.service_provider?.id || m.service_provider_id] = true })
+          setProviderNavOpen(openState)
+        }
+      }
     } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+      console.error('Sidebar mechanic fetch error:', err)
     }
-  }, [params.providerId])
+  }
 
-  useEffect(() => { load() }, [load])
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
 
-  if (loading) return (
-    <div className="flex justify-center items-center h-64">
-      <Loader2 className="animate-spin text-blue-600" size={32} />
-    </div>
-  )
+  // ── Personal nav items ────────────────────────────────────────────────────
+  const personalItems = [
+    { icon: User,          label: 'Dashboard',              path: '/dashboard' },
+    { icon: Plus,          label: 'Add Vehicle',            path: '/dashboard/vehicles/add' },
+    { icon: Search,        label: 'Search Providers',       path: '/dashboard/providers' },
+    { icon: Calendar,      label: 'Bookings',               path: '/dashboard/bookings' },
+    { icon: DollarSign,    label: 'Budget',                 path: '/dashboard/budget' },
+    { icon: ClipboardList, label: 'My Work Orders',         path: '/dashboard/work-orders',
+      badge: woActionCount > 0 ? woActionCount : null },
+    { icon: MessageSquare, label: 'Chat',                   path: '/dashboard/chat',
+      badge: unreadMessages > 0 ? unreadMessages : null },
+    { icon: Bell,          label: 'Reminders',              path: '/dashboard/reminders',
+      badge: remindersCount > 0 ? remindersCount : null },
+    { icon: CalendarDays,  label: 'Calendar',               path: '/dashboard/calendar' },
+    { icon: History,       label: 'History',                path: '/dashboard/history' },
+    { icon: BarChart3,     label: 'Reports',                path: '/dashboard/reports' },
+    { icon: CreditCard,   label: 'Subscription',           path: '/dashboard/subscription' },
+    { icon: Settings,      label: 'Profile',                path: '/dashboard/profile' },
+  ]
 
-  if (error) return (
-    <div className="max-w-2xl mx-auto p-6">
+  // ── Company nav items (gated by role) ─────────────────────────────────────
+  const companyNavItems = (membership) => {
+    if (!membership) return []
+    const base = `/dashboard/company/${membership.id}`
+    // can_chat is the gate, but admins always see it as well.
+    const canChat = membership.is_admin || membership.can_chat
+    const items = [
+      { icon: Building2,    label: 'Overview',    path: base,                       everyone: true  },
+      { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
+      { icon: UserCheck,    label: 'Fleet Assignments', path: `${base}/fleet-assignments`, everyone: true },
+      { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
+      { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true,
+        badge: companyWoActionCount > 0 ? companyWoActionCount : null },
+      { icon: CalendarDays, label: 'Calendar',    path: `${base}/calendar`,         everyone: true  },
+      // Reminders — shows the same fleet recommendations as the owner's
+      // /company/reminders. Renders via the shared CompanyRemindersView
+      // component with this portal's basePath. No badge for now — a fleet-
+      // wide reminder count would need its own query + realtime channel
+      // (mirroring the personal-nav pattern); can be added later.
+      { icon: Bell,         label: 'Reminders',   path: `${base}/reminders`,        everyone: true  },
+      // Find Providers + Chat — both gated on can_chat (admins see them too).
+      // Visually grouped: discover → message.
+      ...(canChat ? [
+        { icon: Search,        label: 'Find Providers', path: `${base}/providers`, everyone: true },
+        { icon: MessageSquare, label: 'Chat',           path: `${base}/chat`,      everyone: true,
+          badge: companyUnread > 0 ? companyUnread : null },
+      ] : []),
+      { icon: Users,        label: 'Team',        path: `${base}/team`,             everyone: true  },
+      { icon: DollarSign,   label: 'Budget',      path: `${base}/budget`,           everyone: false }, // budget access has its own rules — see filter below
+      { icon: BarChart3,    label: 'Reports',     path: `${base}/reports`,          everyone: false }, // admin only
+      { icon: CreditCard,   label: 'Subscription', path: `/company/subscription`,   everyone: false },
+      { icon: LifeBuoy,     label: 'Support',      path: `${base}/support`,           everyone: true },
+      { icon: Megaphone,    label: 'Service Requests', path: `${base}/service-requests`, everyone: true },
+    ]
+    // Filter out restricted items for users who don't qualify.
+    //   • Most admin-only rows show only to is_admin
+    //   • Budget shows to is_admin, accountants, and members who can
+    //     approve payments (view tier) — matches the budget page's
+    //     access model.
+    const canViewBudget =
+      membership.is_admin ||
+      membership.staff_role === 'accountant' ||
+      membership.can_approve_payment
+    const canManageSub =
+       membership.is_admin ||
+       membership.staff_role === 'accountant'
+     return items.filter(item => {
+       if (item.everyone)             return true
+       if (item.label === 'Budget')       return canViewBudget
+       if (item.label === 'Subscription') return canManageSub
+       return membership.is_admin
+     })
+  }
+
+  // ── Provider (mechanic) nav items ────────────────────────────────────────
+  const providerNavItems = (m) => {
+       const canManageProviderSub = [
+         'service_provider_owner', 'admin', 'accountant'
+       ].includes(m.role)
+
+       return [
+         { icon: Building2,     label: 'Overview',              path: `/dashboard/my-teams/provider/${m.providerId}`  },
+         { icon: Users,         label: 'My Teams',              path: '/dashboard/my-teams'                           },
+         { icon: ClipboardList, label: 'Assigned Work Orders',  path: '/dashboard/my-teams/work-orders'               },
+         ...(canManageProviderSub ? [
+           { icon: CreditCard,  label: 'Subscription',          path: '/provider/subscription'                        },
+         ] : []),
+       ]
+     }
+
+  // ── Status config ─────────────────────────────────────────────────────────
+  const statusBadge = (status) => {
+    const map = {
+      active:               { dot: 'bg-green-500',  text: 'text-green-700',  label: 'Active'        },
+      pending_verification: { dot: 'bg-yellow-500', text: 'text-yellow-700', label: 'Pending Review' },
+      pending_info:         { dot: 'bg-orange-500', text: 'text-orange-700', label: 'Info Required'  },
+      rejected:             { dot: 'bg-red-500',    text: 'text-red-700',    label: 'Rejected'       },
+      suspended:            { dot: 'bg-gray-400',   text: 'text-gray-600',   label: 'Suspended'      },
+    }
+    return map[status] ?? map.suspended
+  }
+
+  // ── Nav item component ────────────────────────────────────────────────────
+  const NavItem = ({ item, compact = false }) => {
+    const Icon = item.icon
+    const isActive = pathname === item.path ||
+      (item.path !== '/dashboard' && pathname.startsWith(item.path + '/'))
+
+    return (
       <button
-        onClick={() => router.push('/dashboard/my-teams')}
-        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 text-sm"
+        ref={isActive ? activeItemRef : null}
+        onClick={() => { router.push(item.path); setMobileOpen(false) }}
+        className={`w-full flex items-center rounded-lg transition mb-0.5
+          ${compact ? 'px-3 py-2 text-sm' : 'px-4 py-3'}
+          ${isActive
+            ? 'bg-blue-50 text-blue-600'
+            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+          }`}
       >
-        <ArrowLeft size={16} /> Back to My Teams
+        <Icon className="mr-3 flex-shrink-0" size={compact ? 16 : 20} />
+        <span className={`flex-1 text-left ${compact ? 'font-medium text-sm' : 'font-medium'}`}>
+          {item.label}
+        </span>
+        {item.badge && (
+          <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white bg-green-500 rounded-full">
+            {item.badge > 9 ? '9+' : item.badge}
+          </span>
+        )}
       </button>
-      <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-start gap-3">
-        <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-        <div>
-          <p className="font-semibold text-red-900">Access denied</p>
-          <p className="text-sm text-red-700 mt-1">{error}</p>
+    )
+  }
+
+  // ── Sidebar inner content (shared between desktop + mobile) ────────────────
+  // Pretty label for a role string from service_provider_users.role / mechanics.role
+  const roleLabel = (role) => {
+    const map = {
+      service_provider_owner: 'Owner',
+      admin:                  'Admin',
+      accountant:             'Accountant',
+      manager:                'Manager',
+      senior_mechanic:        'Senior Mechanic',
+      mechanic:               'Mechanic',
+    }
+    if (!role) return ''
+    return map[role] || role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  }
+
+  // Color theme per role badge
+  const roleBadgeClass = (role) => {
+    const map = {
+      service_provider_owner: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
+      admin:                  'bg-rose-100   text-rose-700   border border-rose-200',
+      accountant:             'bg-emerald-100 text-emerald-700 border border-emerald-200',
+      manager:                'bg-sky-100    text-sky-700    border border-sky-200',
+      senior_mechanic:        'bg-amber-100  text-amber-700  border border-amber-200',
+      mechanic:               'bg-slate-100  text-slate-700  border border-slate-200',
+    }
+    return map[role] || 'bg-gray-100 text-gray-700 border border-gray-200'
+  }
+
+  const SidebarContent = () => (
+    <>
+      {/* Logo */}
+      <div className="p-6 border-b border-gray-200 flex-shrink-0">
+        <div className="flex items-center">
+          <Car className="text-blue-600 mr-2" size={32} />
+          <h1 className="text-2xl font-bold text-gray-800">GariCare</h1>
         </div>
       </div>
-    </div>
+
+      <nav className="flex-1 overflow-y-auto p-4">
+
+        {/* ── Personal section ── */}
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
+          Personal
+        </p>
+        {personalItems.map(item => (
+          <NavItem key={item.path} item={item} compact />
+        ))}
+
+        {/* ── Company section — only for members ── */}
+        {!membershipLoading && companyMembership && (
+          <div className="mt-5">
+            {/* Section header — collapsible */}
+            <button
+              onClick={() => setCompanyNavOpen(o => !o)}
+              className="w-full flex items-center justify-between px-1 mb-2 group"
+            >
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                My Company
+                {!companyAccess.loading && !companyAccess.canWrite && (
+                  <span className="ml-1.5 text-[9px] normal-case tracking-normal px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                    Inactive
+                  </span>
+                )}
+              </p>
+              {companyNavOpen
+                ? <ChevronDown size={14} className="text-gray-400" />
+                : <ChevronRight size={14} className="text-gray-400" />
+              }
+            </button>
+
+            {companyNavOpen && (
+              <>
+                {/* Company identity card */}
+                <div className="mx-1 mb-2 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                  <div className="flex items-start gap-2">
+                    <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Building2 size={14} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate leading-tight">
+                        {companyMembership.name}
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusBadge(companyMembership.status).dot}`} />
+                        <span className={`text-[10px] font-medium ${statusBadge(companyMembership.status).text}`}>
+                          {statusBadge(companyMembership.status).label}
+                        </span>
+                      </div>
+
+                      {/* Roles row — Admin + staff_role (free text from company_users.staff_role) */}
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">Roles</p>
+                      <div className="flex flex-wrap gap-1">
+                        {companyMembership.is_admin && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-rose-100 text-rose-700 border border-rose-200"
+                            title="Company administrator"
+                          >
+                            Admin
+                          </span>
+                        )}
+                        {companyMembership.staff_role && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-sky-100 text-sky-700 border border-sky-200 capitalize"
+                            title={`Staff role: ${companyMembership.staff_role}`}
+                          >
+                            {companyMembership.staff_role.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        {!companyMembership.is_admin && !companyMembership.staff_role && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+                            title="Member"
+                          >
+                            Member
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Permissions row — every truthy can_* flag from company_users */}
+                      {(companyMembership.can_approve_work || companyMembership.can_approve_estimates ||
+                        companyMembership.can_approve_payment || companyMembership.can_approve_checkout ||
+                        companyMembership.can_manage_fleet || companyMembership.can_manage_team ||
+                        companyMembership.can_chat) && (
+                        <>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">Permissions</p>
+                          <div className="flex gap-1 flex-wrap">
+                            {companyMembership.can_approve_work && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded" title="Can approve work orders">
+                                WO access
+                              </span>
+                            )}
+                            {companyMembership.can_approve_estimates && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded" title="Can approve estimates">
+                                Estimates
+                              </span>
+                            )}
+                            {companyMembership.can_approve_payment && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded" title="Can approve payments">
+                                Payments
+                              </span>
+                            )}
+                            {companyMembership.can_approve_checkout && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded" title="Can approve checkout">
+                                Checkout
+                              </span>
+                            )}
+                            {companyMembership.can_manage_fleet && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can manage fleet">
+                                Fleet
+                              </span>
+                            )}
+                            {companyMembership.can_manage_team && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" title="Can manage team">
+                                Team
+                              </span>
+                            )}
+                            {companyMembership.can_chat && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded" title="Can chat with providers">
+                                Chat
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status warning for inactive company */}
+                {companyMembership.status !== 'active' && (
+                  <div className="mx-1 mb-2 px-3 py-2 rounded-lg bg-yellow-50 border border-yellow-200 flex items-start gap-2">
+                    <AlertCircle size={13} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-yellow-700 leading-snug">
+                      Company access is limited until verified.
+                    </p>
+                  </div>
+                )}
+
+                {/* Subscription warning */}
+                {!companyAccess.loading && !companyAccess.canWrite && (
+                  <div className="mx-1 mb-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
+                    <CreditCard size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-700 leading-snug">
+                      {companyAccess.state === 'suspended'
+                        ? 'Subscription suspended — view-only mode.'
+                        : 'Trial ended — subscribe for full access.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Company nav items */}
+                <div className={!companyAccess.loading && !companyAccess.canWrite ? 'opacity-60' : ''}>
+                {companyNavItems(companyMembership).map(item => (
+                  <NavItem key={item.path} item={item} compact />
+                ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Service Provider Membership — only for mechanics ── */}
+        {!membershipLoading && mechanicMemberships.length > 0 && (
+          <div className="mt-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
+              Service Provider Membership
+            </p>
+
+            {/* One collapsible block per provider */}
+            {mechanicMemberships.map(m => {
+              const isOpen = providerNavOpen[m.providerId] ?? false
+              const pAccess = providerAccessMap[m.providerId]
+              const providerInactive = pAccess && !pAccess.canWrite
+              return (
+                <div key={m.providerId} className="mb-2">
+                  {/* Provider toggle */}
+                  <button
+                    onClick={() => setProviderNavOpen(prev => ({ ...prev, [m.providerId]: !isOpen }))}
+                    className="w-full flex items-center justify-between px-1 mb-1 group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${providerInactive ? 'bg-gray-400' : 'bg-green-600'}`}>
+                        <Wrench size={12} className="text-white" />
+                      </div>
+                      <span className={`text-xs font-semibold truncate leading-tight ${providerInactive ? 'text-gray-400' : 'text-gray-700'}`}>
+                        {m.providerName}
+                      </span>
+                      {providerInactive && (
+                        <span className="text-[8px] normal-case tracking-normal px-1 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    {isOpen
+                      ? <ChevronDown  size={13} className="text-gray-400 flex-shrink-0" />
+                      : <ChevronRight size={13} className="text-gray-400 flex-shrink-0" />
+                    }
+                  </button>
+
+                  {isOpen && (
+                    <>
+                      {/* Roles + permissions */}
+                      <div className="mx-1 mb-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+                        {/* Roles row — primary SPU role + (optional) on-the-floor mechanic role */}
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Roles</p>
+                        <div className="flex flex-wrap gap-1">
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${roleBadgeClass(m.role)}`}
+                            title={`Service provider role: ${roleLabel(m.role)}`}
+                          >
+                            {roleLabel(m.role)}
+                          </span>
+                          {/* Show the mechanic-table role as a separate badge when it adds info
+                              (e.g. SPU role is admin/manager, but the user is also a senior_mechanic on the floor) */}
+                          {m.hasMechanicRecord && m.mechanicRole && m.mechanicRole !== m.role && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${roleBadgeClass(m.mechanicRole)}`}
+                              title={`Also assigned as ${roleLabel(m.mechanicRole)} in the mechanics roster`}
+                            >
+                              {roleLabel(m.mechanicRole)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Permissions row — every truthy can_* flag from SPU + mechanics */}
+                        {(m.can_approve_work || m.can_send_estimates || m.can_send_invoice ||
+                          m.can_manage_inventory || m.can_manage_team || m.can_chat) && (
+                          <>
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">Permissions</p>
+                            <div className="flex flex-wrap gap-1">
+                              {m.can_approve_work && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded" title="Can approve work orders">
+                                  WO access
+                                </span>
+                              )}
+                              {m.can_send_estimates && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded" title="Can send estimates">
+                                  Estimates
+                                </span>
+                              )}
+                              {m.can_send_invoice && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded" title="Can send invoices">
+                                  Invoices
+                                </span>
+                              )}
+                              {m.can_manage_inventory && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can manage inventory">
+                                  Inventory
+                                </span>
+                              )}
+                              {m.can_manage_team && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded" title="Can manage team">
+                                  Team
+                                </span>
+                              )}
+                              {m.can_chat && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded" title="Can chat with customers">
+                                  Chat
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Subscription warning */}
+                      {providerInactive && (
+                        <div className="mx-1 mb-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
+                          <CreditCard size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-amber-700 leading-snug">
+                            {pAccess?.state === 'suspended'
+                              ? 'Subscription suspended — view-only mode.'
+                              : 'Trial ended — subscribe for full access.'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Provider nav items */}
+                      <div className={providerInactive ? 'opacity-60' : ''}>
+                      {/* Overview is provider-specific */}
+                      <NavItem key={`${m.providerId}-overview`} compact item={{
+                        icon:  Building2,
+                        label: 'Overview',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}`,
+                      }} />
+                      {/* Bookings — provider-specific. Open to all members (read); the
+                          badge surfaces bookings still in 'pending' status (need attention). */}
+                      <NavItem key={`${m.providerId}-bookings`} compact item={{
+                        icon:  Calendar,
+                        label: 'Bookings',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/bookings`,
+                        badge: providerPendingByProvider[m.providerId] > 0
+                          ? providerPendingByProvider[m.providerId]
+                          : null,
+                      }} />
+                      {/* Calendar — provider-specific. Open to all members (read), badge
+                          shows upcoming bookings in the next 7 days for THIS provider. */}
+                      <NavItem key={`${m.providerId}-calendar`} compact item={{
+                        icon:  CalendarDays,
+                        label: 'Calendar',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/calendar`,
+                        badge: providerUpcomingByProvider[m.providerId] > 0
+                          ? providerUpcomingByProvider[m.providerId]
+                          : null,
+                      }} />
+                      {/* Inventory — only visible to members with can_manage_inventory */}
+                      {m.can_manage_inventory && (
+                        <NavItem key={`${m.providerId}-inventory`} compact item={{
+                          icon:  Package,
+                          label: 'Inventory',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/inventory`,
+                        }} />
+                      )}
+                      {/* Analytics — only visible to admin roles (owner, admin, accountant) */}
+                      {['service_provider_owner', 'admin', 'accountant'].includes(m.role) && (
+                        <NavItem key={`${m.providerId}-analytics`} compact item={{
+                          icon:  BarChart3,
+                          label: 'Analytics',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/analytics`,
+                        }} />
+                      )}
+                      {/* Revenue — only visible to admin roles (owner, admin, accountant) */}
+                      {['service_provider_owner', 'admin', 'accountant'].includes(m.role) && (
+                        <NavItem key={`${m.providerId}-revenue`} compact item={{
+                          icon:  DollarSign,
+                          label: 'Revenue',
+                          path:  `/dashboard/my-teams/provider/${m.providerId}/revenue`,
+                        }} />
+                      )}
+                      {/* Support — scoped to this provider */}
+                      <NavItem key={`${m.providerId}-support`} compact item={{
+                        icon:  LifeBuoy,
+                        label: 'Support',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/support`,
+                      }} />
+                      {/* Service Marketplace — owner/admin can respond to broadcasts */}
+                      <NavItem key={`${m.providerId}-marketplace`} compact item={{
+                        icon:  Megaphone,
+                        label: 'Marketplace',
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/service-marketplace`,
+                      }} />
+                      {/* Chat for this provider lives below Assigned Work Orders
+                          in the shared block — keeps the provider-membership
+                          quick-look (Overview only) tight, and groups all chat
+                          entry points together when a member belongs to multiple
+                          providers. */}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Shared pages — shown once regardless of how many providers */}
+            <div className="mt-1 border-t border-gray-100 pt-2">
+              <NavItem compact item={{
+                icon:  Users,
+                label: 'My Teams',
+                path:  '/dashboard/my-teams',
+              }} />
+              <NavItem compact item={{
+                icon:  ClipboardList,
+                label: 'Assigned Work Orders',
+                path:  '/dashboard/my-teams/work-orders',
+              }} />
+
+              {/* Chat — one row per provider where this member has can_chat.
+                  When the user belongs to a single provider, the row label is
+                  just "Chat"; when they belong to several, each row is labelled
+                  with the provider name so they can pick the right inbox.
+                  Each row carries its own unread badge sourced from
+                  providerUnreadByProviderId — bumped live by the realtime
+                  subscription a few hooks above. */}
+              {mechanicMemberships
+                .filter(m => m.can_chat)
+                .map(m => {
+                  const unread     = providerUnreadByProviderId[m.providerId] || 0
+                  const peerUnread = providerPeerUnreadByProviderId[m.providerId] || 0
+                  const showProviderSuffix = mechanicMemberships.filter(x => x.can_chat).length > 1
+                  const suffix = showProviderSuffix ? ` \u00b7 ${m.providerName || 'Provider'}` : ''
+                  return (
+                    <div key={`${m.providerId}-chat-group`}>
+                      {/* Customer chat — existing flow */}
+                      <NavItem key={`${m.providerId}-chat`} compact item={{
+                        icon:  MessageSquare,
+                        label: `Chat${suffix}`,
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/chat`,
+                        badge: unread > 0 ? unread : null,
+                      }} />
+                      {/* Search Providers — provider marketplace, scoped to this membership */}
+                      <NavItem key={`${m.providerId}-search-providers`} compact item={{
+                        icon:  Search,
+                        label: `Search Providers${suffix}`,
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/providers`,
+                      }} />
+                      {/* Peer chat — provider-to-provider conversations */}
+                      <NavItem key={`${m.providerId}-peer-chat`} compact item={{
+                        icon:  Building2,
+                        label: `Provider Chats${suffix}`,
+                        path:  `/dashboard/my-teams/provider/${m.providerId}/peer-chat`,
+                        badge: peerUnread > 0 ? peerUnread : null,
+                      }} />
+                    </div>
+                  )
+                })
+              }
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* Logout */}
+      <div className="flex-shrink-0 border-t border-gray-200 p-3">
+        {isAdminUser && (
+          <button
+            onClick={() => { router.push('/admin/dashboard'); setMobileOpen(false) }}
+            className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-purple-700 bg-purple-50 hover:bg-purple-100 transition mb-0.5"
+          >
+            <Shield className="mr-2.5" size={16} />
+            <span className="font-medium">Admin Panel</span>
+          </button>
+        )}
+        <button
+          onClick={() => { router.push('/dashboard/feedback'); setMobileOpen(false) }}
+          className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-0.5"
+        >
+          <MessageCircle className="mr-2.5" size={16} />
+          <span className="font-medium">Feedback</span>
+        </button>
+        <button
+          onClick={() => { router.push('/dashboard/support'); setMobileOpen(false) }}
+          className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-0.5"
+        >
+          <LifeBuoy className="mr-2.5" size={16} />
+          <span className="font-medium">Support</span>
+        </button>
+        <button
+          onClick={() => { router.push('/dashboard/service-requests'); setMobileOpen(false) }}
+          className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition mb-0.5"
+        >
+          <Megaphone className="mr-2.5" size={16} />
+          <span className="font-medium">Service Requests</span>
+        </button>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition"
+        >
+          <LogOut className="mr-2.5" size={16} />
+          <span className="font-medium">Logout</span>
+        </button>
+      </div>
+    </>
   )
-
-  const {
-    provider, mechanic, ownerName, teamCount,
-    pendingWOs, activeWOs, assignedWOs, shops,
-    reviewWOs, invoiceWOs, actionCount, isAdminRole,
-    canSendEst, canSendInv,
-    calendarTodayCount = 0, calendarUpcomingCount = 0,
-  } = data
-
-  const canSeeWOTab = isAdminRole || mechanic.can_send_estimates || mechanic.can_send_invoice
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
-
-      {/* Back */}
+    <>
+      {/* Mobile toggle */}
       <button
-        onClick={() => router.push('/dashboard/my-teams')}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg"
       >
-        <ArrowLeft size={15} /> Back to My Teams
+        {mobileOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Provider header */}
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-          <Wrench size={22} className="text-white" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">{provider.name}</h1>
-            {provider.is_verified && (
-              <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                <CheckCircle size={11} /> Verified
-              </span>
-            )}
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${mechanic.role === 'accountant' ? 'bg-blue-100 text-blue-700' :
-                mechanic.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                  'bg-gray-100 text-gray-600'
-              }`}>
-              {mechanic.role?.replace(/_/g, ' ')}
-            </span>
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5 capitalize">{provider.status?.replace(/_/g, ' ')}</p>
-        </div>
-      </div>
+      {/* Sidebar */}
+      <aside className={`
+        fixed lg:sticky top-0 left-0 w-64 h-screen bg-white border-r border-gray-200 z-40
+        flex flex-col
+        transition-transform duration-300 ease-in-out
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <SidebarContent />
+      </aside>
 
-      {/* Stats grid — 4-col for admin/accountant, 3-col for mechanics */}
-      {canSeeWOTab ? (
-        <div className="grid grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-            <p className="text-xl font-bold text-gray-900">{teamCount}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Team</p>
-          </div>
-          <div className={`rounded-xl border p-3 text-center ${actionCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
-            <p className={`text-xl font-bold ${actionCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>{actionCount}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Actions</p>
-          </div>
-          <div className={`rounded-xl border p-3 text-center ${reviewWOs.length > 0 ? 'bg-violet-50 border-violet-200' : 'bg-white border-gray-200'}`}>
-            <p className={`text-xl font-bold ${reviewWOs.length > 0 ? 'text-violet-700' : 'text-gray-900'}`}>{reviewWOs.length}</p>
-            <p className="text-xs text-gray-500 mt-0.5">For Review</p>
-          </div>
-          <div className={`rounded-xl border p-3 text-center ${invoiceWOs.length > 0 ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-            <p className={`text-xl font-bold ${invoiceWOs.length > 0 ? 'text-green-700' : 'text-gray-900'}`}>{invoiceWOs.length}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Invoice Due</p>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{teamCount}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Team Members</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-orange-600">{pendingWOs.length}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Pending Response</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600">{activeWOs.length}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Active Work Orders</p>
-          </div>
-        </div>
-      )}
-
-      {/* Action banner */}
-      {canSeeWOTab && actionCount > 0 && (
-        <button
-          onClick={() => setActiveTab('work-orders')}
-          className="w-full flex items-center gap-3 p-4 bg-amber-50 border border-amber-300 rounded-xl hover:bg-amber-100 transition-colors text-left"
-        >
-          <AlertTriangle className="text-amber-600 flex-shrink-0" size={20} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-amber-900">
-              {actionCount} work order{actionCount > 1 ? 's' : ''} need{actionCount === 1 ? 's' : ''} your attention
-            </p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              {reviewWOs.length > 0 && `${reviewWOs.length} estimate${reviewWOs.length > 1 ? 's' : ''} to review`}
-              {reviewWOs.length > 0 && invoiceWOs.length > 0 && ' · '}
-              {invoiceWOs.length > 0 && `${invoiceWOs.length} invoice${invoiceWOs.length > 1 ? 's' : ''} to generate`}
-            </p>
-          </div>
-          <ChevronRight size={16} className="text-amber-600 flex-shrink-0" />
-        </button>
-      )}
-
-      {/* Tab bar */}
-      {canSeeWOTab && (
-        <div className="flex border-b border-gray-200">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
-              {tab.label}
-              {tab.id === 'work-orders' && actionCount > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[10px] font-bold">
-                  {actionCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── OVERVIEW TAB ─────────────────────────────────────────────────── */}
-      {(activeTab === 'overview' || !canSeeWOTab) && (
-        <div className="space-y-5">
-
-          {/* Calendar quick-link — opens the per-provider calendar page.
-          "Book Customer" CTA is shown only when the member has
-          can_approve_work; otherwise just the View Calendar button. */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <CalendarDays className="text-white" size={20} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">
-                    Calendar
-                  </h2>
-                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className={`text-2xl font-bold ${calendarTodayCount > 0 ? 'text-blue-700' : 'text-gray-400'}`}>
-                        {calendarTodayCount}
-                      </span>
-                      <span className="text-xs text-gray-600">today</span>
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className={`text-2xl font-bold ${calendarUpcomingCount > 0 ? 'text-indigo-700' : 'text-gray-400'}`}>
-                        {calendarUpcomingCount}
-                      </span>
-                      <span className="text-xs text-gray-600">next 7 days</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 mt-4">
-              <button
-                onClick={() => router.push(`/dashboard/my-teams/provider/${params.providerId}/calendar`)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-              >
-                <CalendarDays size={16} /> View Calendar
-                <ChevronRight size={14} />
-              </button>
-              {mechanic.can_approve_work && (
-                <button
-                  onClick={() => router.push(`/dashboard/my-teams/provider/${params.providerId}/calendar`)}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"
-                  title="Open the calendar to book a customer"
-                >
-                  <Plus size={16} /> Book Customer
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Provider info */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Provider Info</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <Shield size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Owner</p>
-                  <p className="font-semibold text-gray-900">{ownerName}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <Users size={16} className="text-green-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Team Size</p>
-                  <p className="font-semibold text-gray-900">{teamCount} active member{teamCount !== 1 ? 's' : ''}</p>
-                </div>
-              </div>
-              {provider.phone && (
-                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <Phone size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Phone</p>
-                    <p className="font-medium text-gray-900">{provider.phone}</p>
-                  </div>
-                </div>
-              )}
-              {provider.email && (
-                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <Mail size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Email</p>
-                    <p className="font-medium text-gray-900">{provider.email}</p>
-                  </div>
-                </div>
-              )}
-              {provider.years_in_operation > 0 && (
-                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <Calendar size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Experience</p>
-                    <p className="font-medium text-gray-900">{provider.years_in_operation} years in operation</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            {provider.description && (
-              <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">{provider.description}</p>
-            )}
-            {shops.length > 0 && (
-              <div>
-                <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-2">
-                  Location{shops.length > 1 ? 's' : ''}
-                </p>
-                <div className="space-y-2">
-                  {shops.map(shop => (
-                    <div key={shop.id} className="flex items-start gap-2 text-sm text-gray-700">
-                      <MapPin size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
-                      <span>
-                        {shop.name}
-                        {shop.town ? `, ${shop.town}` : ''}
-                        {shop.county ? `, ${shop.county}` : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* My membership */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">My Membership</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Role</p>
-                <p className="font-semibold text-gray-900 capitalize">{mechanic.role?.replace(/_/g, ' ') || 'Member'}</p>
-              </div>
-              {mechanic.specialization && (
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Specialization</p>
-                  <p className="font-medium text-gray-900">{mechanic.specialization}</p>
-                </div>
-              )}
-              {mechanic.experience_years > 0 && (
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Experience</p>
-                  <p className="font-medium text-gray-900">{mechanic.experience_years} yr{mechanic.experience_years !== 1 ? 's' : ''}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Member Since</p>
-                <p className="font-medium text-gray-900">
-                  {new Date(mechanic.created_at).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Status</p>
-                <p className={`font-medium ${mechanic.is_verified ? 'text-green-700' : 'text-gray-400'}`}>
-                  {mechanic.is_verified ? '✓ Verified' : 'Pending verification'}
-                </p>
-              </div>
-            </div>
-
-            {/* Permissions */}
-            <div>
-              <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-2">Permissions</p>
-              <div className="flex flex-wrap gap-2">
-                {isAdminRole && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-medium text-indigo-700">
-                    <Shield size={11} /> Full work order access
-                  </span>
-                )}
-                {mechanic.can_approve_work && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs font-medium text-purple-700">
-                    <Wrench size={11} /> Manage work orders
-                  </span>
-                )}
-                {mechanic.can_send_estimates && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-medium text-yellow-700">
-                    <Send size={11} /> Send estimates
-                  </span>
-                )}
-                {mechanic.can_send_invoice && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs font-medium text-green-700">
-                    <Receipt size={11} /> Send invoices
-                  </span>
-                )}
-                {mechanic.can_manage_inventory && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium text-blue-700">
-                    <Award size={11} /> Manage inventory
-                  </span>
-                )}
-                {mechanic.can_manage_team && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg text-xs font-medium text-orange-700">
-                    <Users size={11} /> Manage team
-                  </span>
-                )}
-                {mechanic.can_chat && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 border border-pink-200 rounded-lg text-xs font-medium text-pink-700">
-                    <MessageSquare size={11} /> Chat with customers
-                  </span>
-                )}
-                {!isAdminRole && !mechanic.can_approve_work && !mechanic.can_send_estimates
-                  && !mechanic.can_send_invoice && !mechanic.can_manage_inventory && !mechanic.can_manage_team && !mechanic.can_chat && (
-                    <span className="text-xs text-gray-400 italic">Acknowledge / decline assignments only</span>
-                  )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick nav */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => router.push('/dashboard/my-teams')}
-              className="flex items-center justify-center gap-2 p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition text-sm font-medium text-gray-700 hover:text-blue-700"
-            >
-              <Users size={16} /> My Teams
-            </button>
-            <button
-              onClick={() => canSeeWOTab ? setActiveTab('work-orders') : router.push('/dashboard/my-teams/work-orders')}
-              className="flex items-center justify-center gap-2 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-300 hover:bg-green-50 transition text-sm font-medium text-gray-700 hover:text-green-700"
-            >
-              <ClipboardList size={16} />
-              {canSeeWOTab ? 'All Work Orders' : 'My Work Orders'}
-              {(actionCount > 0 || assignedWOs.length > 0) && (
-                <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-[10px] font-bold">
-                  {canSeeWOTab ? (actionCount || assignedWOs.length) : assignedWOs.length}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── WORK ORDERS TAB ──────────────────────────────────────────────── */}
-      {activeTab === 'work-orders' && canSeeWOTab && (
-        <WorkOrdersPanel
-          providerId={params.providerId}
-          canSendEstimates={canSendEst}
-          canSendInvoice={canSendInv}
-          canApproveWork={mechanic.can_approve_work}
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          onClick={() => setMobileOpen(false)}
         />
       )}
-    </div>
+    </>
   )
 }

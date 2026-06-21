@@ -33,6 +33,7 @@ export default function Sidebar({ user }) {
   const [membershipLoading, setMembershipLoading] = useState(true)
   const [mechanicMemberships, setMechanicMemberships] = useState([]) // [{ providerId, providerName, role, can_approve_work, can_manage_inventory, can_chat }]
   const [providerNavOpen, setProviderNavOpen] = useState({})         // { [providerId]: bool }
+  const [providerAccessMap, setProviderAccessMap] = useState({})     // { [providerId]: { canWrite, state } }
   const [providerUnreadByProviderId, setProviderUnreadByProviderId] = useState({}) // { [providerId]: number } — customer chat unread
   const [providerPeerUnreadByProviderId, setProviderPeerUnreadByProviderId] = useState({}) // { [providerId]: number } — peer chat unread (provider-to-provider)
   const [companyUnread, setCompanyUnread] = useState(0)
@@ -326,6 +327,25 @@ export default function Sidebar({ user }) {
     return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mechanicMemberships.filter(m => m.can_chat).map(m => m.providerId).sort().join(',')])
+
+  // ── Per-provider subscription access (for Inactive badge) ─────────────
+  useEffect(() => {
+    if (mechanicMemberships.length === 0) return
+    const fetchAccess = async () => {
+      const map = {}
+      for (const m of mechanicMemberships) {
+        try {
+          const { data } = await supabase.rpc('check_provider_access', {
+            p_provider_id: m.providerId,
+          })
+          if (data) map[m.providerId] = { canWrite: data.can_write === true, state: data.state }
+        } catch {}
+      }
+      setProviderAccessMap(map)
+    }
+    fetchAccess()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mechanicMemberships.map(m => m.providerId).sort().join(',')])
 
   // ── Company unread chat count (My Company section) ──────────────────────
   // Same pattern as the per-provider counts above, but there's only ever one
@@ -894,6 +914,8 @@ export default function Sidebar({ user }) {
             {/* One collapsible block per provider */}
             {mechanicMemberships.map(m => {
               const isOpen = providerNavOpen[m.providerId] ?? false
+              const pAccess = providerAccessMap[m.providerId]
+              const providerInactive = pAccess && !pAccess.canWrite
               return (
                 <div key={m.providerId} className="mb-2">
                   {/* Provider toggle */}
@@ -902,12 +924,17 @@ export default function Sidebar({ user }) {
                     className="w-full flex items-center justify-between px-1 mb-1 group"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 bg-green-600 rounded-md flex items-center justify-center flex-shrink-0">
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${providerInactive ? 'bg-gray-400' : 'bg-green-600'}`}>
                         <Wrench size={12} className="text-white" />
                       </div>
-                      <span className="text-xs font-semibold text-gray-700 truncate leading-tight">
+                      <span className={`text-xs font-semibold truncate leading-tight ${providerInactive ? 'text-gray-400' : 'text-gray-700'}`}>
                         {m.providerName}
                       </span>
+                      {providerInactive && (
+                        <span className="text-[8px] normal-case tracking-normal px-1 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
+                          Inactive
+                        </span>
+                      )}
                     </div>
                     {isOpen
                       ? <ChevronDown  size={13} className="text-gray-400 flex-shrink-0" />
@@ -981,6 +1008,20 @@ export default function Sidebar({ user }) {
                         )}
                       </div>
 
+                      {/* Subscription warning */}
+                      {providerInactive && (
+                        <div className="mx-1 mb-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
+                          <CreditCard size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-amber-700 leading-snug">
+                            {pAccess?.state === 'suspended'
+                              ? 'Subscription suspended — view-only mode.'
+                              : 'Trial ended — subscribe for full access.'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Provider nav items */}
+                      <div className={providerInactive ? 'opacity-60' : ''}>
                       {/* Overview is provider-specific */}
                       <NavItem key={`${m.providerId}-overview`} compact item={{
                         icon:  Building2,
@@ -1048,6 +1089,7 @@ export default function Sidebar({ user }) {
                           quick-look (Overview only) tight, and groups all chat
                           entry points together when a member belongs to multiple
                           providers. */}
+                      </div>
                     </>
                   )}
                 </div>
