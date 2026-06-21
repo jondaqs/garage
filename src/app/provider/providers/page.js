@@ -10,6 +10,7 @@ import {
   Building2
 } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 const ITEMS_PER_PAGE = 12
 
@@ -137,6 +138,7 @@ export default function ProviderSearchProvidersPage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Search Providers">
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
@@ -331,6 +333,7 @@ export default function ProviderSearchProvidersPage() {
         )}
       </div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }
 

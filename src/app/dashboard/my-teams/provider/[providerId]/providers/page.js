@@ -25,6 +25,7 @@ import {
   Building2, AlertCircle
 } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 const ITEMS_PER_PAGE = 12
 
@@ -203,6 +204,7 @@ export default function MemberSearchProvidersPage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Search Providers">
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 py-4">
@@ -340,6 +342,7 @@ export default function MemberSearchProvidersPage() {
         )}
       </div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }
 
