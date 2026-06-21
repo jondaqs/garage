@@ -1268,15 +1268,28 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                           {!isPayingThis ? (
                             <button onClick={() => { setPayingInvoiceId(inv.id); setPayAmount(inv.balance_due?.toString() || inv.total_amount?.toString()) }}
                               className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-gray-900 hover:text-gray-900 font-medium transition-colors">
-                              <DollarSign size={15} /> Record Payment
+                              <CreditCard size={15} /> Record Payment
                             </button>
                           ) : (
                             <div className="rounded-2xl border border-gray-200 overflow-hidden">
-                              <div className="bg-gray-900 px-5 py-3 flex items-center gap-2">
-                                <DollarSign size={14} className="text-amber-400" />
-                                <span className="text-white font-semibold text-sm">Record Payment</span>
+                              <div className="bg-gray-900 px-5 py-3 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <CreditCard size={14} className="text-amber-400" />
+                                  <span className="text-white font-semibold text-sm">Record Payment</span>
+                                </div>
+                                {invConverted(inv.currency_code) && (
+                                  <span className="text-amber-300 text-xs font-medium">
+                                    ≈ {fmtC(inv.balance_due || inv.total_amount)}
+                                  </span>
+                                )}
                               </div>
                               <div className="p-5 space-y-4 bg-white">
+                                {invConverted(inv.currency_code) && (
+                                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700">
+                                    Invoice amount: {fmt(inv.balance_due || inv.total_amount, inv.currency_symbol)} ({inv.currency_code})
+                                    {' '}≈ {fmtC(inv.balance_due || inv.total_amount)} ({displayCurrency})
+                                  </div>
+                                )}
                                 <div className="grid grid-cols-4 gap-2">
                                   {PAYMENT_METHODS.map(m => (
                                     <button key={m.value} onClick={() => setPayMethod(m.value)}
@@ -1289,8 +1302,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
-                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Amount ({inv.currency_code})</label>
+                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">
+                                      Amount ({inv.currency_code})
+                                    </label>
                                     <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
+                                    {invConverted(inv.currency_code) && payAmount && (
+                                      <p className="text-[10px] text-gray-400 mt-1">≈ {fmtC(payAmount)}</p>
+                                    )}
                                   </div>
                                   <div>
                                     <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
