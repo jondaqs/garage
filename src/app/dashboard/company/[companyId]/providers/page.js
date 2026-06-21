@@ -105,6 +105,7 @@ export default function CompanyMemberProvidersPage() {
         `, { count: 'exact' })
         .eq('status', 'active')
         .eq('is_active', true)
+        .eq('is_searchable', true)
 
       if (search)       q = q.ilike('name', `%${search}%`)
       if (descSearch)   q = q.ilike('description', `%${descSearch}%`)

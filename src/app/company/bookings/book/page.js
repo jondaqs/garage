@@ -107,6 +107,7 @@ export default function CompanyBookServicePage() {
         `)
         .eq('status', 'active')
         .eq('is_active', true)
+        .eq('is_searchable', true)
 
       const withRatings = (providerData ?? []).map(p => ({
         ...p,

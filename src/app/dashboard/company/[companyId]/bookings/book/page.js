@@ -1,4 +1,3 @@
-// src/app/company/bookings/book/page.js
 // Provider browser for company owners/admins.
 // Mirrors /dashboard/bookings/book but loads fleet vehicles
 // and routes to `/dashboard/company/${companyId}/bookings/new` after selection.
@@ -105,6 +104,7 @@ export default function MemberBookServicePage() {
         `)
         .eq('status', 'active')
         .eq('is_active', true)
+        .eq('is_searchable', true)
 
       const withRatings = (providerData ?? []).map(p => ({
         ...p,

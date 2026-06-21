@@ -52,6 +52,7 @@ export default function ProvidersPage() {
           service_provider_services(service:services(id, name))
         `, { count: 'exact' })
         .eq('status', 'active')
+        .eq('is_searchable', true)
         .eq('is_active', true)
 
       if (search)       q = q.ilike('name', `%${search}%`)

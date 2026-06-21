@@ -85,6 +85,7 @@ export default function BookServicePage() {
         `)
         .eq('status', 'active')
         .eq('is_active', true)
+        .eq('is_searchable', true)
 
       // Calculate average ratings
       const providersWithRatings = providerData?.map(p => ({
