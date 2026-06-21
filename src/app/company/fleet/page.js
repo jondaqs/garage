@@ -6,7 +6,7 @@ import {
   Truck, Plus, Calendar, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertCircle
 } from 'lucide-react'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 const supabase = createClient()
@@ -146,7 +146,7 @@ export default function FleetPage() {
             {fleet.length} vehicle{fleet.length !== 1 ? 's' : ''} registered
           </p>
         </div>
-        <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
+        <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
         <Link
           href="/company/fleet/add"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -154,7 +154,7 @@ export default function FleetPage() {
           <Plus className="w-4 h-4" />
           Add Vehicle
         </Link>
-        </CompanyWriteGate>
+        </WriteGate>
       </div>
 
       {!ownerAccess.loading && <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />}
@@ -171,7 +171,7 @@ export default function FleetPage() {
           <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles in your fleet</h3>
           <p className="text-gray-500 mb-6">Get started by adding your first vehicle</p>
-          <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
+          <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
           <Link
             href="/company/fleet/add"
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
@@ -179,7 +179,7 @@ export default function FleetPage() {
             <Plus className="w-4 h-4" />
             Add Your First Vehicle
           </Link>
-          </CompanyWriteGate>
+          </WriteGate>
         </div>
       ) : (
         <>

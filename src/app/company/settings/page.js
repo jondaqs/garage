@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 // Tabs — Documents only shown to owner (filtered in render)
@@ -723,13 +723,13 @@ export default function CompanySettingsPage() {
 
           {isOwner && (
             <div className="pt-3 border-t border-gray-100 flex justify-end">
-              <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
+              <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
               <button onClick={saveCompany} disabled={saving || !company.name.trim()}
                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Save &amp; Submit for Review
               </button>
-              </CompanyWriteGate>
+              </WriteGate>
             </div>
           )}
         </div>

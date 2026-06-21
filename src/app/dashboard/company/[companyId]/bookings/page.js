@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Calendar, AlertCircle, Truck, Plus, ChevronRight, Loader2, BadgeCheck } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
 import useCompanyAccess from '@/hooks/useCompanyAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 const STATUS_COLORS = {
@@ -134,13 +134,13 @@ export default function MemberBookingsPage() {
           <p className="text-sm text-gray-500 mt-1">Fleet service bookings</p>
         </div>
         {(membership?.can_manage_fleet || membership?.is_admin) && (
-          <CompanyWriteGate canWrite={access.canWrite} state={access.state}>
+          <WriteGate canWrite={access.canWrite} state={access.state}>
           <button
             onClick={() => router.push(`/dashboard/company/${companyId}/bookings/book`)}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Book Service
           </button>
-          </CompanyWriteGate>
+          </WriteGate>
         )}
       </div>
 

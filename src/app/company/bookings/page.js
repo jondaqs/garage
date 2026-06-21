@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Plus, Calendar, Truck, Wrench, ChevronLeft, ChevronRight, BadgeCheck } from 'lucide-react'
 import VerificationScore from '@/components/VerificationScore'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 // Status code → display config
@@ -170,7 +170,7 @@ export default function CompanyBookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Company Bookings</h1>
           <p className="text-sm text-gray-500 mt-1">{bookings.length} booking{bookings.length !== 1 ? 's' : ''}</p>
         </div>
-        <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
+        <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
         <Link
           href="/company/bookings/book"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -178,7 +178,7 @@ export default function CompanyBookingsPage() {
           <Plus className="w-4 h-4" />
           Book Service
         </Link>
-        </CompanyWriteGate>
+        </WriteGate>
       </div>
 
       {!ownerAccess.loading && <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />}

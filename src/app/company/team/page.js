@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { UserPlus, Mail, Pencil, Check, X, Shield, Loader2, AlertCircle, Clock, Ban, Settings } from 'lucide-react'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 const ROLE_OPTIONS = [
@@ -219,14 +219,14 @@ export default function TeamPage() {
             {invitations.length > 0 && ` · ${invitations.length} pending invitation${invitations.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
+        <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
         <button
           onClick={() => setShowInviteForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
         >
           <UserPlus className="w-4 h-4" /> Invite Member
         </button>
-        </CompanyWriteGate>
+        </WriteGate>
       </div>
 
       {!ownerAccess.loading && <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} />}
@@ -452,7 +452,7 @@ export default function TeamPage() {
                         </div>
                       </div>
                       {member.staff_role !== 'owner' && (
-                        <CompanyWriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state} inline>
+                        <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state} inline>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button onClick={() => startEdit(member)}
                             className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50">
@@ -463,7 +463,7 @@ export default function TeamPage() {
                             <Settings className="w-3 h-3" /> Manage Roles
                           </button>
                         </div>
-                        </CompanyWriteGate>
+                        </WriteGate>
                       )}
                     </div>
                   )}

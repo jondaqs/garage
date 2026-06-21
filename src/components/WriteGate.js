@@ -3,7 +3,7 @@
 import { Lock } from 'lucide-react'
 
 /**
- * CompanyWriteGate
+ * WriteGate
  *
  * Wraps write-action buttons/forms on pages that remain accessible
  * in read-only mode (fleet, team, bookings, work orders).
@@ -12,19 +12,19 @@ import { Lock } from 'lucide-react'
  * and pointer-events disabled, plus an inline message.
  *
  * Usage:
- *   <CompanyWriteGate canWrite={access.canWrite} state={access.state}>
+ *   <WriteGate canWrite={access.canWrite} state={access.state}>
  *     <button onClick={handleAddVehicle}>Add Vehicle</button>
- *   </CompanyWriteGate>
+ *   </WriteGate>
  *
  * Or wrap an entire action bar:
- *   <CompanyWriteGate canWrite={access.canWrite} state={access.state} inline>
+ *   <WriteGate canWrite={access.canWrite} state={access.state} inline>
  *     <div className="flex gap-2">
  *       <button>Invite Member</button>
  *       <button>Change Roles</button>
  *     </div>
- *   </CompanyWriteGate>
+ *   </WriteGate>
  */
-export default function CompanyWriteGate({
+export default function WriteGate({
   canWrite,
   state,
   children,

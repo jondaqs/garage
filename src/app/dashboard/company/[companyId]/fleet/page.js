@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Truck, Plus, Calendar, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import useCompanyAccess from '@/hooks/useCompanyAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
 
 export default function MemberFleetPage() {
@@ -109,7 +109,7 @@ export default function MemberFleetPage() {
           </p>
         </div>
         {canManageFleet && (
-          <CompanyWriteGate canWrite={access.canWrite} state={access.state}>
+          <WriteGate canWrite={access.canWrite} state={access.state}>
           <Link
             href={`/dashboard/company/${companyId}/fleet/add`}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -117,7 +117,7 @@ export default function MemberFleetPage() {
             <Plus className="w-4 h-4" />
             Add Vehicle
           </Link>
-          </CompanyWriteGate>
+          </WriteGate>
         )}
       </div>
 

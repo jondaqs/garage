@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
 import useProviderAccess from '@/hooks/useProviderAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 const TABS = [
@@ -716,13 +716,13 @@ export default function ProviderSettingsPage() {
             <p className="text-xs text-gray-400">
               Shop locations are managed under <strong>My Shops</strong>.
             </p>
-            <CompanyWriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
+            <WriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
             <button onClick={saveBusiness} disabled={saving || !business.name.trim()}
               className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save &amp; Submit for Review
             </button>
-            </CompanyWriteGate>
+            </WriteGate>
           </div>
         </div>
       )}

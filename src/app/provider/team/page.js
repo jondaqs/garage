@@ -9,7 +9,7 @@ import {
   Settings as SettingsIcon
 } from 'lucide-react'
 import useProviderAccess from '@/hooks/useProviderAccess'
-import CompanyWriteGate from '@/components/CompanyWriteGate'
+import WriteGate from '@/components/WriteGate'
 import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 export default function ProviderTeamPage() {
@@ -538,7 +538,7 @@ export default function ProviderTeamPage() {
       {!providerAccess.loading && <ProviderAccessBanner {...providerAccess} />}
 
       {/* Search Users */}
-      <CompanyWriteGate canWrite={providerAccess.canWrite} state={providerAccess.state} inline>
+      <WriteGate canWrite={providerAccess.canWrite} state={providerAccess.state} inline>
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <UserPlus size={20} />
@@ -579,7 +579,7 @@ export default function ProviderTeamPage() {
           </p>
         </div>
       </div>
-      </CompanyWriteGate>
+      </WriteGate>
 
       {/* Team Members */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
