@@ -138,6 +138,7 @@ function DonutChart({ statuses, total }) {
   )
 }
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 export default function MemberAnalyticsPage() {
   const supabase  = createClient()
   const router    = useRouter()
@@ -560,6 +561,7 @@ export default function MemberAnalyticsPage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Analytics">
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -868,5 +870,6 @@ export default function MemberAnalyticsPage() {
         </>
       )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }

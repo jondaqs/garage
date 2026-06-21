@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import TabbedFormModal from './components/TabbedFormModal'
 import DetailsModal from './components/DetailsModal'
 import AdjustStockModal from './components/AdjustStockModal'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 export default function ProviderInventoryPage() {
   const [inventory, setInventory] = useState([])
@@ -390,6 +391,7 @@ function InventoryRow({ item, onView, onEdit, onAdjust, onDelete, readOnly }) {
   const stockStatus = item.stock === 0 ? 'out' : item.stock <= item.min_stock_level ? 'low' : 'ok'
   
   return (
+    <ProviderSubscriptionGate featureName="Inventory Management">
     <tr className={!item.is_active ? 'opacity-50 bg-gray-50' : ''}>
       <td className="px-6 py-4">
         <div>
@@ -450,5 +452,6 @@ function InventoryRow({ item, onView, onEdit, onAdjust, onDelete, readOnly }) {
         )}
       </td>
     </tr>
+    </ProviderSubscriptionGate>
   )
 }

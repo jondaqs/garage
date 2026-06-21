@@ -7,6 +7,7 @@ import {
   Calendar, Wrench, Loader2, AlertCircle,
   ChevronDown, Store, UserCheck, Car, Building2, Crown, Coins
 } from 'lucide-react'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 const PERIODS = [
   { value: '7',  label: 'Last 7 days'  },
@@ -553,6 +554,7 @@ export default function ProviderAnalyticsPage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Analytics">
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header + Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -893,5 +895,6 @@ export default function ProviderAnalyticsPage() {
         </>
       )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }

@@ -23,6 +23,7 @@ import {
   ArrowLeft, XCircle, CheckCircle, AlertCircle, RefreshCw, Building2, BadgeCheck
 } from 'lucide-react'
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 export default function MemberPeerChatPage() {
   const router       = useRouter()
   const params       = useParams()
@@ -417,6 +418,7 @@ export default function MemberPeerChatPage() {
   const otherVerified = !!activeConv?.otherProvider?.is_verified
 
   return (
+    <ProviderSubscriptionGate featureName="Peer Chat">
     <div className="h-[calc(100vh-3.5rem)] sm:h-screen flex bg-gray-50 overflow-hidden">
 
       {/* List */}
@@ -698,5 +700,6 @@ export default function MemberPeerChatPage() {
         )}
       </div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }

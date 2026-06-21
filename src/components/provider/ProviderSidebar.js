@@ -9,6 +9,7 @@ import {
   Search, Building2, MessageCircle, CreditCard, LifeBuoy, Megaphone
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import useProviderAccess from '@/hooks/useProviderAccess'
 
 export default function ProviderSidebar({ provider }) {
   const pathname = usePathname()
@@ -16,6 +17,7 @@ export default function ProviderSidebar({ provider }) {
   const supabase = createClient()
 
   const [mobileOpen,        setMobileOpen]        = useState(false)
+  const providerAccess = useProviderAccess()
   const [activeWoCount,     setActiveWoCount]     = useState(0)
   const [pendingBookings,   setPendingBookings]   = useState(0)
   const [unreadChats,       setUnreadChats]       = useState(0)
@@ -248,8 +250,22 @@ export default function ProviderSidebar({ provider }) {
         </div>
       )}
 
+      {/* Subscription warning */}
+      {!providerAccess.loading && !providerAccess.canWrite && (
+        <div className="mx-4 mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <p className="text-xs text-amber-800 font-medium">
+            {providerAccess.state === 'suspended' ? '⚠ Subscription Suspended' : '⚠ Trial Ended'}
+          </p>
+          <p className="text-xs text-amber-700 mt-0.5">
+            {providerAccess.state === 'suspended'
+              ? 'Contact support to restore access.'
+              : 'Subscribe to continue operating.'}
+          </p>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 px-2 space-y-0.5">
+      <nav className={`flex-1 px-2 space-y-0.5 ${!providerAccess.loading && !providerAccess.canWrite ? 'opacity-60' : ''}`}>
         {navigation.map((item) => {
           const Icon   = item.icon
           const active = isActive(item.href)

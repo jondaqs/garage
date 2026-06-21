@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUpDown, BarChart3
 } from 'lucide-react'
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 export default function MemberInventoryPage() {
   const { providerId } = useParams()
   const router         = useRouter()
@@ -232,6 +233,7 @@ export default function MemberInventoryPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
+    <ProviderSubscriptionGate featureName="Inventory">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -674,5 +676,6 @@ export default function MemberInventoryPage() {
         </div>
       )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }

@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { MapPin, Phone, Mail, Clock, Plus, Edit, Trash2, AlertCircle, DollarSign } from 'lucide-react'
+import useProviderAccess from '@/hooks/useProviderAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 export default function ProviderShopsPage() {
   const router = useRouter()
   const supabase = createClient()
   const [shops, setShops] = useState([])
+  const providerAccess = useProviderAccess()
   const [provider, setProvider] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -121,6 +125,7 @@ export default function ProviderShopsPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Shops</h1>
           <p className="text-gray-600">Manage your shop locations</p>
         </div>
+        <CompanyWriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
         <button
           onClick={() => router.push('/provider/shops/add')}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
@@ -128,7 +133,10 @@ export default function ProviderShopsPage() {
           <Plus size={20} />
           Add Shop
         </button>
+        </CompanyWriteGate>
       </div>
+
+      {!providerAccess.loading && <ProviderAccessBanner {...providerAccess} />}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">

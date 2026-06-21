@@ -30,6 +30,7 @@ const STEPS = [
   { id: 'confirm', label: 'Confirm' },
 ]
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 export default function MemberNewWalkInWorkOrderPage() {
   const router   = useRouter()
   const params   = useParams()
@@ -1018,6 +1019,7 @@ function OwnerOption({ selected, onClick, icon: Icon, title, desc }) {
 
 function ReviewCard({ icon: Icon, title, children }) {
   return (
+    <ProviderSubscriptionGate featureName="Create Work Order">
     <div className="rounded-lg border border-gray-200 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50">
         <Icon size={15} className="text-gray-500" />
@@ -1025,5 +1027,6 @@ function ReviewCard({ icon: Icon, title, children }) {
       </div>
       <div className="px-4 py-3">{children}</div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }

@@ -18,6 +18,7 @@ import { pickEventColor, LEGEND } from '@/lib/calendar/providerCalendarColors'
 
 const localizer = momentLocalizer(moment)
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 export default function MemberProviderCalendarPage() {
   const params   = useParams()
   const router   = useRouter()
@@ -375,6 +376,7 @@ export default function MemberProviderCalendarPage() {
 
   // ── Main render ────────────────────────────────────────────────────────
   return (
+    <ProviderSubscriptionGate featureName="Calendar">
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-6 space-y-4">
 
       {/* Back link */}
@@ -625,5 +627,6 @@ export default function MemberProviderCalendarPage() {
         />
      )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }

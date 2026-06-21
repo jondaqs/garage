@@ -7,6 +7,9 @@ import { Plus,
   ClipboardList, Search, Filter, ChevronRight, ChevronLeft,
   Car, Calendar, AlertCircle, Clock, BellRing, ClipboardCheck, CheckCircle, Store
 } from 'lucide-react'
+import useProviderAccess from '@/hooks/useProviderAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 const STATUS_COLORS = {
   intake:            'bg-gray-100 text-gray-700',
@@ -50,6 +53,7 @@ export default function ProviderWorkOrdersPage() {
   const supabase = createClient()
 
   const [workOrders, setWorkOrders]   = useState([])
+  const providerAccess = useProviderAccess()
   const [customerMap, setCustomerMap] = useState({}) // wo.id → customer name
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState('')
@@ -184,13 +188,17 @@ export default function ProviderWorkOrdersPage() {
             {workOrders.length} total · {activeCount} active
           </p>
         </div>
+        <CompanyWriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
         <button
           onClick={() => router.push('/provider/work-orders/new')}
           className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex-shrink-0"
         >
           <Plus size={18} /> New Walk-In Work Order
         </button>
+        </CompanyWriteGate>
       </div>
+
+      {!providerAccess.loading && <ProviderAccessBanner {...providerAccess} />}
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">

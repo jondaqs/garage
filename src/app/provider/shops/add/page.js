@@ -13,6 +13,7 @@ import {
   INTERNATIONAL,
   KENYA_COUNTIES 
 } from '@/lib/constants/countries'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 export default function AddShopPage() {
   const router = useRouter()
@@ -148,6 +149,7 @@ export default function AddShopPage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Add Shop">
     <div className="max-w-3xl mx-auto px-4 py-8">
       <button
         onClick={() => router.back()}
@@ -497,5 +499,6 @@ export default function AddShopPage() {
         </form>
       </div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }

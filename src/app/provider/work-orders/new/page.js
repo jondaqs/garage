@@ -9,6 +9,7 @@ import {
   ClipboardList, Plus, Info, List, ChevronRight
 } from 'lucide-react'
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 // ─── Step definitions ──────────────────────────────────────────────────────
 const STEPS = [
   { id: 'vehicle',   label: 'Vehicle'  },
@@ -271,6 +272,7 @@ export default function NewWalkInWorkOrderPage() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
+    <ProviderSubscriptionGate featureName="Create Work Order">
     <div className="max-w-2xl mx-auto px-4 py-8">
       <button
         onClick={() => step === 0 ? router.push('/provider/work-orders') : setStep(s => s - 1)}
@@ -991,5 +993,6 @@ export default function NewWalkInWorkOrderPage() {
         </div>
       )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }

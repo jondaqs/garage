@@ -8,6 +8,7 @@ import {
   Send, MessageSquare, Search, Loader2, CheckCheck, Check,
   ArrowLeft, User, XCircle, CheckCircle, AlertCircle, ChevronDown, RefreshCw
 } from 'lucide-react'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 export default function ProviderChatPage() {
   const router       = useRouter()
@@ -406,6 +407,7 @@ export default function ProviderChatPage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Customer Chat">
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
       {/* ── Conversation list ─────────────────────────────────────────────── */}
@@ -693,5 +695,6 @@ export default function ProviderChatPage() {
         )}
       </div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }

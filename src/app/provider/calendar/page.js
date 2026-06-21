@@ -14,6 +14,7 @@ import CalendarStatsCard      from '@/components/provider/CalendarStatsCard'
 import BookCustomerModal      from '@/components/provider/BookCustomerModal'
 import useReminderScanner     from '@/hooks/useReminderScanner'
 import { pickEventColor, LEGEND } from '@/lib/calendar/providerCalendarColors'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 const localizer = momentLocalizer(moment)
 
@@ -268,6 +269,7 @@ export default function ProviderCalendarPage() {
   )
 
   return (
+    <ProviderSubscriptionGate featureName="Calendar">
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-6 space-y-4">
 
       {/* Header */}
@@ -470,5 +472,6 @@ export default function ProviderCalendarPage() {
         }}
       />
     </div>
+    </ProviderSubscriptionGate>
   )
 }

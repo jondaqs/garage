@@ -8,6 +8,9 @@ import {
   FileText, Upload, Trash2, ExternalLink, RefreshCw,
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
+import useProviderAccess from '@/hooks/useProviderAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 const TABS = [
   { id: 'business',  label: 'Business Profile', icon: Store    },
@@ -26,6 +29,7 @@ export default function ProviderSettingsPage() {
   const [tab,        setTab]       = useState('business')
   const [loading,    setLoading]   = useState(true)
   const [saving,     setSaving]    = useState(false)
+  const providerAccess = useProviderAccess()
   const [error,      setError]     = useState('')
   const [success,    setSuccess]   = useState('')
   const [status,     setStatus]    = useState(null)
@@ -589,6 +593,8 @@ export default function ProviderSettingsPage() {
         </div>
       )}
 
+      {!providerAccess.loading && <ProviderAccessBanner {...providerAccess} />}
+
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-sm">
           <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
@@ -710,11 +716,13 @@ export default function ProviderSettingsPage() {
             <p className="text-xs text-gray-400">
               Shop locations are managed under <strong>My Shops</strong>.
             </p>
+            <CompanyWriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
             <button onClick={saveBusiness} disabled={saving || !business.name.trim()}
               className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save &amp; Submit for Review
             </button>
+            </CompanyWriteGate>
           </div>
         </div>
       )}

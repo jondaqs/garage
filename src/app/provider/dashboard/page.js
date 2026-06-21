@@ -10,6 +10,8 @@ import {
   Car, BookOpen
 } from 'lucide-react'
 import LowStockAlerts from '@/components/provider/LowStockAlerts'
+import useProviderAccess from '@/hooks/useProviderAccess'
+import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 function StarRow({ rating }) {
   return (
@@ -44,6 +46,7 @@ export default function ProviderDashboard() {
   const [stats, setStats]     = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
+  const providerAccess = useProviderAccess()
 
   useEffect(() => { loadDashboardData() }, [])
 
@@ -145,6 +148,14 @@ export default function ProviderDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 mt-1 text-sm">Here's what's happening at your garage today.</p>
       </div>
+
+      {/* Subscription banner */}
+      {!providerAccess.loading && (
+        <>
+          <div className="hidden md:block"><ProviderAccessBanner {...providerAccess} /></div>
+          <div className="md:hidden"><ProviderAccessBanner {...providerAccess} compact /></div>
+        </>
+      )}
 
       {/* Pending approvals banner */}
       {stats.pending_approvals > 0 && (

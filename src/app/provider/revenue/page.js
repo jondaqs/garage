@@ -7,6 +7,7 @@ import {
   Store, Users, CreditCard, Building2, Receipt, Crown,
   ArrowUpRight, ArrowDownRight, Coins
 } from 'lucide-react'
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 const PERIODS = [
   { value: '7',   label: 'Last 7 days'   },
@@ -300,6 +301,7 @@ export default function ProviderRevenuePage() {
   const customerList = data?.customer_list || []
 
   return (
+    <ProviderSubscriptionGate featureName="Revenue Reports">
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header + Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -568,5 +570,6 @@ export default function ProviderRevenuePage() {
         </>
       )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }

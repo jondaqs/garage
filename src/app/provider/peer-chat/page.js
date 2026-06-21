@@ -12,6 +12,7 @@ import {
 // Provider-to-provider chat (owner / single-provider context).
 // Reads/writes only peer_conversations / peer_messages — completely separate
 // from the customer-chat surface at /provider/chat.
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 
 export default function ProviderPeerChatPage() {
   const router       = useRouter()
@@ -388,6 +389,7 @@ export default function ProviderPeerChatPage() {
   const otherVerified = !!activeConv?.otherProvider?.is_verified
 
   return (
+    <ProviderSubscriptionGate featureName="Peer Chat">
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
       {/* List */}
@@ -671,5 +673,6 @@ export default function ProviderPeerChatPage() {
         )}
       </div>
     </div>
+    </ProviderSubscriptionGate>
   )
 }

@@ -8,12 +8,16 @@ import {
   Clock, Check, X, AlertCircle, MoreVertical, Trash2,
   Settings as SettingsIcon
 } from 'lucide-react'
+import useProviderAccess from '@/hooks/useProviderAccess'
+import CompanyWriteGate from '@/components/CompanyWriteGate'
+import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 export default function ProviderTeamPage() {
   const router = useRouter()
   const supabase = createClient()
   
   const [loading, setLoading] = useState(true)
+  const providerAccess = useProviderAccess()
   const [provider, setProvider] = useState(null)
   const [teamMembers, setTeamMembers] = useState([])
   const [invitations, setInvitations] = useState([])
@@ -530,7 +534,11 @@ export default function ProviderTeamPage() {
         </div>
       </div>
 
+      {/* Subscription banner */}
+      {!providerAccess.loading && <ProviderAccessBanner {...providerAccess} />}
+
       {/* Search Users */}
+      <CompanyWriteGate canWrite={providerAccess.canWrite} state={providerAccess.state} inline>
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <UserPlus size={20} />
@@ -571,6 +579,7 @@ export default function ProviderTeamPage() {
           </p>
         </div>
       </div>
+      </CompanyWriteGate>
 
       {/* Team Members */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">

@@ -133,6 +133,7 @@ function BarChart({ entries, formatAmount, color = '#3b82f6', hoverColor = '#256
   )
 }
 
+import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
 export default function MemberRevenuePage() {
   const supabase = createClient()
   const router = useRouter()
@@ -320,6 +321,7 @@ export default function MemberRevenuePage() {
   }
 
   return (
+    <ProviderSubscriptionGate featureName="Revenue">
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -578,5 +580,6 @@ export default function MemberRevenuePage() {
         </>
       )}
     </div>
+    </ProviderSubscriptionGate>
   )
 }
