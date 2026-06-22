@@ -3,6 +3,7 @@
  * Saves company profile, bumps status to pending_verification,
  * sends in-app notifications (via RPC) and emails to admin + owner.
  */
+kaput
 
 import { createClient }          from '@/lib/supabase/server'
 import { NextResponse }          from 'next/server'
