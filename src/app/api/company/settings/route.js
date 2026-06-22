@@ -9,7 +9,7 @@ import { NextResponse }          from 'next/server'
 import {
   sendDetailsChangedAdminEmail,
   sendDetailsPendingEmail,
-}                                from '@/lib/email/settingsEmails'
+}  from '@/lib/email/settingsEmails'
 
 export async function POST(request) {
   try {
