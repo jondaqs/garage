@@ -28,6 +28,7 @@ const TYPE_CONFIG = {
 
   // Invoice & payment
   invoice_issued:              { icon: FileText,     bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Invoice Ready'  },
+  subscription_invoice:        { icon: FileText,     bg: 'bg-emerald-100', iconCls: 'text-emerald-600', label: 'Subscription Invoice' },
   payment_received:            { icon: DollarSign,   bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Payment Received' },
 
   // Work order lifecycle
@@ -75,6 +76,12 @@ function getNotificationHref(n, isProvider, isCompany) {
   }
   if (refType === 'receipt' || type === 'payment_received') {
     return null
+  }
+  // Subscription invoices → subscription page (not work order invoice)
+  if (refType === 'subscription_invoice' || type === 'subscription_invoice') {
+    if (isProvider) return `/provider/subscription?view=invoices&invoice=${refId}`
+    if (isCompany)  return `/company/subscription?view=invoices&invoice=${refId}`
+    return `/dashboard/subscription?view=invoices&invoice=${refId}`
   }
   if (refType === 'invoice' || type.includes('invoice')) {
     if (isProvider) return `/provider/work-orders/${refId}`
