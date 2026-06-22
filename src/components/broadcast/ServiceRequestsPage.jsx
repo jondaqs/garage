@@ -16,13 +16,14 @@ import {
   Building2, Wrench, Award, Star,
 } from 'lucide-react'
 import CreateBroadcastModal from '@/components/broadcast/CreateBroadcastModal'
+import WriteGate from '@/components/WriteGate'
 
 const URGENCY_COLORS = { low: 'bg-gray-100 text-gray-700', medium: 'bg-blue-100 text-blue-800', high: 'bg-orange-100 text-orange-800', urgent: 'bg-red-100 text-red-800' }
 const STATUS_COLORS = { open: 'bg-green-100 text-green-800', in_review: 'bg-blue-100 text-blue-800', awarded: 'bg-purple-100 text-purple-800', completed: 'bg-gray-100 text-gray-800', cancelled: 'bg-gray-100 text-gray-500', expired: 'bg-yellow-100 text-yellow-700' }
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' }
 
-function ServiceRequestsContent({ subscriberType, entityId }) {
+function ServiceRequestsContent({ subscriberType, entityId, canWrite = true, accessState = 'subscribed' }) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const deepLinked = searchParams?.get('broadcast') || null
@@ -108,9 +109,11 @@ function ServiceRequestsContent({ subscriberType, entityId }) {
           <button onClick={() => load()} disabled={refreshing} className="p-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           </button>
+          <WriteGate canWrite={canWrite} state={accessState}>
           <button onClick={() => setShowModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 shadow-sm">
             <Plus size={16} /> New Request
           </button>
+          </WriteGate>
         </div>
       </div>
 
@@ -127,7 +130,9 @@ function ServiceRequestsContent({ subscriberType, entityId }) {
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Megaphone size={44} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">No broadcasts found.</p>
+          <WriteGate canWrite={canWrite} state={accessState} inline>
           <button onClick={() => setShowModal(true)} className="mt-4 text-sm text-emerald-600 font-medium">Post your first service request →</button>
+          </WriteGate>
         </div>
       ) : (
         <div className="space-y-3">
@@ -217,10 +222,10 @@ function ServiceRequestsContent({ subscriberType, entityId }) {
   )
 }
 
-export default function ServiceRequestsPage({ subscriberType, entityId }) {
+export default function ServiceRequestsPage({ subscriberType, entityId, canWrite, accessState }) {
   return (
     <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={28} /></div>}>
-      <ServiceRequestsContent subscriberType={subscriberType} entityId={entityId} />
+      <ServiceRequestsContent subscriberType={subscriberType} entityId={entityId} canWrite={canWrite} accessState={accessState} />
     </Suspense>
   )
 }

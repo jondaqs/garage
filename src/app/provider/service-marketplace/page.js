@@ -11,6 +11,9 @@ import {
 } from 'lucide-react'
 import CreateBroadcastModal from '@/components/broadcast/CreateBroadcastModal'
 import RespondToBroadcastModal from '@/components/broadcast/RespondToBroadcastModal'
+import useProviderAccess from '@/hooks/useProviderAccess'
+import WriteGate from '@/components/WriteGate'
+import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 const URGENCY_COLORS = { low: 'bg-gray-100 text-gray-700', medium: 'bg-blue-100 text-blue-800', high: 'bg-orange-100 text-orange-800', urgent: 'bg-red-100 text-red-800' }
 const STATUS_COLORS = { open: 'bg-green-100 text-green-800', in_review: 'bg-blue-100 text-blue-800', awarded: 'bg-purple-100 text-purple-800', completed: 'bg-gray-100 text-gray-800', cancelled: 'bg-gray-100 text-gray-500', expired: 'bg-yellow-100 text-yellow-700' }
@@ -24,6 +27,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   const searchParams = useSearchParams()
   const initialView = searchParams?.get('view') || 'browse'
   const [tab, setTab] = useState(initialView)
+  const providerAccess = useProviderAccess()
 
   // Browse state
   const [allBroadcasts, setAllBroadcasts] = useState([])
@@ -149,6 +153,8 @@ function ProviderMarketplaceContent({ providerIdProp }) {
         <p className="text-sm text-gray-500 mt-1">Browse requests, submit proposals, manage engagements</p>
       </div>
 
+      {!providerAccess.loading && <ProviderAccessBanner {...providerAccess} />}
+
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-gray-200">
         {TABS.map(t => {
@@ -219,10 +225,12 @@ function ProviderMarketplaceContent({ providerIdProp }) {
                           {b.budget_estimate && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded flex items-center gap-0.5"><DollarSign size={8} />{b.budget_estimate}</span>}
                           {b.preferred_start && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded flex items-center gap-0.5"><Clock size={8} />Start: {fmtDate(b.preferred_start)}</span>}
                         </div>
+                        <WriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
                         <button onClick={() => setRespondingTo(b)}
                           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-1.5">
                           <FileText size={14} /> Submit Proposal
                         </button>
+                        </WriteGate>
                       </div>
                     )}
                   </div>
@@ -311,10 +319,12 @@ function ProviderMarketplaceContent({ providerIdProp }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">Post your own service needs</p>
+            <WriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
             <button onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 shadow-sm">
               <Plus size={16} /> New Request
             </button>
+            </WriteGate>
           </div>
 
           {loadingMyBroadcasts ? <Loader2 size={24} className="animate-spin text-emerald-600 mx-auto mt-8" /> :
