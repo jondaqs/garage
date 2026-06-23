@@ -20,7 +20,7 @@ import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
   Package, CreditCard, FileText, CheckCircle, AlertCircle, Loader2,
   ArrowRight, Clock, DollarSign, Send, Banknote, Building2,
-  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus, Globe
+  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus, Globe, Smartphone
 } from 'lucide-react'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
@@ -83,6 +83,13 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [payRef, setPayRef] = useState('')
   const [payNotes, setPayNotes] = useState('')
   const [paymentAccounts, setPaymentAccounts] = useState(null)
+
+  // M-Pesa STK Push
+  const [mpesaPhone, setMpesaPhone] = useState('')
+  const [stkState, setStkState] = useState('idle') // idle | initiating | waiting | success | failed | timeout
+  const [stkError, setStkError] = useState('')
+  const [stkCheckoutId, setStkCheckoutId] = useState(null)
+  const [stkReceipt, setStkReceipt] = useState(null)
 
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
@@ -487,6 +494,69 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
     } finally {
       setPaying(false)
     }
+  }
+
+  // ── M-Pesa STK Push handler ─────────────────────────────────
+  const handleMpesaPay = async (invoiceId, amount) => {
+    if (!mpesaPhone.trim()) { setError('Enter your M-Pesa phone number'); return }
+    setStkState('initiating'); setStkError(''); setError('')
+
+    try {
+      const res = await fetch('/api/payments/mpesa/stk-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId, phoneNumber: mpesaPhone.trim(), amount }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to initiate M-Pesa payment')
+      }
+
+      setStkCheckoutId(data.checkoutRequestId)
+      setStkState('waiting')
+
+      // Poll for result every 3 seconds, max 90 seconds
+      let elapsed = 0
+      const pollId = setInterval(async () => {
+        elapsed += 3000
+        try {
+          const statusRes = await fetch('/api/payments/mpesa/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checkoutRequestId: data.checkoutRequestId }),
+          })
+          const status = await statusRes.json()
+
+          if (status.status === 'verified') {
+            clearInterval(pollId)
+            setStkState('success')
+            setStkReceipt(status.mpesaReceipt)
+            setSuccess(`Payment confirmed! M-Pesa receipt: ${status.mpesaReceipt}`)
+            setPayingInvoiceId(null); setMpesaPhone('')
+            await loadAll()
+          } else if (status.status === 'failed') {
+            clearInterval(pollId)
+            setStkState('failed')
+            setStkError(status.resultDesc || 'Payment was not completed')
+          }
+        } catch { /* polling error — keep trying */ }
+
+        if (elapsed >= 90000) {
+          clearInterval(pollId)
+          if (stkState === 'waiting') {
+            setStkState('timeout')
+            setStkError('Payment confirmation timed out. If you completed the payment, it will be processed shortly.')
+          }
+        }
+      }, 3000)
+    } catch (e) {
+      setStkState('failed')
+      setStkError(e.message)
+    }
+  }
+
+  const resetStkState = () => {
+    setStkState('idle'); setStkError(''); setStkCheckoutId(null); setStkReceipt(null)
   }
 
   const activeSub = subscriptions.find(s => s.is_currently_active)
@@ -1367,32 +1437,104 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                   </div>
                                 )}
 
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-                                      Amount ({inv.currency_code})
-                                    </label>
-                                    <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
-                                    {invConverted(inv.currency_code) && payAmount && (
-                                      <p className="text-[10px] text-gray-400 mt-1">≈ {fmtC(payAmount)}</p>
+                                {/* ── M-Pesa STK Push flow ── */}
+                                {payMethod === 'mpesa' && stkState !== 'idle' ? (
+                                  <div className="text-center py-4 space-y-3">
+                                    {stkState === 'initiating' && (
+                                      <>
+                                        <Loader2 size={32} className="animate-spin text-green-600 mx-auto" />
+                                        <p className="text-sm font-medium text-gray-700">Sending payment request to your phone...</p>
+                                      </>
+                                    )}
+                                    {stkState === 'waiting' && (
+                                      <>
+                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                          <Smartphone size={28} className="text-green-600" />
+                                        </div>
+                                        <p className="text-sm font-semibold text-gray-800">Check your phone</p>
+                                        <p className="text-xs text-gray-500">Enter your M-Pesa PIN to complete the payment</p>
+                                        <Loader2 size={16} className="animate-spin text-gray-400 mx-auto" />
+                                        <p className="text-[10px] text-gray-400">Waiting for confirmation...</p>
+                                      </>
+                                    )}
+                                    {stkState === 'success' && (
+                                      <>
+                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                          <BadgeCheck size={28} className="text-green-600" />
+                                        </div>
+                                        <p className="text-sm font-semibold text-green-700">Payment Confirmed!</p>
+                                        {stkReceipt && <p className="text-xs text-gray-500">M-Pesa Receipt: {stkReceipt}</p>}
+                                      </>
+                                    )}
+                                    {(stkState === 'failed' || stkState === 'timeout') && (
+                                      <>
+                                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                                          <AlertCircle size={28} className="text-red-500" />
+                                        </div>
+                                        <p className="text-sm font-semibold text-red-700">
+                                          {stkState === 'timeout' ? 'Request timed out' : 'Payment failed'}
+                                        </p>
+                                        <p className="text-xs text-gray-500">{stkError}</p>
+                                        <button onClick={resetStkState}
+                                          className="text-sm text-blue-600 font-medium hover:underline">
+                                          Try again
+                                        </button>
+                                      </>
                                     )}
                                   </div>
-                                  <div>
-                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
-                                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. M-Pesa QXZ12345" className={inp} />
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="text-xs font-semibold text-gray-600 block mb-1.5">Notes (optional)</label>
-                                  <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
-                                </div>
-                                <div className="flex gap-2">
-                                  <button onClick={handlePayment} disabled={paying}
-                                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                                    {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Confirm Payment
-                                  </button>
-                                  <button onClick={() => setPayingInvoiceId(null)} className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
-                                </div>
+                                ) : (
+                                  <>
+                                    {/* ── Phone input for M-Pesa ── */}
+                                    {payMethod === 'mpesa' && (
+                                      <div>
+                                        <label className="text-xs font-semibold text-gray-600 block mb-1.5">M-Pesa Phone Number</label>
+                                        <input type="tel" value={mpesaPhone} onChange={e => setMpesaPhone(e.target.value)}
+                                          placeholder="0712345678" className={inp} />
+                                        <p className="text-[10px] text-gray-400 mt-1">You will receive an STK push prompt on this number</p>
+                                      </div>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="text-xs font-semibold text-gray-600 block mb-1.5">
+                                          Amount ({inv.currency_code})
+                                        </label>
+                                        <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
+                                        {invConverted(inv.currency_code) && payAmount && (
+                                          <p className="text-[10px] text-gray-400 mt-1">≈ {fmtC(payAmount)}</p>
+                                        )}
+                                      </div>
+                                      {payMethod !== 'mpesa' && (
+                                        <div>
+                                          <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
+                                          <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. QXZ12345" className={inp} />
+                                        </div>
+                                      )}
+                                    </div>
+                                    {payMethod !== 'mpesa' && (
+                                      <div>
+                                        <label className="text-xs font-semibold text-gray-600 block mb-1.5">Notes (optional)</label>
+                                        <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
+                                      </div>
+                                    )}
+                                    <div className="flex gap-2">
+                                      {payMethod === 'mpesa' ? (
+                                        <button onClick={() => handleMpesaPay(inv.id, payAmount)}
+                                          disabled={paying || !mpesaPhone.trim() || !payAmount}
+                                          className="flex items-center gap-1.5 px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
+                                          <Smartphone size={14} /> Pay with M-Pesa
+                                        </button>
+                                      ) : (
+                                        <button onClick={handlePayment} disabled={paying}
+                                          className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+                                          {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Confirm Payment
+                                        </button>
+                                      )}
+                                      <button onClick={() => { setPayingInvoiceId(null); resetStkState() }}
+                                        className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
                           )}
