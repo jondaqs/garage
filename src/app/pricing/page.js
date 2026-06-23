@@ -99,15 +99,16 @@ export default function PricingPage() {
         }
         setSelectedCurrency(resolvedCurrency)
 
-        // Fetch exchange rate inline (before showing content)
+        // Fetch exchange rate from DB cache (via RPC — no external API call)
         if (resolvedCurrency !== 'USD') {
           try {
-            const resp = await fetch(`/api/pricing/exchange-rate?currency_code=${resolvedCurrency}`)
-            if (resp.ok) {
-              const rateData = await resp.json()
-              setConversionRate(rateData.margined_rate)
+            const { data: rateData } = await supabase.rpc('get_public_exchange_rate', {
+              p_target_code: resolvedCurrency,
+            })
+            if (rateData && rateData.rate) {
+              const MARGIN = 0.025
+              setConversionRate(Math.round(rateData.rate * (1 + MARGIN) * 10000) / 10000)
               setConvSymbol(rateData.currency_symbol || resolvedCurrency)
-              setMarginPct(rateData.margin_pct)
               setRateSource(rateData.source)
             }
           } catch (e) {
@@ -142,16 +143,17 @@ export default function PricingPage() {
     const fetchRate = async () => {
       setRateLoading(true)
       try {
-        const resp = await fetch(`/api/pricing/exchange-rate?currency_code=${selectedCurrency}`)
-        if (!resp.ok) throw new Error('Rate unavailable')
-        const data = await resp.json()
-        setConversionRate(data.margined_rate)
-        setConvSymbol(data.currency_symbol || selectedCurrency)
-        setMarginPct(data.margin_pct)
-        setRateSource(data.source)
+        const { data: rateData, error } = await supabase.rpc('get_public_exchange_rate', {
+          p_target_code: selectedCurrency,
+        })
+        if (error || !rateData?.rate) throw new Error('Rate unavailable')
+        const MARGIN = 0.025
+        setConversionRate(Math.round(rateData.rate * (1 + MARGIN) * 10000) / 10000)
+        setConvSymbol(rateData.currency_symbol || selectedCurrency)
+        setRateSource(rateData.source)
       } catch (e) {
         console.error('Rate fetch error:', e)
-        setConversionRate(1); setConvSymbol('$'); setMarginPct(0)
+        setConversionRate(1); setConvSymbol('$')
       } finally {
         setRateLoading(false)
       }

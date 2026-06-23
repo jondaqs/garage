@@ -1,10 +1,11 @@
 /**
  * GET /api/pricing/exchange-rate?currency_code=KES
  *
- * Returns USD→target conversion rate with forex margin.
+ * AUTHENTICATED ONLY — returns USD→target conversion rate.
+ * DB cache first → external API fallback if cache is empty.
  *
- * PUBLIC (unauthenticated): reads from DB cache only — cron keeps it fresh.
- * AUTHENTICATED: DB cache first → external API fallback if cache is stale.
+ * Public pages (pricing) use the get_public_exchange_rate RPC
+ * directly via Supabase client — they don't call this endpoint.
  */
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
@@ -20,152 +21,81 @@ function getServiceClient() {
   )
 }
 
-/**
- * Read rate from DB cache (exchange_rates table via RPC).
- * Returns { rate, source, currency } or null if not cached.
- */
-async function readCachedRate(supabase, targetCode) {
+async function resolveUsdRate(supabase, targetCode) {
   const code = targetCode.toUpperCase()
+  if (code === 'USD') return { rate: 1, source: 'identity', currency: { code: 'USD', symbol: '$', display_name: 'US Dollar' } }
 
   const { data: currencies } = await supabase
-    .from('currencies')
-    .select('id, code, symbol, display_name')
-    .in('code', ['USD', code])
-    .eq('is_active', true)
+    .from('currencies').select('id, code, symbol, display_name')
+    .in('code', ['USD', code]).eq('is_active', true)
 
-  const usdRow    = currencies?.find(c => c.code === 'USD')
-  const targetRow = currencies?.find(c => c.code === code)
+  const usdRow = currencies?.find(c => c.code === 'USD')
+  const target = currencies?.find(c => c.code === code)
+  if (!usdRow || !target) return { error: `Currency ${code} not found`, status: 404 }
 
-  if (!usdRow || !targetRow) return null
-
+  // 1. Try DB cache
   try {
-    const { data: cached, error } = await supabase.rpc('get_cached_exchange_rate', {
-      p_base_currency_id:  usdRow.id,
-      p_quote_currency_id: targetRow.id,
+    const { data: cached } = await supabase.rpc('get_cached_exchange_rate', {
+      p_base_currency_id: usdRow.id, p_quote_currency_id: target.id,
     })
-    if (!error && cached != null && Number(cached) > 0) {
-      return { rate: Number(cached), source: 'cached', currency: targetRow }
+    if (cached != null && Number(cached) > 0) {
+      return { rate: Number(cached), source: 'cached', currency: target }
     }
   } catch { /* cache miss */ }
 
-  return null
-}
-
-/**
- * Fetch from external APIs and cache the result.
- * Only called for authenticated users when DB cache is empty.
- */
-async function fetchAndCacheRate(supabase, targetCode) {
-  const code = targetCode.toUpperCase()
-
-  const { data: currencies } = await supabase
-    .from('currencies')
-    .select('id, code, symbol, display_name')
-    .in('code', ['USD', code])
-    .eq('is_active', true)
-
-  const usdRow    = currencies?.find(c => c.code === 'USD')
-  const targetRow = currencies?.find(c => c.code === code)
-
-  if (!usdRow || !targetRow) {
-    return { error: `Currency ${code} not found`, status: 404 }
-  }
-
-  // Try open.er-api.com
+  // 2. Try open.er-api.com
   try {
     const resp = await fetch('https://open.er-api.com/v6/latest/USD', {
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(8000),
+      headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000),
     })
     if (resp.ok) {
       const json = await resp.json()
-      const externalRate = Number(json?.rates?.[code])
-      if (externalRate && externalRate > 0) {
-        try {
-          await supabase.rpc('upsert_exchange_rate', {
-            p_base_currency_id: usdRow.id, p_quote_currency_id: targetRow.id,
-            p_rate: externalRate, p_source: 'open.er-api.com',
-          })
-        } catch { /* cache write failed */ }
-        return { rate: externalRate, source: 'external', currency: targetRow }
+      const rate = Number(json?.rates?.[code])
+      if (rate > 0) {
+        try { await supabase.rpc('upsert_exchange_rate', { p_base_currency_id: usdRow.id, p_quote_currency_id: target.id, p_rate: rate, p_source: 'open.er-api.com' }) } catch {}
+        return { rate, source: 'open.er-api.com', currency: target }
       }
     }
-  } catch { /* open.er-api failed */ }
+  } catch {}
 
-  // Try exchangerate.host
+  // 3. Try exchangerate.host
   try {
     const apiKey = process.env.EXCHANGERATE_HOST_KEY || ''
     const url = apiKey
       ? `https://api.exchangerate.host/convert?from=USD&to=${code}&amount=1&access_key=${apiKey}`
       : `https://api.exchangerate.host/convert?from=USD&to=${code}&amount=1`
-    const resp = await fetch(url, {
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(8000),
-    })
+    const resp = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
     if (resp.ok) {
       const json = await resp.json()
       const rate = Number(json?.info?.rate ?? json?.result ?? json?.rates?.[code])
-      if (rate && rate > 0) {
-        try {
-          await supabase.rpc('upsert_exchange_rate', {
-            p_base_currency_id: usdRow.id, p_quote_currency_id: targetRow.id,
-            p_rate: rate, p_source: 'exchangerate.host',
-          })
-        } catch { /* cache write failed */ }
-        return { rate, source: 'external', currency: targetRow }
+      if (rate > 0) {
+        try { await supabase.rpc('upsert_exchange_rate', { p_base_currency_id: usdRow.id, p_quote_currency_id: target.id, p_rate: rate, p_source: 'exchangerate.host' }) } catch {}
+        return { rate, source: 'exchangerate.host', currency: target }
       }
     }
-  } catch { /* exchangerate.host failed */ }
+  } catch {}
 
   return { error: `Unable to resolve rate for USD→${code}`, status: 503 }
 }
 
 export async function GET(request) {
   try {
+    // ── Auth required ───────────────────────────────────────────
+    const { createClient: createServerClient } = await import('@/lib/supabase/server')
+    const authClient = await createServerClient()
+    const { data: { user }, error: authErr } = await authClient.auth.getUser()
+    if (authErr || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const targetCode = searchParams.get('currency_code')
-
-    if (!targetCode) {
-      return NextResponse.json({ error: 'currency_code is required' }, { status: 400 })
-    }
-
-    if (targetCode.toUpperCase() === 'USD') {
-      return NextResponse.json({
-        rate: 1, margined_rate: 1,
-        currency_code: 'USD', currency_symbol: '$', display_name: 'US Dollar',
-        source: 'identity',
-      })
-    }
+    if (!targetCode) return NextResponse.json({ error: 'currency_code is required' }, { status: 400 })
 
     const supabase = getServiceClient()
+    const result = await resolveUsdRate(supabase, targetCode)
 
-    // ── Check auth ──────────────────────────────────────────────────
-    let isAuthenticated = false
-    try {
-      const { createClient: createServerClient } = await import('@/lib/supabase/server')
-      const authClient = await createServerClient()
-      const { data: { user } } = await authClient.auth.getUser()
-      isAuthenticated = !!user
-    } catch { /* not authenticated */ }
-
-    // ── 1. Always try DB cache first ────────────────────────────────
-    let result = await readCachedRate(supabase, targetCode)
-
-    // ── 2. Authenticated users get external fallback if cache is empty
-    if (!result && isAuthenticated) {
-      const external = await fetchAndCacheRate(supabase, targetCode)
-      if (external.error) {
-        return NextResponse.json({ error: external.error }, { status: external.status })
-      }
-      result = external
-    }
-
-    // ── 3. Public with no cache → tell them rates aren't available yet
-    if (!result) {
-      return NextResponse.json({
-        error: 'Exchange rate not available yet. Rates are updated automatically — please try again shortly.',
-      }, { status: 503 })
-    }
+    if (result.error) return NextResponse.json({ error: result.error }, { status: result.status })
 
     const marginedRate = result.rate * (1 + FOREX_MARGIN_PCT / 100)
 
@@ -178,11 +108,7 @@ export async function GET(request) {
       source:          result.source,
     })
 
-    // Public: aggressive CDN cache (1 hour). Private: shorter cache.
-    response.headers.set('Cache-Control',
-      isAuthenticated ? 'private, max-age=1800' : 'public, max-age=3600, s-maxage=3600'
-    )
-
+    response.headers.set('Cache-Control', 'private, max-age=1800')
     return response
   } catch (err) {
     console.error('GET /api/pricing/exchange-rate error:', err)
