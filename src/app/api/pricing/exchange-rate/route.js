@@ -10,8 +10,12 @@
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rateLimiter'
 
 const FOREX_MARGIN_PCT = 2.5
+
+// 5 requests per minute per IP — tighter than middleware (which catches page + API together)
+const exchangeRateLimiter = rateLimit({ windowMs: 60_000, max: 5, message: 'Too many exchange rate requests. Please try again in a minute.' })
 
 function getServiceClient() {
   return createServiceClient(
@@ -80,6 +84,10 @@ async function resolveUsdRate(supabase, targetCode) {
 
 export async function GET(request) {
   try {
+    // ── Rate limit ──────────────────────────────────────────────
+    const limited = exchangeRateLimiter.check(request)
+    if (limited) return limited
+
     // ── Auth required ───────────────────────────────────────────
     const { createClient: createServerClient } = await import('@/lib/supabase/server')
     const authClient = await createServerClient()

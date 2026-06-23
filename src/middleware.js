@@ -5,6 +5,9 @@ import { rateLimit } from '@/lib/rateLimiter'
 // Auth pages: 20 requests per minute per IP
 const authLimiter = rateLimit({ windowMs: 60_000, max: 20, message: 'Too many requests. Please slow down and try again.' })
 
+// Exchange rate / pricing: 10 requests per minute per IP
+const rateLimiter = rateLimit({ windowMs: 60_000, max: 10, message: 'Too many rate lookups. Please try again shortly.' })
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl
 
@@ -19,6 +22,14 @@ export async function middleware(request) {
 
   if (isAuthPage) {
     const limited = authLimiter.check(request)
+    if (limited) return limited
+  }
+
+  // ============================================================
+  // Rate-limit exchange rate API + pricing page
+  // ============================================================
+  if (pathname.startsWith('/api/pricing/exchange-rate') || pathname === '/pricing') {
+    const limited = rateLimiter.check(request)
     if (limited) return limited
   }
 
