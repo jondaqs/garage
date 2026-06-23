@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Settings, Plus, Save, Trash2, X, CheckCircle, AlertCircle,
   Loader2, ToggleLeft, ToggleRight, Store, Wrench, DollarSign,
-  Calendar, ClipboardList, ChevronDown, ChevronRight,
+  Calendar, ClipboardList, ChevronDown, ChevronRight, CreditCard,
 } from 'lucide-react'
 
 const TABS = [
@@ -15,6 +15,7 @@ const TABS = [
   { id: 'currencies',     label: 'Currencies',         icon: DollarSign },
   { id: 'booking_types',  label: 'Booking Types',      icon: Calendar },
   { id: 'statuses',       label: 'Status Codes',       icon: ClipboardList },
+  { id: 'payment_accounts', label: 'Payment Accounts', icon: CreditCard },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -410,6 +411,194 @@ export default function AdminSettingsPage() {
           </Section>
         </div>
       )}
+
+      {/* ── Payment Accounts ── */}
+      {tab === 'payment_accounts' && (
+        <PaymentAccountsEditor supabase={supabase} />
+      )}
+    </div>
+  )
+}
+
+function PaymentAccountsEditor({ supabase }) {
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]   = useState(false)
+  const [msg, setMsg]         = useState({ type: '', text: '' })
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: row } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'payment_accounts')
+        .single()
+      setData(row?.setting_value || {
+        mpesa: { enabled: true, paybill_number: '', account_number: '', business_name: '', instructions: '' },
+        bank:  { enabled: true, show_details: false, instructions: 'Bank transfer details will be shared individually.' },
+        card:  { enabled: false, instructions: 'Card payments not yet available.' },
+        cash:  { enabled: true, instructions: 'Cash payments can be made at our offices.' },
+      })
+      setLoading(false)
+    }
+    load()
+  }, [supabase])
+
+  const update = (method, field, value) => {
+    setData(prev => ({ ...prev, [method]: { ...prev[method], [field]: value } }))
+  }
+
+  const save = async () => {
+    setSaving(true); setMsg({ type: '', text: '' })
+    try {
+      const { error } = await supabase
+        .from('platform_settings')
+        .update({ setting_value: data, updated_at: new Date().toISOString() })
+        .eq('setting_key', 'payment_accounts')
+      if (error) throw error
+      setMsg({ type: 'success', text: 'Payment accounts saved.' })
+    } catch (e) {
+      setMsg({ type: 'error', text: e.message })
+    } finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+
+  return (
+    <div className="space-y-6">
+      {msg.text && (
+        <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${msg.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+          {msg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {msg.text}
+        </div>
+      )}
+
+      {/* M-Pesa */}
+      <Section title="M-Pesa" description="Paybill details shown to users when paying via M-Pesa.">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button onClick={() => update('mpesa', 'enabled', !data.mpesa?.enabled)}
+              className="text-gray-500">{data.mpesa?.enabled ? <ToggleRight size={28} className="text-green-600" /> : <ToggleLeft size={28} />}
+            </button>
+            <span className="text-sm font-medium text-gray-700">{data.mpesa?.enabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+          {data.mpesa?.enabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Business Name</label>
+                <input className={inp} value={data.mpesa?.business_name || ''} onChange={e => update('mpesa', 'business_name', e.target.value)} placeholder="e.g. GariCare Ltd" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Paybill Number</label>
+                <input className={inp} value={data.mpesa?.paybill_number || ''} onChange={e => update('mpesa', 'paybill_number', e.target.value)} placeholder="e.g. 123456" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Account Number</label>
+                <input className={inp} value={data.mpesa?.account_number || ''} onChange={e => update('mpesa', 'account_number', e.target.value)} placeholder="e.g. GC-INV-001" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions to User</label>
+                <input className={inp} value={data.mpesa?.instructions || ''} onChange={e => update('mpesa', 'instructions', e.target.value)} placeholder="Send payment to the Paybill..." />
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Bank */}
+      <Section title="Bank Transfer" description="Bank account details for direct bank transfers.">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button onClick={() => update('bank', 'enabled', !data.bank?.enabled)}
+              className="text-gray-500">{data.bank?.enabled ? <ToggleRight size={28} className="text-green-600" /> : <ToggleLeft size={28} />}
+            </button>
+            <span className="text-sm font-medium text-gray-700">{data.bank?.enabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+          {data.bank?.enabled && (
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <button onClick={() => update('bank', 'show_details', !data.bank?.show_details)}
+                  className="text-gray-500">{data.bank?.show_details ? <ToggleRight size={28} className="text-blue-600" /> : <ToggleLeft size={28} />}
+                </button>
+                <span className="text-sm text-gray-600">{data.bank?.show_details ? 'Show bank details to users' : 'Hide bank details — share individually'}</span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Bank Name</label>
+                  <input className={inp} value={data.bank?.bank_name || ''} onChange={e => update('bank', 'bank_name', e.target.value)} placeholder="e.g. Equity Bank" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Account Name</label>
+                  <input className={inp} value={data.bank?.account_name || ''} onChange={e => update('bank', 'account_name', e.target.value)} placeholder="e.g. GariCare Ltd" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Account Number</label>
+                  <input className={inp} value={data.bank?.account_number || ''} onChange={e => update('bank', 'account_number', e.target.value)} placeholder="e.g. 0123456789" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Branch</label>
+                  <input className={inp} value={data.bank?.branch || ''} onChange={e => update('bank', 'branch', e.target.value)} placeholder="e.g. Westlands Branch" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Swift Code</label>
+                  <input className={inp} value={data.bank?.swift_code || ''} onChange={e => update('bank', 'swift_code', e.target.value)} placeholder="e.g. EABORKE1XXX" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions to User</label>
+                <input className={inp} value={data.bank?.instructions || ''} onChange={e => update('bank', 'instructions', e.target.value)}
+                  placeholder={data.bank?.show_details ? 'Transfer to the account above and use invoice number as reference.' : 'Bank transfer details will be shared individually...'} />
+              </div>
+              {!data.bank?.show_details && (
+                <p className="text-[10px] text-amber-600">Bank details are stored but hidden from users. Only the instructions message is shown. Toggle above to display them.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Cash */}
+      <Section title="Cash" description="Instructions for cash payments.">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button onClick={() => update('cash', 'enabled', !data.cash?.enabled)}
+              className="text-gray-500">{data.cash?.enabled ? <ToggleRight size={28} className="text-green-600" /> : <ToggleLeft size={28} />}
+            </button>
+            <span className="text-sm font-medium text-gray-700">{data.cash?.enabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+          {data.cash?.enabled && (
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions</label>
+              <input className={inp} value={data.cash?.instructions || ''} onChange={e => update('cash', 'instructions', e.target.value)} placeholder="Cash payments can be made at..." />
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Card */}
+      <Section title="Card Payment" description="Card payment gateway configuration.">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button onClick={() => update('card', 'enabled', !data.card?.enabled)}
+              className="text-gray-500">{data.card?.enabled ? <ToggleRight size={28} className="text-green-600" /> : <ToggleLeft size={28} />}
+            </button>
+            <span className="text-sm font-medium text-gray-700">{data.card?.enabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+          {data.card?.enabled && (
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions</label>
+              <input className={inp} value={data.card?.instructions || ''} onChange={e => update('card', 'instructions', e.target.value)} placeholder="Card payment instructions..." />
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <div className="flex justify-end">
+        <button onClick={save} disabled={saving}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Payment Settings
+        </button>
+      </div>
     </div>
   )
 }

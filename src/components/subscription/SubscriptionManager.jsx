@@ -82,6 +82,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [payAmount, setPayAmount] = useState('')
   const [payRef, setPayRef] = useState('')
   const [payNotes, setPayNotes] = useState('')
+  const [paymentAccounts, setPaymentAccounts] = useState(null)
 
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
@@ -303,6 +304,15 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   }, [subscriberId, subscriberType])
 
   useEffect(() => { if (subscriberId) loadAll() }, [loadAll, subscriberId])
+
+  // Fetch payment account details (public setting)
+  useEffect(() => {
+    supabase.from('platform_settings')
+      .select('setting_value')
+      .eq('setting_key', 'payment_accounts')
+      .single()
+      .then(({ data }) => { if (data) setPaymentAccounts(data.setting_value) })
+  }, [supabase])
 
   // Fetch exchange rate when display currency changes
   useEffect(() => {
@@ -1300,6 +1310,63 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                     </button>
                                   ))}
                                 </div>
+
+                                {/* Payment account details */}
+                                {paymentAccounts && paymentAccounts[payMethod] && (
+                                  <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs space-y-1.5">
+                                    {payMethod === 'mpesa' && paymentAccounts.mpesa?.paybill_number && (
+                                      <>
+                                        {paymentAccounts.mpesa.business_name && (
+                                          <p className="font-semibold text-gray-800">{paymentAccounts.mpesa.business_name}</p>
+                                        )}
+                                        <div className="flex gap-4">
+                                          <div>
+                                            <span className="text-gray-500">Paybill: </span>
+                                            <span className="font-bold text-gray-900 select-all">{paymentAccounts.mpesa.paybill_number}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-gray-500">Account: </span>
+                                            <span className="font-bold text-gray-900 select-all">{paymentAccounts.mpesa.account_number}</span>
+                                          </div>
+                                        </div>
+                                        {paymentAccounts.mpesa.instructions && (
+                                          <p className="text-gray-500">{paymentAccounts.mpesa.instructions}</p>
+                                        )}
+                                      </>
+                                    )}
+                                    {payMethod === 'bank' && (
+                                      <>
+                                        {paymentAccounts.bank?.show_details && paymentAccounts.bank?.bank_name ? (
+                                          <>
+                                            <p className="font-semibold text-gray-800">{paymentAccounts.bank.account_name || paymentAccounts.bank.bank_name}</p>
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                              <div><span className="text-gray-500">Bank: </span><span className="font-bold text-gray-900">{paymentAccounts.bank.bank_name}</span></div>
+                                              <div><span className="text-gray-500">Account: </span><span className="font-bold text-gray-900 select-all">{paymentAccounts.bank.account_number}</span></div>
+                                              {paymentAccounts.bank.branch && (
+                                                <div><span className="text-gray-500">Branch: </span><span className="text-gray-900">{paymentAccounts.bank.branch}</span></div>
+                                              )}
+                                              {paymentAccounts.bank.swift_code && (
+                                                <div><span className="text-gray-500">Swift: </span><span className="text-gray-900 select-all">{paymentAccounts.bank.swift_code}</span></div>
+                                              )}
+                                            </div>
+                                            {paymentAccounts.bank.instructions && (
+                                              <p className="text-gray-500">{paymentAccounts.bank.instructions}</p>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <p className="text-gray-600">{paymentAccounts.bank?.instructions || 'Bank details will be shared individually.'}</p>
+                                        )}
+                                      </>
+                                    )}
+                                    {payMethod === 'cash' && paymentAccounts.cash?.instructions && (
+                                      <p className="text-gray-600">{paymentAccounts.cash.instructions}</p>
+                                    )}
+                                    {payMethod === 'card' && paymentAccounts.card?.instructions && (
+                                      <p className="text-gray-600">{paymentAccounts.card.instructions}</p>
+                                    )}
+                                  </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
                                     <label className="text-xs font-semibold text-gray-600 block mb-1.5">
