@@ -78,14 +78,20 @@ export async function POST(request) {
     let payAmountKes = Math.ceil(Number(amount || invoiceBalance))
     let exchangeRate = null
 
+    // Forex margin — must match the margin used by the UI display
+    // (see /api/pricing/exchange-rate → FOREX_MARGIN_PCT)
+    const FOREX_MARGIN_PCT = 2.5
+
     if (invoiceCurrency !== 'KES') {
       // Invoice is in foreign currency (e.g. USD) — convert to KES
       const { data: rateData } = await sc.rpc('get_public_exchange_rate', {
         p_target_code: 'KES',
       })
       if (rateData?.rate && rateData.rate > 0) {
-        exchangeRate = rateData.rate
-        payAmountKes = Math.ceil(invoiceBalance * rateData.rate)
+        // Apply the same forex margin the UI shows so the prompted amount matches
+        const margined = rateData.rate * (1 + FOREX_MARGIN_PCT / 100)
+        exchangeRate = margined
+        payAmountKes = Math.ceil(invoiceBalance * margined)
       } else {
         return NextResponse.json({
           error: `Cannot convert ${invoiceCurrency} to KES — exchange rate not available. Please try again later.`,
