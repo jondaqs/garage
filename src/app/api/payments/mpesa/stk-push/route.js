@@ -72,9 +72,28 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invoice is already paid' }, { status: 400 })
     }
 
-    // Determine amount — use provided amount or invoice balance
-    const payAmount = Math.ceil(Number(amount || invoice.balance_due || invoice.total_amount))
-    if (payAmount <= 0) {
+    // Determine amount in KES (M-Pesa always operates in KES)
+    const invoiceBalance = Number(invoice.balance_due || invoice.total_amount)
+    const invoiceCurrency = invoice.currency_code || 'KES'
+    let payAmountKes = Math.ceil(Number(amount || invoiceBalance))
+    let exchangeRate = null
+
+    if (invoiceCurrency !== 'KES') {
+      // Invoice is in foreign currency (e.g. USD) — convert to KES
+      const { data: rateData } = await sc.rpc('get_public_exchange_rate', {
+        p_target_code: 'KES',
+      })
+      if (rateData?.rate && rateData.rate > 0) {
+        exchangeRate = rateData.rate
+        payAmountKes = Math.ceil(invoiceBalance * rateData.rate)
+      } else {
+        return NextResponse.json({
+          error: `Cannot convert ${invoiceCurrency} to KES — exchange rate not available. Please try again later.`,
+        }, { status: 503 })
+      }
+    }
+
+    if (payAmountKes <= 0) {
       return NextResponse.json({ error: 'Invalid payment amount' }, { status: 400 })
     }
 
@@ -108,9 +127,10 @@ export async function POST(request) {
         invoice_ref_no: invoice.invoice_ref_no,
         user_id: profile.id,
         phone_number: formattedPhone,
-        amount: payAmount,
+        amount: payAmountKes,
         account_reference: invoice.invoice_ref_no?.substring(0, 12) || 'GariCare',
         idempotency_key: idempotencyKey,
+        exchange_rate: exchangeRate,
         status: 'pending',
       })
       .select('id')
@@ -124,7 +144,7 @@ export async function POST(request) {
     // Initiate STK push
     const result = await initiateStkPush({
       phoneNumber: formattedPhone,
-      amount: payAmount,
+      amount: payAmountKes,
       accountReference: invoice.invoice_ref_no?.substring(0, 12) || 'GariCare',
       transactionDesc: 'Subscription',
       callbackUrl,
@@ -152,6 +172,7 @@ export async function POST(request) {
       transactionId: tx.id,
       checkoutRequestId: result.data.checkoutRequestId,
       customerMessage: result.data.customerMessage,
+      amountKes: payAmountKes,
     })
   } catch (err) {
     console.error('[stk-push] error:', err)

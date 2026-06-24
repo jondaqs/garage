@@ -1437,102 +1437,115 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                   </div>
                                 )}
 
-                                {/* ── M-Pesa STK Push flow ── */}
-                                {payMethod === 'mpesa' && stkState !== 'idle' ? (
-                                  <div className="text-center py-4 space-y-3">
-                                    {stkState === 'initiating' && (
-                                      <>
-                                        <Loader2 size={32} className="animate-spin text-green-600 mx-auto" />
-                                        <p className="text-sm font-medium text-gray-700">Sending payment request to your phone...</p>
-                                      </>
-                                    )}
-                                    {stkState === 'waiting' && (
-                                      <>
-                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                                          <Smartphone size={28} className="text-green-600" />
-                                        </div>
-                                        <p className="text-sm font-semibold text-gray-800">Check your phone</p>
-                                        <p className="text-xs text-gray-500">Enter your M-Pesa PIN to complete the payment</p>
-                                        <Loader2 size={16} className="animate-spin text-gray-400 mx-auto" />
-                                        <p className="text-[10px] text-gray-400">Waiting for confirmation...</p>
-                                      </>
-                                    )}
-                                    {stkState === 'success' && (
-                                      <>
-                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                                          <BadgeCheck size={28} className="text-green-600" />
-                                        </div>
-                                        <p className="text-sm font-semibold text-green-700">Payment Confirmed!</p>
-                                        {stkReceipt && <p className="text-xs text-gray-500">M-Pesa Receipt: {stkReceipt}</p>}
-                                      </>
-                                    )}
-                                    {(stkState === 'failed' || stkState === 'timeout') && (
-                                      <>
-                                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-                                          <AlertCircle size={28} className="text-red-500" />
-                                        </div>
-                                        <p className="text-sm font-semibold text-red-700">
-                                          {stkState === 'timeout' ? 'Request timed out' : 'Payment failed'}
-                                        </p>
-                                        <p className="text-xs text-gray-500">{stkError}</p>
-                                        <button onClick={resetStkState}
-                                          className="text-sm text-blue-600 font-medium hover:underline">
-                                          Try again
-                                        </button>
-                                      </>
+                                {/* ── Manual payment recording (all methods) ── */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">
+                                      Amount ({inv.currency_code})
+                                    </label>
+                                    <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
+                                    {invConverted(inv.currency_code) && payAmount && (
+                                      <p className="text-[10px] text-gray-400 mt-1">≈ {fmtC(payAmount)}</p>
                                     )}
                                   </div>
-                                ) : (
-                                  <>
-                                    {/* ── Phone input for M-Pesa ── */}
-                                    {payMethod === 'mpesa' && (
-                                      <div>
-                                        <label className="text-xs font-semibold text-gray-600 block mb-1.5">M-Pesa Phone Number</label>
-                                        <input type="tel" value={mpesaPhone} onChange={e => setMpesaPhone(e.target.value)}
-                                          placeholder="0712345678" className={inp} />
-                                        <p className="text-[10px] text-gray-400 mt-1">You will receive an STK push prompt on this number</p>
-                                      </div>
-                                    )}
+                                  <div>
+                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
+                                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. QXZ12345" className={inp} />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-xs font-semibold text-gray-600 block mb-1.5">Notes (optional)</label>
+                                  <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={handlePayment} disabled={paying}
+                                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+                                    {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Record Payment
+                                  </button>
+                                  <button onClick={() => { setPayingInvoiceId(null); resetStkState() }}
+                                    className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+                                </div>
+                                {payMethod === 'mpesa' && (
+                                  <p className="text-[10px] text-gray-400">Recording a manual payment requires admin confirmation of receipt.</p>
+                                )}
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div>
-                                        <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-                                          Amount ({inv.currency_code})
-                                        </label>
-                                        <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className={inp} />
-                                        {invConverted(inv.currency_code) && payAmount && (
-                                          <p className="text-[10px] text-gray-400 mt-1">≈ {fmtC(payAmount)}</p>
+                                {/* ── M-Pesa STK Push — instant payment ── */}
+                                {payMethod === 'mpesa' && (
+                                  <>
+                                    <div className="flex items-center gap-3 my-2">
+                                      <div className="flex-1 border-t border-gray-200" />
+                                      <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">or pay instantly</span>
+                                      <div className="flex-1 border-t border-gray-200" />
+                                    </div>
+
+                                    {stkState !== 'idle' ? (
+                                      <div className="text-center py-4 space-y-3 bg-gray-50 rounded-xl">
+                                        {stkState === 'initiating' && (
+                                          <>
+                                            <Loader2 size={32} className="animate-spin text-green-600 mx-auto" />
+                                            <p className="text-sm font-medium text-gray-700">Sending payment request to your phone...</p>
+                                          </>
+                                        )}
+                                        {stkState === 'waiting' && (
+                                          <>
+                                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                              <Smartphone size={28} className="text-green-600" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-gray-800">Check your phone</p>
+                                            <p className="text-xs text-gray-500">Enter your M-Pesa PIN to complete the payment</p>
+                                            <Loader2 size={16} className="animate-spin text-gray-400 mx-auto" />
+                                            <p className="text-[10px] text-gray-400">Waiting for confirmation...</p>
+                                          </>
+                                        )}
+                                        {stkState === 'success' && (
+                                          <>
+                                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                              <BadgeCheck size={28} className="text-green-600" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-green-700">Payment Confirmed!</p>
+                                            {stkReceipt && <p className="text-xs text-gray-500">M-Pesa Receipt: {stkReceipt}</p>}
+                                            <p className="text-[10px] text-green-600">Receipt auto-confirmed — no admin action needed.</p>
+                                          </>
+                                        )}
+                                        {(stkState === 'failed' || stkState === 'timeout') && (
+                                          <>
+                                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                                              <AlertCircle size={28} className="text-red-500" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-red-700">
+                                              {stkState === 'timeout' ? 'Request timed out' : 'Payment failed'}
+                                            </p>
+                                            <p className="text-xs text-gray-500">{stkError}</p>
+                                            <button onClick={resetStkState}
+                                              className="text-sm text-blue-600 font-medium hover:underline">Try again</button>
+                                          </>
                                         )}
                                       </div>
-                                      {payMethod !== 'mpesa' && (
-                                        <div>
-                                          <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
-                                          <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. QXZ12345" className={inp} />
+                                    ) : (
+                                      <div className="bg-green-50 border border-green-100 rounded-xl p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                          <Smartphone size={16} className="text-green-700" />
+                                          <span className="text-sm font-semibold text-green-800">M-Pesa STK Push</span>
+                                          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Auto-confirmed</span>
                                         </div>
-                                      )}
-                                    </div>
-                                    {payMethod !== 'mpesa' && (
-                                      <div>
-                                        <label className="text-xs font-semibold text-gray-600 block mb-1.5">Notes (optional)</label>
-                                        <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
-                                      </div>
-                                    )}
-                                    <div className="flex gap-2">
-                                      {payMethod === 'mpesa' ? (
+                                        <div>
+                                          <label className="text-xs font-semibold text-gray-600 block mb-1.5">Phone Number</label>
+                                          <input type="tel" value={mpesaPhone} onChange={e => setMpesaPhone(e.target.value)}
+                                            placeholder="0712345678" className={inp} />
+                                        </div>
+                                        {invConverted(inv.currency_code) && (
+                                          <p className="text-xs text-green-700">
+                                            You will be prompted to pay <strong>KES {cv(inv.balance_due || inv.total_amount).toLocaleString()}</strong> on your phone
+                                          </p>
+                                        )}
                                         <button onClick={() => handleMpesaPay(inv.id, payAmount)}
-                                          disabled={paying || !mpesaPhone.trim() || !payAmount}
-                                          className="flex items-center gap-1.5 px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
+                                          disabled={paying || !mpesaPhone.trim()}
+                                          className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
                                           <Smartphone size={14} /> Pay with M-Pesa
                                         </button>
-                                      ) : (
-                                        <button onClick={handlePayment} disabled={paying}
-                                          className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
-                                          {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Confirm Payment
-                                        </button>
-                                      )}
-                                      <button onClick={() => { setPayingInvoiceId(null); resetStkState() }}
-                                        className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
-                                    </div>
+                                        <p className="text-[10px] text-green-600">Payment is verified automatically — no admin confirmation required.</p>
+                                      </div>
+                                    )}
                                   </>
                                 )}
                               </div>
