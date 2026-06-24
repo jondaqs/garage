@@ -553,7 +553,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             stkPollRef.current = null
             setStkState('success')
             setStkReceipt(status.mpesaReceipt)
-            setSuccess(`Payment confirmed! M-Pesa receipt: ${status.mpesaReceipt}`)
+            setSuccess(status.mpesaReceipt
+              ? `Payment confirmed! Receipt: ${status.mpesaReceipt}`
+              : 'Payment confirmed! Your subscription is now active.')
             setPayingInvoiceId(null); setMpesaPhone('')
             await loadAll()
           } else if (status.status === 'failed') {

@@ -76,19 +76,16 @@ export async function POST(request) {
 
           if (stkResult.success) {
             // Safaricom confirms payment — process it now (callback was missed)
+            // Note: STK Query API does NOT return the M-Pesa receipt number —
+            // that only comes via the callback payload. We proceed without it;
+            // if the callback arrives later it will update the receipt number.
             console.info(`[mpesa-status] Active verify: payment confirmed for ${tx.checkout_request_id}`)
-
-            // Extract receipt from STK query if available
-            const receiptFromQuery = stkResult.raw?.CallbackMetadata?.Item?.find(
-              i => i.Name === 'MpesaReceiptNumber'
-            )?.Value || null
 
             // Update transaction to callback_received first
             await sc.from('mpesa_transactions').update({
               status: 'callback_received',
               result_code: 0,
               result_desc: 'Verified via active STK query (callback missed)',
-              mpesa_receipt_number: receiptFromQuery || tx.mpesa_receipt_number,
               updated_at: new Date().toISOString(),
             }).eq('id', tx.id)
 
@@ -102,12 +99,22 @@ export async function POST(request) {
                 .select('id, status, result_desc, mpesa_receipt_number, amount, verified_at, subscription_payment_id')
                 .eq('id', tx.id).single()
 
+              // Get payment reference as fallback when M-Pesa receipt is unavailable
+              let paymentRef = null
+              if (updated?.subscription_payment_id) {
+                const { data: payment } = await sc.from('subscription_payments')
+                  .select('payment_ref_id')
+                  .eq('id', updated.subscription_payment_id)
+                  .single()
+                paymentRef = payment?.payment_ref_id || null
+              }
+
               if (updated) {
                 return NextResponse.json({
                   transactionId: updated.id,
                   status: updated.status,
                   resultDesc: updated.result_desc,
-                  mpesaReceipt: updated.mpesa_receipt_number,
+                  mpesaReceipt: updated.mpesa_receipt_number || paymentRef,
                   amount: updated.amount,
                   verifiedAt: updated.verified_at,
                   paymentRecorded: !!updated.subscription_payment_id,
@@ -183,12 +190,22 @@ export async function POST(request) {
             .select('id, status, result_desc, mpesa_receipt_number, amount, verified_at, subscription_payment_id')
             .eq('id', tx.id).single()
 
+          // Get payment reference as fallback
+          let paymentRef = null
+          if (updated?.subscription_payment_id) {
+            const { data: payment } = await sc.from('subscription_payments')
+              .select('payment_ref_id')
+              .eq('id', updated.subscription_payment_id)
+              .single()
+            paymentRef = payment?.payment_ref_id || null
+          }
+
           if (updated) {
             return NextResponse.json({
               transactionId: updated.id,
               status: updated.status,
               resultDesc: updated.result_desc,
-              mpesaReceipt: updated.mpesa_receipt_number,
+              mpesaReceipt: updated.mpesa_receipt_number || paymentRef,
               amount: updated.amount,
               verifiedAt: updated.verified_at,
               paymentRecorded: !!updated.subscription_payment_id,
@@ -202,11 +219,21 @@ export async function POST(request) {
     }
 
     // ── Return current status from DB ───────────────────────────
+    // Include payment ref fallback for verified transactions without M-Pesa receipt
+    let fallbackReceipt = null
+    if (tx.status === 'verified' && !tx.mpesa_receipt_number && tx.subscription_payment_id) {
+      const { data: payment } = await sc.from('subscription_payments')
+        .select('payment_ref_id')
+        .eq('id', tx.subscription_payment_id)
+        .single()
+      fallbackReceipt = payment?.payment_ref_id || null
+    }
+
     return NextResponse.json({
       transactionId: tx.id,
       status: tx.status,
       resultDesc: tx.result_desc,
-      mpesaReceipt: tx.status === 'verified' ? tx.mpesa_receipt_number : null,
+      mpesaReceipt: tx.status === 'verified' ? (tx.mpesa_receipt_number || fallbackReceipt) : null,
       amount: tx.amount,
       verifiedAt: tx.verified_at,
       paymentRecorded: !!tx.subscription_payment_id,
