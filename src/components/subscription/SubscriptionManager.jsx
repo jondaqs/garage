@@ -90,6 +90,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [stkError, setStkError] = useState('')
   const [stkCheckoutId, setStkCheckoutId] = useState(null)
   const [stkReceipt, setStkReceipt] = useState(null)
+  const stkPollRef = useRef(null) // ref for polling interval cleanup
 
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
@@ -497,9 +498,25 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   }
 
   // ── M-Pesa STK Push handler ─────────────────────────────────
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (stkPollRef.current) {
+        clearInterval(stkPollRef.current)
+        stkPollRef.current = null
+      }
+    }
+  }, [])
+
   const handleMpesaPay = async (invoiceId, amount) => {
     if (!mpesaPhone.trim()) { setError('Enter your M-Pesa phone number'); return }
     setStkState('initiating'); setStkError(''); setError('')
+
+    // Clear any previous polling interval
+    if (stkPollRef.current) {
+      clearInterval(stkPollRef.current)
+      stkPollRef.current = null
+    }
 
     try {
       const res = await fetch('/api/payments/mpesa/stk-push', {
@@ -515,9 +532,12 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       setStkCheckoutId(data.checkoutRequestId)
       setStkState('waiting')
 
-      // Poll for result every 3 seconds, max 90 seconds
+      // Poll for result every 3 seconds, max 120 seconds
+      // Uses ref-tracked variable to avoid stale closure on stkState
       let elapsed = 0
+      let resolved = false
       const pollId = setInterval(async () => {
+        if (resolved) return
         elapsed += 3000
         try {
           const statusRes = await fetch('/api/payments/mpesa/status', {
@@ -528,27 +548,35 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
           const status = await statusRes.json()
 
           if (status.status === 'verified') {
+            resolved = true
             clearInterval(pollId)
+            stkPollRef.current = null
             setStkState('success')
             setStkReceipt(status.mpesaReceipt)
             setSuccess(`Payment confirmed! M-Pesa receipt: ${status.mpesaReceipt}`)
             setPayingInvoiceId(null); setMpesaPhone('')
             await loadAll()
           } else if (status.status === 'failed') {
+            resolved = true
             clearInterval(pollId)
+            stkPollRef.current = null
             setStkState('failed')
             setStkError(status.resultDesc || 'Payment was not completed')
           }
+          // 'callback_received' = payment received, still processing → keep polling
+          // 'pending' = waiting for user or callback → keep polling
         } catch { /* polling error — keep trying */ }
 
-        if (elapsed >= 90000) {
+        if (!resolved && elapsed >= 120000) {
+          resolved = true
           clearInterval(pollId)
-          if (stkState === 'waiting') {
-            setStkState('timeout')
-            setStkError('Payment confirmation timed out. If you completed the payment, it will be processed shortly.')
-          }
+          stkPollRef.current = null
+          setStkState('timeout')
+          setStkError('Payment confirmation timed out. If you completed the payment, it will be processed shortly — check back in a moment.')
         }
       }, 3000)
+
+      stkPollRef.current = pollId
     } catch (e) {
       setStkState('failed')
       setStkError(e.message)
@@ -556,6 +584,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   }
 
   const resetStkState = () => {
+    if (stkPollRef.current) {
+      clearInterval(stkPollRef.current)
+      stkPollRef.current = null
+    }
     setStkState('idle'); setStkError(''); setStkCheckoutId(null); setStkReceipt(null)
   }
 

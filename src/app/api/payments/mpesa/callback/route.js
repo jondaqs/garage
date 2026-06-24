@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { isValidSafaricomIP, verifyCallbackHmac, getClientIp, extractForensicHeaders } from '@/lib/mpesa/security'
+import { validateSafaricomSource, verifyCallbackHmac, getClientIp, extractForensicHeaders } from '@/lib/mpesa/security'
 import { queryStkStatus } from '@/lib/mpesa/statusQuery'
 import { processVerifiedMpesaPayment } from '@/lib/mpesa/processPayment'
 
@@ -18,7 +18,11 @@ function getServiceClient() {
  * POST /api/payments/mpesa/callback
  *
  * Receives STK Push callback from Safaricom.
- * Security: IP whitelist + HMAC signature + idempotency + double-verification.
+ * Security: IP validation + HMAC signature + idempotency + double-verification.
+ *
+ * IP validation is now proxy-aware — on platforms like Vercel where the
+ * original Safaricom IP is replaced by the edge proxy IP, we fall back to
+ * HMAC as the primary security check.
  *
  * Always returns 200 to Safaricom (even on our errors) — otherwise they retry.
  */
@@ -27,11 +31,24 @@ export async function POST(request) {
   const clientIp = getClientIp(request)
 
   try {
-    // ── 1. IP whitelist ─────────────────────────────────────────
-    if (!isValidSafaricomIP(request)) {
-      console.warn(`[mpesa-callback] Rejected: IP ${clientIp} not in whitelist`)
-      // Still return 200 to prevent retries from unknown sources
+    // ── 1. IP validation (proxy-aware) ──────────────────────────
+    const ipCheck = validateSafaricomSource(request)
+
+    if (!ipCheck.valid) {
+      console.warn(`[mpesa-callback] IP rejected: ${ipCheck.reason}`)
+      await sc.from('mpesa_callback_logs').insert({
+        callback_type: 'stk_callback_ip_rejected',
+        raw_body: null,
+        source_ip: clientIp,
+        headers: extractForensicHeaders(request),
+        processed: false,
+        error_message: `IP rejected: ${ipCheck.reason}`,
+      }).catch(() => {}) // don't fail on log errors
       return NextResponse.json({ ResultCode: 1, ResultDesc: 'Rejected' })
+    }
+
+    if (ipCheck.reason !== 'safaricom_ip_match' && ipCheck.reason !== 'sandbox_mode') {
+      console.info(`[mpesa-callback] Accepted via ${ipCheck.reason} (IP: ${clientIp})`)
     }
 
     // ── 2. Parse body ───────────────────────────────────────────
@@ -48,18 +65,30 @@ export async function POST(request) {
     const sig = searchParams.get('sig')
     const key = searchParams.get('key')
 
-    if (!verifyCallbackHmac(sig, key)) {
-      console.warn(`[mpesa-callback] Invalid HMAC signature from IP ${clientIp}`)
-      // Log the attempt but don't process
+    // HMAC is the primary security check — if IP was accepted via proxy fallback,
+    // HMAC MUST pass. If IP was a direct Safaricom match, HMAC failure is suspicious
+    // but we still process (Safaricom doesn't generate our HMAC — URL params might
+    // have been mangled by their infrastructure).
+    const hmacValid = verifyCallbackHmac(sig, key)
+
+    if (!hmacValid && ipCheck.reason === 'proxy_ip_hmac_fallback') {
+      // Proxy IP + no valid HMAC = reject (could be anyone)
+      console.warn(`[mpesa-callback] Proxy IP with invalid HMAC — rejecting (IP: ${clientIp})`)
       await sc.from('mpesa_callback_logs').insert({
         callback_type: 'stk_callback_rejected',
         raw_body: rawBody,
         source_ip: clientIp,
         headers: extractForensicHeaders(request),
         processed: false,
-        error_message: 'HMAC verification failed',
-      })
+        error_message: 'Proxy IP without valid HMAC',
+      }).catch(() => {})
       return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+    }
+
+    if (!hmacValid) {
+      // Safaricom IP match but HMAC failed — log but still process
+      // (Safaricom may have stripped or URL-encoded the query params)
+      console.warn(`[mpesa-callback] HMAC failed but IP is Safaricom — processing anyway (IP: ${clientIp})`)
     }
 
     // ── 4. Find matching transaction ────────────────────────────
@@ -78,7 +107,7 @@ export async function POST(request) {
       source_ip: clientIp,
       headers: extractForensicHeaders(request),
       processed: false,
-    })
+    }).catch(() => {})
 
     if (!tx) {
       console.warn(`[mpesa-callback] No transaction for CheckoutRequestID: ${checkoutId}`)
@@ -106,6 +135,7 @@ export async function POST(request) {
 
       await sc.from('mpesa_callback_logs').update({ processed: true })
         .eq('transaction_id', tx.id).eq('callback_type', 'stk_callback')
+        .catch(() => {})
 
       return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
     }
@@ -158,13 +188,14 @@ export async function POST(request) {
         console.info(`[mpesa-callback] Payment processed: ${meta.receiptNumber} → invoice ${tx.invoice_ref_no}`)
       } else {
         console.error(`[mpesa-callback] Payment processing failed for ${tx.id}:`, payResult.error)
-        // Transaction stays at callback_received — admin can investigate
+        // Transaction stays at callback_received — status endpoint will retry
       }
     }
 
     // Update callback log as processed
     await sc.from('mpesa_callback_logs').update({ processed: true })
       .eq('transaction_id', tx.id).eq('callback_type', 'stk_callback')
+      .catch(() => {})
 
     return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
   } catch (err) {

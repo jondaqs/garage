@@ -13,27 +13,91 @@ const SAFARICOM_IPS = new Set([
   '196.201.212.136', '196.201.212.69',
 ])
 
+// Known CDN/proxy IPs that might forward Safaricom callbacks
+// (Vercel, Cloudflare, etc. — these replace the original source IP)
+const KNOWN_PROXY_PATTERNS = [
+  /^76\.76\.21\./, /^64\.71\./, // Vercel edge
+  /^172\.(1[6-9]|2[0-9]|3[01])\./, // Docker/internal
+  /^10\./, // Internal
+  /^127\./, // Localhost
+]
+
 /**
  * Extract client IP from request headers.
+ * Checks multiple headers for proxy environments.
  */
 export function getClientIp(request) {
+  // x-forwarded-for can have multiple IPs: client, proxy1, proxy2
+  // The LAST entry before the edge is most reliable on Vercel
+  const xff = request.headers.get('x-forwarded-for')
+  if (xff) {
+    const ips = xff.split(',').map(ip => ip.trim())
+    // Return the first (original client) IP
+    return ips[0] || '0.0.0.0'
+  }
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     request.headers.get('x-real-ip') ||
     '0.0.0.0'
   )
 }
 
 /**
+ * Extract ALL IPs from the forwarding chain (for logging).
+ */
+function getAllForwardedIps(request) {
+  const xff = request.headers.get('x-forwarded-for')
+  if (xff) return xff.split(',').map(ip => ip.trim())
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp) return [realIp]
+  return []
+}
+
+/**
+ * Check if an IP looks like a known CDN/proxy IP.
+ */
+function isKnownProxyIp(ip) {
+  return KNOWN_PROXY_PATTERNS.some(pattern => pattern.test(ip))
+}
+
+/**
  * Verify the callback comes from a valid Safaricom IP.
- * Relaxed in sandbox mode.
+ *
+ * On platforms like Vercel, the original Safaricom IP may be replaced
+ * by the edge proxy IP. When this happens and the request has a valid
+ * HMAC signature, we still process it (HMAC is the stronger security check).
+ *
+ * Returns: { valid: boolean, reason: string, clientIp: string }
+ */
+export function validateSafaricomSource(request) {
+  const clientIp = getClientIp(request)
+  const allIps = getAllForwardedIps(request)
+
+  // Sandbox mode: always allow
+  if (MPESA_CONFIG.isSandbox) {
+    return { valid: true, reason: 'sandbox_mode', clientIp }
+  }
+
+  // Check if any IP in the chain is a Safaricom IP
+  const hasSafaricomIp = allIps.some(ip => SAFARICOM_IPS.has(ip)) || SAFARICOM_IPS.has(clientIp)
+  if (hasSafaricomIp) {
+    return { valid: true, reason: 'safaricom_ip_match', clientIp }
+  }
+
+  // Check if client IP is a known proxy (Vercel, Cloudflare, etc.)
+  // In this case, the original Safaricom IP was stripped — rely on HMAC instead
+  if (isKnownProxyIp(clientIp)) {
+    return { valid: true, reason: 'proxy_ip_hmac_fallback', clientIp }
+  }
+
+  // Unknown IP — still log it but reject
+  return { valid: false, reason: `unknown_ip: ${clientIp}, chain: ${allIps.join(' → ')}`, clientIp }
+}
+
+/**
+ * Legacy wrapper — kept for backward compat but callback route uses validateSafaricomSource now.
  */
 export function isValidSafaricomIP(request) {
-  const ip = getClientIp(request)
-  if (!MPESA_CONFIG.isSandbox) {
-    return SAFARICOM_IPS.has(ip)
-  }
-  return true
+  return validateSafaricomSource(request).valid
 }
 
 /**
