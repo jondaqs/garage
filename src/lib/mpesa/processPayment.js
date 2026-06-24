@@ -120,8 +120,8 @@ export async function processVerifiedMpesaPayment(transactionId) {
     p_invoice_id:     tx.invoice_id,
     p_amount:         paymentInInvoiceCurrency,
     p_paid_via:       'mpesa',
-    p_transaction_id: tx.mpesa_receipt_number,
-    p_notes:          `M-Pesa ${tx.transaction_type === 'stk_push' ? 'STK Push' : 'Paybill'} — ${tx.mpesa_receipt_number} (KES ${paidKes.toLocaleString()})`,
+    p_transaction_id: tx.mpesa_receipt_number || tx.checkout_request_id,
+    p_notes:          `M-Pesa ${tx.transaction_type === 'stk_push' ? 'STK Push' : 'Paybill'}${tx.mpesa_receipt_number ? ' — ' + tx.mpesa_receipt_number : ''} (KES ${paidKes.toLocaleString()})`,
     p_paid_by:        paidBy,
   })
 
