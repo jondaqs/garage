@@ -759,6 +759,7 @@ function PaymentAccountsEditor({ supabase }) {
         .single()
       setData(row?.setting_value || {
         mpesa: { enabled: true, paybill_number: '', account_number: '', business_name: '', instructions: '' },
+        mpesa_stk: { enabled: true, instructions: '' },
         bank:  { enabled: true, show_details: false, instructions: 'Bank transfer details will be shared individually.' },
         card:  { enabled: false, instructions: 'Card payments not yet available.' },
         cash:  { enabled: true, instructions: 'Cash payments can be made at our offices.' },
@@ -798,7 +799,7 @@ function PaymentAccountsEditor({ supabase }) {
       )}
 
       {/* M-Pesa */}
-      <Section title="M-Pesa" description="Paybill details shown to users when paying via M-Pesa.">
+      <Section title="M-Pesa (Manual Paybill)" description="Paybill details shown to users when recording a manual M-Pesa payment. Requires admin confirmation.">
         <div className="space-y-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <button onClick={() => update('mpesa', 'enabled', !data.mpesa?.enabled)}
@@ -824,6 +825,31 @@ function PaymentAccountsEditor({ supabase }) {
                 <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions to User</label>
                 <input className={inp} value={data.mpesa?.instructions || ''} onChange={e => update('mpesa', 'instructions', e.target.value)} placeholder="Send payment to the Paybill..." />
               </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* M-Pesa STK Push */}
+      <Section title="M-Pesa STK Push (Instant)" description="Sends a payment prompt directly to the user's phone. Payment is verified automatically by Safaricom — no admin confirmation needed. Requires M-Pesa Setup to be configured.">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button onClick={() => update('mpesa_stk', 'enabled', !data.mpesa_stk?.enabled)}
+              className="text-gray-500">{data.mpesa_stk?.enabled ? <ToggleRight size={28} className="text-green-600" /> : <ToggleLeft size={28} />}
+            </button>
+            <span className="text-sm font-medium text-gray-700">{data.mpesa_stk?.enabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+          {data.mpesa_stk?.enabled && (
+            <div className="space-y-3">
+              <div className="bg-green-50 border border-green-100 rounded-lg p-3 text-xs text-green-700 space-y-1">
+                <p className="font-semibold">How it works:</p>
+                <p>When a user clicks &ldquo;Pay with M-Pesa&rdquo;, an STK push is sent to their phone. They enter their PIN, and the payment is confirmed automatically. No receipt confirmation is needed.</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions (optional)</label>
+                <input className={inp} value={data.mpesa_stk?.instructions || ''} onChange={e => update('mpesa_stk', 'instructions', e.target.value)} placeholder="Enter your Safaricom number to receive the payment prompt..." />
+              </div>
+              <p className="text-[10px] text-amber-600">Ensure M-Pesa Setup (API credentials, shortcode, passkey) is configured in the M-Pesa Setup tab for STK Push to work.</p>
             </div>
           )}
         </div>

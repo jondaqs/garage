@@ -30,10 +30,10 @@ import SubscriptionTicketModal from '@/components/subscription/SubscriptionTicke
 import { detectCurrencyFromBrowser, matchCurrencyInList } from '@/lib/currency/detectCurrency'
 
 const PAYMENT_METHODS = [
-  { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard },
-  { value: 'cash',          label: 'Cash',      icon: Banknote },
-  { value: 'card',          label: 'Card',      icon: CreditCard },
-  { value: 'bank_transfer', label: 'Bank',      icon: Building2 },
+  { value: 'mpesa',         label: 'M-Pesa',   icon: CreditCard,  accountKey: 'mpesa' },
+  { value: 'cash',          label: 'Cash',      icon: Banknote,    accountKey: 'cash' },
+  { value: 'card',          label: 'Card',      icon: CreditCard,  accountKey: 'card' },
+  { value: 'bank_transfer', label: 'Bank',      icon: Building2,   accountKey: 'bank' },
 ]
 
 const PERIOD_LABELS = {
@@ -321,6 +321,15 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       .single()
       .then(({ data }) => { if (data) setPaymentAccounts(data.setting_value) })
   }, [supabase])
+
+  // Auto-select the first enabled payment method
+  useEffect(() => {
+    if (!paymentAccounts) return
+    const enabledMethods = PAYMENT_METHODS.filter(m => paymentAccounts[m.accountKey]?.enabled !== false)
+    if (enabledMethods.length > 0 && !enabledMethods.find(m => m.value === payMethod)) {
+      setPayMethod(enabledMethods[0].value)
+    }
+  }, [paymentAccounts])
 
   // Fetch exchange rate when display currency changes
   useEffect(() => {
@@ -1405,7 +1414,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                   </div>
                                 )}
                                 <div className="grid grid-cols-4 gap-2">
-                                  {PAYMENT_METHODS.map(m => (
+                                  {PAYMENT_METHODS
+                                    .filter(m => !paymentAccounts || paymentAccounts[m.accountKey]?.enabled !== false)
+                                    .map(m => (
                                     <button key={m.value} onClick={() => setPayMethod(m.value)}
                                       className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
                                         payMethod === m.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'
@@ -1416,7 +1427,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                 </div>
 
                                 {/* Payment account details */}
-                                {paymentAccounts && paymentAccounts[payMethod] && (
+                                {paymentAccounts && paymentAccounts[PAYMENT_METHODS.find(m => m.value === payMethod)?.accountKey] && (
                                   <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs space-y-1.5">
                                     {payMethod === 'mpesa' && paymentAccounts.mpesa?.paybill_number && (
                                       <>
@@ -1438,7 +1449,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                         )}
                                       </>
                                     )}
-                                    {payMethod === 'bank' && (
+                                    {payMethod === 'bank_transfer' && (
                                       <>
                                         {paymentAccounts.bank?.show_details && paymentAccounts.bank?.bank_name ? (
                                           <>
@@ -1504,7 +1515,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                 )}
 
                                 {/* ── M-Pesa STK Push — instant payment ── */}
-                                {payMethod === 'mpesa' && (
+                                {payMethod === 'mpesa' && (!paymentAccounts || paymentAccounts.mpesa_stk?.enabled !== false) && (
                                   <>
                                     <div className="flex items-center gap-3 my-2">
                                       <div className="flex-1 border-t border-gray-200" />
