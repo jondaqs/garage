@@ -1294,6 +1294,9 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         {!isPaid && inv.balance_due > 0 && (
                           <p className="text-xs text-red-500">Balance: {fmtInv(inv.balance_due, inv.currency_symbol, inv.currency_code)}</p>
                         )}
+                        {!isPaid && inv.due_date && (
+                          <p className="text-[10px] text-amber-500">Expires: {fmtD(inv.due_date)}</p>
+                        )}
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.effective_status] || 'bg-gray-100'}`}>
                         {inv.effective_status}
@@ -1342,12 +1345,22 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                 <span className="font-semibold">−{fmtInv(inv.upgrade_credit, inv.currency_symbol, inv.currency_code)}</span>
                               </div>
                             )}
+                            {Number(inv.upgrade_credit) > 0 && !isPaid && (
+                              <p className="text-[10px] text-green-500 italic">Credit is recalculated at payment time based on actual remaining days. Pay sooner for a higher credit.</p>
+                            )}
                           </>
                         })()}
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Amount Due</span>
                           <span className="font-semibold">{fmtInv(inv.amount_due, inv.currency_symbol, inv.currency_code)}</span>
                         </div>
+                        {!isPaid && inv.due_date && (
+                          <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 mt-1">
+                            <p className="text-[10px] text-amber-700">
+                              <strong>24-hour expiry:</strong> This invoice must be paid by {fmtD(inv.due_date)}. Unpaid invoices expire automatically and the subscription will be cancelled. You may re-subscribe after expiry.
+                            </p>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Tax</span>
                           <span className="font-semibold">{fmtInv(inv.tax_amount, inv.currency_symbol, inv.currency_code)}</span>

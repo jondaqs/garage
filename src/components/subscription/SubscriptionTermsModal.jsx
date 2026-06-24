@@ -150,6 +150,36 @@ export default function SubscriptionTermsModal({
                 </p>
               </div>
             </div>
+
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Clock size={15} className="text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">24-Hour Invoice Expiry</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Invoices must be paid within <strong>24 hours</strong> of creation. Unpaid invoices will expire
+                  after this period and the associated subscription will be cancelled. You may re-subscribe
+                  at any time after an invoice expires, but the upgrade credit will be recalculated based on
+                  the remaining days at that point.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <ArrowUpRight size={15} className="text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Dynamic Upgrade Credit</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  When upgrading, the credit shown at checkout is an estimate based on today&apos;s remaining days.
+                  The actual credit applied will be <strong>recalculated at the time of payment</strong> to reflect
+                  the exact number of unused days remaining on your current plan. This means paying sooner gives
+                  you a higher credit.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Warning box */}
