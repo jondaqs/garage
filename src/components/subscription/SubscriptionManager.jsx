@@ -469,6 +469,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   // ── Record payment ─────────────────────────────────────────
   const handlePayment = async () => {
     if (!payAmount || parseFloat(payAmount) <= 0) { setError('Enter a valid amount'); return }
+    if (!payRef.trim()) { setError('Transaction reference is required'); return }
     setPaying(true); setError(''); setSuccess('')
     try {
       const { data, error: rpcErr } = await supabase.rpc('record_subscription_payment', {
@@ -1494,8 +1495,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                     )}
                                   </div>
                                   <div>
-                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref</label>
-                                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. QXZ12345" className={inp} />
+                                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Transaction Ref <span className="text-red-500">*</span></label>
+                                    <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. QXZ12345" required className={inp} />
                                   </div>
                                 </div>
                                 <div>
@@ -1503,7 +1504,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                   <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className={inp} />
                                 </div>
                                 <div className="flex gap-2">
-                                  <button onClick={handlePayment} disabled={paying}
+                                  <button onClick={handlePayment} disabled={paying || !payRef.trim()}
                                     className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
                                     {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Record Payment
                                   </button>
