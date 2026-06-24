@@ -115,12 +115,14 @@ export async function processVerifiedMpesaPayment(transactionId) {
   }
 
   // 6. Record payment via RPC — amount in invoice currency
+  //    Pass p_paid_by so the RPC works from server-side (no auth.uid() session)
   const { data: result, error: rpcErr } = await sc.rpc('record_subscription_payment', {
     p_invoice_id:     tx.invoice_id,
     p_amount:         paymentInInvoiceCurrency,
     p_paid_via:       'mpesa',
     p_transaction_id: tx.mpesa_receipt_number,
     p_notes:          `M-Pesa ${tx.transaction_type === 'stk_push' ? 'STK Push' : 'Paybill'} — ${tx.mpesa_receipt_number} (KES ${paidKes.toLocaleString()})`,
+    p_paid_by:        paidBy,
   })
 
   if (rpcErr || !result?.success) {
