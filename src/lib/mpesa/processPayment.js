@@ -140,12 +140,20 @@ export async function processVerifiedMpesaPayment(transactionId) {
   }).eq('id', transactionId)
 
   // 8. Auto-confirm receipt — STK push is verified by Safaricom, no admin needed
+  //    Pass p_confirmed_by so the RPC works from server-side (no auth.uid() session)
   if (result.receipt_id) {
     try {
-      await sc.rpc('confirm_subscription_receipt', { p_receipt_id: result.receipt_id })
-      console.info(`[mpesa] Receipt ${result.receipt_number} auto-confirmed for M-Pesa payment ${tx.mpesa_receipt_number}`)
+      const { data: confirmResult, error: confirmErr } = await sc.rpc('confirm_subscription_receipt', {
+        p_receipt_id: result.receipt_id,
+        p_confirmed_by: paidBy,
+      })
+      if (confirmErr || !confirmResult?.success) {
+        console.error(`[mpesa] Auto-confirm failed for receipt ${result.receipt_id}:`, confirmErr || confirmResult?.error)
+      } else {
+        console.info(`[mpesa] Receipt ${result.receipt_number} auto-confirmed for M-Pesa payment ${tx.mpesa_receipt_number || tx.checkout_request_id}`)
+      }
     } catch (confirmErr) {
-      console.error(`[mpesa] Auto-confirm failed for receipt ${result.receipt_id}:`, confirmErr)
+      console.error(`[mpesa] Auto-confirm exception for receipt ${result.receipt_id}:`, confirmErr)
       // Non-critical — admin can confirm manually
     }
   }
