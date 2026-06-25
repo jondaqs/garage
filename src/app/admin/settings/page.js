@@ -8,6 +8,7 @@ import {
   Loader2, ToggleLeft, ToggleRight, Store, Wrench, DollarSign,
   Calendar, ClipboardList, ChevronDown, ChevronRight, CreditCard, Smartphone,
   Upload, Key, RefreshCw, Wifi, Eye, EyeOff, Copy, Shield,
+  MessageSquare, Send, Phone,
 } from 'lucide-react'
 
 const TABS = [
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'statuses',       label: 'Status Codes',       icon: ClipboardList },
   { id: 'payment_accounts', label: 'Payment Accounts', icon: CreditCard },
   { id: 'mpesa_setup',    label: 'M-Pesa Setup',       icon: Smartphone },
+  { id: 'sms_setup',      label: 'SMS Setup',           icon: MessageSquare },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -423,6 +425,11 @@ export default function AdminSettingsPage() {
       {tab === 'mpesa_setup' && (
         <MpesaSetupEditor />
       )}
+
+      {/* ── SMS Setup ── */}
+      {tab === 'sms_setup' && (
+        <SmsSetupEditor />
+      )}
     </div>
   )
 }
@@ -738,6 +745,277 @@ function MpesaSetupEditor() {
         <button onClick={save} disabled={saving}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save M-Pesa Configuration
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SmsSetupEditor() {
+  const [config, setConfig] = useState({
+    active_provider: 'none',
+    africastalking: { api_key: '', username: '', sender_id: '', sandbox: false },
+    celcom:         { api_key: '', partner_id: '', sender_id: '' },
+  })
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [msg, setMsg]               = useState({ type: '', text: '' })
+  const [showSecrets, setShowSecrets] = useState({})
+  const [updatedAt, setUpdatedAt]   = useState(null)
+  // Test SMS state
+  const [testPhone, setTestPhone]   = useState('')
+  const [testing, setTesting]       = useState(false)
+  const [testSteps, setTestSteps]   = useState([])
+  // Balance state
+  const [balanceLoading, setBalanceLoading] = useState(false)
+  const [balanceInfo, setBalanceInfo]       = useState(null)
+
+  useEffect(() => {
+    fetch('/api/admin/sms-config')
+      .then(r => r.json())
+      .then(data => {
+        if (data.config) setConfig(prev => ({
+          ...prev,
+          ...data.config,
+          africastalking: { ...prev.africastalking, ...data.config.africastalking },
+          celcom:         { ...prev.celcom,         ...data.config.celcom },
+        }))
+        if (data.updated_at) setUpdatedAt(data.updated_at)
+      })
+      .catch(e => setMsg({ type: 'error', text: e.message }))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const update = (provider, key, val) => {
+    setConfig(prev => ({
+      ...prev,
+      [provider]: { ...prev[provider], [key]: val },
+    }))
+  }
+
+  const setProvider = (id) => setConfig(prev => ({ ...prev, active_provider: id }))
+  const toggleSecret = (key) => setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }))
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 4000) }
+
+  const save = async () => {
+    setSaving(true); setMsg({ type: '', text: '' })
+    try {
+      const res = await fetch('/api/admin/sms-config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', config }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.config) setConfig(prev => ({
+        ...prev,
+        ...data.config,
+        africastalking: { ...prev.africastalking, ...data.config.africastalking },
+        celcom:         { ...prev.celcom,         ...data.config.celcom },
+      }))
+      flash('success', data.message)
+    } catch (e) { flash('error', e.message) }
+    finally { setSaving(false) }
+  }
+
+  const sendTest = async () => {
+    if (!testPhone.trim()) { flash('error', 'Enter a phone number'); return }
+    setTesting(true); setTestSteps([]); setMsg({ type: '', text: '' })
+    try {
+      const res = await fetch('/api/admin/sms-config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_sms', phone: testPhone.trim() }),
+      })
+      const data = await res.json()
+      setTestSteps(data.steps || [])
+      flash(data.success ? 'success' : 'error', data.success ? 'Test SMS sent successfully!' : (data.error || 'Test failed — see steps below'))
+    } catch (e) { flash('error', e.message) }
+    finally { setTesting(false) }
+  }
+
+  const checkBalance = async () => {
+    setBalanceLoading(true); setBalanceInfo(null)
+    try {
+      const res = await fetch('/api/admin/sms-config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_balance', provider: config.active_provider }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setBalanceInfo(data.balance)
+    } catch (e) { flash('error', e.message) }
+    finally { setBalanceLoading(false) }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+
+  const SecretInput = ({ label, provider, field, placeholder }) => (
+    <div>
+      <label className="text-xs font-semibold text-gray-600 block mb-1">{label}</label>
+      <div className="flex gap-1">
+        <input
+          type={showSecrets[`${provider}_${field}`] ? 'text' : 'password'}
+          className={inp + ' flex-1'}
+          value={config[provider]?.[field] || ''}
+          onChange={e => update(provider, field, e.target.value)}
+          placeholder={placeholder}
+        />
+        <button onClick={() => toggleSecret(`${provider}_${field}`)}
+          className="px-2 text-gray-400 hover:text-gray-600" title={showSecrets[`${provider}_${field}`] ? 'Hide' : 'Show'}>
+          {showSecrets[`${provider}_${field}`] ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {msg.text && (
+        <div className={`p-3 rounded-lg flex items-start gap-2 text-sm ${
+          msg.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+        }`}>
+          {msg.type === 'success' ? <CheckCircle size={16} className="mt-0.5 flex-shrink-0" /> : <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />}
+          <p>{msg.text}</p>
+        </div>
+      )}
+
+      {updatedAt && (
+        <p className="text-[10px] text-gray-400">Last updated: {new Date(updatedAt).toLocaleString('en-KE')}</p>
+      )}
+
+      {/* ── Active Provider ─────────────────────────────────────────────── */}
+      <Section title="Active SMS Provider" description="Choose which provider sends SMS notifications. Only one can be active at a time.">
+        <div className="flex gap-3 flex-wrap">
+          {[
+            { id: 'africastalking', label: "Africa's Talking", cost: '~KES 0.80/SMS', activeClass: 'bg-blue-50 border-blue-500 text-blue-700' },
+            { id: 'celcom',         label: 'Celcom Africa',    cost: '~KES 0.25/SMS', activeClass: 'bg-emerald-50 border-emerald-500 text-emerald-700' },
+            { id: 'none',           label: 'Disabled',         cost: 'No SMS sent',   activeClass: 'bg-gray-100 border-gray-400 text-gray-700' },
+          ].map(p => (
+            <button key={p.id} onClick={() => setProvider(p.id)}
+              className={`flex-1 min-w-[140px] px-4 py-3 rounded-lg text-sm font-medium border-2 transition-all text-left ${
+                config.active_provider === p.id
+                  ? p.activeClass
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
+              }`}>
+              <div className="font-semibold">{p.label}</div>
+              <div className="text-[10px] mt-0.5 opacity-75">{p.cost}</div>
+            </button>
+          ))}
+        </div>
+        {config.active_provider === 'none' && (
+          <p className="text-xs text-amber-600 mt-2 font-medium">⚠ SMS is disabled — no notifications will be sent via SMS.</p>
+        )}
+      </Section>
+
+      {/* ── Africa's Talking Credentials ────────────────────────────────── */}
+      {(config.active_provider === 'africastalking' || config.africastalking?.api_key) && (
+        <Section title="Africa's Talking" description="africastalking.com — API credentials from your AT dashboard.">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <SecretInput label="API Key" provider="africastalking" field="api_key" placeholder="Your AT API key" />
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Username</label>
+              <input className={inp} value={config.africastalking?.username || ''} onChange={e => update('africastalking', 'username', e.target.value)}
+                placeholder="e.g. your_app_name or sandbox" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Sender ID (optional)</label>
+              <input className={inp} value={config.africastalking?.sender_id || ''} onChange={e => update('africastalking', 'sender_id', e.target.value)}
+                placeholder="e.g. MOTIIFIX (requires AT approval)" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Mode</label>
+              <div className="flex gap-2 mt-1">
+                {[false, true].map(sb => (
+                  <button key={String(sb)} onClick={() => update('africastalking', 'sandbox', sb)}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                      config.africastalking?.sandbox === sb
+                        ? sb ? 'bg-blue-600 text-white border-blue-600' : 'bg-red-600 text-white border-red-600'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                    }`}>
+                    {sb ? '🧪 Sandbox' : '🔴 Production'}
+                  </button>
+                ))}
+              </div>
+              {!config.africastalking?.sandbox && config.active_provider === 'africastalking' && (
+                <p className="text-[10px] text-red-600 mt-1 font-medium">Production — real SMS will be sent and charged.</p>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* ── Celcom Africa Credentials ───────────────────────────────────── */}
+      {(config.active_provider === 'celcom' || config.celcom?.api_key) && (
+        <Section title="Celcom Africa" description="celcomafrica.com — API credentials from your Celcom dashboard.">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <SecretInput label="API Key" provider="celcom" field="api_key" placeholder="Your Celcom API key" />
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Partner ID</label>
+              <input className={inp} value={config.celcom?.partner_id || ''} onChange={e => update('celcom', 'partner_id', e.target.value)}
+                placeholder="Your Celcom partner ID" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Sender ID / Shortcode</label>
+              <input className={inp} value={config.celcom?.sender_id || ''} onChange={e => update('celcom', 'sender_id', e.target.value)}
+                placeholder="e.g. MOTIIFIX or leave blank for default" />
+              <p className="text-[10px] text-gray-400 mt-1">Sender ID registration ~KES 6,500/network at Celcom.</p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button onClick={checkBalance} disabled={balanceLoading || !config.celcom?.api_key}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 disabled:opacity-50 border border-gray-200">
+              {balanceLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Check Balance
+            </button>
+            {balanceInfo && (
+              <span className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">{JSON.stringify(balanceInfo)}</span>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Test SMS ────────────────────────────────────────────────────── */}
+      {config.active_provider !== 'none' && (
+        <Section title="Test SMS" description="Send a test message to verify your setup is working end-to-end.">
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Phone Number</label>
+              <div className="relative">
+                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input className={inp + ' pl-8'} value={testPhone} onChange={e => setTestPhone(e.target.value)}
+                  placeholder="e.g. 0712345678" onKeyDown={e => e.key === 'Enter' && sendTest()} />
+              </div>
+            </div>
+            <button onClick={sendTest} disabled={testing || !testPhone.trim()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex-shrink-0">
+              {testing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Send Test
+            </button>
+          </div>
+
+          {/* Step-by-step results */}
+          {testSteps.length > 0 && (
+            <div className="mt-4 space-y-1">
+              {testSteps.map((s, i) => (
+                <div key={i} className={`flex items-start gap-2 px-3 py-2 rounded-lg text-xs ${
+                  s.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {s.ok ? <CheckCircle size={14} className="mt-0.5 flex-shrink-0" /> : <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />}
+                  <div>
+                    <span className="font-semibold">{s.step}:</span>{' '}
+                    <span className="break-all">{s.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ── Save ────────────────────────────────────────────────────────── */}
+      <div className="flex justify-end">
+        <button onClick={save} disabled={saving}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save SMS Configuration
         </button>
       </div>
     </div>
