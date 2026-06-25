@@ -92,6 +92,11 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [stkReceipt, setStkReceipt] = useState(null)
   const stkPollRef = useRef(null) // ref for polling interval cleanup
 
+  // Card payment (Paystack)
+  const [cardState, setCardState] = useState('idle') // idle | initiating | success | failed
+  const [cardError, setCardError] = useState('')
+  const [cardReceipt, setCardReceipt] = useState(null)
+
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
 
@@ -601,6 +606,90 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
       stkPollRef.current = null
     }
     setStkState('idle'); setStkError(''); setStkCheckoutId(null); setStkReceipt(null)
+  }
+
+  // ── Card Payment handler (Paystack) ────────────────────────────
+  const resetCardState = () => {
+    setCardState('idle'); setCardError(''); setCardReceipt(null)
+  }
+
+  const handleCardPay = async (invoiceId) => {
+    const email = subscriberProfile?.email
+    if (!email) { setError('Email address is required for card payments'); return }
+
+    setCardState('initiating'); setCardError(''); setError('')
+
+    try {
+      // 1. Initialize Paystack transaction via our backend
+      const res = await fetch('/api/payments/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId, email }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to initialize card payment')
+      }
+
+      // 2. Load Paystack inline popup script if not loaded
+      await loadPaystackScript()
+
+      // 3. Open Paystack popup
+      const popup = new window.PaystackPop()
+      popup.newTransaction({
+        key: data.publicKey,
+        email,
+        amount: data.amountKes * 100, // kobo
+        currency: 'KES',
+        ref: data.reference,
+        onSuccess: async (transaction) => {
+          // 4. Verify with our backend
+          try {
+            const verifyRes = await fetch('/api/payments/paystack/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reference: transaction.reference || data.reference }),
+            })
+            const verifyData = await verifyRes.json()
+            if (verifyRes.ok && verifyData.success) {
+              setCardState('success')
+              setCardReceipt(verifyData.receiptNumber || verifyData.paymentRef)
+              const cardInfo = verifyData.cardLast4 ? ` (****${verifyData.cardLast4})` : ''
+              setSuccess(`Payment confirmed!${cardInfo} Ref: ${verifyData.paymentRef || verifyData.reference}`)
+              setPayingInvoiceId(null)
+              await loadAll()
+            } else {
+              throw new Error(verifyData.error || 'Payment verification failed')
+            }
+          } catch (verifyErr) {
+            setCardState('failed')
+            setCardError(verifyErr.message)
+          }
+        },
+        onCancel: () => {
+          setCardState('idle')
+        },
+        onError: (err) => {
+          setCardState('failed')
+          setCardError(err?.message || 'Payment failed. Please try again.')
+        },
+      })
+    } catch (e) {
+      setCardState('failed')
+      setCardError(e.message)
+    }
+  }
+
+  // Load Paystack inline.js script dynamically
+  const loadPaystackScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.PaystackPop) { resolve(); return }
+      const s = document.createElement('script')
+      s.src = 'https://js.paystack.co/v2/inline.js'
+      s.onload = resolve
+      s.onerror = () => reject(new Error('Failed to load payment gateway'))
+      document.head.appendChild(s)
+    })
   }
 
   const activeSub = subscriptions.find(s => s.is_currently_active)
@@ -1521,7 +1610,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                     className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
                                     {paying ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />} Record Payment
                                   </button>
-                                  <button onClick={() => { setPayingInvoiceId(null); resetStkState() }}
+                                  <button onClick={() => { setPayingInvoiceId(null); resetStkState(); resetCardState() }}
                                     className="px-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
                                 </div>
                                 {payMethod === 'mpesa' && (
@@ -1603,6 +1692,71 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                           <Smartphone size={14} /> Pay with M-Pesa
                                         </button>
                                         <p className="text-[10px] text-green-600">Payment is verified automatically — no admin confirmation required.</p>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+
+                                {/* ── Card / Apple Pay — instant payment via Paystack ── */}
+                                {(payMethod === 'card' || payMethod === 'apple_pay') && (
+                                  <>
+                                    <div className="flex items-center gap-3 my-2">
+                                      <div className="flex-1 border-t border-gray-200" />
+                                      <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">or pay instantly</span>
+                                      <div className="flex-1 border-t border-gray-200" />
+                                    </div>
+
+                                    {cardState !== 'idle' ? (
+                                      <div className="text-center py-4 space-y-3 bg-gray-50 rounded-xl">
+                                        {cardState === 'initiating' && (
+                                          <>
+                                            <Loader2 size={32} className="animate-spin text-blue-600 mx-auto" />
+                                            <p className="text-sm font-medium text-gray-700">Opening secure payment window...</p>
+                                          </>
+                                        )}
+                                        {cardState === 'success' && (
+                                          <>
+                                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                              <BadgeCheck size={28} className="text-green-600" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-green-700">Payment Confirmed!</p>
+                                            {cardReceipt && <p className="text-xs text-gray-500">Ref: {cardReceipt}</p>}
+                                            <p className="text-[10px] text-green-600">Receipt auto-confirmed — no admin action needed.</p>
+                                          </>
+                                        )}
+                                        {cardState === 'failed' && (
+                                          <>
+                                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                                              <AlertCircle size={28} className="text-red-500" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-red-700">Payment failed</p>
+                                            <p className="text-xs text-gray-500">{cardError}</p>
+                                            <button onClick={resetCardState}
+                                              className="text-sm text-blue-600 font-medium hover:underline">Try again</button>
+                                          </>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                          <CreditCard size={16} className="text-blue-700" />
+                                          <span className="text-sm font-semibold text-blue-800">Card / Apple Pay</span>
+                                          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Auto-confirmed</span>
+                                        </div>
+                                        <p className="text-xs text-blue-600">
+                                          Pay securely with Visa, Mastercard, or Apple Pay. M-Pesa GlobalPay virtual cards are also supported.
+                                        </p>
+                                        {invConverted(inv.currency_code) && (
+                                          <p className="text-xs text-blue-700">
+                                            You will be charged <strong>KES {cv(inv.balance_due || inv.total_amount).toLocaleString()}</strong>
+                                          </p>
+                                        )}
+                                        <button onClick={() => handleCardPay(inv.id)}
+                                          disabled={paying || cardState === 'initiating'}
+                                          className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                                          <CreditCard size={14} /> Pay with Card
+                                        </button>
+                                        <p className="text-[10px] text-blue-600">Payment is verified automatically — no admin confirmation required.</p>
                                       </div>
                                     )}
                                   </>
