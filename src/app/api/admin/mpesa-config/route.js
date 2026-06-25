@@ -1,4 +1,16 @@
-// src/app/api/admin/mpesa-config/route.js
+/**
+ * GET/POST /api/admin/mpesa-config
+ * ────────────────────────────────
+ * Admin-only M-Pesa Daraja API configuration.
+ *
+ * SECURITY: Secrets (consumer_key, consumer_secret, passkey, etc.) are ONLY
+ * read from Vercel env vars — never saved to the database.
+ * Database stores only: environment, sandbox_cert, production_cert (public keys).
+ *
+ * The actual payment flow (lib/mpesa/config.js) already reads from env vars.
+ *
+ * Location: src/app/api/admin/mpesa-config/route.js
+ */
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -13,105 +25,159 @@ function getServiceClient() {
   )
 }
 
-/**
- * GET /api/admin/mpesa-config
- * Load saved M-Pesa configuration (admin only).
- * Masks sensitive fields for display.
- */
-export async function GET(request) {
+async function requireAdmin() {
+  const supabase = await createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    return { error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
+  }
+
+  const { data: callerProfile } = await supabase
+    .from('user_profiles_secure')
+    .select('id, user_roles(role:user_roles_lookup(code))')
+    .eq('auth_user_id', session.user.id)
+    .single()
+
+  const codes = callerProfile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+  if (!codes.includes('admin') && !codes.includes('platform_admin')) {
+    return { error: NextResponse.json({ error: 'Admin only' }, { status: 403 }) }
+  }
+
+  return { ok: true, session }
+}
+
+// ─── GET ──────────────────────────────────────────────────────────────────────
+
+export async function GET() {
   try {
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Auth required' }, { status: 401 })
+    const auth = await requireAdmin()
+    if (auth.error) return auth.error
 
     const sc = getServiceClient()
-    const { data: isAdmin } = await sc.rpc('is_user_admin')
-    if (!isAdmin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-
     const { data: row } = await sc
       .from('platform_settings')
       .select('setting_value, updated_at')
       .eq('setting_key', 'mpesa_config')
       .maybeSingle()
 
-    const config = row?.setting_value || {}
+    const dbConfig = row?.setting_value || {}
 
-    // Mask sensitive values for display
-    const masked = {
-      ...config,
-      consumer_secret: config.consumer_secret ? '••••' + config.consumer_secret.slice(-4) : '',
-      passkey: config.passkey ? '••••' + config.passkey.slice(-4) : '',
-      callback_secret: config.callback_secret ? '••••' + config.callback_secret.slice(-4) : '',
-      security_credential: config.security_credential ? '••••' + config.security_credential.slice(-8) : '',
-      // Certificates are not secret but large — just show status
-      sandbox_cert: config.sandbox_cert ? 'Uploaded' : '',
-      production_cert: config.production_cert ? 'Uploaded' : '',
-    }
+    return NextResponse.json({
+      updated_at: row?.updated_at || null,
 
-    return NextResponse.json({ config: masked, updated_at: row?.updated_at })
+      // Only environment + cert status from database
+      environment: dbConfig.environment || process.env.MPESA_ENV || 'sandbox',
+      sandbox_cert_uploaded:    !!(dbConfig.sandbox_cert),
+      production_cert_uploaded: !!(dbConfig.production_cert),
+
+      // Non-secret env var values — prefill UI fields
+      config: {
+        consumer_key:  process.env.MPESA_CONSUMER_KEY  || '',
+        shortcode:     process.env.MPESA_SHORTCODE     || '',
+        initiator_name: process.env.MPESA_INITIATOR_NAME || '',
+      },
+
+      // Boolean flags — which secret env vars are set?
+      env: {
+        MPESA_CONSUMER_KEY:        !!process.env.MPESA_CONSUMER_KEY,
+        MPESA_CONSUMER_SECRET:     !!process.env.MPESA_CONSUMER_SECRET,
+        MPESA_SHORTCODE:           !!process.env.MPESA_SHORTCODE,
+        MPESA_PASSKEY:             !!process.env.MPESA_PASSKEY,
+        MPESA_CALLBACK_SECRET:     !!process.env.MPESA_CALLBACK_SECRET,
+        MPESA_INITIATOR_NAME:      !!process.env.MPESA_INITIATOR_NAME,
+        MPESA_SECURITY_CREDENTIAL: !!process.env.MPESA_SECURITY_CREDENTIAL,
+        MPESA_ENV:                 process.env.MPESA_ENV || '',
+      },
+    })
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
-/**
- * POST /api/admin/mpesa-config
- *
- * Actions:
- *   { action: 'save', config: { ... } }           — save all settings
- *   { action: 'generate_secret' }                  — generate callback secret
- *   { action: 'generate_credential', password }    — generate security credential
- *   { action: 'test_connection' }                  — test OAuth token
- */
+// ─── POST ─────────────────────────────────────────────────────────────────────
+
 export async function POST(request) {
   try {
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Auth required' }, { status: 401 })
+    const auth = await requireAdmin()
+    if (auth.error) return auth.error
 
-    const sc = getServiceClient()
-    const { data: isAdmin } = await sc.rpc('is_user_admin')
-    if (!isAdmin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-
+    const sc   = getServiceClient()
     const body = await request.json()
     const { action } = body
 
-    // Load existing config
+    // Load DB config (environment + certs only)
     const { data: row } = await sc
       .from('platform_settings')
       .select('setting_value')
       .eq('setting_key', 'mpesa_config')
       .maybeSingle()
 
-    let config = row?.setting_value || {}
+    let dbConfig = row?.setting_value || {}
 
-    // ── Generate callback secret ────────────────────────────────
+    // ── Save: only environment + certs ────────────────────────────────────
+    if (action === 'save') {
+      const updates = body.config || {}
+
+      // Only persist non-secret fields
+      const cleaned = {
+        environment:     updates.environment || dbConfig.environment || 'sandbox',
+        sandbox_cert:    dbConfig.sandbox_cert    || null,
+        production_cert: dbConfig.production_cert || null,
+      }
+
+      // Handle cert uploads (new cert text in the request)
+      if (updates.sandbox_cert && updates.sandbox_cert !== 'Uploaded') {
+        cleaned.sandbox_cert = updates.sandbox_cert
+      }
+      if (updates.production_cert && updates.production_cert !== 'Uploaded') {
+        cleaned.production_cert = updates.production_cert
+      }
+
+      const profileRes = await sc.from('user_profiles').select('id').eq('auth_user_id', auth.session.user.id).single()
+
+      const { error } = await sc
+        .from('platform_settings')
+        .upsert({
+          setting_key:   'mpesa_config',
+          setting_value: cleaned,
+          description:   'M-Pesa config (environment + public certs only)',
+          is_public:     false,
+          updated_at:    new Date().toISOString(),
+          updated_by:    profileRes?.data?.id || null,
+        }, { onConflict: 'setting_key' })
+
+      if (error) throw error
+
+      return NextResponse.json({
+        success: true,
+        message: 'M-Pesa environment and certificates saved. All credentials must be set in Vercel env vars.',
+      })
+    }
+
+    // ── Generate callback secret ─────────────────────────────────────────
     if (action === 'generate_secret') {
       const secret = crypto.randomBytes(32).toString('hex')
-      config.callback_secret = secret
-      await upsertConfig(sc, config, user.id)
-
-      // Also set env var for current runtime (won't persist across deploys)
-      process.env.MPESA_CALLBACK_SECRET = secret
 
       return NextResponse.json({
         success: true,
         callback_secret: secret,
-        message: 'Callback secret generated. Add this to your Vercel environment variables as MPESA_CALLBACK_SECRET.',
+        message: 'Callback secret generated. Copy this value to Vercel env vars as MPESA_CALLBACK_SECRET.',
       })
     }
 
-    // ── Generate security credential ────────────────────────────
+    // ── Generate security credential ─────────────────────────────────────
     if (action === 'generate_credential') {
-      const { password } = body
+      const { password, cert } = body
       if (!password) return NextResponse.json({ error: 'Initiator password is required' }, { status: 400 })
 
-      const env = config.environment || 'sandbox'
-      const certPem = env === 'production' ? config.production_cert : config.sandbox_cert
+      // Cert can come from the request (UI upload) or from database
+      const env = body.environment || dbConfig.environment || 'sandbox'
+      const certPem = cert
+        || (env === 'production' ? dbConfig.production_cert : dbConfig.sandbox_cert)
 
       if (!certPem) {
         return NextResponse.json({
-          error: `No ${env} certificate uploaded. Upload the certificate first.`,
+          error: `No ${env} certificate available. Upload the certificate first.`,
         }, { status: 400 })
       }
 
@@ -122,33 +188,33 @@ export async function POST(request) {
         )
         const credential = encrypted.toString('base64')
 
-        config.security_credential = credential
-        config.initiator_name = config.initiator_name || body.initiator_name || ''
-        await upsertConfig(sc, config, user.id)
-
         return NextResponse.json({
           success: true,
           security_credential: credential,
-          message: 'Security credential generated. Add this to your Vercel environment variables as MPESA_SECURITY_CREDENTIAL.',
+          message: 'Security credential generated. Copy this to Vercel env vars as MPESA_SECURITY_CREDENTIAL.',
         })
       } catch (encErr) {
         return NextResponse.json({
-          error: 'Encryption failed — the certificate may be invalid or corrupted. Error: ' + encErr.message,
+          error: 'Encryption failed — the certificate may be invalid. Error: ' + encErr.message,
         }, { status: 400 })
       }
     }
 
-    // ── Test connection ─────────────────────────────────────────
+    // ── Test connection ──────────────────────────────────────────────────
     if (action === 'test_connection') {
-      const consumerKey = config.consumer_key || process.env.MPESA_CONSUMER_KEY
-      const consumerSecret = config.consumer_secret || process.env.MPESA_CONSUMER_SECRET
-      const env = config.environment || process.env.MPESA_ENV || 'sandbox'
+      // API keys always from env vars, with optional UI overrides for testing only
+      const ov = body.overrides || {}
+      const consumerKey    = ov.consumer_key    || process.env.MPESA_CONSUMER_KEY
+      const consumerSecret = ov.consumer_secret || process.env.MPESA_CONSUMER_SECRET
+      const env = ov.environment || dbConfig.environment || process.env.MPESA_ENV || 'sandbox'
       const baseUrl = env === 'production'
         ? 'https://api.safaricom.co.ke'
         : 'https://sandbox.safaricom.co.ke'
 
       if (!consumerKey || !consumerSecret) {
-        return NextResponse.json({ error: 'Consumer Key and Secret are required' }, { status: 400 })
+        return NextResponse.json({
+          error: 'MPESA_CONSUMER_KEY and MPESA_CONSUMER_SECRET must be set in Vercel env vars',
+        }, { status: 400 })
       }
 
       try {
@@ -186,47 +252,9 @@ export async function POST(request) {
       }
     }
 
-    // ── Save config ─────────────────────────────────────────────
-    if (action === 'save') {
-      const updates = body.config || {}
-
-      // Merge — don't overwrite masked/unchanged sensitive fields
-      if (updates.consumer_secret?.startsWith('••••')) delete updates.consumer_secret
-      if (updates.passkey?.startsWith('••••')) delete updates.passkey
-      if (updates.callback_secret?.startsWith('••••')) delete updates.callback_secret
-      if (updates.security_credential?.startsWith('••••')) delete updates.security_credential
-      if (updates.sandbox_cert === 'Uploaded') delete updates.sandbox_cert
-      if (updates.production_cert === 'Uploaded') delete updates.production_cert
-
-      config = { ...config, ...updates }
-      await upsertConfig(sc, config, user.id)
-
-      return NextResponse.json({
-        success: true,
-        message: 'M-Pesa configuration saved. Remember to also update your Vercel environment variables.',
-      })
-    }
-
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err) {
     console.error('[mpesa-config] error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
-}
-
-async function upsertConfig(sc, config, userId) {
-  const profileRes = await sc.from('user_profiles').select('id').eq('auth_user_id', userId).single()
-
-  const { error } = await sc
-    .from('platform_settings')
-    .upsert({
-      setting_key: 'mpesa_config',
-      setting_value: config,
-      description: 'M-Pesa Daraja API configuration',
-      is_public: false,
-      updated_at: new Date().toISOString(),
-      updated_by: profileRes?.data?.id || null,
-    }, { onConflict: 'setting_key' })
-
-  if (error) throw error
 }

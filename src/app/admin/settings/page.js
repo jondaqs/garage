@@ -435,53 +435,91 @@ export default function AdminSettingsPage() {
 }
 
 function MpesaSetupEditor() {
-  const [config, setConfig] = useState({
-    environment: 'sandbox', consumer_key: '', consumer_secret: '',
-    shortcode: '', passkey: '', initiator_name: '',
-    callback_secret: '', security_credential: '',
-    sandbox_cert: '', production_cert: '',
-  })
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState({ type: '', text: '' })
-  const [showSecrets, setShowSecrets] = useState({})
-  const [initiatorPassword, setInitiatorPassword] = useState('')
-  const [generating, setGenerating] = useState('')
-  const [testing, setTesting] = useState(false)
-  const [updatedAt, setUpdatedAt] = useState(null)
+  const [environment, setEnvironment] = useState('sandbox')
+  const [envStatus, setEnvStatus]     = useState({})
+  const [loading, setLoading]         = useState(true)
+  const [saving, setSaving]           = useState(false)
+  const [msg, setMsg]                 = useState({ type: '', text: '' })
+  const [updatedAt, setUpdatedAt]     = useState(null)
+
+  // UI-only fields — prefilled from env, editable for testing, NOT saved to DB
+  const [consumerKey, setConsumerKey]       = useState('')
+  const [consumerSecret, setConsumerSecret] = useState('')
+  const [shortcode, setShortcode]           = useState('')
+  const [passkey, setPasskey]               = useState('')
+  const [initiatorName, setInitiatorName]   = useState('')
+
+  // Cert status + upload
+  const [sandboxCertUploaded, setSandboxCertUploaded]     = useState(false)
+  const [productionCertUploaded, setProductionCertUploaded] = useState(false)
+  const [pendingCerts, setPendingCerts] = useState({ sandbox_cert: null, production_cert: null })
+
+  // Generate
+  const [showSecrets, setShowSecrets]         = useState({})
+  const [generating, setGenerating]           = useState('')
+  const [generatedSecret, setGeneratedSecret] = useState('')
+  const [generatedCredential, setGeneratedCredential] = useState('')
+  const [initiatorPassword, setInitiatorPassword]     = useState('')
+  const [testing, setTesting]                         = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/mpesa-config')
       .then(r => r.json())
       .then(data => {
-        if (data.config) setConfig(prev => ({ ...prev, ...data.config }))
+        if (data.environment) setEnvironment(data.environment)
+        if (data.env)         setEnvStatus(data.env)
+        if (data.config) {
+          setConsumerKey(data.config.consumer_key || '')
+          setShortcode(data.config.shortcode || '')
+          setInitiatorName(data.config.initiator_name || '')
+        }
+        setSandboxCertUploaded(data.sandbox_cert_uploaded || false)
+        setProductionCertUploaded(data.production_cert_uploaded || false)
         if (data.updated_at) setUpdatedAt(data.updated_at)
       })
       .catch(e => setMsg({ type: 'error', text: e.message }))
       .finally(() => setLoading(false))
   }, [])
 
-  const update = (key, val) => setConfig(prev => ({ ...prev, [key]: val }))
   const toggle = (key) => setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }))
-
-  const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text)
-    setMsg({ type: 'success', text: `${label} copied to clipboard` })
-    setTimeout(() => setMsg({ type: '', text: '' }), 2000)
-  }
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 5000) }
 
   const save = async () => {
     setSaving(true); setMsg({ type: '', text: '' })
     try {
+      const config = { environment }
+      // Include pending certs if uploaded
+      if (pendingCerts.sandbox_cert) config.sandbox_cert = pendingCerts.sandbox_cert
+      if (pendingCerts.production_cert) config.production_cert = pendingCerts.production_cert
+
       const res = await fetch('/api/admin/mpesa-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', config }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setMsg({ type: 'success', text: data.message })
-    } catch (e) { setMsg({ type: 'error', text: e.message }) }
+      if (pendingCerts.sandbox_cert) setSandboxCertUploaded(true)
+      if (pendingCerts.production_cert) setProductionCertUploaded(true)
+      setPendingCerts({ sandbox_cert: null, production_cert: null })
+      flash('success', data.message)
+    } catch (e) { flash('error', e.message) }
     finally { setSaving(false) }
+  }
+
+  const testConnection = async () => {
+    setTesting(true); setMsg({ type: '', text: '' })
+    try {
+      const res = await fetch('/api/admin/mpesa-config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test_connection',
+          overrides: { consumer_key: consumerKey, consumer_secret: consumerSecret, environment },
+        }),
+      })
+      const data = await res.json()
+      flash(data.success ? 'success' : 'error', data.message || data.error)
+    } catch (e) { flash('error', e.message) }
+    finally { setTesting(false) }
   }
 
   const generateSecret = async () => {
@@ -493,14 +531,14 @@ function MpesaSetupEditor() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      update('callback_secret', data.callback_secret)
-      setMsg({ type: 'success', text: data.message })
-    } catch (e) { setMsg({ type: 'error', text: e.message }) }
+      setGeneratedSecret(data.callback_secret)
+      flash('success', data.message)
+    } catch (e) { flash('error', e.message) }
     finally { setGenerating('') }
   }
 
   const generateCredential = async () => {
-    if (!initiatorPassword.trim()) { setMsg({ type: 'error', text: 'Enter the initiator password' }); return }
+    if (!initiatorPassword.trim()) { flash('error', 'Enter the initiator password'); return }
     setGenerating('credential')
     try {
       const res = await fetch('/api/admin/mpesa-config', {
@@ -508,29 +546,17 @@ function MpesaSetupEditor() {
         body: JSON.stringify({
           action: 'generate_credential',
           password: initiatorPassword,
-          initiator_name: config.initiator_name,
+          environment,
+          cert: pendingCerts[environment === 'production' ? 'production_cert' : 'sandbox_cert'] || null,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      update('security_credential', data.security_credential)
+      setGeneratedCredential(data.security_credential)
       setInitiatorPassword('')
-      setMsg({ type: 'success', text: data.message })
-    } catch (e) { setMsg({ type: 'error', text: e.message }) }
+      flash('success', data.message)
+    } catch (e) { flash('error', e.message) }
     finally { setGenerating('') }
-  }
-
-  const testConnection = async () => {
-    setTesting(true); setMsg({ type: '', text: '' })
-    try {
-      const res = await fetch('/api/admin/mpesa-config', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test_connection' }),
-      })
-      const data = await res.json()
-      setMsg({ type: data.success ? 'success' : 'error', text: data.message || data.error })
-    } catch (e) { setMsg({ type: 'error', text: e.message }) }
-    finally { setTesting(false) }
   }
 
   const handleCertUpload = (env) => (e) => {
@@ -538,32 +564,26 @@ function MpesaSetupEditor() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = (evt) => {
-      const text = evt.target.result
-      update(env === 'sandbox' ? 'sandbox_cert' : 'production_cert', text)
-      setMsg({ type: 'success', text: `${env} certificate loaded. Click Save to persist.` })
+      setPendingCerts(prev => ({ ...prev, [env === 'sandbox' ? 'sandbox_cert' : 'production_cert']: evt.target.result }))
+      flash('success', `${env} certificate loaded. Click Save to persist.`)
     }
     reader.readAsText(file)
   }
 
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text)
+    flash('success', `${label} copied to clipboard`)
+  }
+
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
 
-  const SecretField = ({ label, field, placeholder }) => (
-    <div>
-      <label className="text-xs font-semibold text-gray-600 block mb-1">{label}</label>
-      <div className="flex gap-1">
-        <input type={showSecrets[field] ? 'text' : 'password'} className={inp + ' flex-1'}
-          value={config[field] || ''} onChange={e => update(field, e.target.value)} placeholder={placeholder} />
-        <button onClick={() => toggle(field)} className="px-2 text-gray-400 hover:text-gray-600"
-          title={showSecrets[field] ? 'Hide' : 'Show'}>
-          {showSecrets[field] ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-        {config[field] && !config[field].startsWith('••••') && (
-          <button onClick={() => copyToClipboard(config[field], label)} className="px-2 text-gray-400 hover:text-gray-600" title="Copy">
-            <Copy size={16} />
-          </button>
-        )}
-      </div>
-    </div>
+  const EnvBadge = ({ envKey }) => (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
+      envStatus[envKey] ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+    }`}>
+      {envStatus[envKey] ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
+      {envKey}: {envStatus[envKey] ? (typeof envStatus[envKey] === 'string' ? envStatus[envKey] : 'Set') : 'Missing'}
+    </span>
   )
 
   return (
@@ -579,13 +599,13 @@ function MpesaSetupEditor() {
         <p className="text-[10px] text-gray-400">Last updated: {new Date(updatedAt).toLocaleString('en-KE')}</p>
       )}
 
-      {/* Environment */}
-      <Section title="Environment" description="Select sandbox for testing or production for live payments.">
+      {/* Environment — saved to DB */}
+      <Section title="Environment" description="This and certificates below are the only settings saved to the database. All credentials must be in Vercel env vars.">
         <div className="flex gap-3">
           {['sandbox', 'production'].map(env => (
-            <button key={env} onClick={() => update('environment', env)}
+            <button key={env} onClick={() => setEnvironment(env)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                config.environment === env
+                environment === env
                   ? env === 'production' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
               }`}>
@@ -593,24 +613,52 @@ function MpesaSetupEditor() {
             </button>
           ))}
         </div>
-        {config.environment === 'production' && (
-          <p className="text-xs text-red-600 mt-2 font-medium">⚠ Production mode — real money will be processed.</p>
+        {environment === 'production' && (
+          <p className="text-xs text-red-600 mt-2 font-medium">Production mode — real money will be processed.</p>
         )}
       </Section>
 
-      {/* API Credentials */}
-      <Section title="Daraja API Credentials" description="From your Safaricom Developer Portal app.">
+      {/* Env var status + credential fields (prefilled, not saved) */}
+      <Section title="Daraja API Credentials" description="Prefilled from Vercel env vars. You can override for testing — changes are not saved to the database.">
+        <div className="flex flex-wrap gap-2 mb-3">
+          <EnvBadge envKey="MPESA_CONSUMER_KEY" />
+          <EnvBadge envKey="MPESA_CONSUMER_SECRET" />
+          <EnvBadge envKey="MPESA_SHORTCODE" />
+          <EnvBadge envKey="MPESA_PASSKEY" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1">Consumer Key</label>
-            <input className={inp} value={config.consumer_key || ''} onChange={e => update('consumer_key', e.target.value)} placeholder="e.g. Gx7Kq..." />
+            <input className={inp} value={consumerKey} onChange={e => setConsumerKey(e.target.value)} placeholder="From Safaricom Developer Portal" />
+            <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_CONSUMER_KEY</p>
           </div>
-          <SecretField label="Consumer Secret" field="consumer_secret" placeholder="e.g. Ab3Cd..." />
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Consumer Secret</label>
+            <div className="flex gap-1">
+              <input type={showSecrets.cs ? 'text' : 'password'} className={inp + ' flex-1'}
+                value={consumerSecret} onChange={e => setConsumerSecret(e.target.value)} placeholder="For testing only — not saved" />
+              <button onClick={() => toggle('cs')} className="px-2 text-gray-400 hover:text-gray-600">
+                {showSecrets.cs ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_CONSUMER_SECRET</p>
+          </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1">Shortcode (Paybill Number)</label>
-            <input className={inp} value={config.shortcode || ''} onChange={e => update('shortcode', e.target.value)} placeholder="e.g. 174379" />
+            <input className={inp} value={shortcode} onChange={e => setShortcode(e.target.value)} placeholder="e.g. 174379" />
+            <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_SHORTCODE</p>
           </div>
-          <SecretField label="Passkey (for STK Push)" field="passkey" placeholder="Lipa Na M-Pesa passkey" />
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Passkey (for STK Push)</label>
+            <div className="flex gap-1">
+              <input type={showSecrets.pk ? 'text' : 'password'} className={inp + ' flex-1'}
+                value={passkey} onChange={e => setPasskey(e.target.value)} placeholder="For testing only — not saved" />
+              <button onClick={() => toggle('pk')} className="px-2 text-gray-400 hover:text-gray-600">
+                {showSecrets.pk ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_PASSKEY</p>
+          </div>
         </div>
         <div className="mt-3 flex items-center gap-3">
           <button onClick={testConnection} disabled={testing}
@@ -618,34 +666,41 @@ function MpesaSetupEditor() {
             {testing ? <Loader2 size={14} className="animate-spin" /> : <Wifi size={14} />}
             Test Connection
           </button>
-          <p className="text-[10px] text-gray-400">Tests OAuth token generation against {config.environment} API</p>
+          <p className="text-[10px] text-gray-400">Tests OAuth token generation against {environment} API</p>
         </div>
       </Section>
 
-      {/* Callback Secret */}
-      <Section title="Callback Secret" description="Random secret used to sign STK Push callback URLs. Prevents spoofed callbacks.">
+      {/* Callback Secret — generate only, never saved to DB */}
+      <Section title="Callback Secret" description="Generate a random secret for signing STK Push callback URLs. Copy to Vercel env vars.">
+        <div className="flex flex-wrap gap-2 mb-3">
+          <EnvBadge envKey="MPESA_CALLBACK_SECRET" />
+        </div>
         <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <SecretField label="MPESA_CALLBACK_SECRET" field="callback_secret" placeholder="Click Generate to create" />
-          </div>
           <button onClick={generateSecret} disabled={generating === 'secret'}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex-shrink-0">
             {generating === 'secret' ? <Loader2 size={14} className="animate-spin" /> : <Key size={14} />}
-            Generate
+            Generate New Secret
           </button>
         </div>
-        <p className="text-[10px] text-amber-600 mt-2">After generating, copy this value to your Vercel environment variables as MPESA_CALLBACK_SECRET.</p>
+        {generatedSecret && (
+          <div className="mt-3 bg-gray-900 rounded-lg p-3 flex items-center gap-2">
+            <code className="text-xs font-mono text-green-400 flex-1 break-all">{generatedSecret}</code>
+            <button onClick={() => copyToClipboard(generatedSecret, 'Callback secret')}
+              className="px-2 py-1 text-gray-400 hover:text-white flex-shrink-0"><Copy size={14} /></button>
+          </div>
+        )}
+        <p className="text-[10px] text-amber-600 mt-2">Copy this value to Vercel env vars as MPESA_CALLBACK_SECRET, then redeploy.</p>
       </Section>
 
-      {/* Certificates */}
-      <Section title="API Certificates" description="Public key certificates from Safaricom for encrypting the security credential.">
+      {/* Certificates — saved to DB (public keys, not secrets) */}
+      <Section title="API Certificates" description="Safaricom public key certificates for encrypting the security credential. These are saved to the database (they are public keys, not secrets).">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-gray-700">🧪 Sandbox Certificate</span>
-              {config.sandbox_cert && config.sandbox_cert !== 'Uploaded' ? (
-                <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Loaded</span>
-              ) : config.sandbox_cert === 'Uploaded' ? (
+              {pendingCerts.sandbox_cert ? (
+                <span className="text-xs text-blue-600 font-medium flex items-center gap-1"><AlertCircle size={12} /> Loaded (unsaved)</span>
+              ) : sandboxCertUploaded ? (
                 <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Saved</span>
               ) : (
                 <span className="text-xs text-gray-400">Not uploaded</span>
@@ -656,13 +711,12 @@ function MpesaSetupEditor() {
               <input type="file" accept=".cer,.pem,.crt" className="hidden" onChange={handleCertUpload('sandbox')} />
             </label>
           </div>
-
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-gray-700">🔴 Production Certificate</span>
-              {config.production_cert && config.production_cert !== 'Uploaded' ? (
-                <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Loaded</span>
-              ) : config.production_cert === 'Uploaded' ? (
+              {pendingCerts.production_cert ? (
+                <span className="text-xs text-blue-600 font-medium flex items-center gap-1"><AlertCircle size={12} /> Loaded (unsaved)</span>
+              ) : productionCertUploaded ? (
                 <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Saved</span>
               ) : (
                 <span className="text-xs text-gray-400">Not uploaded</span>
@@ -682,69 +736,72 @@ function MpesaSetupEditor() {
         </p>
       </Section>
 
-      {/* Security Credential */}
-      <Section title="Security Credential" description="Encrypts the initiator password with Safaricom's certificate. Required for Transaction Status Query and Reversals.">
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Initiator Name</label>
-              <input className={inp} value={config.initiator_name || ''} onChange={e => update('initiator_name', e.target.value)} placeholder="e.g. testapi" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Initiator Password</label>
-              <div className="flex gap-1">
-                <input type={showSecrets.init_pass ? 'text' : 'password'} className={inp + ' flex-1'}
-                  value={initiatorPassword} onChange={e => setInitiatorPassword(e.target.value)}
-                  placeholder="Enter password to encrypt" />
-                <button onClick={() => toggle('init_pass')} className="px-2 text-gray-400 hover:text-gray-600">
-                  {showSecrets.init_pass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1">Password is used to generate the credential, never stored.</p>
-            </div>
+      {/* Security Credential — generate only */}
+      <Section title="Security Credential" description="Encrypts the initiator password with Safaricom's certificate. Copy result to Vercel env vars.">
+        <div className="flex flex-wrap gap-2 mb-3">
+          <EnvBadge envKey="MPESA_INITIATOR_NAME" />
+          <EnvBadge envKey="MPESA_SECURITY_CREDENTIAL" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Initiator Name</label>
+            <input className={inp} value={initiatorName} onChange={e => setInitiatorName(e.target.value)} placeholder="e.g. testapi" />
+            <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_INITIATOR_NAME</p>
           </div>
-
-          <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <SecretField label="Generated Security Credential" field="security_credential" placeholder="Click Generate after entering password" />
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Initiator Password</label>
+            <div className="flex gap-1">
+              <input type={showSecrets.init_pass ? 'text' : 'password'} className={inp + ' flex-1'}
+                value={initiatorPassword} onChange={e => setInitiatorPassword(e.target.value)}
+                placeholder="Enter password to encrypt" />
+              <button onClick={() => toggle('init_pass')} className="px-2 text-gray-400 hover:text-gray-600">
+                {showSecrets.init_pass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
-            <button onClick={generateCredential} disabled={generating === 'credential' || !initiatorPassword}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex-shrink-0">
-              {generating === 'credential' ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
-              Generate Credential
-            </button>
+            <p className="text-[10px] text-gray-400 mt-1">Used to generate the credential — never stored anywhere.</p>
           </div>
-
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-            <p className="text-xs text-blue-700">
-              <strong>How it works:</strong> Your initiator password is encrypted using the {config.environment} certificate
-              and converted to base64. The password is NOT stored — only the encrypted credential is saved.
-              Add the credential to Vercel as MPESA_SECURITY_CREDENTIAL.
-            </p>
+        </div>
+        <div className="mt-3">
+          <button onClick={generateCredential} disabled={generating === 'credential' || !initiatorPassword}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
+            {generating === 'credential' ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+            Generate Credential
+          </button>
+        </div>
+        {generatedCredential && (
+          <div className="mt-3 bg-gray-900 rounded-lg p-3 flex items-center gap-2">
+            <code className="text-xs font-mono text-green-400 flex-1 break-all">{generatedCredential.substring(0, 60)}...</code>
+            <button onClick={() => copyToClipboard(generatedCredential, 'Security credential')}
+              className="px-2 py-1 text-gray-400 hover:text-white flex-shrink-0"><Copy size={14} /></button>
           </div>
+        )}
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-3">
+          <p className="text-xs text-blue-700">
+            <strong>How it works:</strong> Your initiator password is encrypted using the {environment} certificate
+            and converted to base64. The password is never stored. Copy the generated credential to Vercel as MPESA_SECURITY_CREDENTIAL.
+          </p>
         </div>
       </Section>
 
-      {/* Env vars reminder */}
-      <Section title="Environment Variables" description="Copy these values to your Vercel project settings.">
+      {/* Env vars reference */}
+      <Section title="Required Environment Variables" description="Set these in Vercel → Settings → Environment Variables. Redeploy after any change.">
         <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto">
-          <p>MPESA_ENV={config.environment}</p>
-          <p>MPESA_CONSUMER_KEY={config.consumer_key || '...'}</p>
-          <p>MPESA_CONSUMER_SECRET={config.consumer_secret?.startsWith('••••') ? '...' : config.consumer_secret || '...'}</p>
-          <p>MPESA_SHORTCODE={config.shortcode || '...'}</p>
-          <p>MPESA_PASSKEY={config.passkey?.startsWith('••••') ? '...' : config.passkey || '...'}</p>
-          <p>MPESA_CALLBACK_SECRET={config.callback_secret?.startsWith('••••') ? '...' : config.callback_secret || '...'}</p>
-          {config.initiator_name && <p>MPESA_INITIATOR_NAME={config.initiator_name}</p>}
-          {config.security_credential && !config.security_credential.startsWith('••••') && (
-            <p>MPESA_SECURITY_CREDENTIAL={config.security_credential.substring(0, 30)}...</p>
-          )}
+          <p>MPESA_ENV=<span className="text-gray-500">{environment}</span></p>
+          <p>MPESA_CONSUMER_KEY=<span className="text-gray-500">{consumerKey || 'your_consumer_key'}</span></p>
+          <p>MPESA_CONSUMER_SECRET=<span className="text-gray-500">your_consumer_secret</span></p>
+          <p>MPESA_SHORTCODE=<span className="text-gray-500">{shortcode || '174379'}</span></p>
+          <p>MPESA_PASSKEY=<span className="text-gray-500">your_passkey</span></p>
+          <p>MPESA_CALLBACK_SECRET=<span className="text-gray-500">{generatedSecret || 'your_callback_secret'}</span></p>
+          {initiatorName && <p>MPESA_INITIATOR_NAME=<span className="text-gray-500">{initiatorName}</span></p>}
+          {generatedCredential && <p>MPESA_SECURITY_CREDENTIAL=<span className="text-gray-500">{generatedCredential.substring(0, 30)}...</span></p>}
         </div>
       </Section>
 
+      {/* Save — only environment + certs */}
       <div className="flex justify-end">
         <button onClick={save} disabled={saving}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save M-Pesa Configuration
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Environment & Certificates
         </button>
       </div>
     </div>
