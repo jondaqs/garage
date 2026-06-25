@@ -142,6 +142,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
   const [cardState, setCardState] = useState('idle') // idle | initiating | success | failed
   const [cardError, setCardError] = useState('')
   const [cardReceipt, setCardReceipt] = useState(null)
+  const [expiredToastId, setExpiredToastId] = useState(null) // invoice id showing expiry toast
 
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
@@ -1601,20 +1602,35 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                       {!isPaid && (
                         <div>
                           {!isPayingThis ? (
-                            <button onClick={() => {
-                              if (isExpired) {
-                                setError(`Invoice ${inv.invoice_ref_no} expired on ${fmtD(inv.due_date)}. Please create a new subscription to get a fresh invoice.`)
-                                return
-                              }
-                              setPayingInvoiceId(inv.id); setPayAmount(inv.balance_due?.toString() || inv.total_amount?.toString())
-                            }}
-                              className={`w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed rounded-xl text-sm font-medium transition-colors ${
-                                isExpired
-                                  ? 'border-red-200 text-red-400 hover:border-red-300 hover:text-red-500 cursor-not-allowed'
-                                  : 'border-gray-200 text-gray-500 hover:border-gray-900 hover:text-gray-900'
-                              }`}>
-                              <CreditCard size={15} /> {isExpired ? 'Invoice Expired' : 'Record Payment'}
-                            </button>
+                            <>
+                              <button onClick={() => {
+                                if (isExpired) {
+                                  setExpiredToastId(inv.id)
+                                  setTimeout(() => setExpiredToastId(prev => prev === inv.id ? null : prev), 5000)
+                                  return
+                                }
+                                setPayingInvoiceId(inv.id); setPayAmount(inv.balance_due?.toString() || inv.total_amount?.toString())
+                              }}
+                                className={`w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed rounded-xl text-sm font-medium transition-colors ${
+                                  isExpired
+                                    ? 'border-red-200 text-red-400 hover:border-red-300 hover:text-red-500'
+                                    : 'border-gray-200 text-gray-500 hover:border-gray-900 hover:text-gray-900'
+                                }`}>
+                                <CreditCard size={15} /> {isExpired ? 'Invoice Expired' : 'Record Payment'}
+                              </button>
+                              {expiredToastId === inv.id && (
+                                <div className="mt-2 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                                  <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-xs font-semibold text-red-700">Invoice expired on {fmtD(inv.due_date)}</p>
+                                    <p className="text-[10px] text-red-500 mt-0.5">Please create a new subscription to get a fresh invoice.</p>
+                                  </div>
+                                  <button onClick={() => setExpiredToastId(null)} className="text-red-300 hover:text-red-500">
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <div className="rounded-2xl border border-gray-200 overflow-hidden">
                               <div className="bg-gray-900 px-5 py-3 flex items-center justify-between">
