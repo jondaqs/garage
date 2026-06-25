@@ -3,8 +3,10 @@
  * ──────────────────────────────
  * Admin-only SMS provider configuration.
  *
- * GET  — load saved config (masks secrets)
- * POST — actions: save | test_sms | check_balance
+ * SECURITY: Only `active_provider` is saved to the database.
+ * All credentials (API keys, usernames, etc.) live in Vercel env vars.
+ * The UI fields prefill from env vars and can be overridden for testing,
+ * but overrides are NOT persisted — they last only for that test send.
  *
  * Location: src/app/api/admin/sms-config/route.js
  */
@@ -22,51 +24,72 @@ function getServiceClient() {
   )
 }
 
-async function verifyAdmin(sc) {
-  const { data: isAdmin } = await sc.rpc('is_user_admin')
-  return !!isAdmin
-}
-
-// ─── Mask sensitive fields for display ────────────────────────────────────────
-
-function maskConfig(config) {
-  if (!config) return {}
-  const mask = (val) => val ? '••••' + val.slice(-4) : ''
-  return {
-    ...config,
-    africastalking: config.africastalking ? {
-      ...config.africastalking,
-      api_key: mask(config.africastalking.api_key),
-    } : {},
-    celcom: config.celcom ? {
-      ...config.celcom,
-      api_key: mask(config.celcom.api_key),
-    } : {},
+async function requireAdmin() {
+  const supabase = await createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    return { error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
   }
+
+  const { data: callerProfile } = await supabase
+    .from('user_profiles_secure')
+    .select('id, user_roles(role:user_roles_lookup(code))')
+    .eq('auth_user_id', session.user.id)
+    .single()
+
+  const codes = callerProfile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+  if (!codes.includes('admin') && !codes.includes('platform_admin')) {
+    return { error: NextResponse.json({ error: 'Admin only' }, { status: 403 }) }
+  }
+
+  return { ok: true, session }
 }
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
 
 export async function GET() {
   try {
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Auth required' }, { status: 401 })
+    const auth = await requireAdmin()
+    if (auth.error) return auth.error
 
     const sc = getServiceClient()
-    if (!(await verifyAdmin(sc))) {
-      return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-    }
 
+    // Read only active_provider from database
     const { data: row } = await sc
       .from('platform_settings')
       .select('setting_value, updated_at')
       .eq('setting_key', 'sms_config')
       .maybeSingle()
 
+    const savedProvider = row?.setting_value?.active_provider || null
+
+    // Auto-detect if nothing saved
+    const fallbackProvider = process.env.AT_API_KEY ? 'africastalking'
+      : process.env.CELCOM_API_KEY ? 'celcom' : 'none'
+
     return NextResponse.json({
-      config: maskConfig(row?.setting_value || null),
-      updated_at: row?.updated_at || null,
+      active_provider: savedProvider || fallbackProvider,
+      updated_at:      row?.updated_at || null,
+
+      // Non-secret env var values — prefill UI fields
+      africastalking: {
+        username:  process.env.AT_USERNAME  || '',
+        sender_id: process.env.AT_SENDER_ID || '',
+        sandbox:   process.env.AT_SANDBOX === 'true',
+      },
+      celcom: {
+        partner_id: process.env.CELCOM_PARTNER_ID || '',
+        sender_id:  process.env.CELCOM_SENDER_ID  || '',
+      },
+
+      // Boolean flags — are secret env vars set?
+      env: {
+        AT_API_KEY:       !!process.env.AT_API_KEY,
+        AT_USERNAME:      !!process.env.AT_USERNAME,
+        AT_SANDBOX:       process.env.AT_SANDBOX || '',
+        CELCOM_API_KEY:   !!process.env.CELCOM_API_KEY,
+        CELCOM_PARTNER_ID:!!process.env.CELCOM_PARTNER_ID,
+      },
     })
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -77,79 +100,42 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Auth required' }, { status: 401 })
+    const auth = await requireAdmin()
+    if (auth.error) return auth.error
 
-    const sc = getServiceClient()
-    if (!(await verifyAdmin(sc))) {
-      return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-    }
-
+    const sc   = getServiceClient()
     const body = await request.json()
     const { action } = body
 
-    // ── Save config ────────────────────────────────────────────────────────
+    // ── Save: only persists active_provider ─────────────────────────────────
     if (action === 'save') {
-      const incoming = body.config || {}
+      const activeProvider = body.active_provider || 'none'
 
-      // Load existing to preserve masked secrets
-      const { data: existingRow } = await sc
-        .from('platform_settings')
-        .select('setting_value')
-        .eq('setting_key', 'sms_config')
-        .maybeSingle()
-
-      const existing = existingRow?.setting_value || {}
-
-      // Merge: keep existing secrets if incoming has masked values
-      const merged = {
-        active_provider: incoming.active_provider || existing.active_provider || 'none',
-        africastalking: {
-          api_key:   incoming.africastalking?.api_key?.startsWith('••••')
-            ? existing.africastalking?.api_key || ''
-            : (incoming.africastalking?.api_key || ''),
-          username:  incoming.africastalking?.username  ?? existing.africastalking?.username ?? '',
-          sender_id: incoming.africastalking?.sender_id ?? existing.africastalking?.sender_id ?? '',
-          sandbox:   incoming.africastalking?.sandbox   ?? existing.africastalking?.sandbox ?? false,
-        },
-        celcom: {
-          api_key:    incoming.celcom?.api_key?.startsWith('••••')
-            ? existing.celcom?.api_key || ''
-            : (incoming.celcom?.api_key || ''),
-          partner_id: incoming.celcom?.partner_id ?? existing.celcom?.partner_id ?? '',
-          sender_id:  incoming.celcom?.sender_id  ?? existing.celcom?.sender_id ?? '',
-        },
-      }
-
-      const profileRes = await sc.from('user_profiles').select('id').eq('auth_user_id', user.id).single()
+      const profileRes = await sc.from('user_profiles').select('id').eq('auth_user_id', auth.session.user.id).single()
 
       const { error } = await sc
         .from('platform_settings')
         .upsert({
           setting_key:   'sms_config',
-          setting_value: merged,
-          description:   'SMS provider configuration (Africa\'s Talking / Celcom Africa)',
+          setting_value: { active_provider: activeProvider },
+          description:   'Active SMS provider (africastalking | celcom | none)',
           is_public:     false,
           updated_at:    new Date().toISOString(),
           updated_by:    profileRes?.data?.id || null,
         }, { onConflict: 'setting_key' })
 
       if (error) throw error
-
-      // Clear transport cache so next SMS uses new config
       clearSmsConfigCache()
 
       return NextResponse.json({
         success: true,
-        message: 'SMS configuration saved.',
-        config: maskConfig(merged),
+        message: `SMS provider set to "${activeProvider}". Credentials are read from Vercel env vars.`,
       })
     }
 
-    // ── Test SMS ───────────────────────────────────────────────────────────
+    // ── Test SMS: uses UI overrides for non-secrets, env for API keys ──────
     if (action === 'test_sms') {
-      const { phone, provider: testProvider } = body
+      const { phone, provider: testProvider, overrides } = body
       const steps = []
       const log = (step, ok, detail) => steps.push({ step, ok, detail })
 
@@ -166,39 +152,33 @@ export async function POST(request) {
       }
       log('Normalise', true, `${phone} → ${normPhone}`)
 
-      // Load real (unmasked) config
+      // Determine provider
       const { data: row } = await sc
         .from('platform_settings')
         .select('setting_value')
         .eq('setting_key', 'sms_config')
         .maybeSingle()
 
-      const config = row?.setting_value || {}
-      const provider = testProvider || config.active_provider || 'none'
+      const savedProvider = row?.setting_value?.active_provider || 'none'
+      const provider = testProvider || savedProvider
 
       if (provider === 'none' || !provider) {
-        log('Provider', false, 'No SMS provider configured')
+        log('Provider', false, 'No SMS provider selected — choose one and save first')
         return NextResponse.json({ success: false, steps }, { status: 400 })
       }
       log('Provider', true, provider === 'africastalking' ? "Africa's Talking" : 'Celcom Africa')
 
-      const providerConfig = config[provider] || {}
-
-      // Check credentials
-      if (provider === 'africastalking') {
-        if (!providerConfig.api_key || !providerConfig.username) {
-          log('Credentials', false, 'API Key or Username is missing')
-          return NextResponse.json({ success: false, steps }, { status: 400 })
-        }
-        const isSandbox = providerConfig.sandbox === true
-        log('Credentials', true, `Username: ${providerConfig.username}, Sender: ${providerConfig.sender_id || '(default)'}, Mode: ${isSandbox ? 'SANDBOX (no real delivery)' : 'PRODUCTION'}`)
-      } else {
-        if (!providerConfig.api_key || !providerConfig.partner_id) {
-          log('Credentials', false, 'API Key or Partner ID is missing')
-          return NextResponse.json({ success: false, steps }, { status: 400 })
-        }
-        log('Credentials', true, `Partner: ${providerConfig.partner_id}, Sender: ${providerConfig.sender_id || 'Motiifix'}`)
+      // API key always from env
+      const apiKey = provider === 'africastalking' ? process.env.AT_API_KEY : process.env.CELCOM_API_KEY
+      if (!apiKey) {
+        const envVar = provider === 'africastalking' ? 'AT_API_KEY' : 'CELCOM_API_KEY'
+        log('Env var', false, `${envVar} is not set in Vercel environment variables`)
+        return NextResponse.json({ success: false, steps }, { status: 400 })
       }
+      log('Env var', true, 'API key found in environment')
+
+      // Non-secret fields: use UI overrides if provided, fallback to env vars
+      const ov = overrides || {}
 
       // Queue
       let queueId = null
@@ -221,40 +201,60 @@ export async function POST(request) {
         let results
 
         if (provider === 'africastalking') {
-          const { sandbox, api_key, username, sender_id } = providerConfig
+          const username  = ov.username  || process.env.AT_USERNAME  || ''
+          const senderId  = ov.sender_id || process.env.AT_SENDER_ID || ''
+          const sandbox   = ov.sandbox != null ? ov.sandbox : (process.env.AT_SANDBOX === 'true')
+
+          if (!username) {
+            log('Config', false, 'Username is missing — set AT_USERNAME env var or enter in the field')
+            return NextResponse.json({ success: false, steps }, { status: 400 })
+          }
+
           const baseUrl = sandbox
             ? 'https://api.sandbox.africastalking.com/version1'
             : 'https://api.africastalking.com/version1'
 
+          log('Config', true, `Username: ${username}, Sender: ${senderId || '(default)'}, Mode: ${sandbox ? 'SANDBOX' : 'PRODUCTION'}, URL: ${baseUrl}`)
+
           const params = new URLSearchParams({ username, to: normPhone, message: testMessage })
-          if (sender_id) params.set('from', sender_id)
+          if (senderId) params.set('from', senderId)
 
           const res = await fetch(`${baseUrl}/messaging`, {
             method: 'POST',
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'apiKey': api_key },
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'apiKey': apiKey },
             body: params.toString(),
           })
           if (!res.ok) throw new Error(`AT HTTP ${res.status}: ${await res.text()}`)
           const data = await res.json()
-          results = data?.SMSMessageData?.Recipients ?? []
-          results = results.map(r => ({ number: r.number, status: r.status, messageId: r.messageId, cost: r.cost }))
+          results = (data?.SMSMessageData?.Recipients ?? []).map(r => ({
+            number: r.number, status: r.status, messageId: r.messageId, cost: r.cost,
+          }))
 
         } else {
+          const partnerId = ov.partner_id || process.env.CELCOM_PARTNER_ID || ''
+          const senderId  = ov.sender_id  || process.env.CELCOM_SENDER_ID  || 'Motiifix'
+
+          if (!partnerId) {
+            log('Config', false, 'Partner ID is missing — set CELCOM_PARTNER_ID env var or enter in the field')
+            return NextResponse.json({ success: false, steps }, { status: 400 })
+          }
+
+          log('Config', true, `Partner: ${partnerId}, Sender: ${senderId}`)
+
           const res = await fetch('https://isms.celcomafrica.com/api/services/sendsms/', {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              apikey: providerConfig.api_key,
-              partnerID: providerConfig.partner_id,
-              message: testMessage,
-              shortcode: providerConfig.sender_id || 'Motiifix',
-              mobile: normPhone.replace('+', ''),
+              apikey:    apiKey,
+              partnerID: partnerId,
+              message:   testMessage,
+              shortcode: senderId,
+              mobile:    normPhone.replace('+', ''),
             }),
           })
           if (!res.ok) throw new Error(`Celcom HTTP ${res.status}: ${await res.text()}`)
           const data = await res.json()
-          const responses = data?.responses || []
-          results = responses.map(r => ({
+          results = (data?.responses || []).map(r => ({
             number:    String(r.mobile || ''),
             status:    (r['response-description'] === 'Success' || r['respose-code'] === 200) ? 'Success' : (r['response-description'] || 'Failed'),
             messageId: String(r.messageid || ''),
@@ -268,7 +268,6 @@ export async function POST(request) {
           ? `Delivered! messageId=${first.messageId}, cost=${first.cost || 'N/A'}`
           : `Failed: status="${first.status}"`)
 
-        // Update queue
         if (queueId) {
           await sc.from('sms_queue').update({
             status: ok ? 'sent' : 'failed',
@@ -289,30 +288,21 @@ export async function POST(request) {
       }
     }
 
-    // ── Check balance (AT only) ────────────────────────────────────────────
+    // ── Check balance (Celcom only) ────────────────────────────────────────
     if (action === 'check_balance') {
-      const { data: row } = await sc
-        .from('platform_settings')
-        .select('setting_value')
-        .eq('setting_key', 'sms_config')
-        .maybeSingle()
+      const celcomKey  = process.env.CELCOM_API_KEY
+      const partnerId  = body.partner_id || process.env.CELCOM_PARTNER_ID
+      if (!celcomKey)  return NextResponse.json({ success: false, error: 'CELCOM_API_KEY not set in env' }, { status: 400 })
+      if (!partnerId)  return NextResponse.json({ success: false, error: 'CELCOM_PARTNER_ID not set' }, { status: 400 })
 
-      const config = row?.setting_value || {}
-      const provider = body.provider || config.active_provider
-
-      if (provider === 'celcom') {
-        try {
-          const celConfig = config.celcom || {}
-          const res = await fetch(`https://isms.celcomafrica.com/api/services/getbalance/?apikey=${encodeURIComponent(celConfig.api_key)}&partnerID=${encodeURIComponent(celConfig.partner_id)}`)
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const data = await res.json()
-          return NextResponse.json({ success: true, balance: data })
-        } catch (e) {
-          return NextResponse.json({ success: false, error: e.message }, { status: 500 })
-        }
+      try {
+        const res = await fetch(`https://isms.celcomafrica.com/api/services/getbalance/?apikey=${encodeURIComponent(celcomKey)}&partnerID=${encodeURIComponent(partnerId)}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        return NextResponse.json({ success: true, balance: data })
+      } catch (e) {
+        return NextResponse.json({ success: false, error: e.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: false, error: 'Balance check not supported for this provider' })
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

@@ -2,24 +2,32 @@
  * lib/sms/transport.js
  * ────────────────────
  * Multi-provider SMS gateway — supports Africa's Talking and Celcom Africa.
- * Admin can switch providers via Settings → SMS Setup without redeployment.
  *
- * Provider configs are read from `platform_settings.sms_config` (preferred)
- * with fallback to env vars for backward compatibility.
+ * ALL credentials come from Vercel env vars — nothing from the database.
+ * Only `active_provider` (which provider to use) is read from platform_settings
+ * so the admin can switch providers without redeploying.
  *
- * Env vars (fallback):
- *   AT_API_KEY / AT_USERNAME / AT_SENDER_ID / AT_SANDBOX     — Africa's Talking
- *   CELCOM_API_KEY / CELCOM_PARTNER_ID / CELCOM_SENDER_ID    — Celcom Africa
+ * Africa's Talking env vars:
+ *   AT_API_KEY       — API key
+ *   AT_USERNAME      — app username (use 'sandbox' for testing)
+ *   AT_SENDER_ID     — (optional) shortcode/alphanumeric sender
+ *   AT_SANDBOX       — set to 'true' for sandbox mode
+ *
+ * Celcom Africa env vars:
+ *   CELCOM_API_KEY    — API key
+ *   CELCOM_PARTNER_ID — partner ID
+ *   CELCOM_SENDER_ID  — (optional) sender name
  *
  * Server-only — never import in client components.
  */
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
-// ─── Config cache ────────────────────────────────────────────────────────────
+// ─── Active provider cache ───────────────────────────────────────────────────
+// Only the provider choice is cached from the database. All secrets come from env.
 
-let _configCache = null
-let _configFetchedAt = 0
+let _activeProvider = null
+let _providerFetchedAt = 0
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 function getInternalServiceClient() {
@@ -30,14 +38,14 @@ function getInternalServiceClient() {
 }
 
 /**
- * getSmsConfig()
- * Reads sms_config from platform_settings with a 5-minute in-memory cache.
- * Falls back to env vars if database config is unavailable.
+ * getActiveProvider()
+ * Reads which provider is active from platform_settings (cached 5 min).
+ * Falls back to whichever env var is set.
  */
-export async function getSmsConfig() {
+async function getActiveProvider() {
   const now = Date.now()
-  if (_configCache && (now - _configFetchedAt) < CACHE_TTL_MS) {
-    return _configCache
+  if (_activeProvider && (now - _providerFetchedAt) < CACHE_TTL_MS) {
+    return _activeProvider
   }
 
   try {
@@ -49,40 +57,28 @@ export async function getSmsConfig() {
         .eq('setting_key', 'sms_config')
         .maybeSingle()
 
-      if (row?.setting_value) {
-        _configCache = row.setting_value
-        _configFetchedAt = now
-        return _configCache
+      if (row?.setting_value?.active_provider) {
+        _activeProvider = row.setting_value.active_provider
+        _providerFetchedAt = now
+        return _activeProvider
       }
     }
   } catch (err) {
-    console.warn('⚠️  SMS config read failed (falling back to env vars):', err.message)
+    console.warn('⚠️  SMS provider read failed (falling back to env):', err.message)
   }
 
-  // Fallback: build config from env vars
-  const fallback = {
-    active_provider: process.env.AT_API_KEY ? 'africastalking' : (process.env.CELCOM_API_KEY ? 'celcom' : 'none'),
-    africastalking: {
-      api_key:   process.env.AT_API_KEY   || '',
-      username:  process.env.AT_USERNAME  || '',
-      sender_id: process.env.AT_SENDER_ID || '',
-      sandbox:   process.env.AT_SANDBOX === 'true',
-    },
-    celcom: {
-      api_key:    process.env.CELCOM_API_KEY    || '',
-      partner_id: process.env.CELCOM_PARTNER_ID || '',
-      sender_id:  process.env.CELCOM_SENDER_ID  || '',
-    },
-  }
-  _configCache = fallback
-  _configFetchedAt = now
-  return fallback
+  // Fallback: auto-detect from env vars
+  _activeProvider = process.env.AT_API_KEY ? 'africastalking'
+    : process.env.CELCOM_API_KEY ? 'celcom'
+    : 'none'
+  _providerFetchedAt = now
+  return _activeProvider
 }
 
-/** Force-clear cache (used after admin saves new config) */
+/** Force-clear cache (called after admin saves new config) */
 export function clearSmsConfigCache() {
-  _configCache = null
-  _configFetchedAt = 0
+  _activeProvider = null
+  _providerFetchedAt = 0
 }
 
 // ─── Phone normalisation ──────────────────────────────────────────────────────
@@ -121,11 +117,16 @@ export function normalisePhone(phone) {
 
 // ─── Provider: Africa's Talking ───────────────────────────────────────────────
 
-async function sendViaAfricasTalking({ to, message, config }) {
-  const { api_key, username, sender_id, sandbox } = config
+async function sendViaAfricasTalking({ to, message }) {
+  const apiKey   = process.env.AT_API_KEY
+  const username = process.env.AT_USERNAME
+  const senderId = process.env.AT_SENDER_ID || undefined
+  const sandbox  = process.env.AT_SANDBOX === 'true'
 
-  if (!api_key || !username) {
-    throw new Error("Africa's Talking credentials missing (api_key / username)")
+  if (!apiKey || !username) {
+    throw new Error(
+      "Africa's Talking credentials missing. Set AT_API_KEY and AT_USERNAME in Vercel env vars."
+    )
   }
 
   const baseUrl = sandbox
@@ -137,14 +138,14 @@ async function sendViaAfricasTalking({ to, message, config }) {
     to:      Array.isArray(to) ? to.join(',') : to,
     message: message.slice(0, 1600),
   })
-  if (sender_id) body.set('from', sender_id)
+  if (senderId) body.set('from', senderId)
 
   const response = await fetch(`${baseUrl}/messaging`, {
     method:  'POST',
     headers: {
       'Accept':       'application/json',
       'Content-Type': 'application/x-www-form-urlencoded',
-      'apiKey':       api_key,
+      'apiKey':       apiKey,
     },
     body: body.toString(),
   })
@@ -157,6 +158,7 @@ async function sendViaAfricasTalking({ to, message, config }) {
   const data = await response.json()
   const results = data?.SMSMessageData?.Recipients ?? []
 
+  // Log failures without throwing (partial success is valid)
   results.forEach(r => {
     if (r.status !== 'Success') {
       console.warn(`⚠️  SMS to ${r.number} failed: ${r.status}`)
@@ -173,23 +175,18 @@ async function sendViaAfricasTalking({ to, message, config }) {
 
 // ─── Provider: Celcom Africa ──────────────────────────────────────────────────
 
-async function sendViaCelcom({ to, message, config }) {
-  const { api_key, partner_id, sender_id } = config
+async function sendViaCelcom({ to, message }) {
+  const apiKey    = process.env.CELCOM_API_KEY
+  const partnerId = process.env.CELCOM_PARTNER_ID
+  const senderId  = process.env.CELCOM_SENDER_ID || 'Motiifix'
 
-  if (!api_key || !partner_id) {
-    throw new Error('Celcom Africa credentials missing (api_key / partner_id)')
+  if (!apiKey || !partnerId) {
+    throw new Error(
+      'Celcom Africa credentials missing. Set CELCOM_API_KEY and CELCOM_PARTNER_ID in Vercel env vars.'
+    )
   }
 
-  // Celcom expects a single number per request (comma-separated for bulk)
   const recipients = Array.isArray(to) ? to.join(',') : to
-
-  const payload = {
-    apikey:    api_key,
-    partnerID: partner_id,
-    message:   message.slice(0, 1600),
-    shortcode: sender_id || 'Motiifix',
-    mobile:    recipients,
-  }
 
   const response = await fetch('https://isms.celcomafrica.com/api/services/sendsms/', {
     method:  'POST',
@@ -197,7 +194,13 @@ async function sendViaCelcom({ to, message, config }) {
       'Accept':       'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      apikey:    apiKey,
+      partnerID: partnerId,
+      message:   message.slice(0, 1600),
+      shortcode: senderId,
+      mobile:    recipients,
+    }),
   })
 
   if (!response.ok) {
@@ -208,11 +211,10 @@ async function sendViaCelcom({ to, message, config }) {
   const data = await response.json()
   const responses = data?.responses || []
 
-  // Celcom returns { "respose-code": 200, "response-description": "Success", "mobile": ..., "messageid": ... }
-  // Note: AT has typo "respose-code" in their API
   return responses.map(r => ({
     number:    String(r.mobile || ''),
-    status:    (r['response-description'] === 'Success' || r['respose-code'] === 200) ? 'Success' : (r['response-description'] || 'Failed'),
+    status:    (r['response-description'] === 'Success' || r['respose-code'] === 200)
+      ? 'Success' : (r['response-description'] || 'Failed'),
     messageId: String(r.messageid || ''),
     cost:      r.cost || '',
   }))
@@ -224,12 +226,12 @@ async function sendViaCelcom({ to, message, config }) {
  * sendSms({ to, message })
  *
  * @param {string|string[]} to      - E.164 phone number(s)
- * @param {string}          message - SMS body
+ * @param {string}          message - SMS body (≤160 chars for single, auto-splits)
  * @returns {Promise<Array<{number, status, messageId, cost}>>}
+ * @throws on network error or provider non-2xx response
  */
 export async function sendSms({ to, message }) {
-  const smsConfig = await getSmsConfig()
-  const provider = smsConfig.active_provider
+  const provider = await getActiveProvider()
 
   const recipients = (Array.isArray(to) ? to : [to])
     .map(normalisePhone)
@@ -240,14 +242,16 @@ export async function sendSms({ to, message }) {
   }
 
   if (provider === 'celcom') {
-    return sendViaCelcom({ to: recipients, message, config: smsConfig.celcom || {} })
+    return sendViaCelcom({ to: recipients, message })
   }
 
   if (provider === 'africastalking') {
-    return sendViaAfricasTalking({ to: recipients, message, config: smsConfig.africastalking || {} })
+    return sendViaAfricasTalking({ to: recipients, message })
   }
 
-  throw new Error(`SMS provider "${provider}" is not configured. Set up a provider in Admin → Settings → SMS Setup.`)
+  throw new Error(
+    `SMS provider "${provider}" is not configured. Set up a provider in Admin → Settings → SMS Setup.`
+  )
 }
 
 // ─── Queue helpers ────────────────────────────────────────────────────────────
@@ -270,6 +274,7 @@ export async function queueSmsRecord(supabase, {
       .from('sms_queue')
       .insert({
         recipient_phone: recipientPhone,
+        // recipient_name, reference_table, reference_id not on this table
         message,
         status,
         error_message:   errorMessage || null,
@@ -295,6 +300,7 @@ export async function markSmsQueued(supabase, queueId, { status, sentAt, errorMe
       status,
       sent_at:       sentAt       || null,
       error_message: errorMessage || null,
+      // provider_message_id, cost not on this table
     }).eq('id', queueId)
     if (messageId) console.log(`[sms_queue] messageId=${messageId}`)
   } catch (err) {
@@ -330,14 +336,14 @@ export async function sendAndQueueSms(supabase, {
   }
 
   // Check if any provider is configured
-  let smsConfig
+  let provider
   try {
-    smsConfig = await getSmsConfig()
+    provider = await getActiveProvider()
   } catch {
-    smsConfig = { active_provider: 'none' }
+    provider = 'none'
   }
 
-  if (!smsConfig.active_provider || smsConfig.active_provider === 'none') {
+  if (!provider || provider === 'none') {
     console.warn('⚠️  SMS skipped — no SMS provider configured')
     await queueSmsRecord(supabase, {
       recipientPhone: phone,

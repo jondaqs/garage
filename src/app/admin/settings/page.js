@@ -752,21 +752,23 @@ function MpesaSetupEditor() {
 }
 
 function SmsSetupEditor() {
-  const [config, setConfig] = useState({
-    active_provider: 'none',
-    africastalking: { api_key: '', username: '', sender_id: '', sandbox: false },
-    celcom:         { api_key: '', partner_id: '', sender_id: '' },
-  })
-  const [loading, setLoading]       = useState(true)
-  const [saving, setSaving]         = useState(false)
-  const [msg, setMsg]               = useState({ type: '', text: '' })
-  const [showSecrets, setShowSecrets] = useState({})
-  const [updatedAt, setUpdatedAt]   = useState(null)
-  // Test SMS state
+  const [activeProvider, setActiveProvider] = useState('none')
+  const [envStatus, setEnvStatus]          = useState({})
+  const [loading, setLoading]              = useState(true)
+  const [saving, setSaving]                = useState(false)
+  const [msg, setMsg]                      = useState({ type: '', text: '' })
+  const [updatedAt, setUpdatedAt]          = useState(null)
+
+  // UI-only fields — prefilled from env, editable for testing, never saved to DB
+  const [at, setAt]       = useState({ username: '', sender_id: '', sandbox: false })
+  const [celcom, setCelcom] = useState({ partner_id: '', sender_id: '' })
+
+  // Test SMS
   const [testPhone, setTestPhone]   = useState('')
   const [testing, setTesting]       = useState(false)
   const [testSteps, setTestSteps]   = useState([])
-  // Balance state
+
+  // Balance
   const [balanceLoading, setBalanceLoading] = useState(false)
   const [balanceInfo, setBalanceInfo]       = useState(null)
 
@@ -774,44 +776,27 @@ function SmsSetupEditor() {
     fetch('/api/admin/sms-config')
       .then(r => r.json())
       .then(data => {
-        if (data.config) setConfig(prev => ({
-          ...prev,
-          ...data.config,
-          africastalking: { ...prev.africastalking, ...data.config.africastalking },
-          celcom:         { ...prev.celcom,         ...data.config.celcom },
-        }))
-        if (data.updated_at) setUpdatedAt(data.updated_at)
+        if (data.active_provider) setActiveProvider(data.active_provider)
+        if (data.africastalking)  setAt(prev => ({ ...prev, ...data.africastalking }))
+        if (data.celcom)          setCelcom(prev => ({ ...prev, ...data.celcom }))
+        if (data.env)             setEnvStatus(data.env)
+        if (data.updated_at)      setUpdatedAt(data.updated_at)
       })
       .catch(e => setMsg({ type: 'error', text: e.message }))
       .finally(() => setLoading(false))
   }, [])
 
-  const update = (provider, key, val) => {
-    setConfig(prev => ({
-      ...prev,
-      [provider]: { ...prev[provider], [key]: val },
-    }))
-  }
-
-  const setProvider = (id) => setConfig(prev => ({ ...prev, active_provider: id }))
-  const toggleSecret = (key) => setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }))
-  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 4000) }
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 5000) }
 
   const save = async () => {
     setSaving(true); setMsg({ type: '', text: '' })
     try {
       const res = await fetch('/api/admin/sms-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', config }),
+        body: JSON.stringify({ action: 'save', active_provider: activeProvider }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      if (data.config) setConfig(prev => ({
-        ...prev,
-        ...data.config,
-        africastalking: { ...prev.africastalking, ...data.config.africastalking },
-        celcom:         { ...prev.celcom,         ...data.config.celcom },
-      }))
       flash('success', data.message)
     } catch (e) { flash('error', e.message) }
     finally { setSaving(false) }
@@ -821,9 +806,14 @@ function SmsSetupEditor() {
     if (!testPhone.trim()) { flash('error', 'Enter a phone number'); return }
     setTesting(true); setTestSteps([]); setMsg({ type: '', text: '' })
     try {
+      // Send current UI field values as overrides — not saved, just used for this test
+      const overrides = activeProvider === 'africastalking'
+        ? { username: at.username, sender_id: at.sender_id, sandbox: at.sandbox }
+        : { partner_id: celcom.partner_id, sender_id: celcom.sender_id }
+
       const res = await fetch('/api/admin/sms-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test_sms', phone: testPhone.trim() }),
+        body: JSON.stringify({ action: 'test_sms', phone: testPhone.trim(), provider: activeProvider, overrides }),
       })
       const data = await res.json()
       setTestSteps(data.steps || [])
@@ -837,7 +827,7 @@ function SmsSetupEditor() {
     try {
       const res = await fetch('/api/admin/sms-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check_balance', provider: config.active_provider }),
+        body: JSON.stringify({ action: 'check_balance', partner_id: celcom.partner_id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -848,23 +838,13 @@ function SmsSetupEditor() {
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
 
-  const SecretInput = ({ label, provider, field, placeholder }) => (
-    <div>
-      <label className="text-xs font-semibold text-gray-600 block mb-1">{label}</label>
-      <div className="flex gap-1">
-        <input
-          type={showSecrets[`${provider}_${field}`] ? 'text' : 'password'}
-          className={inp + ' flex-1'}
-          value={config[provider]?.[field] || ''}
-          onChange={e => update(provider, field, e.target.value)}
-          placeholder={placeholder}
-        />
-        <button onClick={() => toggleSecret(`${provider}_${field}`)}
-          className="px-2 text-gray-400 hover:text-gray-600" title={showSecrets[`${provider}_${field}`] ? 'Hide' : 'Show'}>
-          {showSecrets[`${provider}_${field}`] ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
-    </div>
+  const EnvBadge = ({ envKey }) => (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
+      envStatus[envKey] ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+    }`}>
+      {envStatus[envKey] ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
+      {envKey}: {envStatus[envKey] ? 'Set' : 'Missing'}
+    </span>
   )
 
   return (
@@ -882,52 +862,64 @@ function SmsSetupEditor() {
         <p className="text-[10px] text-gray-400">Last updated: {new Date(updatedAt).toLocaleString('en-KE')}</p>
       )}
 
-      {/* ── Active Provider ─────────────────────────────────────────────── */}
-      <Section title="Active SMS Provider" description="Choose which provider sends SMS notifications. Only one can be active at a time.">
+      {/* ── Active Provider (this is what gets saved) ── */}
+      <Section title="Active SMS Provider" description="This is the only setting saved to the database. All credentials must be set in Vercel environment variables.">
         <div className="flex gap-3 flex-wrap">
           {[
             { id: 'africastalking', label: "Africa's Talking", cost: '~KES 0.80/SMS', activeClass: 'bg-blue-50 border-blue-500 text-blue-700' },
             { id: 'celcom',         label: 'Celcom Africa',    cost: '~KES 0.25/SMS', activeClass: 'bg-emerald-50 border-emerald-500 text-emerald-700' },
             { id: 'none',           label: 'Disabled',         cost: 'No SMS sent',   activeClass: 'bg-gray-100 border-gray-400 text-gray-700' },
           ].map(p => (
-            <button key={p.id} onClick={() => setProvider(p.id)}
+            <button key={p.id} onClick={() => setActiveProvider(p.id)}
               className={`flex-1 min-w-[140px] px-4 py-3 rounded-lg text-sm font-medium border-2 transition-all text-left ${
-                config.active_provider === p.id
-                  ? p.activeClass
-                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
+                activeProvider === p.id ? p.activeClass : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
               }`}>
               <div className="font-semibold">{p.label}</div>
               <div className="text-[10px] mt-0.5 opacity-75">{p.cost}</div>
             </button>
           ))}
         </div>
-        {config.active_provider === 'none' && (
-          <p className="text-xs text-amber-600 mt-2 font-medium">⚠ SMS is disabled — no notifications will be sent via SMS.</p>
+        {activeProvider === 'none' && (
+          <p className="text-xs text-amber-600 mt-2 font-medium">SMS is disabled — no notifications will be sent via SMS.</p>
         )}
+        <div className="flex justify-end mt-4">
+          <button onClick={save} disabled={saving}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Provider Choice
+          </button>
+        </div>
       </Section>
 
-      {/* ── Africa's Talking Credentials ────────────────────────────────── */}
-      {(config.active_provider === 'africastalking' || config.africastalking?.api_key) && (
-        <Section title="Africa's Talking" description="africastalking.com — API credentials from your AT dashboard.">
+      {/* ── Africa's Talking ── */}
+      {activeProvider === 'africastalking' && (
+        <Section title="Africa's Talking" description="Fields below are prefilled from Vercel env vars. You can override them here for testing — changes are not saved.">
+          <div className="flex flex-wrap gap-2 mb-3">
+            <EnvBadge envKey="AT_API_KEY" />
+            <EnvBadge envKey="AT_USERNAME" />
+          </div>
+          {!envStatus.AT_API_KEY && (
+            <p className="text-xs text-red-600 mb-3">Set <code className="bg-gray-100 px-1 rounded text-[11px]">AT_API_KEY</code> in Vercel → Settings → Environment Variables, then redeploy.</p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <SecretInput label="API Key" provider="africastalking" field="api_key" placeholder="Your AT API key" />
             <div>
               <label className="text-xs font-semibold text-gray-600 block mb-1">Username</label>
-              <input className={inp} value={config.africastalking?.username || ''} onChange={e => update('africastalking', 'username', e.target.value)}
-                placeholder="e.g. your_app_name or sandbox" />
+              <input className={inp} value={at.username} onChange={e => setAt(p => ({ ...p, username: e.target.value }))}
+                placeholder="e.g. your_app_name (from AT dashboard)" />
+              <p className="text-[10px] text-gray-400 mt-1">Env: AT_USERNAME</p>
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 block mb-1">Sender ID (optional)</label>
-              <input className={inp} value={config.africastalking?.sender_id || ''} onChange={e => update('africastalking', 'sender_id', e.target.value)}
+              <input className={inp} value={at.sender_id} onChange={e => setAt(p => ({ ...p, sender_id: e.target.value }))}
                 placeholder="e.g. MOTIIFIX (requires AT approval)" />
+              <p className="text-[10px] text-gray-400 mt-1">Env: AT_SENDER_ID · Leave blank to use default</p>
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 block mb-1">Mode</label>
               <div className="flex gap-2 mt-1">
                 {[false, true].map(sb => (
-                  <button key={String(sb)} onClick={() => update('africastalking', 'sandbox', sb)}
+                  <button key={String(sb)} onClick={() => setAt(p => ({ ...p, sandbox: sb }))}
                     className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                      config.africastalking?.sandbox === sb
+                      at.sandbox === sb
                         ? sb ? 'bg-blue-600 text-white border-blue-600' : 'bg-red-600 text-white border-red-600'
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                     }`}>
@@ -935,33 +927,41 @@ function SmsSetupEditor() {
                   </button>
                 ))}
               </div>
-              {!config.africastalking?.sandbox && config.active_provider === 'africastalking' && (
-                <p className="text-[10px] text-red-600 mt-1 font-medium">Production — real SMS will be sent and charged.</p>
+              <p className="text-[10px] text-gray-400 mt-1">Env: AT_SANDBOX={at.sandbox ? 'true' : 'false'}</p>
+              {!at.sandbox && (
+                <p className="text-[10px] text-red-600 mt-0.5 font-medium">Production — real SMS will be sent and charged.</p>
               )}
             </div>
           </div>
         </Section>
       )}
 
-      {/* ── Celcom Africa Credentials ───────────────────────────────────── */}
-      {(config.active_provider === 'celcom' || config.celcom?.api_key) && (
-        <Section title="Celcom Africa" description="celcomafrica.com — API credentials from your Celcom dashboard.">
+      {/* ── Celcom Africa ── */}
+      {activeProvider === 'celcom' && (
+        <Section title="Celcom Africa" description="Fields below are prefilled from Vercel env vars. You can override them here for testing — changes are not saved.">
+          <div className="flex flex-wrap gap-2 mb-3">
+            <EnvBadge envKey="CELCOM_API_KEY" />
+            <EnvBadge envKey="CELCOM_PARTNER_ID" />
+          </div>
+          {!envStatus.CELCOM_API_KEY && (
+            <p className="text-xs text-red-600 mb-3">Set <code className="bg-gray-100 px-1 rounded text-[11px]">CELCOM_API_KEY</code> in Vercel → Settings → Environment Variables, then redeploy.</p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <SecretInput label="API Key" provider="celcom" field="api_key" placeholder="Your Celcom API key" />
             <div>
               <label className="text-xs font-semibold text-gray-600 block mb-1">Partner ID</label>
-              <input className={inp} value={config.celcom?.partner_id || ''} onChange={e => update('celcom', 'partner_id', e.target.value)}
+              <input className={inp} value={celcom.partner_id} onChange={e => setCelcom(p => ({ ...p, partner_id: e.target.value }))}
                 placeholder="Your Celcom partner ID" />
+              <p className="text-[10px] text-gray-400 mt-1">Env: CELCOM_PARTNER_ID</p>
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 block mb-1">Sender ID / Shortcode</label>
-              <input className={inp} value={config.celcom?.sender_id || ''} onChange={e => update('celcom', 'sender_id', e.target.value)}
-                placeholder="e.g. MOTIIFIX or leave blank for default" />
-              <p className="text-[10px] text-gray-400 mt-1">Sender ID registration ~KES 6,500/network at Celcom.</p>
+              <input className={inp} value={celcom.sender_id} onChange={e => setCelcom(p => ({ ...p, sender_id: e.target.value }))}
+                placeholder="e.g. MOTIIFIX or leave blank" />
+              <p className="text-[10px] text-gray-400 mt-1">Env: CELCOM_SENDER_ID · ~KES 6,500/network to register</p>
             </div>
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <button onClick={checkBalance} disabled={balanceLoading || !config.celcom?.api_key}
+            <button onClick={checkBalance} disabled={balanceLoading || !envStatus.CELCOM_API_KEY}
               className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 disabled:opacity-50 border border-gray-200">
               {balanceLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Check Balance
@@ -973,9 +973,32 @@ function SmsSetupEditor() {
         </Section>
       )}
 
-      {/* ── Test SMS ────────────────────────────────────────────────────── */}
-      {config.active_provider !== 'none' && (
-        <Section title="Test SMS" description="Send a test message to verify your setup is working end-to-end.">
+      {/* ── Required Env Vars ── */}
+      {activeProvider !== 'none' && (
+        <Section title="Required Environment Variables" description="Set these in Vercel → Settings → Environment Variables. Redeploy after any change.">
+          <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto">
+            {activeProvider === 'africastalking' && (
+              <>
+                <p>AT_API_KEY=<span className="text-gray-500">your_api_key_here</span></p>
+                <p>AT_USERNAME=<span className="text-gray-500">{at.username || 'your_app_name'}</span></p>
+                <p>AT_SANDBOX=<span className="text-gray-500">{at.sandbox ? 'true' : 'false'}</span></p>
+                {at.sender_id && <p>AT_SENDER_ID=<span className="text-gray-500">{at.sender_id}</span></p>}
+              </>
+            )}
+            {activeProvider === 'celcom' && (
+              <>
+                <p>CELCOM_API_KEY=<span className="text-gray-500">your_api_key_here</span></p>
+                <p>CELCOM_PARTNER_ID=<span className="text-gray-500">{celcom.partner_id || 'your_partner_id'}</span></p>
+                {celcom.sender_id && <p>CELCOM_SENDER_ID=<span className="text-gray-500">{celcom.sender_id}</span></p>}
+              </>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Test SMS ── */}
+      {activeProvider !== 'none' && (
+        <Section title="Test SMS" description="Sends a test using the field values above (overrides env vars for this test only — not saved).">
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs font-semibold text-gray-600 block mb-1">Phone Number</label>
@@ -992,7 +1015,6 @@ function SmsSetupEditor() {
             </button>
           </div>
 
-          {/* Step-by-step results */}
           {testSteps.length > 0 && (
             <div className="mt-4 space-y-1">
               {testSteps.map((s, i) => (
@@ -1010,14 +1032,6 @@ function SmsSetupEditor() {
           )}
         </Section>
       )}
-
-      {/* ── Save ────────────────────────────────────────────────────────── */}
-      <div className="flex justify-end">
-        <button onClick={save} disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save SMS Configuration
-        </button>
-      </div>
     </div>
   )
 }
