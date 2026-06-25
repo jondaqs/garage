@@ -17,9 +17,7 @@ function getServiceClient() {
  * POST /api/payments/paystack/webhook
  *
  * Receives Paystack webhook events (charge.success, etc.).
- * Acts as a safety net — the primary verification is done via the
- * popup callback + /verify endpoint. This handles cases where the
- * popup was closed before the callback fired.
+ * Safety net for cases where the popup closed before the callback fired.
  */
 export async function POST(request) {
   try {
@@ -48,11 +46,14 @@ export async function POST(request) {
     const sc = getServiceClient()
 
     // Check if already processed (idempotency)
-    const { data: existing } = await sc.from('paystack_transactions')
-      .select('status')
-      .eq('reference', reference)
-      .single()
-      .catch(() => ({ data: null }))
+    let existing = null
+    try {
+      const { data: row } = await sc.from('paystack_transactions')
+        .select('status')
+        .eq('reference', reference)
+        .single()
+      existing = row
+    } catch { /* not found */ }
 
     if (existing?.status === 'verified') {
       console.info(`[paystack-webhook] Already processed: ${reference}`)
@@ -76,11 +77,12 @@ export async function POST(request) {
       return NextResponse.json({ received: true })
     }
 
-    // Calculate payment in invoice currency
-    let paymentInInvoiceCurrency = tx.amountValue
+    // Use subtotal (before service fee) for recording against the invoice
+    const subtotalKes = meta.subtotal_kes ? Number(meta.subtotal_kes) : tx.amountValue
+    let paymentInInvoiceCurrency = subtotalKes
     const originalCurrency = meta.original_currency || 'KES'
     if (exchangeRate && exchangeRate > 0 && originalCurrency !== 'KES') {
-      paymentInInvoiceCurrency = Math.round((tx.amountValue / exchangeRate) * 100) / 100
+      paymentInInvoiceCurrency = Math.round((subtotalKes / exchangeRate) * 100) / 100
     }
 
     // Process the payment
@@ -100,15 +102,17 @@ export async function POST(request) {
     })
 
     // Update tracking record
-    await sc.from('paystack_transactions').update({
-      status: payResult.success ? 'verified' : 'processing_failed',
-      channel: tx.channel,
-      card_last4: tx.cardLast4,
-      paid_at: tx.paidAt,
-      subscription_payment_id: payResult.paymentId || null,
-      result_message: payResult.success ? 'Verified via webhook' : payResult.error,
-      updated_at: new Date().toISOString(),
-    }).eq('reference', reference).catch(() => {})
+    try {
+      await sc.from('paystack_transactions').update({
+        status: payResult.success ? 'verified' : 'processing_failed',
+        channel: tx.channel,
+        card_last4: tx.cardLast4,
+        paid_at: tx.paidAt,
+        subscription_payment_id: payResult.paymentId || null,
+        result_message: payResult.success ? 'Verified via webhook' : payResult.error,
+        updated_at: new Date().toISOString(),
+      }).eq('reference', reference)
+    } catch (e) { console.warn('[paystack-webhook] Could not update tx:', e.message) }
 
     if (payResult.success) {
       console.info(`[paystack-webhook] Payment processed: ${reference} → ${payResult.paymentRef}`)
@@ -119,7 +123,6 @@ export async function POST(request) {
     return NextResponse.json({ received: true })
   } catch (err) {
     console.error('[paystack-webhook] Error:', err)
-    // Always return 200 to Paystack
     return NextResponse.json({ received: true })
   }
 }
