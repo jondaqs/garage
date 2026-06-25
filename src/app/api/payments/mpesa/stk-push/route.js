@@ -72,6 +72,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invoice is already paid' }, { status: 400 })
     }
 
+    if (invoice.effective_status === 'overdue') {
+      return NextResponse.json({
+        error: 'This invoice has expired. Please create a new subscription to get a fresh invoice.',
+      }, { status: 400 })
+    }
+
     // Determine amount in KES (M-Pesa always operates in KES)
     const invoiceBalance = Number(invoice.balance_due || invoice.total_amount)
     const invoiceCurrency = invoice.currency_code || 'KES'

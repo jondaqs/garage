@@ -74,6 +74,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invoice is already paid' }, { status: 400 })
     }
 
+    if (invoice.effective_status === 'overdue') {
+      return NextResponse.json({
+        error: 'This invoice has expired. Please create a new subscription to get a fresh invoice.',
+      }, { status: 400 })
+    }
+
     // Resolve payer profile
     const { data: profile } = await sc
       .from('user_profiles')

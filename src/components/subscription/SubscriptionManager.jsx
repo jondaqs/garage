@@ -1426,6 +1426,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             invoices.filter(i => Number(i.total_amount) > 0).map(inv => {
               const isExpanded = expandedInvoice === inv.id
               const isPaid = inv.invoice_status_code === 'paid'
+              const isExpired = inv.effective_status === 'overdue'
               const isPayingThis = payingInvoiceId === inv.id
 
               const buildInvoiceArgs = () => ({
@@ -1597,7 +1598,17 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         </button>
                       </div>
 
-                      {!isPaid && (
+                      {!isPaid && isExpired && (
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center space-y-1">
+                          <AlertCircle size={20} className="text-red-400 mx-auto" />
+                          <p className="text-sm font-semibold text-red-700">Invoice Expired</p>
+                          <p className="text-xs text-red-500">
+                            This invoice expired on {fmtD(inv.due_date)}. Please create a new subscription to get a fresh invoice.
+                          </p>
+                        </div>
+                      )}
+
+                      {!isPaid && !isExpired && (
                         <div>
                           {!isPayingThis ? (
                             <button onClick={() => { setPayingInvoiceId(inv.id); setPayAmount(inv.balance_due?.toString() || inv.total_amount?.toString()) }}
