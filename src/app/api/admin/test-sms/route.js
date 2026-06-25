@@ -6,7 +6,7 @@
  *
  * Body: { "phone": "07XXXXXXXX" }
  *
- * Admin-only — guarded by is_user_admin().
+ * Admin-only — uses the same user_roles check as other admin routes.
  * Location: src/app/api/admin/test-sms/route.js
  */
 
@@ -30,26 +30,27 @@ export async function POST(request) {
   }
 
   try {
-    // ── 1. Auth check ──────────────────────────────────────────────────────────
+    // ── 1. Auth check (same pattern as ban-user, mpesa-config, etc.) ───────
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', user.id)
+    const { data: callerProfile } = await supabase
+      .from('user_profiles_secure')
+      .select('id, user_roles(role:user_roles_lookup(code))')
+      .eq('auth_user_id', session.user.id)
       .single()
 
-    if (profile?.role !== 'admin') {
+    const codes = callerProfile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+    if (!codes.includes('admin') && !codes.includes('platform_admin')) {
       return NextResponse.json({ error: 'Admin only' }, { status: 403 })
     }
-    log('1. Auth', true, `Authenticated as ${profile.full_name} (admin)`)
+    log('1. Auth', true, `Admin verified (roles: ${codes.join(', ')})`)
 
-    // ── 2. Read request body ───────────────────────────────────────────────────
+    // ── 2. Read request body ───────────────────────────────────────────────
     const body = await request.json().catch(() => ({}))
     const rawPhone = body.phone
 
@@ -59,7 +60,7 @@ export async function POST(request) {
     }
     log('2. Input', true, `Raw phone: "${rawPhone}"`)
 
-    // ── 3. Normalise phone ─────────────────────────────────────────────────────
+    // ── 3. Normalise phone ─────────────────────────────────────────────────
     const phone = normalisePhone(rawPhone)
     if (!phone) {
       log('3. Normalise', false, `Could not normalise "${rawPhone}" to E.164`)
@@ -67,7 +68,7 @@ export async function POST(request) {
     }
     log('3. Normalise', true, `Normalised to ${phone}`)
 
-    // ── 4. Check env vars ──────────────────────────────────────────────────────
+    // ── 4. Check env vars ──────────────────────────────────────────────────
     const envReport = {
       AT_API_KEY:   !!process.env.AT_API_KEY,
       AT_USERNAME:  !!process.env.AT_USERNAME,
@@ -85,7 +86,7 @@ export async function POST(request) {
     }
     log('4. Env vars', true, JSON.stringify(envReport))
 
-    // ── 5. Determine mode ──────────────────────────────────────────────────────
+    // ── 5. Determine mode ──────────────────────────────────────────────────
     const isSandbox = process.env.AT_SANDBOX === 'true'
     const baseUrl = isSandbox
       ? 'https://api.sandbox.africastalking.com/version1'
@@ -94,7 +95,7 @@ export async function POST(request) {
       ? `SANDBOX mode → ${baseUrl} (messages will NOT be delivered to real phones)`
       : `PRODUCTION mode → ${baseUrl} (messages WILL be delivered)`)
 
-    // ── 6. Queue record (sms_queue) ────────────────────────────────────────────
+    // ── 6. Queue record (sms_queue) ────────────────────────────────────────
     const sc = getServiceClient()
     const testMessage = `Motiifix TEST: If you received this, your SMS is working! Sent at ${new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })}`
     let queueId = null
@@ -112,7 +113,7 @@ export async function POST(request) {
       log('6. Queue', false, 'No SUPABASE_SERVICE_ROLE_KEY — cannot queue. SMS will still attempt.')
     }
 
-    // ── 7. Send SMS via Africa's Talking ───────────────────────────────────────
+    // ── 7. Send SMS via Africa's Talking ───────────────────────────────────
     try {
       const results = await sendSms({ to: phone, message: testMessage })
       const first = results[0] || {}
@@ -123,7 +124,7 @@ export async function POST(request) {
         log('7. Send', false, `AT returned status="${first.status}" for ${first.number}. messageId=${first.messageId}`)
       }
 
-      // ── 8. Update queue record ─────────────────────────────────────────────
+      // ── 8. Update queue record ─────────────────────────────────────────
       if (sc && queueId) {
         await markSmsQueued(sc, queueId, {
           status:       first.status === 'Success' ? 'sent' : 'failed',
