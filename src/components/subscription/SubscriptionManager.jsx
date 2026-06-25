@@ -20,7 +20,8 @@ import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
 import {
   Package, CreditCard, FileText, CheckCircle, AlertCircle, Loader2,
   ArrowRight, Clock, DollarSign, Send, Banknote, Building2,
-  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus, Globe, Smartphone
+  BadgeCheck, Sparkles, X, Check, ChevronDown, ChevronUp, Download, Receipt, MessageSquarePlus, Globe, Smartphone,
+  Car, Users
 } from 'lucide-react'
 import { buildSubscriptionInvoiceHtml } from '@/lib/subscription/buildSubscriptionInvoiceHtml'
 import { buildSubscriptionReceiptHtml } from '@/lib/subscription/buildSubscriptionReceiptHtml'
@@ -39,6 +40,51 @@ const PAYMENT_METHODS = [
 const PERIOD_LABELS = {
   monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: 'Semi-Annual',
   annual: 'Annual', tri_annual: 'Tri-Annual',
+}
+
+/** Compact utilization card for the active subscription section */
+function UtilizationCard({ icon, label, current, max, colorClass = 'blue' }) {
+  const isUnlimited = max == null
+  const pct = isUnlimited ? 0 : max > 0 ? Math.min((current / max) * 100, 100) : 0
+  const isOver = !isUnlimited && current > max
+  const isNear = !isUnlimited && !isOver && pct >= 80
+
+  const colors = {
+    blue:   { bg: 'bg-blue-50',   border: 'border-blue-100',   bar: 'bg-blue-500',   text: 'text-blue-700',   over: 'text-red-600' },
+    purple: { bg: 'bg-purple-50', border: 'border-purple-100', bar: 'bg-purple-500', text: 'text-purple-700', over: 'text-red-600' },
+    green:  { bg: 'bg-green-50',  border: 'border-green-100',  bar: 'bg-green-500',  text: 'text-green-700',  over: 'text-red-600' },
+    amber:  { bg: 'bg-amber-50',  border: 'border-amber-100',  bar: 'bg-amber-500',  text: 'text-amber-700',  over: 'text-red-600' },
+  }
+  const c = colors[colorClass] || colors.blue
+
+  return (
+    <div className={`${c.bg} border ${c.border} rounded-xl p-3 space-y-1.5`}>
+      <div className="flex items-center gap-1.5">
+        <span className={c.text}>{icon}</span>
+        <span className={`text-[10px] font-semibold uppercase tracking-wider ${c.text}`}>{label}</span>
+      </div>
+      <p className={`text-lg font-bold ${isOver ? c.over : c.text}`}>
+        {current}
+        <span className="text-xs font-normal text-gray-400">
+          {isUnlimited ? ' / ∞' : ` / ${max}`}
+        </span>
+      </p>
+      {!isUnlimited && (
+        <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${isOver ? 'bg-red-500' : isNear ? 'bg-amber-400' : c.bar}`}
+            style={{ width: `${Math.min(pct, 100)}%` }}
+          />
+        </div>
+      )}
+      {isOver && (
+        <p className="text-[9px] text-red-500 font-medium">Exceeded — upgrade your plan</p>
+      )}
+      {isNear && (
+        <p className="text-[9px] text-amber-600 font-medium">Approaching limit</p>
+      )}
+    </div>
+  )
 }
 
 const STATUS_COLORS = {
@@ -99,6 +145,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
 
   // Trial check
   const [trialInfo, setTrialInfo] = useState(null)
+  const [metrics, setMetrics] = useState(null) // { vehicle_count, staff_count, monthly_client_count, shop_count }
 
   // Subscription page path per subscriber type (used for invoice CTA URLs)
   const subscriptionPath = subscriberType === 'individual' ? '/dashboard/subscription'
@@ -296,6 +343,14 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         if (addonData?.[0]) setShopAddon(addonData[0])
         else if (addonData) setShopAddon(addonData)
       }
+
+      // Fetch utilization metrics for all subscriber types
+      const { data: metricsData } = await supabase.rpc('count_subscriber_metrics', {
+        p_subscriber_type: subscriberType,
+        p_subscriber_id: subscriberId,
+      })
+      if (metricsData?.[0]) setMetrics(metricsData[0])
+      else if (metricsData) setMetrics(metricsData)
 
       // Step 2: Fetch receipts using subscription IDs (avoids .in([]) error)
       const subIds = (subs || []).map(s => s.id)
@@ -767,6 +822,59 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               </div>
             )}
           </div>
+
+          {/* ── Utilization breakdown ──────────────────────── */}
+          {metrics && (
+            <div className="px-6 pb-5 space-y-3">
+              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Plan Utilization</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+                {/* Vehicles — individual & company */}
+                {(subscriberType === 'individual' || subscriberType === 'company') && (
+                  <UtilizationCard
+                    icon={<Car size={14} />}
+                    label="Vehicles"
+                    current={metrics.vehicle_count || 0}
+                    max={activeSub.max_vehicles}
+                    colorClass="blue"
+                  />
+                )}
+
+                {/* Staff — company & provider */}
+                {(subscriberType === 'company' || subscriberType === 'service_provider') && (
+                  <UtilizationCard
+                    icon={<Users size={14} />}
+                    label="Staff"
+                    current={metrics.staff_count || 0}
+                    max={activeSub.max_users}
+                    colorClass="purple"
+                  />
+                )}
+
+                {/* Work orders/month — provider */}
+                {subscriberType === 'service_provider' && (
+                  <UtilizationCard
+                    icon={<FileText size={14} />}
+                    label="Work Orders / mo"
+                    current={metrics.monthly_client_count || 0}
+                    max={activeSub.max_clients}
+                    colorClass="green"
+                  />
+                )}
+
+                {/* Shops — provider */}
+                {subscriberType === 'service_provider' && (
+                  <UtilizationCard
+                    icon={<Building2 size={14} />}
+                    label="Shops"
+                    current={providerShops.length}
+                    max={Math.max(Number(activeSub?.shop_count || 0), 1)}
+                    colorClass="amber"
+                  />
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Shop list for providers */}
           {subscriberType === 'service_provider' && (

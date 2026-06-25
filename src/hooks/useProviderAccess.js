@@ -29,6 +29,9 @@ export default function useProviderAccess() {
   const [currentShops, setCurrentShops]             = useState(0)
   const [canAddStaff, setCanAddStaff]               = useState(false)
   const [canAddShop, setCanAddShop]                 = useState(false)
+  const [maxClients, setMaxClients]                 = useState(null)
+  const [currentClients, setCurrentClients]         = useState(0)
+  const [canAcceptClient, setCanAcceptClient]       = useState(false)
   const [planName, setPlanName]                     = useState(null)
   const [subscriptionStatus, setSubscriptionStatus] = useState(null)
   const [reason, setReason]                         = useState('')
@@ -108,6 +111,9 @@ export default function useProviderAccess() {
         setCurrentShops(data.current_shops || 0)
         setCanAddStaff(data.can_add_staff === true)
         setCanAddShop(data.can_add_shop === true)
+        setMaxClients(data.max_clients)
+        setCurrentClients(data.current_clients || 0)
+        setCanAcceptClient(data.can_accept_client === true)
         setPlanName(data.plan_name)
         setSubscriptionStatus(data.subscription_status)
         setReason(data.reason || '')
@@ -135,6 +141,9 @@ export default function useProviderAccess() {
     currentShops,
     canAddStaff,
     canAddShop,
+    maxClients,
+    currentClients,
+    canAcceptClient,
     planName,
     subscriptionStatus,
     reason,
