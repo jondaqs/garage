@@ -761,7 +761,7 @@ function PaymentAccountsEditor({ supabase }) {
         mpesa: { enabled: true, paybill_number: '', account_number: '', business_name: '', instructions: '' },
         mpesa_stk: { enabled: true, instructions: '' },
         bank:  { enabled: true, show_details: false, instructions: 'Bank transfer details will be shared individually.' },
-        card:  { enabled: false, instructions: 'Card payments not yet available.' },
+        card:  { enabled: false, service_fee_pct: 3.5, instructions: '' },
         cash:  { enabled: true, instructions: 'Cash payments can be made at our offices.' },
       })
       setLoading(false)
@@ -925,8 +925,8 @@ function PaymentAccountsEditor({ supabase }) {
         </div>
       </Section>
 
-      {/* Card */}
-      <Section title="Card Payment" description="Card payment gateway configuration.">
+      {/* Card / Apple Pay (Paystack) */}
+      <Section title="Card / Apple Pay (Paystack)" description="Card payment gateway powered by Paystack. Accepts Visa, Mastercard, Apple Pay, and M-Pesa GlobalPay virtual cards. API keys are configured via environment variables.">
         <div className="space-y-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <button onClick={() => update('card', 'enabled', !data.card?.enabled)}
@@ -935,9 +935,28 @@ function PaymentAccountsEditor({ supabase }) {
             <span className="text-sm font-medium text-gray-700">{data.card?.enabled ? 'Enabled' : 'Disabled'}</span>
           </label>
           {data.card?.enabled && (
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions</label>
-              <input className={inp} value={data.card?.instructions || ''} onChange={e => update('card', 'instructions', e.target.value)} placeholder="Card payment instructions..." />
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 space-y-1">
+                <p className="font-semibold">Paystack integration:</p>
+                <p>Card payments are processed through Paystack (by Stripe). API keys must be set as environment variables: <code className="bg-blue-100 px-1 rounded text-[10px]">PAYSTACK_SECRET_KEY</code> and <code className="bg-blue-100 px-1 rounded text-[10px]">NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY</code>.</p>
+                <p>Set the webhook URL in your Paystack dashboard to: <code className="bg-blue-100 px-1 rounded text-[10px]">{'{your-domain}'}/api/payments/paystack/webhook</code></p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Service Fee (%)</label>
+                  <input type="number" step="0.1" min="0" max="20" className={inp}
+                    value={data.card?.service_fee_pct ?? 3.5}
+                    onChange={e => update('card', 'service_fee_pct', parseFloat(e.target.value) || 0)}
+                    placeholder="3.5" />
+                  <p className="text-[10px] text-gray-400 mt-1">Added on top of the invoice amount. Set to at least 2.9% to cover Paystack fees (2.9% local, 3.8% international). Shown to the user before payment.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Instructions (optional)</label>
+                  <input className={inp} value={data.card?.instructions || ''} onChange={e => update('card', 'instructions', e.target.value)}
+                    placeholder="Pay securely with Visa, Mastercard, or Apple Pay..." />
+                </div>
+              </div>
+              <p className="text-[10px] text-amber-600">Supported methods: Visa, Mastercard, Amex, Apple Pay, M-Pesa GlobalPay virtual Visa card.</p>
             </div>
           )}
         </div>

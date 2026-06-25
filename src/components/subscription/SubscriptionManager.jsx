@@ -1746,11 +1746,28 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                                         <p className="text-xs text-blue-600">
                                           Pay securely with Visa, Mastercard, or Apple Pay. M-Pesa GlobalPay virtual cards are also supported.
                                         </p>
-                                        {invConverted(inv.currency_code) && (
-                                          <p className="text-xs text-blue-700">
-                                            You will be charged <strong>KES {cv(inv.balance_due || inv.total_amount).toLocaleString()}</strong>
-                                          </p>
-                                        )}
+                                        {(() => {
+                                          const feePct = paymentAccounts?.card?.service_fee_pct ?? 3.5
+                                          const subtotal = cv(inv.balance_due || inv.total_amount)
+                                          const fee = Math.ceil(subtotal * feePct / 100)
+                                          const total = subtotal + fee
+                                          return invConverted(inv.currency_code) || inv.currency_code === 'KES' ? (
+                                            <div className="bg-white rounded-lg p-2.5 text-xs space-y-1 border border-blue-100">
+                                              <div className="flex justify-between text-blue-700">
+                                                <span>Subtotal</span>
+                                                <span>KES {subtotal.toLocaleString()}</span>
+                                              </div>
+                                              <div className="flex justify-between text-blue-500">
+                                                <span>Service fee ({feePct}%)</span>
+                                                <span>KES {fee.toLocaleString()}</span>
+                                              </div>
+                                              <div className="flex justify-between text-blue-900 font-semibold border-t border-blue-100 pt-1">
+                                                <span>Total charge</span>
+                                                <span>KES {total.toLocaleString()}</span>
+                                              </div>
+                                            </div>
+                                          ) : null
+                                        })()}
                                         <button onClick={() => handleCardPay(inv.id)}
                                           disabled={paying || cardState === 'initiating'}
                                           className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
