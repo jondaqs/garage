@@ -1598,22 +1598,22 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         </button>
                       </div>
 
-                      {!isPaid && isExpired && (
-                        <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center space-y-1">
-                          <AlertCircle size={20} className="text-red-400 mx-auto" />
-                          <p className="text-sm font-semibold text-red-700">Invoice Expired</p>
-                          <p className="text-xs text-red-500">
-                            This invoice expired on {fmtD(inv.due_date)}. Please create a new subscription to get a fresh invoice.
-                          </p>
-                        </div>
-                      )}
-
-                      {!isPaid && !isExpired && (
+                      {!isPaid && (
                         <div>
                           {!isPayingThis ? (
-                            <button onClick={() => { setPayingInvoiceId(inv.id); setPayAmount(inv.balance_due?.toString() || inv.total_amount?.toString()) }}
-                              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-gray-900 hover:text-gray-900 font-medium transition-colors">
-                              <CreditCard size={15} /> Record Payment
+                            <button onClick={() => {
+                              if (isExpired) {
+                                setError(`Invoice ${inv.invoice_ref_no} expired on ${fmtD(inv.due_date)}. Please create a new subscription to get a fresh invoice.`)
+                                return
+                              }
+                              setPayingInvoiceId(inv.id); setPayAmount(inv.balance_due?.toString() || inv.total_amount?.toString())
+                            }}
+                              className={`w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed rounded-xl text-sm font-medium transition-colors ${
+                                isExpired
+                                  ? 'border-red-200 text-red-400 hover:border-red-300 hover:text-red-500 cursor-not-allowed'
+                                  : 'border-gray-200 text-gray-500 hover:border-gray-900 hover:text-gray-900'
+                              }`}>
+                              <CreditCard size={15} /> {isExpired ? 'Invoice Expired' : 'Record Payment'}
                             </button>
                           ) : (
                             <div className="rounded-2xl border border-gray-200 overflow-hidden">
