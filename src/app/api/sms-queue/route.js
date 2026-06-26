@@ -2,30 +2,59 @@
  * GET/DELETE /api/sms-queue
  * ─────────────────────────
  * View SMS queue status and statistics, clean up old records.
+ * ADMIN-ONLY — requires authenticated admin role.
  * Location: src/app/api/sms-queue/route.js
  */
 
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { createClient }                        from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { NextResponse }                        from 'next/server'
 
 function getServiceClient() {
-  return createClient(
+  return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
 
+const ADMIN_CODES = ['admin', 'platform_admin', 'moderator', 'support']
+
+async function requireAdmin() {
+  const supabase = await createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    return { error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
+  }
+
+  const { data: profile } = await supabase
+    .from('user_profiles_secure')
+    .select('id, user_roles(role:user_roles_lookup(code))')
+    .eq('auth_user_id', session.user.id)
+    .single()
+
+  const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+  const isAdmin = codes.some(c => ADMIN_CODES.includes(c))
+
+  if (!isAdmin) {
+    return { error: NextResponse.json({ error: 'Admin access required' }, { status: 403 }) }
+  }
+
+  return { ok: true, session }
+}
+
 export async function GET(request) {
+  const auth = await requireAdmin()
+  if (auth.error) return auth.error
+
   try {
-    const supabase = getServiceClient()
+    const sc = getServiceClient()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const limit  = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    // Build query
-    let query = supabase
+    let query = sc
       .from('sms_queue_secure')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -36,13 +65,10 @@ export async function GET(request) {
     }
 
     const { data: messages, error, count } = await query
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Get counts by status
-    const { data: allRows } = await supabase
+    const { data: allRows } = await sc
       .from('sms_queue_secure')
       .select('status')
 
@@ -74,23 +100,24 @@ export async function GET(request) {
 }
 
 export async function DELETE(request) {
+  const auth = await requireAdmin()
+  if (auth.error) return auth.error
+
   try {
-    const supabase = getServiceClient()
+    const sc = getServiceClient()
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '30')
 
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - days)
 
-    const { error } = await supabase
+    const { error } = await sc
       .from('sms_queue')
       .delete()
       .eq('status', 'sent')
       .lt('sent_at', cutoffDate.toISOString())
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({
       success: true,
