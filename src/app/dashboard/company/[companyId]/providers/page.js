@@ -101,7 +101,8 @@ export default function CompanyMemberProvidersPage() {
           provider_type:service_provider_types(id, display_name, code, description),
           shops_secure(id, name, town, county, latitude, longitude),
           provider_reviews(rating),
-          service_provider_services(service:services(id, name))
+          service_provider_services(service:services(id, name)),
+          owner:user_profiles_secure(profile_picture_url)
         `, { count: 'exact' })
         .eq('status', 'active')
         .eq('is_active', true)
@@ -465,8 +466,12 @@ function ProviderCard({ provider: p, onClick, onChat }) {
       <div className="p-5">
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-sm">
-            {p.name[0].toUpperCase()}
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-sm overflow-hidden">
+            {p.owner?.profile_picture_url ? (
+              <img src={p.owner.profile_picture_url} alt={p.name} className="w-full h-full object-cover" />
+            ) : (
+              p.name[0].toUpperCase()
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">

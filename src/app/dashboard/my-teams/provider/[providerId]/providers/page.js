@@ -357,8 +357,12 @@ function ProviderCard({ provider: p, starting, onClick, onChat }) {
       <div className="h-1 bg-gradient-to-r from-green-500 to-green-400" />
       <div className="p-5">
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-sm">
-            {p.name?.[0]?.toUpperCase() || '?'}
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-sm overflow-hidden">
+            {p.owner_profile_picture_url ? (
+              <img src={p.owner_profile_picture_url} alt={p.name} className="w-full h-full object-cover" />
+            ) : (
+              p.name?.[0]?.toUpperCase() || '?'
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
