@@ -39,60 +39,30 @@ export default function ProvidersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      let q = supabase
-        .from('service_providers_secure')
-        .select(`
-          id, name, description, is_verified, phone, email, website,
-          years_in_operation, kra_pin_verified, registration_verified, location_verified,
-          verification_score, owner_profile_picture_url,
-          verification_score,
-          provider_type:service_provider_types(id, display_name, code, description),
-          shops_secure(id, name, town, county, latitude, longitude),
-          provider_reviews(rating),
-          service_provider_services(service:services(id, name))
-        `, { count: 'exact' })
-        .eq('status', 'active')
-        .eq('is_searchable', true)
-        .eq('is_active', true)
-
-      if (search)       q = q.ilike('name', `%${search}%`)
-      if (descSearch)   q = q.ilike('description', `%${descSearch}%`)
-      if (typeFilter)   q = q.eq('provider_type_id', typeFilter)
-      if (verifiedOnly) q = q.eq('is_verified', true)
-      if (locationFilter) {
-        // Filter by shop town/county — we can't do a direct join filter with count in one call,
-        // so we'll post-filter after fetch
-      }
-
-      const { data, count, error } = await q
-        .order('is_verified', { ascending: false })
-        .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1)
+      const { data, error } = await supabase.rpc('search_providers_for_company', {
+        p_company_id:       ownerAccess.companyId,
+        p_search:           search || null,
+        p_description:      descSearch || null,
+        p_provider_type_id: typeFilter || null,
+        p_location:         locationFilter || null,
+        p_verified_only:    verifiedOnly,
+        p_limit:            ITEMS_PER_PAGE,
+        p_offset:           page * ITEMS_PER_PAGE,
+      })
 
       if (error) throw error
 
-      let results = (data || []).map(p => ({
-        ...p,
-        avgRating:   p.provider_reviews?.length
-          ? p.provider_reviews.reduce((s, r) => s + r.rating, 0) / p.provider_reviews.length
-          : 0,
-        reviewCount: p.provider_reviews?.length || 0,
-        services:    (p.service_provider_services || []).map(s => s.service).filter(Boolean),
+      const rows = data || []
+      let results = rows.map(r => ({
+        ...r,
+        avgRating:   Number(r.avg_rating || 0),
+        reviewCount: Number(r.review_count || 0),
+        services:    Array.isArray(r.services) ? r.services : [],
+        shops:       Array.isArray(r.shops)    ? r.shops    : [],
       }))
 
-      // Post-filter by location
-      if (locationFilter.trim()) {
-        const loc = locationFilter.toLowerCase()
-        results = results.filter(p =>
-          p.shops?.some(s =>
-            s.town?.toLowerCase().includes(loc) ||
-            s.county?.toLowerCase().includes(loc) ||
-            s.name?.toLowerCase().includes(loc)
-          )
-        )
-      }
-
       setProviders(results)
-      setTotal(count || 0)
+      setTotal(rows[0]?.total_count || 0)
     } catch (e) {
       console.error(e)
     } finally {
