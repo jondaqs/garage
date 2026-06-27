@@ -41,12 +41,11 @@ export default function ProvidersPage() {
         .select(`
           id, name, description, is_verified, phone, email, website,
           years_in_operation, kra_pin_verified, registration_verified, location_verified,
-          verification_score,
+          verification_score, owner_profile_picture_url,
           provider_type:service_provider_types(id, display_name, code, description),
           shops_secure(id, name, town, county, latitude, longitude),
           provider_reviews(rating),
-          service_provider_services(service:services(id, name)),
-          owner:user_profiles_secure(profile_picture_url)
+          service_provider_services(service:services(id, name))
         `, { count: 'exact' })
         .eq('status', 'active')
         .eq('is_searchable', true)
@@ -375,8 +374,8 @@ function ProviderCard({ provider: p, onClick, onChat }) {
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-sm overflow-hidden">
-            {p.owner?.profile_picture_url ? (
-              <img src={p.owner.profile_picture_url} alt={p.name} className="w-full h-full object-cover" />
+            {p.owner_profile_picture_url ? (
+              <img src={p.owner_profile_picture_url} alt={p.name} className="w-full h-full object-cover" />
             ) : (
               p.name[0].toUpperCase()
             )}
