@@ -37,6 +37,7 @@ export default function ProvidersPage() {
   const [verifiedOnly,   setVerifiedOnly]   = useState(false)
 
   const load = useCallback(async () => {
+    if (!ownerAccess.companyId) return
     setLoading(true)
     try {
       const { data, error } = await supabase.rpc('search_providers_for_company', {
@@ -68,7 +69,7 @@ export default function ProvidersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, descSearch, typeFilter, locationFilter, verifiedOnly, page])
+  }, [ownerAccess.companyId, search, descSearch, typeFilter, locationFilter, verifiedOnly, page])
 
   useEffect(() => { load() }, [load])
 
