@@ -139,6 +139,10 @@ export default function ProviderMemberChatPage() {
 
     if (statusFilter !== 'all') q = q.eq('status', statusFilter)
     const { data } = await q
+    // DEBUG: check if profile_picture_url is present in the fetched data
+    if (data?.length) {
+      console.log('[MEMBER CHAT DEBUG] First conversation user data:', JSON.stringify(data[0]?.user))
+    }
     return data || []
   }, [authState, providerId, statusFilter])
 
@@ -547,6 +551,10 @@ export default function ProviderMemberChatPage() {
             filteredConvs.map(conv => {
               const name      = customerName(conv)
               const isCompany = !!conv.company_id
+              // DEBUG: log avatar data for each conversation
+              if (!isCompany) {
+                console.log(`[AVATAR DEBUG] conv=${conv.id} user=`, conv.user, 'pic=', conv.user?.profile_picture_url)
+              }
               return (
                 <button key={conv.id} onClick={() => selectConversation(conv.id, conv)}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-50 hover:bg-gray-50 transition-colors ${
