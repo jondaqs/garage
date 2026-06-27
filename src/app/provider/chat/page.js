@@ -19,6 +19,7 @@ export default function ProviderChatPage() {
   const [profile,       setProfile]       = useState(null)   // provider user profile
   const [provider,      setProvider]      = useState(null)   // service_provider record
   const [canChat,       setCanChat]       = useState(false)
+  const [initializing,  setInitializing]  = useState(true)   // true until init() finishes
   const [conversations, setConversations] = useState([])
   const [activeConv,    setActiveConv]    = useState(null)
   const [messages,      setMessages]      = useState([])
@@ -40,40 +41,44 @@ export default function ProviderChatPage() {
   // ── Load profile + provider + permissions ────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
 
-      const { data: prof } = await supabase
-        .from('user_profiles_secure')
-        .select('id, first_name, last_name')
-        .eq('auth_user_id', user.id)
-        .single()
-      setProfile(prof)
-      if (!prof) return
+        const { data: prof } = await supabase
+          .from('user_profiles_secure')
+          .select('id, first_name, last_name')
+          .eq('auth_user_id', user.id)
+          .single()
+        setProfile(prof)
+        if (!prof) return
 
-      // Find provider: owner first, then SPU
-      const { data: owned } = await supabase
-        .from('service_providers_secure')
-        .select('id, name')
-        .eq('owner_user_id', prof.id)
-        .maybeSingle()
+        // Find provider: owner first, then SPU
+        const { data: owned } = await supabase
+          .from('service_providers_secure')
+          .select('id, name')
+          .eq('owner_user_id', prof.id)
+          .maybeSingle()
 
-      if (owned) {
-        setProvider(owned)
-        setCanChat(true)
-        return
-      }
+        if (owned) {
+          setProvider(owned)
+          setCanChat(true)
+          return
+        }
 
-      const { data: spu } = await supabase
-        .from('service_provider_users')
-        .select('service_provider_id, can_chat, service_providers_secure(id, name)')
-        .eq('user_id', prof.id)
-        .eq('is_active', true)
-        .maybeSingle()
+        const { data: spu } = await supabase
+          .from('service_provider_users')
+          .select('service_provider_id, can_chat, service_providers_secure(id, name)')
+          .eq('user_id', prof.id)
+          .eq('is_active', true)
+          .maybeSingle()
 
-      if (spu) {
-        setProvider(spu.service_providers)
-        setCanChat(!!spu.can_chat)
+        if (spu) {
+          setProvider(spu.service_providers)
+          setCanChat(!!spu.can_chat)
+        }
+      } finally {
+        setInitializing(false)
       }
     }
     init()
@@ -397,7 +402,7 @@ export default function ProviderChatPage() {
 
   const unreadTotal = conversations.reduce((s, c) => s + (c.provider_unread_count || 0), 0)
 
-  if (!canChat && !loadingConvs) {
+  if (!canChat && !loadingConvs && !initializing) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-8 text-center">
         <AlertCircle size={48} className="text-gray-300 mb-4" />

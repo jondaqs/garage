@@ -25,7 +25,11 @@ export default function CompanySubscriptionGate({
   const access = useCompanyAccess(companyId)
 
   // ── Loading skeleton ────────────────────────────────────────────────
-  if (access.loading) {
+  // Also treat companyId=null as loading — the caller may still be
+  // resolving which company the user belongs to (useOwnerCompanyAccess).
+  // Without this, useCompanyAccess(null) returns { loading:false,
+  // canWrite:false } immediately, flashing the lock screen.
+  if (access.loading || !companyId) {
     return (
       <div className="max-w-6xl mx-auto animate-pulse">
         <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
