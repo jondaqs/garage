@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 /**
@@ -44,8 +44,20 @@ export default function useCompanyAccess(companyId) {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null)
   const [reason, setReason]                         = useState('')
 
+  // Track which companyId the current state was resolved for.
+  // When companyId changes (e.g. null → real id), state is stale
+  // for one render before the effect fires. The ref lets us detect
+  // that at render time and report loading=true immediately.
+  const resolvedForRef = useRef(undefined)
+
   const resolve = useCallback(async () => {
-    if (!companyId) { setLoading(false); return }
+    if (!companyId) {
+      resolvedForRef.current = null
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
 
     try {
       const { data, error } = await supabase.rpc('check_company_access', {
@@ -79,14 +91,20 @@ export default function useCompanyAccess(companyId) {
       setCanWrite(false)
       setState(null)
     } finally {
+      resolvedForRef.current = companyId
       setLoading(false)
     }
   }, [companyId, supabase])
 
   useEffect(() => { resolve() }, [resolve])
 
+  // Detect stale state at render time: if companyId has changed but the
+  // effect hasn't fired yet, report loading=true so consumers never see
+  // the previous companyId's canWrite value attributed to the new one.
+  const isStale = companyId !== resolvedForRef.current
+
   return {
-    loading,
+    loading: loading || isStale,
     state,
     canWrite,
     trialEndsAt,
