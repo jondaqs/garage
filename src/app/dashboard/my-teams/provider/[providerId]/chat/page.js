@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 
 import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
+import ChatAvatar from '@/components/ChatAvatar'
 export default function ProviderMemberChatPage() {
   const router       = useRouter()
   const params       = useParams()
@@ -130,7 +131,7 @@ export default function ProviderMemberChatPage() {
         id, updated_at, last_message_at, last_message_preview,
         provider_unread_count, status, closed_at, company_id,
         closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
-        user:user_profiles_secure!user_id(id, first_name, last_name),
+        user:user_profiles_secure!user_id(id, first_name, last_name, profile_picture_url),
         company:company_profiles_secure!company_id(id, name)
       `)
       .eq('service_provider_id', providerId)
@@ -551,13 +552,17 @@ export default function ProviderMemberChatPage() {
                   className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-50 hover:bg-gray-50 transition-colors ${
                     activeConv?.id === conv.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
                   }`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-                    isCompany
-                      ? 'bg-gradient-to-br from-indigo-400 to-indigo-600'
-                      : 'bg-gradient-to-br from-gray-400 to-gray-600'
-                  }`}>
-                    {isCompany ? <Building2 size={16} /> : (name[0]?.toUpperCase() || 'C')}
-                  </div>
+                  {isCompany ? (
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-400 to-indigo-600">
+                      <Building2 size={16} />
+                    </div>
+                  ) : (
+                    <ChatAvatar
+                      src={conv.user?.profile_picture_url}
+                      name={name}
+                      gradient="from-gray-400 to-gray-600"
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">{name}</p>
@@ -603,13 +608,18 @@ export default function ProviderMemberChatPage() {
                 className="sm:hidden p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
                 <ArrowLeft size={18} />
               </button>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-                activeConv.company_id
-                  ? 'bg-gradient-to-br from-indigo-400 to-indigo-600'
-                  : 'bg-gradient-to-br from-gray-400 to-gray-600'
-              }`}>
-                {activeConv.company_id ? <Building2 size={16} /> : (customerName(activeConv)[0]?.toUpperCase() || 'C')}
-              </div>
+              {activeConv.company_id ? (
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-400 to-indigo-600">
+                  <Building2 size={16} />
+                </div>
+              ) : (
+                <ChatAvatar
+                  src={activeConv.user?.profile_picture_url}
+                  name={customerName(activeConv)}
+                  size="sm"
+                  gradient="from-gray-400 to-gray-600"
+                />
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{customerName(activeConv)}</p>
                 <p className={`text-xs ${activeConv.status === 'closed' ? 'text-red-500' : 'text-green-500'}`}>

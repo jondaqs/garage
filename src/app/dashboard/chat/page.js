@@ -8,6 +8,7 @@ import {
   ArrowLeft, Send, MessageSquare, Search, Loader2,
   Building2, CheckCheck, Check, X, XCircle, AlertCircle, CheckCircle, RefreshCw
 } from 'lucide-react'
+import ChatAvatar from '@/components/ChatAvatar'
 
 export default function ChatPage() {
   const router       = useRouter()
@@ -56,7 +57,7 @@ export default function ChatPage() {
       .select(`
         id, updated_at, last_message_at, last_message_preview, user_unread_count, status,
         closed_at, closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
-        provider:service_providers_secure(id, name, is_verified)
+        provider:service_providers_secure(id, name, is_verified, owner_profile_picture_url)
       `)
       .eq('user_id', profile.id)
       .is('company_id', null)
@@ -156,7 +157,7 @@ export default function ChatPage() {
         .from('conversations')
         .insert({ user_id: profile.id, service_provider_id: providerId })
         .select(`id, updated_at, last_message_at, last_message_preview, user_unread_count,
-          provider:service_providers_secure(id, name, is_verified)`)
+          provider:service_providers_secure(id, name, is_verified, owner_profile_picture_url)`)
         .single()
       if (!error && newConv) {
         setConversations(prev => [newConv, ...prev])
@@ -445,9 +446,11 @@ export default function ChatPage() {
                   activeConv?.id === conv.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
                 }`}
               >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {conv.provider?.name?.[0]?.toUpperCase() || '?'}
-                </div>
+                <ChatAvatar
+                  src={conv.provider?.owner_profile_picture_url}
+                  name={conv.provider?.name}
+                  gradient="from-blue-500 to-blue-700"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800 truncate">{conv.provider?.name}</p>
@@ -497,9 +500,12 @@ export default function ChatPage() {
               >
                 <ArrowLeft size={18} />
               </button>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                {activeConv.provider?.name?.[0]?.toUpperCase() || '?'}
-              </div>
+              <ChatAvatar
+                src={activeConv.provider?.owner_profile_picture_url}
+                name={activeConv.provider?.name}
+                size="sm"
+                gradient="from-blue-500 to-blue-700"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">
                   {activeConv.provider?.name || 'Service Provider'}

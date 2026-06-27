@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 
 import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
+import ChatAvatar from '@/components/ChatAvatar'
 export default function MemberPeerChatPage() {
   const router       = useRouter()
   const params       = useParams()
@@ -127,8 +128,8 @@ export default function MemberPeerChatPage() {
       initiator_provider_id, recipient_provider_id,
       initiator_unread_count, recipient_unread_count,
       closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
-      initiator:service_providers_secure!initiator_provider_id(id, name, is_verified),
-      recipient:service_providers_secure!recipient_provider_id(id, name, is_verified)
+      initiator:service_providers_secure!initiator_provider_id(id, name, is_verified, owner_profile_picture_url),
+      recipient:service_providers_secure!recipient_provider_id(id, name, is_verified, owner_profile_picture_url)
     `
 
     let qInit  = supabase.from('peer_conversations').select(baseSelect)
@@ -489,9 +490,11 @@ export default function MemberPeerChatPage() {
                 className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-50 hover:bg-gray-50 transition-colors ${
                   activeConv?.id === conv.id ? 'bg-green-50 border-l-2 border-l-green-500' : ''
                 }`}>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-white flex-shrink-0">
-                  <Building2 size={16} />
-                </div>
+                <ChatAvatar
+                  src={conv.otherProvider?.owner_profile_picture_url}
+                  name={conv.otherProvider?.name || 'Provider'}
+                  gradient="from-green-500 to-green-700"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1 min-w-0">
@@ -545,9 +548,12 @@ export default function MemberPeerChatPage() {
                 className="sm:hidden p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
                 <ArrowLeft size={18} />
               </button>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-white flex-shrink-0">
-                <Building2 size={15} />
-              </div>
+              <ChatAvatar
+                src={activeConv.otherProvider?.owner_profile_picture_url}
+                name={otherName}
+                size="sm"
+                gradient="from-green-500 to-green-700"
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1">
                   <p className="text-sm font-semibold text-gray-800 truncate">{otherName}</p>

@@ -30,6 +30,7 @@ import {
   ArrowLeft, XCircle, CheckCircle, AlertCircle, Building2, RefreshCw,
 } from 'lucide-react'
 import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import ChatAvatar from '@/components/ChatAvatar'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 export default function CompanyOwnerChatPage() {
@@ -104,7 +105,7 @@ export default function CompanyOwnerChatPage() {
         id, updated_at, last_message_at, last_message_preview,
         company_unread_count, status, closed_at,
         closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
-        provider:service_providers_secure!service_provider_id(id, name, is_verified),
+        provider:service_providers_secure!service_provider_id(id, name, is_verified, owner_profile_picture_url),
         opened_by:user_profiles_secure!user_id(id, first_name, last_name)
       `)
       .eq('company_id', company.id)
@@ -201,7 +202,7 @@ export default function CompanyOwnerChatPage() {
       })
       .select(`
         id, updated_at, last_message_at, last_message_preview, company_unread_count, status,
-        provider:service_providers_secure!service_provider_id(id, name, is_verified),
+        provider:service_providers_secure!service_provider_id(id, name, is_verified, owner_profile_picture_url),
         opened_by:user_profiles_secure!user_id(id, first_name, last_name)
       `)
       .single()
@@ -520,9 +521,11 @@ export default function CompanyOwnerChatPage() {
                   className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-50 hover:bg-gray-50 transition-colors ${
                     activeConv?.id === conv.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
                   }`}>
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                    {name[0]?.toUpperCase()}
-                  </div>
+                  <ChatAvatar
+                    src={conv.provider?.owner_profile_picture_url}
+                    name={name}
+                    gradient="from-blue-400 to-blue-600"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">{name}</p>
@@ -567,9 +570,12 @@ export default function CompanyOwnerChatPage() {
                 className="sm:hidden p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
                 <ArrowLeft size={18} />
               </button>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                {(activeConv.provider?.name || 'P')[0]?.toUpperCase()}
-              </div>
+              <ChatAvatar
+                src={activeConv.provider?.owner_profile_picture_url}
+                name={activeConv.provider?.name || 'Provider'}
+                size="sm"
+                gradient="from-blue-400 to-blue-600"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">
                   {activeConv.provider?.name || 'Provider'}
