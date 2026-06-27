@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { sendCompanyRegistrationEmail, sendCompanyInviteEmail, sendAdminNewCompanyEmail } from '@/lib/email/sendCompanyInviteEmail'
 
+// SECURITY FIX: Core company creation (company_profiles + company_users + user_roles
+// + notifications) now uses register_company RPC in a single transaction.
+// Team invitations, fleet vehicles, documents, and emails still handled here.
+
 export async function POST(request) {
     try {
         const supabase = await createClient()
@@ -27,24 +31,11 @@ export async function POST(request) {
             return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
         }
 
-        // Check if user already owns a company
-        const { data: existingCompany } = await supabase
-            .from('company_profiles_secure')
-            .select('id, name')
-            .eq('owner_user_id', userProfile.id)
-            .maybeSingle()
-
-        if (existingCompany) {
-            return NextResponse.json({
-                error: 'User already owns a company',
-                existingCompany: existingCompany.name
-            }, { status: 400 })
-        }
-
-        // Create company profile
-        const { data: company, error: companyError } = await supabase
-            .from('company_profiles')
-            .insert([{
+        // ── 1. Core registration via RPC ──────────────────────────────────
+        // Replaces: company_profiles INSERT, company_users INSERT,
+        //           user_roles INSERT, notifications INSERT
+        const { data: result, error: rpcError } = await supabase.rpc('register_company', {
+            p_data: {
                 name: body.companyInfo.name,
                 registration_number: body.companyInfo.registrationNumber,
                 tax_id: body.companyInfo.taxId,
@@ -58,74 +49,29 @@ export async function POST(request) {
                 country: body.companyDetails.country || 'Kenya',
                 working_days: body.companyDetails.workingDays || null,
                 years_in_operation: body.companyDetails.yearsInOperation
-                    ? parseInt(body.companyDetails.yearsInOperation)
-                    : null,
+                    ? parseInt(body.companyDetails.yearsInOperation) : null,
                 opening_time: body.companyDetails.openingTime,
                 closing_time: body.companyDetails.closingTime,
-                owner_user_id: userProfile.id,
-                status: 'pending_verification',
-                submitted_at: new Date().toISOString(),
-                is_active: false
-            }])
-            .select()
+            }
+        })
 
-        if (companyError) {
-            console.error('❌ Company creation error:', companyError)
+        if (rpcError) {
+            console.error('❌ register_company RPC error:', rpcError)
             return NextResponse.json({
-                error: `Failed to create company: ${companyError.message}`
+                error: `Failed to create company: ${rpcError.message}`
             }, { status: 500 })
         }
 
-        const companyId = company[0].id
-        console.log('✅ Company created:', companyId)
-
-        // Add owner as company user with admin rights
-        const { error: companyUserError } = await supabase
-            .from('company_users')
-            .insert([{
-                user_id: userProfile.id,
-                company_id: companyId,
-                staff_role: 'owner',
-                is_admin: true,
-                is_active: true,
-                updated_by: userProfile.id
-            }])
-
-        if (companyUserError) {
-            console.error('⚠️ Company user error:', companyUserError)
-        } else {
-            console.log('✅ Owner added as company admin')
+        if (!result?.success) {
+            return NextResponse.json({
+                error: result?.error || 'Company registration failed'
+            }, { status: 400 })
         }
 
-        // Assign company_owner role
-        try {
-            const { data: companyOwnerRole } = await supabase
-                .from('user_roles_lookup')
-                .select('id')
-                .eq('code', 'company_owner')
-                .single()
+        const companyId = result.company_id
+        console.log('✅ Company registered via RPC:', companyId)
 
-            if (companyOwnerRole) {
-                const { error: roleError } = await supabase
-                    .from('user_roles')
-                    .insert([{
-                        user_id: userProfile.id,
-                        role_id: companyOwnerRole.id
-                    }])
-
-                if (roleError) {
-                    console.error('⚠️ Role assignment error:', roleError)
-                } else {
-                    console.log('✅ Company owner role assigned')
-                }
-            } else {
-                console.error('⚠️ company_owner role not found in user_roles_lookup')
-            }
-        } catch (roleError) {
-            console.error('⚠️ Role assignment error:', roleError)
-        }
-
-        // Link uploaded documents to the company (uploaded_files pattern)
+        // ── 2. Link uploaded documents ────────────────────────────────────
         if (body.documents && body.documents.length > 0) {
             const documentIds = body.documents.map(doc => doc.id).filter(Boolean)
 
@@ -143,13 +89,10 @@ export async function POST(request) {
                 } else {
                     console.log('✅ Documents linked to company')
                 }
-
-                // Document URLs are stored via uploaded_files (reference_type='company_document').
-                // No URL snapshot needed on company_profiles — dropped to avoid RLS recursion.
             }
         }
 
-        // Add team member invitations
+        // ── 3. Team member invitations ────────────────────────────────────
         if (body.teamMembers && body.teamMembers.length > 0) {
             for (const member of body.teamMembers) {
                 try {
@@ -177,12 +120,11 @@ export async function POST(request) {
                         console.error(`⚠️ Invitation error for ${member.email}:`, inviteError)
                     } else {
                         console.log(`✅ Invitation created for ${member.email}`)
-                        // Send invitation email to the team member
                         try {
                             await sendCompanyInviteEmail({
                                 inviteeEmail: member.email,
                                 inviteeName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
-                                companyName: company[0].name,
+                                companyName: body.companyInfo.name,
                                 inviterName: `${userProfile.first_name} ${userProfile.last_name}`,
                                 staffRole: member.role || member.staffRole || 'driver',
                                 invitationToken: inviteToken,
@@ -197,18 +139,17 @@ export async function POST(request) {
             }
         }
 
-        // Add fleet vehicles
-        // BUG 1.2 FIX: plate_number and year_of_manufacture (not license_plate / year)
+        // ── 4. Fleet vehicles ─────────────────────────────────────────────
         if (body.fleet && body.fleet.length > 0) {
             for (const vehicle of body.fleet) {
                 try {
                     const { data: newVehicle, error: vehicleError } = await supabase
                         .from('vehicles')
                         .insert([{
-                            plate_number: vehicle.licensePlate || vehicle.plateNumber,  // was license_plate ❌
+                            plate_number: vehicle.licensePlate || vehicle.plateNumber,
                             make: vehicle.make,
                             model: vehicle.model,
-                            year_of_manufacture: vehicle.year ? parseInt(vehicle.year) : null,  // was year ❌
+                            year_of_manufacture: vehicle.year ? parseInt(vehicle.year) : null,
                             color: vehicle.color,
                             vin: vehicle.vin
                         }])
@@ -220,8 +161,6 @@ export async function POST(request) {
                         continue
                     }
 
-                    // RLS on vehicle_ownership requires owner_user_id to match auth user
-                    // Set both: owner_company_id for company ownership, owner_user_id for RLS
                     const { error: ownershipError } = await supabase
                         .from('vehicle_ownership')
                         .insert([{
@@ -241,12 +180,13 @@ export async function POST(request) {
             }
         }
 
+        // ── 5. Emails ─────────────────────────────────────────────────────
         // Send confirmation email to owner
         try {
             await sendCompanyRegistrationEmail({
                 ownerEmail: user.email,
                 ownerName: `${userProfile.first_name} ${userProfile.last_name}`,
-                companyName: company[0].name,
+                companyName: body.companyInfo.name,
                 companyId: companyId
             })
             console.log('✅ Registration confirmation email sent')
@@ -254,40 +194,13 @@ export async function POST(request) {
             console.error('⚠️ Email error (non-fatal):', emailError)
         }
 
-        // Notify admins — insert a single broadcast notification with recipient_type: 'admin'
-        // (same pattern as provider registration; no need to resolve individual admin user IDs)
-        try {
-            const { error: notifError } = await supabase
-                .from('notifications')
-                .insert([{
-                    recipient_type: 'admin',
-                    type: 'company_registration',
-                    notification_type: 'company_registration',
-                    reference_type: 'company',
-                    reference_table: 'company_profiles',
-                    reference_id: companyId,
-                    title: 'New Company Registration',
-                    message: `${company[0].name} has registered and is pending verification`,
-                    is_read: false,
-                }])
-
-            if (notifError) {
-                console.error('⚠️ Admin notification error:', notifError)
-            } else {
-                console.log('✅ Admin notification sent')
-            }
-        } catch (notifError) {
-            console.error('⚠️ Notification error (non-fatal):', notifError)
-        }
-
         // Send email alert to admin inbox
-        // ADMIN_EMAIL env var holds the admin notification address
         try {
             const adminEmail = process.env.ADMIN_EMAIL
             if (adminEmail) {
                 await sendAdminNewCompanyEmail({
                     adminEmail,
-                    companyName: company[0].name,
+                    companyName: body.companyInfo.name,
                     ownerName: `${userProfile.first_name} ${userProfile.last_name}`,
                     ownerEmail: user.email,
                     registrationNumber: body.companyInfo.registrationNumber,
@@ -304,8 +217,8 @@ export async function POST(request) {
             success: true,
             company: {
                 id: companyId,
-                name: company[0].name,
-                status: company[0].status
+                name: body.companyInfo.name,
+                status: 'pending_verification'
             }
         })
 

@@ -1,10 +1,14 @@
 // src/app/api/team/search-users/route.js
+// SECURITY FIX: Replaced auth.admin.listUsers() (requires service_role key,
+// exposes all auth emails) with a search via user_profiles_secure view.
+// The view decrypts email via pii_decrypt() for rows the caller can access.
+
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')
 
@@ -41,56 +45,44 @@ export async function GET(request) {
       )
     }
 
-    // Search for users by email (must be exact match for security)
-    const { data: authUsers, error: searchError } = await supabase.auth.admin.listUsers()
-    
-    if (searchError) {
-      console.error('Search error:', searchError)
+    // Search for users by email via the secure view.
+    // user_profiles_secure decrypts email_enc via pii_decrypt().
+    // The ilike filter works on the decrypted output.
+    const { data: userProfiles, error: profileError } = await supabase
+      .from('user_profiles_secure')
+      .select('id, auth_user_id, first_name, last_name, email, is_active, is_suspended')
+      .ilike('email', `%${email}%`)
+      .limit(20)
+
+    if (profileError) {
+      console.error('Profile search error:', profileError)
       return NextResponse.json(
         { error: 'Failed to search users' },
         { status: 500 }
       )
     }
 
-    // Filter users by email match
-    const matchedAuthUsers = authUsers.users.filter(u => 
-      u.email && u.email.toLowerCase().includes(email.toLowerCase())
-    )
-
-    // Get user profiles for matched users
-    const { data: userProfiles, error: profileError } = await supabase
-      .from('user_profiles_secure')
-      .select('id, auth_user_id, first_name, last_name, is_active, is_suspended')
-      .in('auth_user_id', matchedAuthUsers.map(u => u.id))
-
-    if (profileError) {
-      console.error('Profile error:', profileError)
-      return NextResponse.json(
-        { error: 'Failed to fetch user profiles' },
-        { status: 500 }
-      )
-    }
-
-    // Combine auth users with profiles
-    const results = matchedAuthUsers.map(authUser => {
-      const profile = userProfiles.find(p => p.auth_user_id === authUser.id)
-      return {
-        email: authUser.email,
-        user_id: profile?.id,
-        first_name: profile?.first_name || '',
-        last_name: profile?.last_name || '',
-        is_active: profile?.is_active || false,
-        is_suspended: profile?.is_suspended || false,
-        can_invite: profile?.is_active && !profile?.is_suspended
-      }
-    }).filter(u => u.user_id) // Only return users with profiles
+    // Build results
+    const results = (userProfiles || [])
+      .filter(p => p.id && p.email) // Only users with profiles and emails
+      .map(p => ({
+        email: p.email,
+        user_id: p.id,
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        is_active: p.is_active || false,
+        is_suspended: p.is_suspended || false,
+        can_invite: p.is_active && !p.is_suspended
+      }))
 
     // Check if any are already team members
+    const userIds = results.map(r => r.user_id)
+
     const { data: existingMembers } = await supabase
       .from('mechanics')
       .select('user_id')
       .eq('service_provider_id', provider.id)
-      .in('user_id', results.map(r => r.user_id))
+      .in('user_id', userIds)
 
     const existingMemberIds = new Set(existingMembers?.map(m => m.user_id) || [])
 

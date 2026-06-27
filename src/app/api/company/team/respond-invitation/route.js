@@ -1,6 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// SECURITY FIX: Replaced direct company_users INSERT (which relied on the
+// dangerous insert_own_record policy) with accept_company_invitation RPC.
+// The RPC validates invitation status, expiry, and email match in a
+// SECURITY DEFINER function before creating the membership.
+
 export async function POST(request) {
   try {
     const supabase = await createClient()
@@ -24,10 +29,52 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile
+    // ── Accept ────────────────────────────────────────────────────────────
+    if (body.response === 'accept') {
+      // Single RPC call handles everything:
+      // 1. Validates invitation (pending, not expired, addressed to caller)
+      // 2. Inserts company_users row (trigger sets default permissions)
+      // 3. Assigns company_member role
+      // 4. Marks invitation as accepted
+      const { data: result, error: rpcError } = await supabase.rpc('accept_company_invitation', {
+        p_invitation_token: body.token
+      })
+
+      if (rpcError) {
+        console.error('❌ accept_company_invitation RPC error:', rpcError)
+        return NextResponse.json({ error: rpcError.message }, { status: 500 })
+      }
+
+      if (!result?.success) {
+        return NextResponse.json({
+          error: result?.error || 'Failed to accept invitation'
+        }, { status: 400 })
+      }
+
+      // Fetch company name for the response
+      const { data: company } = await supabase
+        .from('company_profiles_secure')
+        .select('name')
+        .eq('id', result.company_id)
+        .maybeSingle()
+
+      console.log('✅ User accepted company invitation via RPC')
+
+      return NextResponse.json({
+        success:     true,
+        message:     `You've successfully joined ${company?.name || 'the company'}`,
+        companyId:   result.company_id,
+        companyName: company?.name,
+        alreadyMember: result.already_member || false,
+      })
+    }
+
+    // ── Reject ────────────────────────────────────────────────────────────
+    // For rejection, we still need to look up the invitation to update it.
+    // This is simpler — no membership creation needed.
     const { data: userProfile } = await supabase
       .from('user_profiles_secure')
-      .select('id, email')
+      .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -35,120 +82,25 @@ export async function POST(request) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    // Look up invitation by invitation_token (NOT 'token' — that column doesn't exist)
+    // Look up invitation by token
     const { data: invitation, error: invitationError } = await supabase
       .from('company_invitations_secure')
-      .select('*, company:company_profiles_secure(id, name)')
+      .select('id, status, company:company_profiles_secure(id, name)')
       .eq('invitation_token', body.token)
       .maybeSingle()
 
     if (invitationError || !invitation) {
-      console.error('❌ Invitation not found:', invitationError)
       return NextResponse.json({
         error: 'Invalid or expired invitation'
       }, { status: 404 })
     }
 
-    // Verify this invitation is addressed to the caller
-    // Column is 'email', not 'invitee_email'
-    const inviteeEmail = invitation.email
-    const callerEmail  = user.email || userProfile.email
-
-    if (inviteeEmail !== callerEmail) {
-      return NextResponse.json({
-        error: 'This invitation is not for you'
-      }, { status: 403 })
-    }
-
-    // Must still be pending
     if (invitation.status !== 'pending') {
       return NextResponse.json({
         error: `Invitation already ${invitation.status}`
       }, { status: 400 })
     }
 
-    // Must not be expired
-    if (new Date(invitation.expires_at) < new Date()) {
-      await supabase
-        .from('company_invitations')
-        .update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('id', invitation.id)
-
-      return NextResponse.json({
-        error: 'Invitation has expired'
-      }, { status: 400 })
-    }
-
-    // ── Accept ────────────────────────────────────────────────────────────
-    if (body.response === 'accept') {
-
-      // Guard: don't insert a duplicate company_users row
-      const { data: existing } = await supabase
-        .from('company_users')
-        .select('id')
-        .eq('user_id', userProfile.id)
-        .eq('company_id', invitation.company_id)
-        .maybeSingle()
-
-      if (!existing) {
-        const { error: memberError } = await supabase
-          .from('company_users')
-          .insert([{
-            user_id:    userProfile.id,
-            company_id: invitation.company_id,
-            staff_role: invitation.staff_role,
-            is_admin:   invitation.is_admin,
-            is_active:  true,
-            updated_by: userProfile.id,
-          }])
-
-        if (memberError) {
-          console.error('❌ Member creation error:', memberError)
-          return NextResponse.json({
-            error: `Failed to join company: ${memberError.message}`
-          }, { status: 500 })
-        }
-      }
-
-      // Assign company_member role in user_roles (ignore if already assigned)
-      const { data: roleRow } = await supabase
-        .from('user_roles_lookup')
-        .select('id')
-        .eq('code', 'company_member')
-        .maybeSingle()
-
-      if (roleRow) {
-        // Use upsert with ignoreDuplicates — Supabase JS equivalent of ON CONFLICT DO NOTHING
-        await supabase
-          .from('user_roles')
-          .upsert(
-            [{ user_id: userProfile.id, role_id: roleRow.id }],
-            { ignoreDuplicates: true }
-          )
-      }
-
-      // Mark invitation accepted + link invitee_user_id
-      await supabase
-        .from('company_invitations')
-        .update({
-          status:          'accepted',
-          accepted_at:     new Date().toISOString(),
-          invitee_user_id: userProfile.id,
-          updated_at:      new Date().toISOString(),
-        })
-        .eq('id', invitation.id)
-
-      console.log('✅ User accepted company invitation and joined company_users')
-
-      return NextResponse.json({
-        success:     true,
-        message:     `You've successfully joined ${invitation.company?.name}`,
-        companyId:   invitation.company_id,
-        companyName: invitation.company?.name,
-      })
-    }
-
-    // ── Reject ────────────────────────────────────────────────────────────
     await supabase
       .from('company_invitations')
       .update({

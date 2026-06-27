@@ -1,5 +1,9 @@
 'use client'
 
+// SECURITY FIX: All token reads/writes moved from user_profiles to user_oauth_tokens.
+// user_oauth_tokens has own-row-only RLS — tokens are no longer exposed via
+// user_profiles_select_open.
+
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Check, X, RefreshCw, AlertCircle } from 'lucide-react'
@@ -11,6 +15,7 @@ export default function GoogleCalendarSync() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [autoSync, setAutoSync] = useState(false)
+  const [profileId, setProfileId] = useState(null)
 
   useEffect(() => {
     checkConnectionStatus()
@@ -20,15 +25,25 @@ export default function GoogleCalendarSync() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
-      // Check if user has Google Calendar token stored
-      const { data } = await supabase
-        .from('user_profiles_secure')
-        .select('google_calendar_token')
+      // Get profile ID first
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('id')
         .eq('auth_user_id', user.id)
         .single()
 
-      setIsConnected(!!data?.google_calendar_token)
-      setAutoSync(!!data?.google_calendar_auto_sync)
+      if (!profile) return
+      setProfileId(profile.id)
+
+      // Check token status from user_oauth_tokens
+      const { data: oauthData } = await supabase
+        .from('user_oauth_tokens')
+        .select('google_calendar_token, google_calendar_auto_sync')
+        .eq('user_id', profile.id)
+        .maybeSingle()
+
+      setIsConnected(!!oauthData?.google_calendar_token)
+      setAutoSync(!!oauthData?.google_calendar_auto_sync)
     } catch (error) {
       console.error('Error checking connection:', error)
     }
@@ -69,15 +84,19 @@ export default function GoogleCalendarSync() {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      if (!profileId) return
 
       await supabase
-        .from('user_profiles')
+        .from('user_oauth_tokens')
         .update({ 
           google_calendar_token: null,
-          google_calendar_auto_sync: false
+          google_calendar_refresh_token: null,
+          google_calendar_auto_sync: false,
+          google_calendar_event_ids: '{}',
+          google_calendar_token_expires_at: null,
+          updated_at: new Date().toISOString(),
         })
-        .eq('auth_user_id', user.id)
+        .eq('user_id', profileId)
 
       setIsConnected(false)
       setAutoSync(false)
@@ -94,15 +113,19 @@ export default function GoogleCalendarSync() {
     setSuccess('')
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      const { data: profile } = await supabase
-        .from('user_profiles_secure')
-        .select('id, google_calendar_token')
-        .eq('auth_user_id', user.id)
-        .single()
+      if (!profileId) {
+        setError('Profile not loaded')
+        return
+      }
 
-      if (!profile.google_calendar_token) {
+      // Read token from user_oauth_tokens
+      const { data: oauthData } = await supabase
+        .from('user_oauth_tokens')
+        .select('google_calendar_token')
+        .eq('user_id', profileId)
+        .maybeSingle()
+
+      if (!oauthData?.google_calendar_token) {
         setError('Please connect Google Calendar first')
         return
       }
@@ -118,7 +141,7 @@ export default function GoogleCalendarSync() {
           status:booking_statuses(code, display_name),
           booking_services(service:services(name))
         `)
-        .eq('customer_user_id', profile.id)
+        .eq('customer_user_id', profileId)
         .gte('booking_date', new Date().toISOString().split('T')[0])
         .in('status.code', ['pending', 'confirmed', 'in_progress'])
 
@@ -127,7 +150,7 @@ export default function GoogleCalendarSync() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: profile.google_calendar_token,
+          token: oauthData.google_calendar_token,
           bookings
         })
       })
@@ -146,13 +169,16 @@ export default function GoogleCalendarSync() {
 
   const toggleAutoSync = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      if (!profileId) return
       const newValue = !autoSync
 
       await supabase
-        .from('user_profiles')
-        .update({ google_calendar_auto_sync: newValue })
-        .eq('auth_user_id', user.id)
+        .from('user_oauth_tokens')
+        .update({
+          google_calendar_auto_sync: newValue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', profileId)
 
       setAutoSync(newValue)
       setSuccess(`Auto-sync ${newValue ? 'enabled' : 'disabled'}`)

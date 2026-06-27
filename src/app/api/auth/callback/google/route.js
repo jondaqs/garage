@@ -1,8 +1,10 @@
 // FILE LOCATION: src/app/api/auth/callback/google/route.js
 // OAuth callback handler for Google Calendar integration
+// SECURITY FIX: Tokens now stored in user_oauth_tokens (own-row RLS)
+// instead of user_profiles (open SELECT policy)
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request) {
   const requestUrl = new URL(request.url)
@@ -51,8 +53,8 @@ export async function GET(request) {
     const tokens = await tokenResponse.json()
     console.log('Tokens received successfully')
 
-    // Get Supabase client
-    const supabase = createClient()
+    // Get Supabase server client (uses cookies for auth)
+    const supabase = await createClient()
     
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -64,22 +66,35 @@ export async function GET(request) {
       )
     }
 
+    // Get user profile ID (user_oauth_tokens uses profile ID, not auth ID)
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      console.error('Profile not found:', profileError)
+      throw new Error('User profile not found')
+    }
+
     console.log('Storing tokens for user:', user.id)
 
-    // Store tokens in user_profiles table
-    const { error: updateError } = await supabase
-      .from('user_profiles')
-      .update({
+    // Store tokens in user_oauth_tokens table (secured with own-row-only RLS)
+    const { error: upsertError } = await supabase
+      .from('user_oauth_tokens')
+      .upsert({
+        user_id: profile.id,
         google_calendar_token: tokens.access_token,
         google_calendar_refresh_token: tokens.refresh_token,
         google_calendar_token_expires_at: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString(),
-        google_calendar_auto_sync: true
-      })
-      .eq('auth_user_id', user.id)
+        google_calendar_auto_sync: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
 
-    if (updateError) {
-      console.error('Failed to store tokens:', updateError)
-      throw updateError
+    if (upsertError) {
+      console.error('Failed to store tokens:', upsertError)
+      throw upsertError
     }
 
     console.log('Google Calendar connected successfully')

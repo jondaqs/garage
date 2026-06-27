@@ -1,5 +1,8 @@
 'use client'
 
+// SECURITY FIX: Replaced 5+ client-side inserts with single register_service_provider RPC.
+// All inserts now happen in a server-side transaction via SECURITY DEFINER function.
+
 import React, { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -20,11 +23,14 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
     setError('')
 
     try {
-      // 1. Create Service Provider
-      const { data: provider, error: providerError } = await supabase
-        .from('service_providers')
-        .insert([{
-          owner_user_id: userProfile.id,
+      // Single RPC call replaces 5+ separate client-side inserts:
+      // 1. service_providers INSERT
+      // 2. user_roles INSERT (role assignment)
+      // 3. service_provider_services INSERT (service links)
+      // 4. shops INSERT
+      // 5. notifications INSERT (admin + user)
+      const { data: result, error: rpcError } = await supabase.rpc('register_service_provider', {
+        p_data: {
           provider_type_id: data.providerType.id,
           name: data.providerInfo.businessName,
           registration_number: data.providerInfo.registrationNumber,
@@ -32,132 +38,32 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
           description: data.providerInfo.description,
           phone: data.providerInfo.phone,
           email: data.providerInfo.email,
-          years_in_operation: data.providerInfo.yearsInOperation ? parseInt(data.providerInfo.yearsInOperation) : null,
-          status: 'pending_verification',
-          is_active: false,
-          is_verified: false,
-          submitted_at: new Date().toISOString()
-        }])
-        .select()
-        .single()
-
-      if (providerError) throw providerError
-
-      // 2. Assign service provider owner role
-      const { data: ownerRole, error: lookupError } = await supabase
-        .from('user_roles_lookup')
-        .select('id')
-        .eq('code', 'service_provider_owner')
-        .single()
- 
-      if (lookupError) {
-        console.error('❌ Error fetching role lookup:', lookupError)
-        throw new Error('Failed to fetch service provider role')
-      }
- 
-      console.log('✅ Found owner role:', ownerRole.id)
- 
-      if (ownerRole) {
-        console.log('🔍 Assigning role to user:', {
-          user_id: userProfile.id,
-          role_id: ownerRole.id
-        })
-        
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .insert([{
-            user_id: userProfile.id,
-            role_id: ownerRole.id
-          }])
-          .select()
-        
-        if (roleError) {
-          console.error('❌ Role assignment error:', roleError)
-          console.error('Error details:', {
-            code: roleError.code,
-            message: roleError.message,
-            details: roleError.details,
-            hint: roleError.hint
-          })
-          throw new Error(`Failed to assign role: ${roleError.message}`)
+          years_in_operation: data.providerInfo.yearsInOperation
+            ? parseInt(data.providerInfo.yearsInOperation) : null,
+          country: data.providerInfo.country || 'Kenya',
+          service_ids: (data.selectedServices || []).map(s => s.id),
+          shops: (data.shops || []).map(shop => ({
+            name: shop.name,
+            description: shop.description,
+            phone: shop.phone,
+            email: shop.email,
+            county: shop.county,
+            town: shop.town,
+            street: shop.street,
+            latitude: shop.latitude ? parseFloat(shop.latitude) : null,
+            longitude: shop.longitude ? parseFloat(shop.longitude) : null,
+            opening_time: shop.openingTime,
+            closing_time: shop.closingTime,
+          })),
         }
-        
-        console.log('✅ Role assigned successfully:', roleData)
-      } else {
-        throw new Error('Owner role not found in user_roles_lookup')
-      }
+      })
 
-      // 3. Link services
-      if (data.selectedServices && data.selectedServices.length > 0) {
-        const serviceLinks = data.selectedServices.map(service => ({
-          service_provider_id: provider.id,
-          service_id: service.id,
-          is_active: true
-        }))
+      if (rpcError) throw rpcError
+      if (!result?.success) throw new Error(result?.error || 'Registration failed')
 
-        const { error: servicesError } = await supabase
-          .from('service_provider_services')
-          .insert(serviceLinks)
-
-        if (servicesError) throw servicesError
-      }
-
-      // 4. Create shops
-      if (data.shops && data.shops.length > 0) {
-        const shopsToInsert = data.shops.map(shop => ({
-          service_provider_id: provider.id,
-          name: shop.name,
-          description: shop.description,
-          phone: shop.phone,
-          email: shop.email,
-          county: shop.county,
-          town: shop.town,
-          street: shop.street,
-          latitude: shop.latitude ? parseFloat(shop.latitude) : null,
-          longitude: shop.longitude ? parseFloat(shop.longitude) : null,
-          opening_time: shop.openingTime,
-          closing_time: shop.closingTime,
-          is_active: false // Will be activated after verification
-        }))
-
-        const { error: shopsError } = await supabase
-          .from('shops')
-          .insert(shopsToInsert)
-
-        if (shopsError) throw shopsError
-      }
-
-      // 5. Store banking info if provided (you might want a separate table)
-      // For now, we'll skip this or you can add a payment_info table
-
-      // 6. Create notification for admin
-      const { error: notifError } = await supabase
-        .from('notifications')
-        .insert([{
-          recipient_type: 'admin',
-          notification_type: 'new_provider_registration',
-          title: 'New Service Provider Registration',
-          message: `${data.providerInfo.businessName} has submitted a registration for approval`,
-          reference_id: provider.id,
-          reference_type: 'service_provider'
-        }])
-
-      // 7. Create notification for user
-      await supabase
-        .from('notifications')
-        .insert([{
-          recipient_user_id: userProfile.id,
-          notification_type: 'registration_confirmation',
-          title: 'Registration Submitted',
-          message: 'Your service provider registration has been submitted and is pending verification. We will notify you once the review is complete.',
-          reference_id: provider.id,
-          reference_type: 'service_provider'
-        }])
+      console.log('✅ Provider registered:', result.provider_id)
 
       setSuccess(true)
-
-      // Wait a moment for database to fully commit
-      await new Promise(resolve => setTimeout(resolve, 500))
 
       // Refresh the session to pick up the new role
       await supabase.auth.refreshSession()
