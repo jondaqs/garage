@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 /**
  * ChatAvatar — shared avatar component for all chat surfaces.
  *
@@ -20,15 +22,20 @@ export default function ChatAvatar({
   size = 'md',
   gradient = 'from-blue-500 to-blue-700',
 }) {
+  const [imgError, setImgError] = useState(false)
   const px = size === 'sm' ? 'w-9 h-9' : 'w-10 h-10'
-  const textSize = size === 'sm' ? 'text-sm' : 'text-sm'
+  const textSize = 'text-sm'
   const initial = name?.[0]?.toUpperCase() || '?'
 
-  if (src) {
+  if (src && !imgError) {
     return (
       <img
         src={src}
         alt={name}
+        onError={() => {
+          console.warn('[ChatAvatar] Image failed to load:', src)
+          setImgError(true)
+        }}
         className={`${px} rounded-full object-cover flex-shrink-0`}
       />
     )
