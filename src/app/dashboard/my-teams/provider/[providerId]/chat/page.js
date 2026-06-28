@@ -480,6 +480,11 @@ export default function ProviderMemberChatPage() {
     <ProviderSubscriptionGate featureName="Chat">
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
+      {/* DEBUG: remove this banner once confirmed */}
+      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'red',color:'white',padding:'8px',textAlign:'center',fontWeight:'bold'}}>
+        🔴 NEW FILE LOADED — if you see this, the file is active
+      </div>
+
       {/* ── Conversation list ─────────────────────────────────────────── */}
       <div className={`w-full sm:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col
         ${mobileShowChat ? 'hidden sm:flex' : 'flex'}`}>
