@@ -28,7 +28,6 @@ import {
 } from 'lucide-react'
 
 import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
-import ChatAvatar from '@/components/ChatAvatar'
 export default function ProviderMemberChatPage() {
   const router       = useRouter()
   const params       = useParams()
@@ -139,10 +138,6 @@ export default function ProviderMemberChatPage() {
 
     if (statusFilter !== 'all') q = q.eq('status', statusFilter)
     const { data } = await q
-    // DEBUG: check if profile_picture_url is present in the fetched data
-    if (data?.length) {
-      console.log('[MEMBER CHAT DEBUG] First conversation user data:', JSON.stringify(data[0]?.user))
-    }
     return data || []
   }, [authState, providerId, statusFilter])
 
@@ -480,11 +475,6 @@ export default function ProviderMemberChatPage() {
     <ProviderSubscriptionGate featureName="Chat">
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
-      {/* DEBUG: remove this banner once confirmed */}
-      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'red',color:'white',padding:'8px',textAlign:'center',fontWeight:'bold'}}>
-        🔴 NEW FILE LOADED — if you see this, the file is active
-      </div>
-
       {/* ── Conversation list ─────────────────────────────────────────── */}
       <div className={`w-full sm:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col
         ${mobileShowChat ? 'hidden sm:flex' : 'flex'}`}>
@@ -556,10 +546,6 @@ export default function ProviderMemberChatPage() {
             filteredConvs.map(conv => {
               const name      = customerName(conv)
               const isCompany = !!conv.company_id
-              // DEBUG: log avatar data for each conversation
-              if (!isCompany) {
-                console.log(`[AVATAR DEBUG] conv=${conv.id} user=`, conv.user, 'pic=', conv.user?.profile_picture_url)
-              }
               return (
                 <button key={conv.id} onClick={() => selectConversation(conv.id, conv)}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-50 hover:bg-gray-50 transition-colors ${
@@ -574,17 +560,12 @@ export default function ProviderMemberChatPage() {
                       src={conv.user.profile_picture_url}
                       alt={name}
                       className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                      onError={e => { console.warn('[IMG INLINE] failed:', conv.user.profile_picture_url); e.target.style.display = 'none' }}
                     />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                       {name[0]?.toUpperCase() || '?'}
                     </div>
                   )}
-                  {/* DEBUG: show raw value on screen */}
-                  <span style={{fontSize:'9px',color:'red',position:'absolute',left:0,bottom:0,maxWidth:'80px',overflow:'hidden',whiteSpace:'nowrap'}}>
-                    {conv.user?.profile_picture_url ? '✅HAS_URL' : `❌NO_URL(${typeof conv.user?.profile_picture_url})`}
-                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">{name}</p>
