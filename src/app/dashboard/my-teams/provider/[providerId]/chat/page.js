@@ -581,6 +581,10 @@ export default function ProviderMemberChatPage() {
                       {name[0]?.toUpperCase() || '?'}
                     </div>
                   )}
+                  {/* DEBUG: show raw value on screen */}
+                  <span style={{fontSize:'9px',color:'red',position:'absolute',left:0,bottom:0,maxWidth:'80px',overflow:'hidden',whiteSpace:'nowrap'}}>
+                    {conv.user?.profile_picture_url ? '✅HAS_URL' : `❌NO_URL(${typeof conv.user?.profile_picture_url})`}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">{name}</p>
