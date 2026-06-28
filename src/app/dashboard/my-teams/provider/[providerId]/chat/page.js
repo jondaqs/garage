@@ -564,12 +564,17 @@ export default function ProviderMemberChatPage() {
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-400 to-indigo-600">
                       <Building2 size={16} />
                     </div>
-                  ) : (
-                    <ChatAvatar
-                      src={conv.user?.profile_picture_url}
-                      name={name}
-                      gradient="from-gray-400 to-gray-600"
+                  ) : conv.user?.profile_picture_url ? (
+                    <img
+                      src={conv.user.profile_picture_url}
+                      alt={name}
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                      onError={e => { console.warn('[IMG INLINE] failed:', conv.user.profile_picture_url); e.target.style.display = 'none' }}
                     />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {name[0]?.toUpperCase() || '?'}
+                    </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
@@ -620,13 +625,16 @@ export default function ProviderMemberChatPage() {
                 <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-400 to-indigo-600">
                   <Building2 size={16} />
                 </div>
-              ) : (
-                <ChatAvatar
-                  src={activeConv.user?.profile_picture_url}
-                  name={customerName(activeConv)}
-                  size="sm"
-                  gradient="from-gray-400 to-gray-600"
+              ) : activeConv.user?.profile_picture_url ? (
+                <img
+                  src={activeConv.user.profile_picture_url}
+                  alt={customerName(activeConv)}
+                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                 />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                  {(customerName(activeConv)[0] || '?').toUpperCase()}
+                </div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{customerName(activeConv)}</p>
