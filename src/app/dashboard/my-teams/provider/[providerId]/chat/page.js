@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 
 import ProviderSubscriptionGate from '@/components/ProviderSubscriptionGate'
+import ChatAvatar from '@/components/ChatAvatar'
 export default function ProviderMemberChatPage() {
   const router       = useRouter()
   const params       = useParams()
@@ -131,7 +132,7 @@ export default function ProviderMemberChatPage() {
         provider_unread_count, status, closed_at, company_id,
         closed_by:user_profiles_secure!closed_by_id(id, first_name, last_name),
         user:user_profiles_secure!user_id(id, first_name, last_name, profile_picture_url),
-        company:company_profiles_secure!company_id(id, name)
+        company:company_profiles_secure!company_id(id, name, owner:user_profiles_secure!owner_user_id(profile_picture_url))
       `)
       .eq('service_provider_id', providerId)
       .order('last_message_at', { ascending: false, nullsFirst: false })
@@ -552,19 +553,17 @@ export default function ProviderMemberChatPage() {
                     activeConv?.id === conv.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
                   }`}>
                   {isCompany ? (
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-400 to-indigo-600">
-                      <Building2 size={16} />
-                    </div>
-                  ) : conv.user?.profile_picture_url ? (
-                    <img
-                      src={conv.user.profile_picture_url}
-                      alt={name}
-                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    <ChatAvatar
+                      src={conv.company?.owner?.profile_picture_url}
+                      name={name}
+                      gradient="from-indigo-400 to-indigo-600"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                      {name[0]?.toUpperCase() || '?'}
-                    </div>
+                    <ChatAvatar
+                      src={conv.user?.profile_picture_url}
+                      name={name}
+                      gradient="from-gray-400 to-gray-600"
+                    />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
@@ -612,19 +611,19 @@ export default function ProviderMemberChatPage() {
                 <ArrowLeft size={18} />
               </button>
               {activeConv.company_id ? (
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-400 to-indigo-600">
-                  <Building2 size={16} />
-                </div>
-              ) : activeConv.user?.profile_picture_url ? (
-                <img
-                  src={activeConv.user.profile_picture_url}
-                  alt={customerName(activeConv)}
-                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                <ChatAvatar
+                  src={activeConv.company?.owner?.profile_picture_url}
+                  name={customerName(activeConv)}
+                  size="sm"
+                  gradient="from-indigo-400 to-indigo-600"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {(customerName(activeConv)[0] || '?').toUpperCase()}
-                </div>
+                <ChatAvatar
+                  src={activeConv.user?.profile_picture_url}
+                  name={customerName(activeConv)}
+                  size="sm"
+                  gradient="from-gray-400 to-gray-600"
+                />
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{customerName(activeConv)}</p>
