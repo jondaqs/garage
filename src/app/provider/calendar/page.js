@@ -231,7 +231,7 @@ export default function ProviderCalendarPage() {
   }
 
   const exportCalendar = () => {
-    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Motiifix//Provider Calendar//EN\n'
+    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Carfix-Connect//Provider Calendar//EN\n'
     events.forEach(ev => {
       ics += 'BEGIN:VEVENT\n'
       ics += `UID:${ev.id}\n`
@@ -258,7 +258,7 @@ export default function ProviderCalendarPage() {
     const blob = new Blob([ics], { type: 'text/calendar' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a'); a.href = url
-    a.download = 'motiifix-provider-calendar.ics'; a.click()
+    a.download = 'Carfix-Connect-provider-calendar.ics'; a.click()
     URL.revokeObjectURL(url)
   }
 

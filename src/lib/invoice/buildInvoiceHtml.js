@@ -15,7 +15,7 @@
  * clients AND in html2canvas without any colour-stripping shim.
  */
 
-const BRAND = 'Motiifix'
+const BRAND = 'Carfix-Connect'
 
 /**
  * @param {object} args

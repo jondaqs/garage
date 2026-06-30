@@ -15,7 +15,7 @@
 import { sendAndQueueSms, normalisePhone } from './transport.js'
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
-const BRAND   = 'Motiifix'
+const BRAND   = 'Carfix-Connect'
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-KE', {

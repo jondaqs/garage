@@ -638,7 +638,7 @@ async function sendWalkInInviteEmail({
   const mailjetApiKey  = process.env.MAILJET_API_KEY
   const mailjetSecret  = process.env.MAILJET_SECRET_KEY
   const fromEmail      = process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com'
-  const fromName       = process.env.MAILJET_FROM_NAME  || 'Motiifix'
+  const fromName       = process.env.MAILJET_FROM_NAME  || 'Carfix-Connect'
 
   if (!mailjetApiKey || !mailjetSecret) {
     await supabase.from('email_queue').insert({

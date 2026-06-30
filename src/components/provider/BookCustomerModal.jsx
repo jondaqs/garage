@@ -344,7 +344,7 @@ export default function BookCustomerModal({
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1.5">
-                  Min 3 characters. Searches all vehicles registered in Motiifix.
+                  Min 3 characters. Searches all vehicles registered in Carfix-Connect.
                 </p>
               </div>
 
@@ -483,7 +483,7 @@ export default function BookCustomerModal({
                       <div className="text-sm">
                         <p className="font-medium text-amber-900">Vehicle not found</p>
                         <p className="text-amber-800 mt-0.5">
-                          This vehicle isn't registered in Motiifix. To service it now, create a{' '}
+                          This vehicle isn't registered in Carfix-Connect. To service it now, create a{' '}
                           <strong>Walk-In Work Order</strong> instead, which can also invite the owner to register.
                         </p>
                       </div>

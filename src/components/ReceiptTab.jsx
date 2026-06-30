@@ -422,7 +422,7 @@ export function ReceiptContent({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
             <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, letterSpacing: 3, color: '#f59e0b', textTransform: 'uppercase' }}>
-              Motiifix
+              Carfix-Connect
             </p>
             <p style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 900, color: '#fff' }}>
               Payment Receipt
@@ -612,7 +612,7 @@ export function ReceiptContent({
       {/* Footer */}
       <div style={{ margin: '16px 24px 28px', textAlign: 'center', paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
         <p style={{ margin: '0 0 2px', fontSize: 11, color: '#94a3b8' }}>Thank you for choosing {provider?.name || 'our service'}.</p>
-        <p style={{ margin: 0, fontSize: 10, color: '#cbd5e1' }}>Powered by Motiifix · motiifix.com</p>
+        <p style={{ margin: 0, fontSize: 10, color: '#cbd5e1' }}>Powered by Carfix-Connect · carfix-connect.com</p>
       </div>
     </div>
   )

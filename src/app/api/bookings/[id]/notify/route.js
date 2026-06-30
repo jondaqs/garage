@@ -15,7 +15,7 @@ import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 
 const TAG   = (id) => `[POST /api/bookings/${id}/notify]`
-const BRAND = 'Motiifix'
+const BRAND = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 
 function getServiceClient() {

@@ -25,7 +25,7 @@ function getMailjetConfig() {
     auth: `Basic ${Buffer.from(`${apiKey}:${secretKey}`).toString('base64')}`,
     from: {
       Email: process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com',
-      Name:  process.env.MAILJET_FROM_NAME  || 'Motiifix',
+      Name:  process.env.MAILJET_FROM_NAME  || 'Carfix-Connect',
     },
   }
 }

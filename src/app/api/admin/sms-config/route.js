@@ -182,7 +182,7 @@ export async function POST(request) {
 
       // Queue
       let queueId = null
-      const testMessage = `Motiifix TEST: SMS via ${provider === 'africastalking' ? "Africa's Talking" : 'Celcom Africa'} is working! ${new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })}`
+      const testMessage = `Carfix-Connect TEST: SMS via ${provider === 'africastalking' ? "Africa's Talking" : 'Celcom Africa'} is working! ${new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })}`
 
       try {
         const { data: queueData } = await sc
@@ -232,7 +232,7 @@ export async function POST(request) {
 
         } else {
           const partnerId = ov.partner_id || process.env.CELCOM_PARTNER_ID || ''
-          const senderId  = ov.sender_id  || process.env.CELCOM_SENDER_ID  || 'Motiifix'
+          const senderId  = ov.sender_id  || process.env.CELCOM_SENDER_ID  || 'Carfix-Connect'
 
           if (!partnerId) {
             log('Config', false, 'Partner ID is missing — set CELCOM_PARTNER_ID env var or enter in the field')

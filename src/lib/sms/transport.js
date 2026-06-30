@@ -178,7 +178,7 @@ async function sendViaAfricasTalking({ to, message }) {
 async function sendViaCelcom({ to, message }) {
   const apiKey    = process.env.CELCOM_API_KEY
   const partnerId = process.env.CELCOM_PARTNER_ID
-  const senderId  = process.env.CELCOM_SENDER_ID || 'Motiifix'
+  const senderId  = process.env.CELCOM_SENDER_ID || 'Carfix-Connect'
 
   if (!apiKey || !partnerId) {
     throw new Error(

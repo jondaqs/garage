@@ -52,7 +52,7 @@ export async function sendInvitationEmail(invitation_id) {
     const mailjetFromName =
       process.env.MAILJET_FROM_NAME ||
       process.env.MAILJET_SENDER_NAME ||
-      'Motiifix'
+      'Carfix-Connect'
 
     console.log('🔑 Checking Mailjet credentials...')
     console.log('Has API Key:', !!mailjetApiKey)
@@ -301,13 +301,13 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
       
       <p><strong>To accept this invitation:</strong></p>
       <ol>
-        <li>Log in to Motiifix using this email: <strong>${recipientEmail}</strong></li>
+        <li>Log in to Carfix-Connect using this email: <strong>${recipientEmail}</strong></li>
         <li>Go to your dashboard</li>
         <li>You'll see the invitation - click Accept</li>
       </ol>
       
       <div style="text-align: center;">
-        <a href="${appUrl}/auth/login" class="button">Go to Motiifix</a>
+        <a href="${appUrl}/auth/login" class="button">Go to Carfix-Connect</a>
       </div>
       
       <p style="color: #dc2626; font-weight: 600;">⏰ This invitation expires in 7 days</p>
@@ -315,7 +315,7 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
     
     <div class="footer">
       <p>If you didn't expect this invitation, you can safely ignore this email.</p>
-      <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">This is an automated message from Motiifix</p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">This is an automated message from Carfix-Connect</p>
     </div>
   </div>
 </body>
@@ -343,7 +343,7 @@ Visit: ${appUrl}/auth/login
 If you didn't expect this invitation, you can safely ignore this email.
 
 ---
-This is an automated message from Motiifix
+This is an automated message from Carfix-Connect
   `
 
   return { subject, html, text }

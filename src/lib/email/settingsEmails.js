@@ -14,7 +14,7 @@
 import { sendAndQueueEmail } from './transport.js'
 
 const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
-const BRAND_NAME = 'Motiifix'
+const BRAND_NAME = 'Carfix-Connect'
 
 // ─── 1. Admin alert — details changed, review required ───────────────────────
 
