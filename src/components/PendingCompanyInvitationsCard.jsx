@@ -102,7 +102,7 @@ export default function PendingCompanyInvitationsCard() {
             Company Invitation{invitations.length > 1 ? 's' : ''} ({invitations.length})
           </h2>
           <p className="text-sm text-gray-500">
-            You have been invited to join {invitations.length > 1 ? 'companies' : 'a company'} on GariCare
+            You have been invited to join {invitations.length > 1 ? 'companies' : 'a company'} on Carfix-Connect
           </p>
         </div>
       </div>

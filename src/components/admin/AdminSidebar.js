@@ -107,7 +107,7 @@ export default function AdminSidebar() {
         <div className="flex items-center flex-shrink-0 px-4">
           <Shield className="text-blue-400 mr-2" size={32} />
           <div>
-            <h2 className="text-lg font-bold text-white">GariCare Admin</h2>
+            <h2 className="text-lg font-bold text-white">Carfix-Connect Admin</h2>
             <p className="text-xs text-gray-400">Admin Panel</p>
           </div>
         </div>

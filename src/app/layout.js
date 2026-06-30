@@ -4,7 +4,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'GariCare - Vehicle Management Platform',
+  title: 'Carfix-Connect - Vehicle Management Platform',
   description: 'Manage your vehicles, book services, and track maintenance',
   manifest: '/manifest.json',
   themeColor: '#2563eb',

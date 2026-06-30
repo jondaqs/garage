@@ -76,7 +76,7 @@ export default function PendingVerificationPage() {
           
           <div className="pt-4">
             <p className="text-sm text-gray-500">
-              Need help? Contact support at support@garicare.com
+              Need help? Contact support at support@Carfix-Connect.com
             </p>
           </div>
         </div>

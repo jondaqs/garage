@@ -43,7 +43,7 @@ export default function ProviderIntroStep({ nextStep, previousStep }) {
     <div className="max-w-3xl mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-gray-800 mb-3">
-          Welcome to GariCare Provider Network
+          Welcome to Carfix-Connect Provider Network
         </h2>
         <p className="text-lg text-gray-600">
           Join Kenya's leading automotive service platform
@@ -162,7 +162,7 @@ export default function ProviderIntroStep({ nextStep, previousStep }) {
           />
           <span className="ml-3 text-gray-700">
             I have read and agree to the Terms & Conditions and commit to maintaining 
-            the required standards as a GariCare service provider
+            the required standards as a Carfix-Connect service provider
           </span>
         </label>
       </div>

@@ -14,7 +14,7 @@
  *   - SubscriptionManager (client-side download)
  */
 
-const BRAND = 'GariCare'
+const BRAND = 'Carfix-Connect'
 
 /**
  * @param {object} args

@@ -53,7 +53,7 @@ export async function sendCompanyInviteEmail({
     <div style="max-width:600px;margin:0 auto;padding:20px;">
       <h2 style="color:#2563eb;">You've Been Invited to Join ${companyName}</h2>
       <p>Hello ${inviteeName || ''},</p>
-      <p><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on GariCare.</p>
+      <p><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on Carfix-Connect.</p>
       <div style="background:#f3f4f6;padding:15px;border-radius:5px;margin:20px 0;">
         <p style="margin:5px 0;"><strong>Company:</strong> ${companyName}</p>
         <p style="margin:5px 0;"><strong>Your Role:</strong> ${staffRole}</p>
@@ -67,12 +67,12 @@ export async function sendCompanyInviteEmail({
       <p style="color:#6b7280;font-size:14px;">This invitation expires in 7 days.</p>
       <p style="color:#6b7280;font-size:14px;">Or copy: <a href="${acceptUrl}">${acceptUrl}</a></p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
-      <p style="color:#6b7280;font-size:12px;">Best regards,<br>The GariCare Team</p>
+      <p style="color:#6b7280;font-size:12px;">Best regards,<br>The Carfix-Connect Team</p>
     </div></body></html>`
 
   const result = await sendMail({
     to: [{ Email: inviteeEmail, Name: inviteeName || inviteeEmail }],
-    subject: `You've been invited to join ${companyName} on GariCare`,
+    subject: `You've been invited to join ${companyName} on Carfix-Connect`,
     html,
   })
   console.log('✅ Company invitation email sent:', inviteeEmail)
@@ -94,7 +94,7 @@ export async function sendCompanyRegistrationEmail({
     <div style="max-width:600px;margin:0 auto;padding:20px;">
       <h2 style="color:#2563eb;">Company Registration Received</h2>
       <p>Dear ${ownerName},</p>
-      <p>Thank you for registering <strong>${companyName}</strong> with GariCare!</p>
+      <p>Thank you for registering <strong>${companyName}</strong> with Carfix-Connect!</p>
       <div style="background:#f3f4f6;padding:15px;border-radius:5px;margin:20px 0;">
         <p style="margin:5px 0;"><strong>Company:</strong> ${companyName}</p>
         ${registrationNumber ? `<p style="margin:5px 0;"><strong>Reg. No.:</strong> ${registrationNumber}</p>` : ''}
@@ -113,7 +113,7 @@ export async function sendCompanyRegistrationEmail({
         </a>
       </div>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
-      <p style="color:#6b7280;font-size:12px;">Best regards,<br>The GariCare Team</p>
+      <p style="color:#6b7280;font-size:12px;">Best regards,<br>The Carfix-Connect Team</p>
     </div></body></html>`
 
   const result = await sendMail({
@@ -140,7 +140,7 @@ export async function sendAdminNewCompanyEmail({
     <html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
     <div style="max-width:600px;margin:0 auto;padding:20px;">
       <h2 style="color:#2563eb;">New Company Registration — Action Required</h2>
-      <p>A new company has registered on GariCare and is awaiting verification.</p>
+      <p>A new company has registered on Carfix-Connect and is awaiting verification.</p>
       <div style="background:#fef9c3;border:1px solid #fde68a;padding:15px;border-radius:5px;margin:20px 0;">
         <p style="margin:5px 0;"><strong>Company Name:</strong> ${companyName}</p>
         ${registrationNumber ? `<p style="margin:5px 0;"><strong>Reg. No.:</strong> ${registrationNumber}</p>` : ''}
@@ -157,11 +157,11 @@ export async function sendAdminNewCompanyEmail({
         Please log in to the admin panel to review the submitted documents and approve or reject this registration.
       </p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
-      <p style="color:#6b7280;font-size:12px;">GariCare Admin System</p>
+      <p style="color:#6b7280;font-size:12px;">Carfix-Connect Admin System</p>
     </div></body></html>`
 
   const result = await sendMail({
-    to: [{ Email: adminEmail, Name: 'GariCare Admin' }],
+    to: [{ Email: adminEmail, Name: 'Carfix-Connect Admin' }],
     subject: `New Company Registration: ${companyName} – Pending Review`,
     html,
   })
@@ -183,7 +183,7 @@ export async function sendCompanyApprovalEmail({
     <div style="max-width:600px;margin:0 auto;padding:20px;">
       <h2 style="color:#10b981;">🎉 Your Company Has Been Approved!</h2>
       <p>Congratulations ${ownerName}!</p>
-      <p><strong>${companyName}</strong> has been verified and approved on GariCare.</p>
+      <p><strong>${companyName}</strong> has been verified and approved on Carfix-Connect.</p>
       <h3 style="color:#2563eb;">You Now Have Full Access To:</h3>
       <ul>
         <li>✓ Complete fleet management</li>
@@ -198,12 +198,12 @@ export async function sendCompanyApprovalEmail({
         </a>
       </div>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
-      <p style="color:#6b7280;font-size:12px;">Best regards,<br>The GariCare Team</p>
+      <p style="color:#6b7280;font-size:12px;">Best regards,<br>The Carfix-Connect Team</p>
     </div></body></html>`
 
   const result = await sendMail({
     to: [{ Email: ownerEmail, Name: ownerName }],
-    subject: `🎉 ${companyName} Has Been Approved – GariCare`,
+    subject: `🎉 ${companyName} Has Been Approved – Carfix-Connect`,
     html,
   })
   console.log('✅ Company approval email sent:', ownerEmail)

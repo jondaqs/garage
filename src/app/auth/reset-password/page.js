@@ -166,7 +166,7 @@ export default function ResetPasswordPage() {
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center space-y-5">
             <div className="flex items-center justify-center">
               <Car className="text-blue-600 mr-2" size={40} />
-              <h1 className="text-3xl font-bold text-gray-800">GariCare</h1>
+              <h1 className="text-3xl font-bold text-gray-800">Carfix-Connect</h1>
             </div>
 
             <div className="flex flex-col items-center gap-3 p-5 bg-amber-50 border border-amber-200 rounded-xl">
@@ -206,7 +206,7 @@ export default function ResetPasswordPage() {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
               <Car className="text-blue-600 mr-2" size={40} />
-              <h1 className="text-3xl font-bold text-gray-800">GariCare</h1>
+              <h1 className="text-3xl font-bold text-gray-800">Carfix-Connect</h1>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">
               {needsMfa ? 'Verify Your Identity' : 'Set New Password'}

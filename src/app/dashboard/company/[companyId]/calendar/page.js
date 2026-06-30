@@ -191,7 +191,7 @@ export default function MemberCompanyCalendarPage() {
   }
 
   const exportCalendar = () => {
-    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//GariCare//Company Fleet//EN\n'
+    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Carfix-Connect//Company Fleet//EN\n'
     events.forEach(ev => {
       const b = ev.resource
       ics += 'BEGIN:VEVENT\n'

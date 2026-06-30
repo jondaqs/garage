@@ -458,7 +458,7 @@ export default function VehicleDetailPage() {
           { align: 'right' }
         )
         pdf.text(
-          vehicle.plate_number + ' · GariCare Vehicle Report',
+          vehicle.plate_number + ' · Carfix-Connect Vehicle Report',
           margin,
           pageH - 6
         )

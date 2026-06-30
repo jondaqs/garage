@@ -1160,7 +1160,7 @@ function PaymentAccountsEditor({ supabase }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-gray-600 block mb-1">Business Name</label>
-                <input className={inp} value={data.mpesa?.business_name || ''} onChange={e => update('mpesa', 'business_name', e.target.value)} placeholder="e.g. GariCare Ltd" />
+                <input className={inp} value={data.mpesa?.business_name || ''} onChange={e => update('mpesa', 'business_name', e.target.value)} placeholder="e.g. Carfix-Connect Ltd" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-600 block mb-1">Paybill Number</label>
@@ -1228,7 +1228,7 @@ function PaymentAccountsEditor({ supabase }) {
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-gray-600 block mb-1">Account Name</label>
-                  <input className={inp} value={data.bank?.account_name || ''} onChange={e => update('bank', 'account_name', e.target.value)} placeholder="e.g. GariCare Ltd" />
+                  <input className={inp} value={data.bank?.account_name || ''} onChange={e => update('bank', 'account_name', e.target.value)} placeholder="e.g. Carfix-Connect Ltd" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-gray-600 block mb-1">Account Number</label>

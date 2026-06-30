@@ -7,7 +7,7 @@ export default function CompanyIntroStep({ nextStep }) {
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">
-        Welcome to GariCare Company Registration
+        Welcome to Carfix-Connect Company Registration
       </h1>
       
       <div className="prose max-w-none mb-8">
@@ -44,7 +44,7 @@ export default function CompanyIntroStep({ nextStep }) {
         <h2 className="text-xl font-semibold mt-6 mb-3">Terms & Conditions</h2>
         <div className="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto text-sm">
           <p className="mb-3">
-            By registering your company on GariCare, you agree to the following terms:
+            By registering your company on Carfix-Connect, you agree to the following terms:
           </p>
           <ul className="space-y-2 list-disc pl-5">
             <li>All information provided must be accurate and up-to-date</li>
@@ -52,7 +52,7 @@ export default function CompanyIntroStep({ nextStep }) {
             <li>Business documents provided are valid and current</li>
             <li>You agree to our privacy policy and data handling practices</li>
             <li>Your company will comply with all service terms</li>
-            <li>You authorize GariCare to verify the information provided</li>
+            <li>You authorize Carfix-Connect to verify the information provided</li>
           </ul>
         </div>
       </div>

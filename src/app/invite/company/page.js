@@ -181,7 +181,7 @@ function AcceptInvitationContent() {
           <h1 className="text-2xl font-bold text-gray-900">You&apos;re Invited</h1>
           <p className="text-gray-500 text-sm mt-1">
             {invitation.first_name ? `Hi ${invitation.first_name}! ` : ''}
-            You have been invited to join a company on GariCare.
+            You have been invited to join a company on Carfix-Connect.
           </p>
         </div>
 
@@ -265,7 +265,7 @@ function AcceptInvitationContent() {
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          GariCare · Fleet & Vehicle Management Platform
+          Carfix-Connect · Fleet & Vehicle Management Platform
         </p>
       </div>
     </div>

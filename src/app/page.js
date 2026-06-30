@@ -224,7 +224,7 @@ export default function LandingPage() {
               <Car size={20} color="#fff" />
             </div>
             <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-              GariCare
+              Carfix-Connect
             </span>
           </div>
 
@@ -407,7 +407,7 @@ export default function LandingPage() {
         }}>
           <div className="fade-up delay-4" style={{ textAlign: 'center', marginBottom: 40 }}>
             <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-              Why GariCare
+              Why Carfix-Connect
             </p>
             <h2 className="gc-display" style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
               Everything your vehicle needs
@@ -449,7 +449,7 @@ export default function LandingPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Car size={16} color="rgba(255,255,255,0.3)" />
-            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>GariCare</span>
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
             <button
@@ -478,7 +478,7 @@ export default function LandingPage() {
             </button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} GariCare. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
           </p>
         </footer>
       </div>

@@ -73,7 +73,7 @@ function SuspendedContent() {
 
         <div className="space-y-3">
           <a
-            href="mailto:support@garicare.com"
+            href="mailto:support@carfix-connect.com"
             className="flex items-center justify-center gap-2 w-full px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
           >
             <Mail size={16} /> Contact Support

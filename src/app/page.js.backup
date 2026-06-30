@@ -15,7 +15,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
             <Car className="text-white mr-2" size={32} />
-            <h1 className="text-2xl font-bold text-white">GariCare</h1>
+            <h1 className="text-2xl font-bold text-white">Carfix-Connect</h1>
           </div>
           <button
             onClick={() => router.push('/auth/login')}

@@ -13,7 +13,7 @@ export default function AboutPage() {
     {
       icon: Shield,
       title: 'Trust First',
-      body: "Every service provider on GariCare is vetted before they're listed. No flaky garages, no surprise charges, no guesswork."
+      body: "Every service provider on Carfix-Connect is vetted before they're listed. No flaky garages, no surprise charges, no guesswork."
     },
     {
       icon: Zap,
@@ -120,7 +120,7 @@ export default function AboutPage() {
               <Car size={20} color="#fff" />
             </div>
             <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-              GariCare
+              Carfix-Connect
             </span>
           </button>
 
@@ -216,7 +216,7 @@ export default function AboutPage() {
               color: 'rgba(255,255,255,0.78)',
               maxWidth: 720,
             }}>
-              GariCare connects Kenyan drivers, garages, and fleet operators on one straightforward platform. We started because servicing a vehicle in this country is harder than it should be — too many phone calls, too much uncertainty, too many missing records. So we built the tool we wished existed.
+              Carfix-Connect connects Kenyan drivers, garages, and fleet operators on one straightforward platform. We started because servicing a vehicle in this country is harder than it should be — too many phone calls, too much uncertainty, too many missing records. So we built the tool we wished existed.
             </p>
           </div>
         </div>
@@ -334,14 +334,14 @@ export default function AboutPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Car size={16} color="rgba(255,255,255,0.3)" />
-            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>GariCare</span>
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
             <button onClick={() => router.push('/about')}   style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}>About</button>
             <button onClick={() => router.push('/contact')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}>Contact</button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} GariCare. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
           </p>
         </footer>
       </div>

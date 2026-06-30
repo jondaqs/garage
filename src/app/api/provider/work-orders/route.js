@@ -654,7 +654,7 @@ async function sendWalkInInviteEmail({
 
   const html  = buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl })
   const text  = buildInviteEmailText({ ownerName, workOrderNumber, plateNumber, inviteToken, appUrl })
-  const subject = `Your vehicle (${plateNumber}) is at the garage — track it on GariCare`
+  const subject = `Your vehicle (${plateNumber}) is at the garage — track it on Carfix-Connect`
 
   let queuedId = null
   try {
@@ -721,7 +721,7 @@ function buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteT
 <div class="wrap">
   <div class="header">
     <h1 style="margin:0;font-size:24px">🔧 Your Vehicle is at the Garage</h1>
-    <p style="margin:10px 0 0;opacity:.9">Track your service on GariCare</p>
+    <p style="margin:10px 0 0;opacity:.9">Track your service on Carfix-Connect</p>
   </div>
   <div class="body">
     <p style="font-size:16px">${greeting}</p>
@@ -732,7 +732,7 @@ function buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteT
       <p style="margin:0"><strong>Vehicle Plate:</strong> ${plateNumber}</p>
     </div>
     <p>To <strong>view service progress, approve work estimates, and receive updates</strong>,
-    create your free GariCare account using this link:</p>
+    create your free Carfix-Connect account using this link:</p>
     <div style="text-align:center">
       <a href="${registerUrl}" class="btn">Create My Account &amp; Track Service</a>
     </div>
@@ -741,14 +741,14 @@ function buildInviteEmailHtml({ ownerName, workOrderNumber, plateNumber, inviteT
       After registering, the vehicle and work order will automatically appear in your dashboard.
     </p>
     <p style="font-size:13px;color:#6b7280">
-      Already have a GariCare account?
+      Already have a Carfix-Connect account?
       <a href="${appUrl}/auth/login" style="color:#16a34a">Log in here</a> —
       the work order will be linked to your vehicle.
     </p>
   </div>
   <div class="footer">
     <p>If this wasn't your vehicle or you have questions, please ignore this email.</p>
-    <p style="font-size:12px;color:#9ca3af">GariCare — Vehicle Service Platform</p>
+    <p style="font-size:12px;color:#9ca3af">Carfix-Connect — Vehicle Service Platform</p>
   </div>
 </div>
 </body></html>`
@@ -765,7 +765,7 @@ Work Order: ${workOrderNumber}
 Vehicle:    ${plateNumber}
 
 To track your service progress, approve work estimates, and receive updates,
-create your free GariCare account here:
+create your free Carfix-Connect account here:
 
 ${registerUrl}
 
@@ -774,6 +774,6 @@ This invitation expires in 7 days.
 Already have an account? Log in at ${appUrl}/auth/login
 
 ---
-GariCare — Vehicle Service Platform
+Carfix-Connect — Vehicle Service Platform
 `
 }

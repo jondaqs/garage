@@ -226,7 +226,7 @@ export default function PricingPage() {
             <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Car size={20} color="#fff" />
             </div>
-            <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>GariCare</span>
+            <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Carfix-Connect</span>
           </button>
           <div className="gc-pricing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {[
@@ -403,7 +403,7 @@ export default function PricingPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Car size={16} color="rgba(255,255,255,0.3)" />
-            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>GariCare</span>
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
             {['About', 'Pricing', 'Contact'].map(link => (
@@ -415,7 +415,7 @@ export default function PricingPage() {
             ))}
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} GariCare. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
           </p>
         </footer>
       </div>

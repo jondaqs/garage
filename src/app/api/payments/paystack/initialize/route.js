@@ -119,7 +119,7 @@ export async function POST(request) {
     const reference = `GC-${invoiceId.substring(0, 8)}-${Date.now()}`
 
     // Build callback URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://garicare.com'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://carfix-connect.com'
     const callbackUrl = `${baseUrl}/api/payments/paystack/verify?reference=${reference}`
 
     // Initialize Paystack transaction (total = subtotal + service fee)

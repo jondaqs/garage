@@ -17,7 +17,7 @@ function CompanySignupContent() {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
               <Car className="text-blue-600 mr-2" size={40} />
-              <h1 className="text-3xl font-bold text-gray-800">GariCare</h1>
+              <h1 className="text-3xl font-bold text-gray-800">Carfix-Connect</h1>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">Company Fleet Registration</h2>
             <p className="text-gray-600 mt-2">

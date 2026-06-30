@@ -9,7 +9,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 
-const BRAND = 'GariCare'
+const BRAND = 'Carfix-Connect'
 
 function getServiceClient() {
   return createServiceClient(
@@ -169,7 +169,7 @@ export async function POST(request) {
 </table></td></tr></table></body></html>`
 
       sendAndQueueEmail(sc, {
-        to: [{ Email: adminEmail, Name: 'GariCare Admin' }],
+        to: [{ Email: adminEmail, Name: 'Carfix-Connect Admin' }],
         subject: `New Service Added: "${cleanName}"${providerName ? ` — ${providerName}` : ''}`,
         html,
         text: `New service: "${cleanName}"${description ? `\nDesc: ${description}` : ''}${providerName ? `\nBy: ${providerName}` : ''}\nID: ${newService.id}`,

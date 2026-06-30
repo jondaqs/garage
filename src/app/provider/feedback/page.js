@@ -346,7 +346,7 @@ function FeedbackRow({ fb, onDelete }) {
       {fb.admin_response && (
         <div className="mt-3 pl-3 border-l-2 border-green-300 bg-green-50/40 py-2 px-3 rounded-r-lg">
           <p className="text-xs font-medium text-green-700 mb-0.5">
-            Response from GariCare team
+            Response from Carfix-Connect team
             {fb.reviewer_first_name && ` · ${fb.reviewer_first_name} ${fb.reviewer_last_name || ''}`.trim()}
           </p>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{fb.admin_response}</p>

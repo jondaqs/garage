@@ -144,7 +144,7 @@ export async function sendEstimateApprovalEmail(supabase, {
     bodyHtml,
     ctaHref:     approveUrl,
     ctaLabel:    'Review &amp; Approve Estimate',
-    footerNote:  `You can approve, reject, or request changes from your GariCare dashboard.`,
+    footerNote:  `You can approve, reject, or request changes from your Carfix-Connect dashboard.`,
   })
 
   const text = `${greeting}
@@ -363,7 +363,7 @@ export async function sendWorkOrderCompletedEmail(supabase, {
     bodyHtml,
     ctaHref:     detailUrl,
     ctaLabel:    'View Service Details',
-    footerNote:  'You can view the full service record and invoice in your GariCare dashboard.',
+    footerNote:  'You can view the full service record and invoice in your Carfix-Connect dashboard.',
   })
 
   const text = `${greeting}
@@ -412,7 +412,7 @@ export async function sendInvoiceEmail(supabase, {
     </table>
     <p style="color:#374151;font-size:14px;margin:0;">
       Please arrange payment at your earliest convenience. You can view your full invoice
-      and service breakdown in your GariCare dashboard.
+      and service breakdown in your Carfix-Connect dashboard.
     </p>`
 
   const html = emailWrapper({

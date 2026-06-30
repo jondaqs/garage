@@ -256,7 +256,7 @@ export default function GoogleCalendarSync() {
           </button>
 
           <div className="mt-6 text-xs text-gray-500">
-            <p>By connecting, you allow GariCare to:</p>
+            <p>By connecting, you allow Carfix-Connect to:</p>
             <ul className="mt-2 space-y-1">
               <li>• Create events for your bookings</li>
               <li>• Update events when bookings change</li>

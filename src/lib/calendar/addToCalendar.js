@@ -10,7 +10,7 @@ export function addToGoogleCalendar(booking) {
   
   const params = new URLSearchParams({
     action: 'TEMPLATE',
-    text: `GariCare Booking - ${booking.vehicle?.plate_number}`,
+    text: `Carfix-Connect Booking - ${booking.vehicle?.plate_number}`,
     dates: `${startDateTime}/${endDateTime}`,
     details: `Booking at ${booking.service_provider?.name}\n\nVehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\n\nServices: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\n\nProblem: ${booking.problem_description}`,
     location: `${booking.shop?.name}, ${booking.shop?.town}, ${booking.shop?.county}${booking.shop?.street ? ', ' + booking.shop?.street : ''}`,
@@ -31,7 +31,7 @@ export function addToAppleCalendar(booking) {
   // Create download link
   const link = document.createElement('a')
   link.href = url
-  link.download = `garicare-booking-${booking.booking_number}.ics`
+  link.download = `Carfix-Connect-booking-${booking.booking_number}.ics`
   link.click()
   
   window.URL.revokeObjectURL(url)
@@ -47,7 +47,7 @@ export function addToOutlookCalendar(booking) {
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
     rru: 'addevent',
-    subject: `GariCare Booking - ${booking.vehicle?.plate_number}`,
+    subject: `Carfix-Connect Booking - ${booking.vehicle?.plate_number}`,
     startdt: startDateTime,
     enddt: endDateTime,
     body: `Booking at ${booking.service_provider?.name}\n\nVehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\n\nServices: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\n\nProblem: ${booking.problem_description}`,
@@ -67,7 +67,7 @@ export function downloadICS(booking) {
   
   const link = document.createElement('a')
   link.href = url
-  link.download = `garicare-booking-${booking.booking_number}.ics`
+  link.download = `Carfix-Connect-booking-${booking.booking_number}.ics`
   link.click()
   
   window.URL.revokeObjectURL(url)
@@ -84,17 +84,17 @@ function generateICS(booking) {
   let icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//GariCare//Bookings//EN',
+    'PRODID:-//Carfix-Connect//Bookings//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:GariCare Bookings',
+    'X-WR-CALNAME:Carfix-Connect Bookings',
     'X-WR-TIMEZONE:Africa/Nairobi',
     'BEGIN:VEVENT',
-    `UID:${booking.id}@garicare.com`,
+    `UID:${booking.id}@carfix-connect.com`,
     `DTSTAMP:${now}`,
     `DTSTART:${startDateTime}`,
     `DTEND:${endDateTime}`,
-    `SUMMARY:GariCare - ${booking.vehicle?.plate_number}`,
+    `SUMMARY:Carfix-Connect - ${booking.vehicle?.plate_number}`,
     `DESCRIPTION:Booking at ${booking.service_provider?.name}\\n\\nVehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\\n\\nServices: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\\n\\nProblem: ${booking.problem_description?.replace(/\n/g, '\\n')}`,
     `LOCATION:${booking.shop?.name}, ${booking.shop?.town}, ${booking.shop?.county}${booking.shop?.street ? ', ' + booking.shop?.street : ''}`,
     `STATUS:${booking.status?.code === 'confirmed' ? 'CONFIRMED' : 'TENTATIVE'}`,
@@ -102,7 +102,7 @@ function generateICS(booking) {
     'BEGIN:VALARM',
     'TRIGGER:-PT1H',
     'ACTION:DISPLAY',
-    'DESCRIPTION:Reminder: GariCare booking in 1 hour',
+    'DESCRIPTION:Reminder: Carfix-Connect booking in 1 hour',
     'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR'

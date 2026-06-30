@@ -140,7 +140,7 @@ export async function POST(request) {
         user_id: profile.id,
         phone_number: formattedPhone,
         amount: payAmountKes,
-        account_reference: invoice.invoice_ref_no?.substring(0, 12) || 'GariCare',
+        account_reference: invoice.invoice_ref_no?.substring(0, 12) || 'Carfix-Connect',
         idempotency_key: idempotencyKey,
         exchange_rate: exchangeRate,
         status: 'pending',
@@ -157,7 +157,7 @@ export async function POST(request) {
     const result = await initiateStkPush({
       phoneNumber: formattedPhone,
       amount: payAmountKes,
-      accountReference: invoice.invoice_ref_no?.substring(0, 12) || 'GariCare',
+      accountReference: invoice.invoice_ref_no?.substring(0, 12) || 'Carfix-Connect',
       transactionDesc: 'Subscription',
       callbackUrl,
     })

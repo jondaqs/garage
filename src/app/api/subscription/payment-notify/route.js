@@ -15,7 +15,7 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 
-const BRAND   = 'GariCare'
+const BRAND   = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
 
 function getServiceClient() {

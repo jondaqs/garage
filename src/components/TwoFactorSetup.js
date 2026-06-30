@@ -73,7 +73,7 @@ export default function TwoFactorSetup({ accentColor = 'blue' }) {
 
       const { data, error: err } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        friendlyName: 'GariCare Authenticator',
+        friendlyName: 'Carfix-Connect Authenticator',
       })
       if (err) throw err
       setEnrollData(data)

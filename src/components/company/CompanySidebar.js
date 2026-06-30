@@ -149,7 +149,7 @@ export default function CompanySidebar({ company, userRole }) {
           <Building2 className="text-white w-5 h-5" />
         </div>
         <div className="ml-3 min-w-0">
-          <p className="text-sm font-bold text-gray-900 truncate">{company?.name || 'GariCare'}</p>
+          <p className="text-sm font-bold text-gray-900 truncate">{company?.name || 'Carfix-Connect'}</p>
           <p className="text-xs text-gray-500">Company Portal</p>
         </div>
         {/* Close button (mobile only) */}

@@ -20,7 +20,7 @@ export async function POST(request) {
     for (const booking of bookings) {
       try {
         const event = {
-          summary: `GariCare - ${booking.vehicle?.plate_number}`,
+          summary: `Carfix-Connect - ${booking.vehicle?.plate_number}`,
           description: `Booking at ${booking.service_provider?.name}\n\n` +
                       `Vehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\n\n` +
                       `Services: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\n\n` +
@@ -44,8 +44,8 @@ export async function POST(request) {
           status: booking.status?.code === 'confirmed' ? 'confirmed' : 'tentative',
           extendedProperties: {
             private: {
-              gariCareBookingId: booking.id,
-              gariCareBookingNumber: booking.booking_number
+              carfixConnectBookingId: booking.id,
+              carfixConnectBookingNumber: booking.booking_number
             }
           }
         }
@@ -98,7 +98,7 @@ export async function PUT(request) {
     const { token, eventId, booking } = await request.json()
 
     const event = {
-      summary: `GariCare - ${booking.vehicle?.plate_number}`,
+      summary: `Carfix-Connect - ${booking.vehicle?.plate_number}`,
       description: `Booking at ${booking.service_provider?.name}\n\n` +
                   `Vehicle: ${booking.vehicle?.plate_number} ${booking.vehicle?.make} ${booking.vehicle?.model}\n\n` +
                   `Services: ${booking.booking_services?.map(bs => bs.service?.name).join(', ')}\n\n` +

@@ -228,7 +228,7 @@ export default function CompanyCalendarPage() {
   }
 
   const exportCalendar = () => {
-    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//GariCare//Company Fleet//EN\n'
+    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Carfix-Connect//Company Fleet//EN\n'
     events.forEach(ev => {
       const b = ev.resource
       ics += 'BEGIN:VEVENT\n'
@@ -256,7 +256,7 @@ export default function CompanyCalendarPage() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = 'garicare-fleet-calendar.ics'
+    a.download = 'Carfix-Connect-fleet-calendar.ics'
     a.click()
     URL.revokeObjectURL(url)
   }

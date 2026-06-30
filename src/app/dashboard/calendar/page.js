@@ -143,7 +143,7 @@ export default function BookingsCalendarPage() {
 
   const exportCalendar = () => {
     // Create .ics file content
-    let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//GariCare//Bookings//EN\n'
+    let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Carfix-Connect//Bookings//EN\n'
     
     events.forEach(event => {
       const booking = event.resource
@@ -166,7 +166,7 @@ export default function BookingsCalendarPage() {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'garicare-bookings.ics'
+    link.download = 'Carfix-Connect-bookings.ics'
     link.click()
     window.URL.revokeObjectURL(url)
   }

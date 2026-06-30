@@ -332,7 +332,7 @@ ${providerName} has invited you to join their team${role ? ` as a ${role}` : ''}
 ${specialization ? `Specialization: ${specialization}\n` : ''}${experienceYears ? `Experience: ${experienceYears} years\n` : ''}
 
 To accept this invitation:
-1. Log in to GariCare using this email: ${recipientEmail}
+1. Log in to Carfix-Connect using this email: ${recipientEmail}
 2. Go to your dashboard
 3. You'll see the invitation - click Accept
 

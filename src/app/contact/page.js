@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 
 // ─── Configure these once your business contact details are confirmed ──────
-const SUPPORT_EMAIL = 'hello@garicare.co.ke'
+const SUPPORT_EMAIL = 'info@carfix-connect.com'
 const SUPPORT_PHONE = '+254 700 000 000'
 const SUPPORT_LOCATION = 'Nairobi, Kenya'
 // ───────────────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ export default function ContactPage() {
 
     // Build a mailto link to open the user's email client with the message
     // pre-filled. Easy fallback while a real backend endpoint isn't wired up.
-    const subject = `[GariCare ${topic}] from ${name.trim()}`
+    const subject = `[Carfix-Connect ${topic}] from ${name.trim()}`
     const body =
       `Name: ${name.trim()}\n` +
       `Email: ${email.trim()}\n` +
@@ -174,7 +174,7 @@ export default function ContactPage() {
               <Car size={20} color="#fff" />
             </div>
             <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-              GariCare
+              Carfix-Connect
             </span>
           </button>
 
@@ -266,7 +266,7 @@ export default function ContactPage() {
               color: 'rgba(255,255,255,0.78)',
               maxWidth: 640,
             }}>
-              Questions about GariCare? Want to list your garage? Looking for a fleet solution? Drop us a line — we read every message.
+              Questions about Carfix-Connect? Want to list your garage? Looking for a fleet solution? Drop us a line — we read every message.
             </p>
           </div>
         </div>
@@ -484,14 +484,14 @@ export default function ContactPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Car size={16} color="rgba(255,255,255,0.3)" />
-            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>GariCare</span>
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
             <button onClick={() => router.push('/about')}   style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}>About</button>
             <button onClick={() => router.push('/contact')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}>Contact</button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} GariCare. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
           </p>
         </footer>
       </div>
