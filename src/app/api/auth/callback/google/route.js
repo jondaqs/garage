@@ -27,7 +27,7 @@ export async function GET(request) {
   }
 
   try {
-    console.log('Exchanging authorization code for tokens...')
+    
 
     // Exchange authorization code for access and refresh tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -51,7 +51,7 @@ export async function GET(request) {
     }
 
     const tokens = await tokenResponse.json()
-    console.log('Tokens received successfully')
+    
 
     // Get Supabase server client (uses cookies for auth)
     const supabase = await createClient()
@@ -78,8 +78,6 @@ export async function GET(request) {
       throw new Error('User profile not found')
     }
 
-    console.log('Storing tokens for user:', user.id)
-
     // Store tokens in user_oauth_tokens table (secured with own-row-only RLS)
     const { error: upsertError } = await supabase
       .from('user_oauth_tokens')
@@ -96,8 +94,6 @@ export async function GET(request) {
       console.error('Failed to store tokens:', upsertError)
       throw upsertError
     }
-
-    console.log('Google Calendar connected successfully')
 
     // Redirect to settings page with success message
     return NextResponse.redirect(

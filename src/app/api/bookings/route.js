@@ -123,7 +123,7 @@ export async function POST(request) {
     if (!pendingStatus) {
       return NextResponse.json({ error: '"pending" booking status not found' }, { status: 500 })
     }
-    console.log(`[/api/bookings] provider=${provider?.name} owner_user_id=${provider?.owner_user_id||'MISSING'}`)
+    
 
     // ── Load shop (optional) ──────────────────────────────────────────────────
     let shop = null

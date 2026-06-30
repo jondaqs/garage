@@ -314,7 +314,6 @@ export default function CompanyDetailPage({ params }) {
             )
           }
 
-          console.log(`✅ Notified ${pendingInvites.length} pending invitee(s)`)
         }
       } catch (inviteNotifError) {
         console.error('⚠️ Invitee notification error (non-fatal):', inviteNotifError)
