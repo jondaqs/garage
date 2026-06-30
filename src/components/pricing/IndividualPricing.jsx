@@ -5,14 +5,96 @@ import { Car, Check, ArrowRight, Sparkles, Star, Zap } from 'lucide-react'
 
 const ACCENT = '#3b82f6'
 
+// ── Support level per tier (added to the feature list) ──
+const SUPPORT_LEVELS = {
+  ind_basic_plus: 'Basic support',
+  ind_starter:    'Standard support',
+  ind_growth:     'Elevated support',
+  ind_family:     'Professional support',
+  ind_fleet:      'Dedicated support',
+}
+
+// ── Features to REMOVE from specific tiers (after accumulation) ──
+const REMOVE_FROM_TIER = {
+  ind_growth: ['Priority support', 'Detailed analytics', 'Custom alerts'],
+  ind_family: ['Family sharing', 'Fleet overview', 'Bulk service booking'],
+  ind_fleet:  ['API access'],
+}
+
+// Vehicle-count patterns to strip (these are covered by the subscription package)
+const isVehicleFeature = (f) => /\d+\s*(–|-|to)\s*\d+\s*vehicle/i.test(f)
+  || /^\d+\s*vehicle/i.test(f)
+  || /^up\s*to\s*\d+\s*vehicle/i.test(f)
+  || /vehicle\s*limit/i.test(f)
+  || /vehicles?\s*included/i.test(f)
+
 export default function IndividualPricing({ tiers = [], period, trialConfig }) {
   if (!tiers.length) return <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No plans available</p>
 
   // Identify special tiers
   const freeTier = tiers.find(t => Number(t.base_monthly_price) === 0)
   const basicPlusTier = tiers.find(t => t.tier_code === 'ind_basic_plus')
-  // Mark popular: the basic plus if it exists, otherwise the second tier
   const popularCode = basicPlusTier?.tier_code || (tiers.length >= 2 ? tiers[1]?.tier_code : null)
+
+  // Sort tiers by sort_order or price for accumulation
+  const sorted = [...tiers].sort((a, b) =>
+    (a.sort_order ?? a.base_monthly_price) - (b.sort_order ?? b.base_monthly_price)
+  )
+
+  // Parse features for each tier
+  const parsedFeatures = {}
+  sorted.forEach(t => {
+    try {
+      parsedFeatures[t.tier_code] = typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || [])
+    } catch { parsedFeatures[t.tier_code] = [] }
+  })
+
+  // Build cumulative features for paid tiers
+  const buildFeatures = (tier) => {
+    const isFree = Number(tier.base_monthly_price) === 0
+    const ownFeatures = parsedFeatures[tier.tier_code] || []
+
+    // Free tier: show its own features as-is
+    if (isFree) return ownFeatures
+
+    // Paid tiers: accumulate from all lower tiers + own
+    const tierIdx = sorted.findIndex(t => t.tier_code === tier.tier_code)
+    const accumulated = []
+    const seen = new Set()
+
+    for (let i = 0; i <= tierIdx; i++) {
+      const code = sorted[i].tier_code
+      const feats = parsedFeatures[code] || []
+      feats.forEach(f => {
+        const key = f.toLowerCase().trim()
+        if (!seen.has(key)) {
+          seen.add(key)
+          accumulated.push(f)
+        }
+      })
+    }
+
+    // Filter out vehicle-count features
+    let filtered = accumulated.filter(f => !isVehicleFeature(f))
+
+    // Remove tier-specific features
+    const removals = REMOVE_FROM_TIER[tier.tier_code]
+    if (removals) {
+      const removalSet = new Set(removals.map(r => r.toLowerCase().trim()))
+      filtered = filtered.filter(f => !removalSet.has(f.toLowerCase().trim()))
+    }
+
+    // Also remove any support-level features from lower tiers
+    // (we'll add the correct one below)
+    const allSupportValues = new Set(Object.values(SUPPORT_LEVELS).map(s => s.toLowerCase()))
+    filtered = filtered.filter(f => !allSupportValues.has(f.toLowerCase().trim()))
+
+    // Add this tier's support level
+    const support = SUPPORT_LEVELS[tier.tier_code]
+    if (support) filtered.push(support)
+
+    return filtered
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20, alignItems: 'stretch' }}>
@@ -22,7 +104,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
         const monthly = t.base_monthly_price
         const isFree = Number(monthly) === 0
         const isBasicPlus = t.tier_code === 'ind_basic_plus'
-        const features = (() => { try { return typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || []) } catch { return [] } })()
+        const features = buildFeatures(t)
 
         // Determine what premium features are missing from the free tier
         const premiumFeatures = ['Budget tracking', 'Expense reports', 'Maintenance history', 'Service reminders']
