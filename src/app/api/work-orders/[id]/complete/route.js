@@ -10,8 +10,12 @@ import { createClient }                from '@/lib/supabase/server'
 import { NextResponse }                from 'next/server'
 import { sendWorkOrderCompletedEmail } from '@/lib/email/workOrderEmails'
 import { sendWorkOrderCompletedSms }   from '@/lib/sms/workOrderSms'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 export async function POST(request, { params }) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase            = await createClient()
     const { id: workOrderId } = await params

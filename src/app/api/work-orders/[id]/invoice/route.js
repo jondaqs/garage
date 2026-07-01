@@ -11,6 +11,7 @@
 import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
+import { readLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -21,6 +22,9 @@ function getServiceClient() {
 }
 
 export async function GET(request, { params }) {
+  const limited = readLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase            = await createClient()
     const sc                  = getServiceClient()

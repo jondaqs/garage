@@ -1,9 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { requireCompanyWrite } from '@/lib/guards/companyAccess'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 // Get single vehicle
 export async function GET(request, { params }) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const { id } = await params
@@ -37,6 +41,9 @@ export async function GET(request, { params }) {
 
 // Update vehicle
 export async function PUT(request, { params }) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
     const { id } = await params
@@ -113,6 +120,9 @@ export async function PUT(request, { params }) {
 
 // Delete vehicle from fleet
 export async function DELETE(request, { params }) {
+  const limited3 = writeLimiter.check(request)
+  if (limited3) return limited3
+
   try {
     const supabase = await createClient()
     const { id } = await params

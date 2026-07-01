@@ -16,6 +16,7 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 import { buildSubscriptionInvoiceHtml }        from '@/lib/subscription/buildSubscriptionInvoiceHtml'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 const BRAND   = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
@@ -93,6 +94,9 @@ function buildInvoiceEmailHtml({ subscriberName, invoiceRef, packageName,
 }
 
 export async function POST(request) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const sc       = getServiceClient()

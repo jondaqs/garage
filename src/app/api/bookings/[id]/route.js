@@ -10,6 +10,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 const TAG = (id) => `[PATCH /api/bookings/${id}]`
 
@@ -104,6 +105,9 @@ View: ${bookingUrl}
 }
 
 export async function PATCH(request, { params }) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   const { id } = await params
   const t = TAG(id)
 

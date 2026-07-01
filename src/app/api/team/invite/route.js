@@ -4,8 +4,12 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sendInvitationEmail } from '@/lib/email/sendInvitationEmail'
 import { piiHmac } from '@/lib/pii'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function POST(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
     try {
         const supabase = await createClient()
 

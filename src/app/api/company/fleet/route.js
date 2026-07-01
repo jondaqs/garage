@@ -2,9 +2,13 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { requireCanAddVehicle } from '@/lib/guards/companyAccess'
 import { piiHmacRaw } from '@/lib/pii'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 // Get company fleet
 export async function GET(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
 
@@ -90,6 +94,9 @@ export async function GET(request) {
 
 // Add vehicle to fleet
 export async function POST(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
     const body = await request.json()

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { MPESA_CONFIG } from '@/lib/mpesa/config'
 import { getOAuthToken } from '@/lib/mpesa/auth'
+import { paymentLimiter } from '@/lib/rateLimiters'
 
 /**
  * POST /api/payments/mpesa/c2b/register
@@ -16,6 +17,9 @@ import { getOAuthToken } from '@/lib/mpesa/auth'
  *   - Cancelled: reject payments that fail validation
  */
 export async function POST(request) {
+  const limited = paymentLimiter.check(request)
+  if (limited) return limited
+
   try {
     // Admin auth
     const authClient = await createClient()

@@ -1,9 +1,13 @@
 // src/app/api/team/members/route.js
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 // GET team members
 export async function GET(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = createClient()
 
@@ -73,6 +77,9 @@ export async function GET(request) {
 
 // PATCH - Update member permissions/status
 export async function PATCH(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = createClient()
     const body = await request.json()
@@ -144,6 +151,9 @@ export async function PATCH(request) {
 
 // DELETE - Remove team member
 export async function DELETE(request) {
+  const limited3 = writeLimiter.check(request)
+  if (limited3) return limited3
+
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)

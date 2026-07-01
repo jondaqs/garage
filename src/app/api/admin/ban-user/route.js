@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { adminLimiter } from '@/lib/rateLimiters'
 
 // Service-role client — never exposed to the browser
 function getAdminClient() {
@@ -37,6 +38,9 @@ async function getCallerClient() {
 }
 
 export async function POST(request) {
+  const limited = adminLimiter.check(request)
+  if (limited) return limited
+
   try {
     const { auth_user_id, action } = await request.json()
 

@@ -13,6 +13,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 const BRAND   = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
@@ -79,6 +80,9 @@ function buildTicketEmailHtml({ adminName, ticketNumber, entityName, subscriberT
 }
 
 export async function POST(req) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

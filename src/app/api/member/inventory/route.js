@@ -1,6 +1,7 @@
 // → src/app/api/member/inventory/route.js
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 /**
  * GET  /api/member/inventory?providerId=<uuid>
@@ -67,6 +68,9 @@ async function resolveContext(supabase, providerId) {
 
 // ── GET: list inventory for a provider ──────────────────────────────────────
 export async function GET(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
@@ -135,6 +139,9 @@ export async function GET(request) {
 
 // ── POST: add new inventory item ────────────────────────────────────────────
 export async function POST(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
     const body = await request.json()

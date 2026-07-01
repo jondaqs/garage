@@ -13,6 +13,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 const TAG   = (id) => `[POST /api/bookings/${id}/notify]`
 const BRAND = 'Carfix-Connect'
@@ -41,6 +42,9 @@ const fmtTime = (t) => {
 }
 
 export async function POST(request, { params }) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   const { id } = await params
   const t      = TAG(id)
 

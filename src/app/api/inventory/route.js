@@ -3,8 +3,12 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function GET() {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
 
@@ -138,6 +142,9 @@ export async function GET() {
 
 // POST - Add new inventory item with ALL fields
 export async function POST(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
 

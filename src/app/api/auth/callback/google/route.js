@@ -5,8 +5,12 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { readLimiter } from '@/lib/rateLimiters'
 
 export async function GET(request) {
+  const limited = readLimiter.check(request)
+  if (limited) return limited
+
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const error = requestUrl.searchParams.get('error')

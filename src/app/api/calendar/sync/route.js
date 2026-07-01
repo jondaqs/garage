@@ -2,8 +2,12 @@
 // API route for syncing bookings with Google Calendar
 
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function POST(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const { token, bookings } = await request.json()
 
@@ -94,6 +98,9 @@ export async function POST(request) {
 
 // Update event in Google Calendar
 export async function PUT(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const { token, eventId, booking } = await request.json()
 
@@ -143,6 +150,9 @@ export async function PUT(request) {
 
 // Delete event from Google Calendar
 export async function DELETE(request) {
+  const limited3 = writeLimiter.check(request)
+  if (limited3) return limited3
+
   try {
     const { token, eventId } = await request.json()
 

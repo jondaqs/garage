@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { adminLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -49,6 +50,9 @@ async function requireAdmin() {
 // ─── GET ──────────────────────────────────────────────────────────────────────
 
 export async function GET() {
+  const limited = adminLimiter.check(request)
+  if (limited) return limited
+
   try {
     const auth = await requireAdmin()
     if (auth.error) return auth.error
@@ -97,6 +101,9 @@ export async function GET() {
 // ─── POST ─────────────────────────────────────────────────────────────────────
 
 export async function POST(request) {
+  const limited2 = adminLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const auth = await requireAdmin()
     if (auth.error) return auth.error

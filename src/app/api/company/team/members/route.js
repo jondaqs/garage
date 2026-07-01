@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { requireCompanyWrite } from '@/lib/guards/companyAccess'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 // Service role client — bypasses RLS for reading other users' profiles
 // Used only server-side, never exposed to the browser
@@ -14,6 +15,9 @@ function getServiceClient() {
 }
 
 export async function GET(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
 
@@ -112,6 +116,9 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
     const body = await request.json()

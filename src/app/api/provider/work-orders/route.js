@@ -17,6 +17,7 @@ import { NextResponse }                          from 'next/server'
 import { sendWalkInCreatedEmail, sendWalkInOwnerEmail, sendWalkInFleetEmail } from '@/lib/email/walkInEmails'
 import { sendWalkInCreatedSms, sendWalkInInviteSms, sendWalkInOwnerSms, sendWalkInFleetSms } from '@/lib/sms/walkInSms'
 import { piiHmacRaw } from '@/lib/pii'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -30,6 +31,9 @@ function getServiceClient() {
 const ADMIN_ROLES = ['service_provider_owner', 'admin']
 
 export async function POST(request) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const body     = await request.json()

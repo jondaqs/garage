@@ -19,6 +19,7 @@ import { createClient as createServiceClient }     from '@supabase/supabase-js'
 import { NextResponse }                            from 'next/server'
 import { sendBookingConfirmationEmail }            from '@/lib/email/bookingEmails'
 import { sendBookingConfirmationSms }              from '@/lib/sms/bookingSms'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -37,6 +38,9 @@ function calcEndTime(startTime) {
 }
 
 export async function POST(request) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const body     = await request.json()

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { verifyTransaction } from '@/lib/paystack/client'
 import { processVerifiedCardPayment } from '@/lib/paystack/processPayment'
+import { paymentLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -20,6 +21,9 @@ function getServiceClient() {
  * Paystack redirect callback after payment. Verifies and redirects to dashboard.
  */
 export async function GET(request) {
+  const limited = paymentLimiter.check(request)
+  if (limited) return limited
+
   const { searchParams } = new URL(request.url)
   const reference = searchParams.get('reference') || searchParams.get('trxref')
 
@@ -46,6 +50,9 @@ export async function GET(request) {
  * Body: { reference }
  */
 export async function POST(request) {
+  const limited2 = paymentLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const authClient = await createClient()
     const { data: { user }, error: authErr } = await authClient.auth.getUser()

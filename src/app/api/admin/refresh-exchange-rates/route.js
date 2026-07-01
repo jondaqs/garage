@@ -9,6 +9,7 @@
 import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
+import { adminLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -19,6 +20,9 @@ function getServiceClient() {
 }
 
 export async function POST(req) {
+  const limited = adminLimiter.check(request)
+  if (limited) return limited
+
   try {
     // Auth check
     const supabase = await createClient()

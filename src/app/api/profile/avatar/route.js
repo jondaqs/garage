@@ -13,6 +13,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createServerClient }                from '@supabase/ssr'
 import { cookies }                           from 'next/headers'
 import { NextResponse }                      from 'next/server'
+import { authLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createAdminClient(
@@ -37,6 +38,9 @@ async function getCallerClient() {
 }
 
 export async function POST(request) {
+  const limited = authLimiter.check(request)
+  if (limited) return limited
+
   try {
     // 1. Verify the caller is authenticated
     const supabase = await getCallerClient()

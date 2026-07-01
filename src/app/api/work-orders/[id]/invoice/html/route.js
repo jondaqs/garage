@@ -23,6 +23,7 @@ import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { buildInvoiceHtml }                    from '@/lib/invoice/buildInvoiceHtml'
+import { readLimiter } from '@/lib/rateLimiters'
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 
@@ -35,6 +36,9 @@ function getServiceClient() {
 }
 
 export async function GET(_request, { params }) {
+  const limited = readLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase            = await createClient()
     const sc                  = getServiceClient()

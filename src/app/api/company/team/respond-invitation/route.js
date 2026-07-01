@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 // SECURITY FIX: Replaced direct company_users INSERT (which relied on the
 // dangerous insert_own_record policy) with accept_company_invitation RPC.
@@ -7,6 +8,9 @@ import { NextResponse } from 'next/server'
 // SECURITY DEFINER function before creating the membership.
 
 export async function POST(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const body = await request.json()

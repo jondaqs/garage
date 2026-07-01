@@ -17,6 +17,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 // External provider — free, no key, supports almost every ISO 4217 code.
 // Returns shape:
@@ -88,6 +89,9 @@ async function resolveRate(supabase, baseId, quoteId) {
 }
 
 export async function GET(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
 
@@ -110,6 +114,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

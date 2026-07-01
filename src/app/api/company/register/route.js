@@ -1,12 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { sendCompanyRegistrationEmail, sendCompanyInviteEmail, sendAdminNewCompanyEmail } from '@/lib/email/sendCompanyInviteEmail'
+import { authLimiter } from '@/lib/rateLimiters'
 
 // SECURITY FIX: Core company creation (company_profiles + company_users + user_roles
 // + notifications) now uses register_company RPC in a single transaction.
 // Team invitations, fleet vehicles, documents, and emails still handled here.
 
 export async function POST(request) {
+  const limited = authLimiter.check(request)
+  if (limited) return limited
+
     try {
         const supabase = await createClient()
         const body = await request.json()

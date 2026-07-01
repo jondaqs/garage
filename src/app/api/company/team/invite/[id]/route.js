@@ -8,6 +8,7 @@
 import { createClient }                                from '@/lib/supabase/server'
 import { createClient as createServiceClient }         from '@supabase/supabase-js'
 import { NextResponse }                                from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -18,6 +19,9 @@ function getServiceClient() {
 }
 
 export async function DELETE(request, { params }) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase         = await createClient()
     const { id: inviteId } = await params

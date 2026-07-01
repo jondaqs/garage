@@ -10,8 +10,12 @@ import {
   sendDetailsChangedAdminEmail,
   sendDetailsPendingEmail,
 }  from '@/lib/email/settingsEmails' 
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function POST(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const body     = await request.json()

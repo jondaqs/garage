@@ -28,6 +28,7 @@ import { createClient as createServiceClient }   from '@supabase/supabase-js'
 import { NextResponse }                          from 'next/server'
 import { sendBookingReminderEmail }              from '@/lib/email/bookingEmails'
 import { sendBookingReminderSms }                from '@/lib/sms/bookingSms'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -41,6 +42,9 @@ function getServiceClient() {
 const LIVE_STATUS_CODES = new Set(['pending', 'confirmed'])
 
 export async function POST(request, context) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   // Next.js 15: params is a Promise; Next.js 14 it's a plain object.
   // Awaiting handles both.
   const { id: bookingId } = await context.params

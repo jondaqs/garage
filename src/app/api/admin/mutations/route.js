@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { adminLimiter } from '@/lib/rateLimiters'
 
 // ── Whitelist: only these table+operation combos are allowed ──────────────
 const ALLOWED = {
@@ -39,6 +40,9 @@ const ALLOWED = {
 const SKIP_AUDIT = new Set(['admin_action_logs', 'support_ticket_messages'])
 
 export async function POST(request) {
+  const limited = adminLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const body = await request.json()

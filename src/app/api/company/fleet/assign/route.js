@@ -1,6 +1,7 @@
 // → src/app/api/company/fleet/assign/route.js
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 /**
  * GET  — fetch fleet vehicles with assignment info via RPC
@@ -44,6 +45,9 @@ async function resolveCompanyId(supabase) {
 
 // ── GET: fleet with assignments (via RPC) ───────────────────────────────────
 export async function GET() {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const ctx = await resolveCompanyId(supabase)
@@ -79,6 +83,9 @@ export async function GET() {
 
 // ── POST: assign / unassign (via RPC) ───────────────────────────────────────
 export async function POST(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const supabase = await createClient()
     const ctx = await resolveCompanyId(supabase)

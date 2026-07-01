@@ -1,6 +1,7 @@
 // → src/app/api/member/inventory/[id]/route.js
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 /**
  * PUT    /api/member/inventory/<id>   — update an inventory item
@@ -54,6 +55,9 @@ async function resolveAndAuthorise(supabase, itemId) {
 
 // ── PUT: update item ────────────────────────────────────────────────────────
 export async function PUT(request, context) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const params = await context.params
     const { id } = params
@@ -128,6 +132,9 @@ export async function PUT(request, context) {
 
 // ── DELETE: remove item ─────────────────────────────────────────────────────
 export async function DELETE(request, context) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     const params = await context.params
     const { id } = params

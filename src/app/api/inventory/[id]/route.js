@@ -3,8 +3,12 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function PUT(request, context) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     // CRITICAL FIX: await params in Next.js 15+
     const params = await context.params
@@ -161,6 +165,9 @@ export async function PUT(request, context) {
 }
 
 export async function DELETE(request, context) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   try {
     // CRITICAL FIX: await params in Next.js 15+
     const params = await context.params
@@ -203,6 +210,9 @@ export async function DELETE(request, context) {
 
 // PATCH - Adjust stock quantity
 export async function PATCH(request, context) {
+  const limited3 = writeLimiter.check(request)
+  if (limited3) return limited3
+
   try {
     // CRITICAL FIX: await params in Next.js 15+
     const params = await context.params

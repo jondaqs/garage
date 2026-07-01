@@ -7,8 +7,12 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function POST(request, { params }) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase            = await createClient()
     const { id: workOrderId } = await params

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { queryStkStatus } from '@/lib/mpesa/statusQuery'
 import { processVerifiedMpesaPayment } from '@/lib/mpesa/processPayment'
+import { paymentLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -31,6 +32,9 @@ function getServiceClient() {
  * Body: { checkoutRequestId } or { transactionId }
  */
 export async function POST(request) {
+  const limited = paymentLimiter.check(request)
+  if (limited) return limited
+
   try {
     // Auth
     const authClient = await createClient()

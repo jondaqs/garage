@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { initializeTransaction } from '@/lib/paystack/client'
 import { PAYSTACK_CONFIG, FOREX_MARGIN_PCT } from '@/lib/paystack/config'
+import { paymentLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -24,6 +25,9 @@ function getServiceClient() {
  * Returns: { success, accessCode, reference, amountKes, subtotalKes, serviceFeeKes, serviceFeePct }
  */
 export async function POST(request) {
+  const limited = paymentLimiter.check(request)
+  if (limited) return limited
+
   try {
     // Auth
     const authClient = await createClient()

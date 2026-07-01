@@ -16,6 +16,7 @@ import {
   sendBookingConfirmationSms,
   sendNewBookingProviderSms,
 }                                                  from '@/lib/sms/bookingSms'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 /** Service-role client — can read auth.users email */
 function getServiceClient() {
@@ -60,6 +61,9 @@ function calcEndTime(startTime) {
 }
 
 export async function POST(request) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const sc       = getServiceClient()   // service client for queue inserts (bypasses RLS)

@@ -11,6 +11,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendEstimateApprovalEmail }           from '@/lib/email/workOrderEmails'
 import { sendEstimateApprovalSms }             from '@/lib/sms/workOrderSms'
+import { commsLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -22,6 +23,9 @@ function getServiceClient() {
 }
 
 export async function POST(request, { params }) {
+  const limited = commsLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase            = await createClient()
     const { id: workOrderId } = await params

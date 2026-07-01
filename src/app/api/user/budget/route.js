@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 /**
  * Personal user budget API.
@@ -41,6 +42,9 @@ function rpcResponse(data, rpcError, defaultStatus = 200) {
 
 // ── GET ────────────────────────────────────────────────────────────────────
 export async function GET(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   const supabase = await createClient()
   if (!(await requireAuth(supabase))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -61,6 +65,9 @@ export async function GET(request) {
 
 // ── POST ───────────────────────────────────────────────────────────────────
 export async function POST(request) {
+  const limited2 = writeLimiter.check(request)
+  if (limited2) return limited2
+
   const supabase = await createClient()
   if (!(await requireAuth(supabase))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -80,6 +87,9 @@ export async function POST(request) {
 
 // ── PATCH ──────────────────────────────────────────────────────────────────
 export async function PATCH(request) {
+  const limited3 = writeLimiter.check(request)
+  if (limited3) return limited3
+
   const supabase = await createClient()
   if (!(await requireAuth(supabase))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -105,6 +115,9 @@ export async function PATCH(request) {
 
 // ── DELETE ─────────────────────────────────────────────────────────────────
 export async function DELETE(request) {
+  const limited4 = writeLimiter.check(request)
+  if (limited4) return limited4
+
   const supabase = await createClient()
   if (!(await requireAuth(supabase))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

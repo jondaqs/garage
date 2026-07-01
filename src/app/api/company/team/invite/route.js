@@ -2,8 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { sendCompanyInviteEmail } from '@/lib/email/sendCompanyInviteEmail'
 import { requireCanAddStaff } from '@/lib/guards/companyAccess'
+import { writeLimiter } from '@/lib/rateLimiters'
 
 export async function POST(request) {
+  const limited = writeLimiter.check(request)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const body = await request.json()

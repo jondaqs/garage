@@ -9,6 +9,7 @@
 import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
+import { adminLimiter } from '@/lib/rateLimiters'
 
 function getServiceClient() {
   return createServiceClient(
@@ -44,6 +45,9 @@ async function requireAdmin() {
 }
 
 export async function GET(request) {
+  const limited = adminLimiter.check(request)
+  if (limited) return limited
+
   const auth = await requireAdmin()
   if (auth.error) return auth.error
 
@@ -96,6 +100,9 @@ export async function GET(request) {
 }
 
 export async function DELETE(request) {
+  const limited2 = adminLimiter.check(request)
+  if (limited2) return limited2
+
   const auth = await requireAdmin()
   if (auth.error) return auth.error
 
