@@ -17,7 +17,7 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { commsLimiter } from '@/lib/rateLimiters'
-import { requireUUID } from '@/lib/validation'
+import { requireNumber, requireUUID, sanitizeText } from '@/lib/validation'
 
 const BRAND   = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
@@ -121,7 +121,11 @@ export async function POST(request, { params }) {
 
     // Parse body — receipt details passed from client after process_payment
     const body = await request.json().catch(() => ({}))
-    const { receipt_number, amount_paid, payment_method, invoice_number } = body
+    const { receipt_number: rawReceipt, amount_paid: rawAmount, payment_method: rawMethod, invoice_number: rawInvoice } = body
+    const receipt_number = sanitizeText(rawReceipt, 100)
+    const amount_paid = requireNumber(rawAmount, { min: 0 })
+    const payment_method = sanitizeText(rawMethod, 50)
+    const invoice_number = sanitizeText(rawInvoice, 100)
 
     // Load work order and invoice
     const { data: wo } = await sc

@@ -4,7 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
-import { requireUUID } from '@/lib/validation'
+import { requireNumber, requireUUID, sanitizeText } from '@/lib/validation'
 
 export async function PUT(request, context) {
   const limited = writeLimiter.check(request)
@@ -234,7 +234,10 @@ export async function PATCH(request, context) {
     }
 
     const body = await request.json()
-    const { adjustment, reason } = body
+    const { adjustment: rawAdj, reason: rawReason } = body
+    const adjustment = requireNumber(rawAdj, { integer: true })
+    if (adjustment == null) return NextResponse.json({ error: 'Valid adjustment number is required' }, { status: 400 })
+    const reason = sanitizeText(rawReason, 500)
 
     // Validate
     if (adjustment === undefined || adjustment === 0) {

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { safeJsonParse } from '@/lib/validation'
 
 /**
  * Personal user budget API.
@@ -73,7 +74,8 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const { data: body, error: parseErr } = await safeJsonParse(request)
+  if (parseErr) return parseErr
   const currency_id = await resolveCurrencyId(supabase, body)
 
   const { data, error } = await supabase.rpc('create_user_budget', {
@@ -95,7 +97,8 @@ export async function PATCH(request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
+  const { data: body, error: parseErr } = await safeJsonParse(request)
+  if (parseErr) return parseErr
   if (!body?.id) {
     return NextResponse.json({ error: 'Budget id is required' }, { status: 400 })
   }

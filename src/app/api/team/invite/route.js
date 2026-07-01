@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { sendInvitationEmail } from '@/lib/email/sendInvitationEmail'
 import { piiHmac } from '@/lib/pii'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { isValidEmail, requireNumber, sanitizeText } from '@/lib/validation'
 
 export async function POST(request) {
   const limited = writeLimiter.check(request)
@@ -14,7 +15,11 @@ export async function POST(request) {
         const supabase = await createClient()
 
         const body = await request.json()
-        const { email, role, specialization, experience_years } = body
+        const { email: rawEmail, role, specialization: rawSpec, experience_years: rawYears } = body
+            const email = rawEmail?.trim()?.toLowerCase()
+            if (!email || !isValidEmail(email)) return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
+            const specialization = sanitizeText(rawSpec, 200)
+            const experience_years = rawYears != null ? requireNumber(rawYears, { min: 0, max: 60, integer: true }) : null
 
         console.log('📨 Invite route called for:', email)
 

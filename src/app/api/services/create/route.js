@@ -9,6 +9,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireText, requireUUIDs, sanitizeText } from '@/lib/validation'
 
 const BRAND = 'Carfix-Connect'
 
@@ -71,7 +72,12 @@ export async function POST(request) {
     const supabase = await createClient()
     const sc       = getServiceClient()
     const body     = await request.json()
-    const { name, description, service_provider_id, force = false } = body
+    const { name: rawName, description: rawDesc, service_provider_id, force = false } = body
+    const name = requireText(rawName, 200)
+    if (!name) return NextResponse.json({ error: 'Service name is required' }, { status: 400 })
+    const description = sanitizeText(rawDesc, 2000)
+    const _invUUID = requireUUIDs({ service_provider_id })
+    if (_invUUID) return NextResponse.json({ error: _invUUID }, { status: 400 })
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Service name is required' }, { status: 400 })

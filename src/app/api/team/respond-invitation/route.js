@@ -3,6 +3,7 @@ import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { isOneOf, requireUUID, sanitizeText } from '@/lib/validation'
 
 function getServiceClient() {
   return createServiceClient(
@@ -19,7 +20,10 @@ export async function POST(request) {
   try {
     const supabase = await createClient()
     const body     = await request.json()
-    const { invitation_id, action, rejection_reason } = body
+    const { invitation_id, action, rejection_reason: rawRejection } = body
+    if (!requireUUID(invitation_id)) return NextResponse.json({ error: 'Invalid invitation ID' }, { status: 400 })
+    if (!isOneOf(action, ['accept', 'reject'])) return NextResponse.json({ error: 'Action must be accept or reject' }, { status: 400 })
+    const rejection_reason = sanitizeText(rawRejection, 500)
 
     if (!invitation_id || !action) {
       return NextResponse.json({ error: 'invitation_id and action are required' }, { status: 400 })

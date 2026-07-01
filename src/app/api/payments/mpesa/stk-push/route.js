@@ -7,6 +7,7 @@ import { formatPhone } from '@/lib/mpesa/config'
 import { initiateStkPush } from '@/lib/mpesa/stkPush'
 import { generateCallbackHmac } from '@/lib/mpesa/security'
 import { rateLimit } from '@/lib/rateLimiter'
+import { isValidPhone, requireNumber, requireUUID } from '@/lib/validation'
 
 const limiter = rateLimit({ windowMs: 60_000, max: 3, message: 'Too many payment attempts. Please wait a minute.' })
 
@@ -32,7 +33,11 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { invoiceId, phoneNumber, amount } = body
+    const { invoiceId, phoneNumber, amount: rawAmount } = body
+    if (!requireUUID(invoiceId)) return NextResponse.json({ error: 'Invalid invoice ID' }, { status: 400 })
+    if (!isValidPhone(phoneNumber)) return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
+    const amount = requireNumber(rawAmount, { min: 1 })
+    if (!amount) return NextResponse.json({ error: 'Valid amount is required' }, { status: 400 })
 
     if (!invoiceId || !phoneNumber) {
       return NextResponse.json({ error: 'invoiceId and phoneNumber are required' }, { status: 400 })

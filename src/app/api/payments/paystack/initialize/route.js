@@ -6,6 +6,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { initializeTransaction } from '@/lib/paystack/client'
 import { PAYSTACK_CONFIG, FOREX_MARGIN_PCT } from '@/lib/paystack/config'
 import { paymentLimiter } from '@/lib/rateLimiters'
+import { isValidEmail, requireUUID } from '@/lib/validation'
 
 function getServiceClient() {
   return createServiceClient(
@@ -36,7 +37,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const { invoiceId, email } = await request.json()
+    const { invoiceId, email: rawEmail } = await request.json()
+    if (!requireUUID(invoiceId)) return NextResponse.json({ error: 'Invalid invoice ID' }, { status: 400 })
+    const email = rawEmail?.trim()?.toLowerCase()
+    if (!isValidEmail(email)) return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
     if (!invoiceId) {
       return NextResponse.json({ error: 'invoiceId is required' }, { status: 400 })
     }

@@ -8,7 +8,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
-import { requireUUID } from '@/lib/validation'
+import { requireUUID, sanitizeText } from '@/lib/validation'
 
 export async function POST(request, { params }) {
   const limited = writeLimiter.check(request)
@@ -19,7 +19,9 @@ export async function POST(request, { params }) {
     const { id: workOrderId } = await params
     if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
     const body                = await request.json().catch(() => ({}))
-    const { passed, notes }   = body
+    const { passed, notes: rawNotes }   = body
+    if (typeof passed !== 'boolean') return NextResponse.json({ error: 'passed must be true or false' }, { status: 400 })
+    const notes = sanitizeText(rawNotes, 2000)
 
     if (typeof passed !== 'boolean') {
       return NextResponse.json({ error: 'passed (boolean) is required' }, { status: 400 })
