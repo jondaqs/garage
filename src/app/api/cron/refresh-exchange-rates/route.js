@@ -10,6 +10,7 @@
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { safeCompare } from '@/lib/safeCompare'
 
 function getServiceClient() {
   return createServiceClient(
@@ -23,7 +24,7 @@ export async function GET(request) {
   try {
     // ── Security: verify Vercel cron secret ──────────────────────────
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!safeCompare(authHeader, `Bearer ${process.env.CRON_SECRET}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

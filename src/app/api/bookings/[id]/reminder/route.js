@@ -29,7 +29,7 @@ import { NextResponse }                          from 'next/server'
 import { sendBookingReminderEmail }              from '@/lib/email/bookingEmails'
 import { sendBookingReminderSms }                from '@/lib/sms/bookingSms'
 import { commsLimiter } from '@/lib/rateLimiters'
-import { requireUUID } from '@/lib/validation'
+import { safeCompare } from '@/lib/safeCompare'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -49,14 +49,13 @@ export async function POST(request, context) {
   // Next.js 15: params is a Promise; Next.js 14 it's a plain object.
   // Awaiting handles both.
   const { id: bookingId } = await context.params
-  if (!requireUUID(bookingId)) return NextResponse.json({ error: 'Invalid booking ID' }, { status: 400 })
   const url   = new URL(request.url)
   const force = url.searchParams.get('force') === '1'
 
   // ── Auth path: secret header OR signed-in user ─────────────────────────
   const secretHeader  = request.headers.get('x-reminder-secret')
   const expectedSecret = process.env.REMINDER_SCAN_SECRET
-  const isServiceMode  = !!expectedSecret && secretHeader === expectedSecret
+  const isServiceMode  = !!expectedSecret && safeCompare(secretHeader, expectedSecret)
 
   let supabase, callerProfileId = null
   if (isServiceMode) {

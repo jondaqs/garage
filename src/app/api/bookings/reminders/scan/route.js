@@ -26,6 +26,7 @@
 import { createClient }                          from '@/lib/supabase/server'
 import { createClient as createServiceClient }   from '@supabase/supabase-js'
 import { NextResponse }                          from 'next/server'
+import { safeCompare }                           from '@/lib/safeCompare'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -44,7 +45,7 @@ export async function POST(request) {
   try {
     const secretHeader  = request.headers.get('x-reminder-secret')
     const expectedSecret = process.env.REMINDER_SCAN_SECRET
-    const isServiceMode  = !!expectedSecret && secretHeader === expectedSecret
+    const isServiceMode  = !!expectedSecret && safeCompare(secretHeader, expectedSecret)
 
     let scopeProviderId = null
     if (!isServiceMode) {
