@@ -17,6 +17,7 @@ import {
   sendNewBookingProviderSms,
 }                                                  from '@/lib/sms/bookingSms'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUIDs } from '@/lib/validation'
 
 /** Service-role client — can read auth.users email */
 function getServiceClient() {
@@ -88,6 +89,9 @@ export async function POST(request) {
     if (authErr || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const _invalidUUID = requireUUIDs({ providerId, vehicleId })
+    if (_invalidUUID) return NextResponse.json({ error: _invalidUUID }, { status: 400 })
 
     if (!providerId || !vehicleId || !bookingDate || !bookingTime) {
       return NextResponse.json(

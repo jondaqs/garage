@@ -9,6 +9,7 @@ import { createClient }                                from '@/lib/supabase/serv
 import { createClient as createServiceClient }         from '@supabase/supabase-js'
 import { NextResponse }                                from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 function getServiceClient() {
   return createServiceClient(
@@ -25,6 +26,7 @@ export async function DELETE(request, { params }) {
   try {
     const supabase         = await createClient()
     const { id: inviteId } = await params
+    if (!requireUUID(inviteId)) return NextResponse.json({ error: 'Invalid invitation ID' }, { status: 400 })
 
     // ── Auth ──────────────────────────────────────────────────────────────
     const { data: { user }, error: authErr } = await supabase.auth.getUser()

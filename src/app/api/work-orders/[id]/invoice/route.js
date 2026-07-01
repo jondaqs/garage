@@ -12,6 +12,7 @@ import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { readLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 function getServiceClient() {
   return createServiceClient(
@@ -29,6 +30,7 @@ export async function GET(request, { params }) {
     const supabase            = await createClient()
     const sc                  = getServiceClient()
     const { id: workOrderId } = await params
+    if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

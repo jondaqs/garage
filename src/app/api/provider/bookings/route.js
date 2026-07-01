@@ -20,6 +20,7 @@ import { NextResponse }                            from 'next/server'
 import { sendBookingConfirmationEmail }            from '@/lib/email/bookingEmails'
 import { sendBookingConfirmationSms }              from '@/lib/sms/bookingSms'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUIDs } from '@/lib/validation'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -63,6 +64,9 @@ export async function POST(request) {
     if (authErr || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const _invalidUUID = requireUUIDs({ providerId, vehicleId, customerUserId })
+    if (_invalidUUID) return NextResponse.json({ error: _invalidUUID }, { status: 400 })
 
     if (!providerId || !vehicleId || !customerUserId || !bookingDate || !bookingTime) {
       return NextResponse.json(

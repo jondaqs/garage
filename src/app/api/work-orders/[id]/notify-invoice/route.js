@@ -12,6 +12,7 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 const BRAND   = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
@@ -73,6 +74,7 @@ export async function POST(request, { params }) {
     const supabase     = await createClient()
     const sc           = getServiceClient()
     const { id: woId } = await params
+    if (!requireUUID(woId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) {

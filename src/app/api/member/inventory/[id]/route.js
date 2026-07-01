@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 /**
  * PUT    /api/member/inventory/<id>   — update an inventory item
@@ -61,6 +62,7 @@ export async function PUT(request, context) {
   try {
     const params = await context.params
     const { id } = params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     const supabase = await createClient()
 
     const ctx = await resolveAndAuthorise(supabase, id)
@@ -138,6 +140,7 @@ export async function DELETE(request, context) {
   try {
     const params = await context.params
     const { id } = params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     const supabase = await createClient()
 
     const ctx = await resolveAndAuthorise(supabase, id)

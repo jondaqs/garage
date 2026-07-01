@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { requireCompanyWrite } from '@/lib/guards/companyAccess'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 // Get single vehicle
 export async function GET(request, { params }) {
@@ -11,6 +12,7 @@ export async function GET(request, { params }) {
   try {
     const supabase = await createClient()
     const { id } = await params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -47,6 +49,7 @@ export async function PUT(request, { params }) {
   try {
     const supabase = await createClient()
     const { id } = await params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     const body = await request.json()
     
     const { data: { user } } = await supabase.auth.getUser()
@@ -126,6 +129,7 @@ export async function DELETE(request, { params }) {
   try {
     const supabase = await createClient()
     const { id } = await params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {

@@ -11,6 +11,7 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 const TAG = (id) => `[PATCH /api/bookings/${id}]`
 
@@ -109,6 +110,7 @@ export async function PATCH(request, { params }) {
   if (limited) return limited
 
   const { id } = await params
+  if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
   const t = TAG(id)
 
   try {

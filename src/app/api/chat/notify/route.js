@@ -11,6 +11,7 @@ import { NextResponse }                        from 'next/server'
 import { sendAndQueueEmail }                   from '@/lib/email/transport'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUIDs } from '@/lib/validation'
 
 const BRAND   = 'Carfix-Connect'
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
@@ -38,6 +39,9 @@ export async function POST(request) {
     if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { conversationId, messageId, senderName, preview } = await request.json()
+    const _invalidUUID = requireUUIDs({ conversationId })
+    if (_invalidUUID) return NextResponse.json({ error: _invalidUUID }, { status: 400 })
+
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 })
 
     // Load conversation + provider

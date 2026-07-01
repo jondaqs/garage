@@ -11,6 +11,7 @@ import { NextResponse }                from 'next/server'
 import { sendWorkOrderCompletedEmail } from '@/lib/email/workOrderEmails'
 import { sendWorkOrderCompletedSms }   from '@/lib/sms/workOrderSms'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 export async function POST(request, { params }) {
   const limited = commsLimiter.check(request)
@@ -19,6 +20,7 @@ export async function POST(request, { params }) {
   try {
     const supabase            = await createClient()
     const { id: workOrderId } = await params
+    if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
     const body                = await request.json().catch(() => ({}))
     const { final_mileage, technician_notes } = body
 

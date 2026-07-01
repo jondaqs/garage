@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 export async function PUT(request, context) {
   const limited = writeLimiter.check(request)
@@ -13,6 +14,7 @@ export async function PUT(request, context) {
     // CRITICAL FIX: await params in Next.js 15+
     const params = await context.params
     const { id } = params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     console.log('📝 PUT request for item ID:', id) // Should show actual ID now
 
@@ -172,6 +174,7 @@ export async function DELETE(request, context) {
     // CRITICAL FIX: await params in Next.js 15+
     const params = await context.params
     const { id } = params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     console.log('🗑️ DELETE request for item ID:', id)
 
@@ -217,6 +220,7 @@ export async function PATCH(request, context) {
     // CRITICAL FIX: await params in Next.js 15+
     const params = await context.params
     const { id } = params
+    if (!requireUUID(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     console.log('📊 PATCH (adjust stock) for item ID:', id)
 

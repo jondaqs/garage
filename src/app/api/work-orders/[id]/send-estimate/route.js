@@ -12,6 +12,7 @@ import { NextResponse }                        from 'next/server'
 import { sendEstimateApprovalEmail }           from '@/lib/email/workOrderEmails'
 import { sendEstimateApprovalSms }             from '@/lib/sms/workOrderSms'
 import { commsLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -29,6 +30,7 @@ export async function POST(request, { params }) {
   try {
     const supabase            = await createClient()
     const { id: workOrderId } = await params
+    if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) {

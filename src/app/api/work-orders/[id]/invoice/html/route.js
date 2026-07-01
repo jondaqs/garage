@@ -24,6 +24,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { buildInvoiceHtml }                    from '@/lib/invoice/buildInvoiceHtml'
 import { readLimiter } from '@/lib/rateLimiters'
+import { requireUUID } from '@/lib/validation'
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 
@@ -43,6 +44,7 @@ export async function GET(_request, { params }) {
     const supabase            = await createClient()
     const sc                  = getServiceClient()
     const { id: workOrderId } = await params
+    if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) {
