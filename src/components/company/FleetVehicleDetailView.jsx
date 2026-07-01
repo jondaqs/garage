@@ -243,7 +243,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
         .maybeSingle()
       setPendingRequest(pending || null)
     } catch (err) {
-      console.error(err)
+      console.error('Operation failed')
       setError('Failed to load vehicle details.')
     } finally {
       setLoading(false)
@@ -641,7 +641,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       const fileDate = new Date().toISOString().slice(0, 10)
       pdf.save('Fleet-Report-' + vehicle.plate_number + '-' + fileDate + '.pdf')
     } catch (err) {
-      console.error('PDF error:', err)
+      console.error('PDF error:')
       setError('Failed to generate report. Please try again.')
     } finally {
       setDownloading(false)

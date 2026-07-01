@@ -144,7 +144,7 @@ export default function AdminUsersPage() {
       setTotalCount(count)
       if (page === 1 && !debouncedSearch) setTotalAll(count)
     } catch (err) {
-      console.error('Error loading users:', err)
+      console.error('Error loading users:')
     } finally {
       setLoading(false)
     }
@@ -183,7 +183,7 @@ export default function AdminUsersPage() {
 
       await loadUsers()
     } catch (err) {
-      console.error(`${action} failed:`, err)
+      console.error(`${action} failed:`)
       alert(`Failed to ${action} user: ${err.message}`)
     } finally {
       setProcessing(null)

@@ -24,14 +24,14 @@ export async function GET(request, { params }) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, vehicle })
 
   } catch (error) {
     console.error('❌ Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -96,7 +96,7 @@ export async function PUT(request, { params }) {
 
     if (updateError) {
       console.error('❌ Update error:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -107,7 +107,7 @@ export async function PUT(request, { params }) {
 
   } catch (error) {
     console.error('❌ Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -154,7 +154,7 @@ export async function DELETE(request, { params }) {
 
     if (deleteError) {
       console.error('❌ Delete error:', deleteError)
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -164,6 +164,6 @@ export async function DELETE(request, { params }) {
 
   } catch (error) {
     console.error('❌ Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

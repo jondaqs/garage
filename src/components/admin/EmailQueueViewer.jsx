@@ -35,7 +35,7 @@ export default function EmailQueueViewer() {
         setTotalCount(data.total || 0)
       }
     } catch (error) {
-      console.error('Load email queue error:', error)
+      console.error('Load email queue error:')
     } finally {
       setLoading(false)
     }

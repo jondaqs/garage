@@ -25,7 +25,7 @@ async function requireAuth(supabase) {
 
 function rpcResponse(data, rpcError, defaultStatus = 200) {
   if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
   if (!data?.success) {
     const msg = data?.error || 'Unknown error'

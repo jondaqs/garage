@@ -80,7 +80,7 @@ export default function SaveCustomPlanModal({
       if (err) throw err
       setSearchResults(data || [])
     } catch (e) {
-      console.error('Entity search error:', e)
+      console.error('Entity search error:')
       setSearchResults([])
     } finally {
       setSearching(false)
@@ -150,7 +150,7 @@ export default function SaveCustomPlanModal({
           packages_created: result.packages_created,
           batch_id: result.batch_id,
         }),
-      }).catch(e => console.warn('[custom-plan-notify] fire-and-forget failed:', e.message))
+      }).catch(e => console.warn('[custom-plan-notify] fire-and-forget failed:'))
     } catch (e) {
       setError(e.message || 'Failed to save custom plan')
     } finally {

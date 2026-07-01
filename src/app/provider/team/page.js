@@ -75,7 +75,7 @@ export default function ProviderTeamPage() {
       await loadInvitations(providerData.id)
 
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading data:')
     } finally {
       setLoading(false)
     }
@@ -90,7 +90,7 @@ export default function ProviderTeamPage() {
       const { data: spuData, error } = await supabase.rpc('get_provider_team_members', {
         p_provider_id: pId
       })
-      if (error) console.error('get_provider_team_members error:', error)
+      if (error) console.error('get_provider_team_members error:')
 
       const spuUserIds = new Set((spuData || []).map(m => m.user_id))
 
@@ -175,7 +175,7 @@ export default function ProviderTeamPage() {
 
       setTeamMembers([...spuRows, ...mechRows])
     } catch (error) {
-      console.error('Error in loadTeamMembers:', error)
+      console.error('Error in loadTeamMembers:')
       setTeamMembers([])
     }
   }
@@ -206,7 +206,7 @@ export default function ProviderTeamPage() {
       .order('invited_at', { ascending: false })
 
     if (error) {
-      console.error('Error loading invitations:', error)
+      console.error('Error loading invitations:')
       return
     }
 
@@ -244,7 +244,7 @@ export default function ProviderTeamPage() {
         alert(data.error || 'Failed to send invitation')
       }
     } catch (error) {
-      console.error('Invitation error:', error)
+      console.error('Invitation error:')
       alert('Failed to send invitation')
     }
   }
@@ -263,7 +263,7 @@ export default function ProviderTeamPage() {
       alert('Invitation cancelled')
       await loadInvitations(provider.id)
     } catch (error) {
-      console.error('Cancel error:', error)
+      console.error('Cancel error:')
       alert('Failed to cancel invitation')
     }
   }
@@ -387,7 +387,7 @@ export default function ProviderTeamPage() {
         .eq('id', mechanicId)
 
       if (error) {
-        console.error('Toggle error:', error)
+        console.error('Toggle error:')
         alert('Failed to update status')
         return
       }
@@ -404,7 +404,7 @@ export default function ProviderTeamPage() {
       alert(`Team member ${!currentStatus ? 'activated' : 'deactivated'}`)
 
     } catch (error) {
-      console.error('Toggle status error:', error)
+      console.error('Toggle status error:')
       alert('Failed to update status')
     }
   }
@@ -450,7 +450,7 @@ export default function ProviderTeamPage() {
 
       alert('Team member verified successfully')
     } catch (error) {
-      console.error('Verify error:', error)
+      console.error('Verify error:')
       alert('Failed to verify member')
     }
   }
@@ -465,7 +465,7 @@ export default function ProviderTeamPage() {
         .eq('id', mechanicId)
 
       if (error) {
-        console.error('Remove error:', error)
+        console.error('Remove error:')
         alert('Failed to remove member')
         return
       }
@@ -474,7 +474,7 @@ export default function ProviderTeamPage() {
       const { data: { user } } = await supabase.auth.getUser()
       await loadTeamMembers(user.id)
     } catch (error) {
-      console.error('Remove error:', error)
+      console.error('Remove error:')
       alert('Failed to remove member')
     }
   }

@@ -90,7 +90,7 @@ export async function POST(request) {
 
     if (rpcError) {
       console.error('create_walk_in_work_order RPC error:', rpcError)
-      return NextResponse.json({ error: rpcError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
     if (!result.success) {
       const status = (result.error || '').toLowerCase().includes('permission') ? 403 : 400

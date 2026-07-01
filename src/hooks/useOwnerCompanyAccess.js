@@ -54,7 +54,7 @@ export default function useOwnerCompanyAccess() {
           if (membership) setCompanyId(membership.company_id)
         }
       } catch (err) {
-        console.error('useOwnerCompanyAccess resolve error:', err)
+        console.error('useOwnerCompanyAccess resolve error:')
       } finally {
         setResolving(false)
       }

@@ -212,7 +212,7 @@ export default function MemberBookingDetailPage() {
                     workOrderId: data.work_order_id,
                     workOrderNumber: data.work_order_number,
                 }),
-            }).catch(e => console.error('[memberBooking] notify failed (non-fatal):', e.message))
+            }).catch(e => console.error('[memberBooking] notify failed (non-fatal):'))
 
             setSuccessMsg(`Work order ${data.work_order_number} created!`)
             await loadBooking()

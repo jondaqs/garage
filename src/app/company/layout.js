@@ -81,7 +81,7 @@ export default function CompanyLayout({ children }) {
             router.push('/auth/company-signup')
 
         } catch (error) {
-            console.error('Error checking user:', error)
+            console.error('Error checking user:')
             router.push('/auth/login')
         } finally {
             setLoading(false)

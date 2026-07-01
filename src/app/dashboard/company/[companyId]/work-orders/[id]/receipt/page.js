@@ -187,7 +187,7 @@ function ReceiptPageInner({ backPath }) {
         document.body.removeChild(wrapper)
       }
     } catch (e) {
-      console.error('PDF error:', e)
+      console.error('PDF error:')
     } finally {
       setDownloading(false)
     }

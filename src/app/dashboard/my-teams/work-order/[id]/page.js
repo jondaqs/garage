@@ -43,8 +43,8 @@ class WOErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) { return { error } }
   componentDidCatch(error, info) {
     console.error('[MyTeams WO] === RENDER ERROR ===')
-    console.error('[MyTeams WO] Message:', error?.message)
-    console.error('[MyTeams WO] Stack:', error?.stack)
+    console.error('[MyTeams WO] Load failed')
+    console.error('[MyTeams WO] Load failed')
     console.error('[MyTeams WO] Component:', info?.componentStack)
     this.setState({ errorInfo: info })
   }
@@ -269,7 +269,7 @@ export default function MechanicWorkOrderPage() {
 
         setMechanics([...seen.values()])
       } catch (err) {
-        console.error('Failed to load mechanics:', err)
+        console.error('Failed to load mechanics:')
       }
     })()
   }, [woProviderId, perms?.can_manage_team, perms?.can_approve_work, isAdminRole])

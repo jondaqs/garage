@@ -173,7 +173,7 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
       setNotifications(all)
       setUnreadCount(all.filter(n => !n.is_read).length)
     } catch (err) {
-      console.error('Error loading notifications:', err)
+      console.error('Error loading notifications:')
     } finally {
       setLoading(false)
     }

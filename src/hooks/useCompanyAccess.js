@@ -65,7 +65,7 @@ export default function useCompanyAccess(companyId) {
       })
 
       if (error || !data) {
-        console.error('check_company_access error:', error)
+        console.error('check_company_access error:')
         // Deny by default on error
         setCanWrite(false)
         setState(null)
@@ -87,7 +87,7 @@ export default function useCompanyAccess(companyId) {
       setSubscriptionStatus(data.subscription_status)
       setReason(data.reason || '')
     } catch (err) {
-      console.error('useCompanyAccess error:', err)
+      console.error('useCompanyAccess error:')
       setCanWrite(false)
       setState(null)
     } finally {

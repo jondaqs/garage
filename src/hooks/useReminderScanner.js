@@ -58,7 +58,7 @@ export default function useReminderScanner({
       }
       return null
     } catch (e) {
-      console.warn('[useReminderScanner] scan failed:', e.message)
+      console.warn('[useReminderScanner] scan failed:')
       return null
     } finally {
       inFlightRef.current = false

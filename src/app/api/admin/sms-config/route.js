@@ -92,7 +92,7 @@ export async function GET() {
       },
     })
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -284,7 +284,7 @@ export async function POST(request) {
         if (queueId) {
           await sc.from('sms_queue').update({ status: 'failed', error_message: sendErr.message }).eq('id', queueId)
         }
-        return NextResponse.json({ success: false, steps, error: sendErr.message }, { status: 500 })
+        return NextResponse.json({ success: false, steps, error: 'SMS send failed' }, { status: 500 })
       }
     }
 
@@ -301,13 +301,13 @@ export async function POST(request) {
         const data = await res.json()
         return NextResponse.json({ success: true, balance: data })
       } catch (e) {
-        return NextResponse.json({ success: false, error: e.message }, { status: 500 })
+        return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
       }
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err) {
     console.error('[sms-config] error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

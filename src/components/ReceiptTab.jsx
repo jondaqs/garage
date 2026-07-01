@@ -302,7 +302,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         document.body.removeChild(wrapper)
       }
     } catch (e) {
-      console.error('PDF download error:', e)
+      console.error('PDF download error:')
     } finally {
       setDownloading(false)
     }

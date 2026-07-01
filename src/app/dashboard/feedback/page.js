@@ -68,7 +68,7 @@ export default function CustomerFeedbackPage() {
       if (!data?.success) throw new Error(data?.error || 'Failed to load history')
       setHistory(data.rows || [])
     } catch (err) {
-      console.error('feedback history load error', err)
+      console.error('feedback history load error')
     } finally {
       setLoadingList(false)
     }

@@ -135,7 +135,7 @@ export default function AuthenticationStep({
           .single()
 
         if (profileError) {
-          console.error('Profile fetch error:', profileError)
+          console.error('Profile fetch error:')
           throw new Error('Profile creation failed. Please contact support or try again.')
         }
 

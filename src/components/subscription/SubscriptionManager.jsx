@@ -366,7 +366,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         setReceipts([])
       }
     } catch (e) {
-      console.error('Load error:', e)
+      console.error('Load error:')
     } finally {
       setLoading(false)
     }
@@ -404,7 +404,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         setConvRate(data.margined_rate || 1)
         setDisplaySymbol(data.currency_symbol || displayCurrency)
       } catch (e) {
-        console.error('Currency rate error:', e)
+        console.error('Currency rate error:')
         setConvRate(1); setDisplaySymbol('$'); setDisplayCurrency('USD')
       } finally { setRateLoading(false); setCurrencyReady(true) }
     }
@@ -518,7 +518,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subscription_id: subId }),
           })
-        } catch (e) { console.warn('Invoice notification failed (non-fatal):', e.message) }
+        } catch (e) { console.warn('Invoice notification failed (non-fatal):') }
       }
     } catch (e) {
       setError(e.message)
@@ -560,7 +560,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             transaction_ref: payRef || null,
           }),
         })
-      } catch (e) { console.warn('Receipt notification failed (non-fatal):', e.message) }
+      } catch (e) { console.warn('Receipt notification failed (non-fatal):') }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -1463,7 +1463,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               const downloadInvoice = async () => {
                 setDownloadingId(inv.id)
                 try { await downloadHtmlAsPdf(buildSubscriptionInvoiceHtml({ ...buildInvoiceArgs(), forPdf: true }), `Invoice-${inv.invoice_ref_no}`) }
-                catch (e) { console.error('PDF download error:', e) }
+                catch (e) { console.error('PDF download error:') }
                 finally { setDownloadingId(null) }
               }
 
@@ -1969,7 +1969,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
               const downloadReceipt = async () => {
                 setDownloadingId(r.id)
                 try { await downloadHtmlAsPdf(receiptHtml(), `Receipt-${r.receipt_number}`) }
-                catch (e) { console.error('PDF download error:', e) }
+                catch (e) { console.error('PDF download error:') }
                 finally { setDownloadingId(null) }
               }
 

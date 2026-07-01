@@ -196,7 +196,7 @@ export default function MemberProviderCalendarPage() {
         .not('status_id', 'in', termIds.length > 0 ? `(${termIds.join(',')})` : '(null)')
       setWorkOrders((woData || []).filter(wo => !linkedWoIds.has(wo.id)))
     } catch (err) {
-      console.error('Member calendar load error:', err)
+      console.error('Member calendar load error:')
     } finally {
       setLoading(false)
     }

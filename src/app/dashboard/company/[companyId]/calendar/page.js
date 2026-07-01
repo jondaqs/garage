@@ -110,7 +110,7 @@ export default function MemberCompanyCalendarPage() {
       setWorkOrders((woData || []).filter(wo => !terminal.includes(wo.status?.code)))
 
     } catch (err) {
-      console.error('Member calendar error:', err)
+      console.error('Member calendar error:')
     } finally {
       setLoading(false)
     }

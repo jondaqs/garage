@@ -31,7 +31,7 @@ export default function PendingCompanyInvitationsCard() {
         .order('created_at', { ascending: false })
 
       if (fetchErr) {
-        console.error('Company invitations fetch error:', fetchErr)
+        console.error('Company invitations fetch error:')
         return
       }
 
@@ -40,7 +40,7 @@ export default function PendingCompanyInvitationsCard() {
       const valid = (data || []).filter(inv => new Date(inv.expires_at) > now)
       setInvitations(valid)
     } catch (err) {
-      console.error('PendingCompanyInvitationsCard error:', err)
+      console.error('PendingCompanyInvitationsCard error:')
     } finally {
       setLoading(false)
     }

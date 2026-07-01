@@ -60,7 +60,7 @@ export default function ProviderShopsPage() {
       setShops(shopsData || [])
 
     } catch (err) {
-      console.error('Error loading shops:', err)
+      console.error('Error loading shops:')
       setError('Failed to load shops')
     } finally {
       setLoading(false)
@@ -83,7 +83,7 @@ export default function ProviderShopsPage() {
       alert('Shop deleted successfully')
       loadShops()
     } catch (err) {
-      console.error('Error deleting shop:', err)
+      console.error('Error deleting shop:')
       alert('Failed to delete shop: ' + err.message)
     }
   }
@@ -99,7 +99,7 @@ export default function ProviderShopsPage() {
 
       loadShops()
     } catch (err) {
-      console.error('Error updating shop:', err)
+      console.error('Error updating shop:')
       alert('Failed to update shop status')
     }
   }

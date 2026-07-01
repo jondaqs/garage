@@ -34,7 +34,7 @@ export default function SmsQueueViewer() {
         setTotalCount(data.total || 0)
       }
     } catch (error) {
-      console.error('Load SMS queue error:', error)
+      console.error('Load SMS queue error:')
     } finally {
       setLoading(false)
     }

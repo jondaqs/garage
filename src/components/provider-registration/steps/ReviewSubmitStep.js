@@ -75,7 +75,7 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       }, 2000)
 
     } catch (err) {
-      console.error('Submission error:', err)
+      console.error('Submission error:')
       setError(err.message || 'Failed to submit registration. Please try again.')
     } finally {
       setSubmitting(false)

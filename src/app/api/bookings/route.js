@@ -160,7 +160,7 @@ export async function POST(request) {
 
     if (bookingErr) {
       console.error('Booking insert error:', bookingErr)
-      return NextResponse.json({ error: bookingErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // ── booking_services ──────────────────────────────────────────────────────

@@ -83,7 +83,7 @@ export default function EditShopPage() {
       })
 
     } catch (err) {
-      console.error('Error loading shop:', err)
+      console.error('Error loading shop:')
       setError('Failed to load shop details')
     } finally {
       setLoading(false)
@@ -130,7 +130,7 @@ export default function EditShopPage() {
       }, 2000)
 
     } catch (err) {
-      console.error('Error updating shop:', err)
+      console.error('Error updating shop:')
       setError(err.message || 'Failed to update shop')
     } finally {
       setSaving(false)

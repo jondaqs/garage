@@ -34,7 +34,7 @@ export default function AdjustStockModal({ item, onClose, onSuccess }) {
         alert(data.error || 'Failed to adjust stock')
       }
     } catch (error) {
-      console.error('Adjust stock error:', error)
+      console.error('Adjust stock error:')
       alert('Failed to adjust stock')
     } finally {
       setSubmitting(false)

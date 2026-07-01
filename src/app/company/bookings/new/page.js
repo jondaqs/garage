@@ -111,7 +111,7 @@ export default function CompanyNewBookingPage() {
       setVehicle(vehicleData)
 
     } catch (err) {
-      console.error('Load error:', err)
+      console.error('Load error:')
       setError('Failed to load booking data')
     } finally {
       setLoading(false)
@@ -175,7 +175,7 @@ export default function CompanyNewBookingPage() {
       router.push(`/company/bookings/${data.bookingId}`)
 
     } catch (err) {
-      console.error('Booking error:', err)
+      console.error('Booking error:')
       setError('Failed to create booking: ' + err.message)
     } finally {
       setSubmitting(false)

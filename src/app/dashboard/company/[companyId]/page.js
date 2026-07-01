@@ -97,7 +97,7 @@ export default function MemberCompanyOverviewPage() {
         budget:    budget        ?? null,
       })
     } catch (err) {
-      console.error('Overview fetch error:', err)
+      console.error('Overview fetch error:')
       setError('Failed to load company data.')
     } finally {
       setLoading(false)

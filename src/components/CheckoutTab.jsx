@@ -182,7 +182,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         setHandover(prev => ({ ...prev, co_payment_confirmed: false }))
       }
     } catch (e) {
-      console.error('CheckoutTab loadCheckout:', e.message)
+      console.error('CheckoutTab loadCheckout:')
     } finally {
       setLoading(false)
     }
@@ -221,7 +221,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
         p_final_mileage:           finalMileage  ? parseInt(finalMileage) : null,
       })
     } catch (e) {
-      console.error('CheckoutTab saveProgress:', e.message)
+      console.error('CheckoutTab saveProgress:')
     }
   }
 
@@ -271,7 +271,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
 
       // Fire email + SMS notification to car owner (non-blocking)
       fetch(`/api/work-orders/${workOrder.id}/checkout-notify`, { method: 'POST' })
-        .catch(e => console.warn('[checkout-notify]', e.message))
+        .catch(e => console.warn('[checkout-notify]'))
 
       setSuccess('Checkout submitted. The customer will be notified to confirm.')
       await loadCheckout()

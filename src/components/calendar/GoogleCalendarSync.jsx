@@ -45,7 +45,7 @@ export default function GoogleCalendarSync() {
       setIsConnected(!!oauthData?.google_calendar_token)
       setAutoSync(!!oauthData?.google_calendar_auto_sync)
     } catch (error) {
-      console.error('Error checking connection:', error)
+      console.error('Error checking connection:')
     }
   }
 
@@ -73,7 +73,7 @@ export default function GoogleCalendarSync() {
       // Open auth window
       window.location.href = authUrl
     } catch (error) {
-      console.error('Error connecting to Google Calendar:', error)
+      console.error('Error connecting to Google Calendar:')
       setError('Failed to connect to Google Calendar')
     }
   }
@@ -102,7 +102,7 @@ export default function GoogleCalendarSync() {
       setAutoSync(false)
       setSuccess('Google Calendar disconnected successfully')
     } catch (error) {
-      console.error('Error disconnecting:', error)
+      console.error('Error disconnecting:')
       setError('Failed to disconnect Google Calendar')
     }
   }
@@ -160,7 +160,7 @@ export default function GoogleCalendarSync() {
       const result = await response.json()
       setSuccess(`Synced ${result.count} bookings to Google Calendar`)
     } catch (error) {
-      console.error('Error syncing:', error)
+      console.error('Error syncing:')
       setError('Failed to sync with Google Calendar')
     } finally {
       setSyncing(false)
@@ -183,7 +183,7 @@ export default function GoogleCalendarSync() {
       setAutoSync(newValue)
       setSuccess(`Auto-sync ${newValue ? 'enabled' : 'disabled'}`)
     } catch (error) {
-      console.error('Error toggling auto-sync:', error)
+      console.error('Error toggling auto-sync:')
       setError('Failed to update auto-sync setting')
     }
   }

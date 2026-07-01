@@ -118,7 +118,7 @@ export default function CompanyMemberProvidersPage() {
       setProviders(results)
       setTotal(rows[0]?.total_count || 0)
     } catch (e) {
-      console.error(e)
+      console.error('Operation failed')
     } finally {
       setLoading(false)
     }

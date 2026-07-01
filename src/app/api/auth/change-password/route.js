@@ -181,7 +181,7 @@ export async function POST(request) {
   } catch (err) {
     
     return NextResponse.json(
-      { error: err.message || 'Failed to reset password.' },
+      { error: 'Failed to reset password.' },
       { status: 500 },
     )
   }

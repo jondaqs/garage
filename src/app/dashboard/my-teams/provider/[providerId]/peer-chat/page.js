@@ -281,7 +281,7 @@ export default function MemberPeerChatPage() {
             p_conversation_id: activeConv.id,
             p_own_provider_id: ownProviderId,
           })
-            .then(({ error }) => { if (error) console.error('mark_peer_conversation_read failed:', error) })
+            .then(({ error }) => { if (error) console.error('mark_peer_conversation_read failed:') })
           // Optimistic local zero so the badge clears immediately, before
           // the realtime UPDATE on peer_conversations arrives.
           setConversations(prev => prev.map(c => c.id === activeConv.id
@@ -336,7 +336,7 @@ export default function MemberPeerChatPage() {
     if (error || !msg) {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id))
       setBody(text)
-      console.error('send_peer_message failed:', error)
+      console.error('send_peer_message failed:')
     } else {
       const enriched = {
         ...msg,
@@ -369,7 +369,7 @@ export default function MemberPeerChatPage() {
       setActiveConv(updated)
       setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, ...row } : c))
     } else if (error) {
-      console.error('toggle_peer_conversation_status failed:', error)
+      console.error('toggle_peer_conversation_status failed:')
     }
     setClosingConv(false)
   }

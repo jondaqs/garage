@@ -104,7 +104,7 @@ export default function CompanyRegistrationFlow() {
         }
       }
     } catch (error) {
-      console.error('Error checking user:', error)
+      console.error('Error checking user:')
     } finally {
       setLoading(false)
     }

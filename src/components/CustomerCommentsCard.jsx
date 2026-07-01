@@ -30,7 +30,7 @@ export default function CustomerCommentsCard({ workOrderId }) {
         })
         if (cancelled) return
         if (error) {
-          console.warn('CustomerCommentsCard RPC error:', error.message)
+          console.warn('CustomerCommentsCard RPC error:')
           setComments([])
         } else if (data?.success) {
           setComments(data.comments || [])

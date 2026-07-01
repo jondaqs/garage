@@ -68,7 +68,7 @@ export default function PendingProvidersPage() {
       const merged = (pendingRows || []).map(r => ({ ...r, ...(detailsById[r.service_provider_id] || {}) }))
       setProviders(merged)
     } catch (err) {
-      console.error('Error loading providers:', err)
+      console.error('Error loading providers:')
     } finally {
       setLoading(false)
     }

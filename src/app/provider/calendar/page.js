@@ -124,7 +124,7 @@ export default function ProviderCalendarPage() {
 
       setWorkOrders((woData || []).filter(wo => !linkedWoIds.has(wo.id)))
     } catch (err) {
-      console.error('Provider calendar load error:', err)
+      console.error('Provider calendar load error:')
     } finally {
       setLoading(false)
     }

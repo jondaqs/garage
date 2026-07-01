@@ -90,7 +90,7 @@ export async function POST(request, { params }) {
       .update({ status_id: newStatus.id, updated_at: new Date().toISOString() })
       .eq('id', woId)
 
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+    if (upErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 
     // ── Call RPC: inserts in-app notifications + returns recipient list ───────
     const { data: rpcResult, error: rpcErr } = await supabase.rpc(

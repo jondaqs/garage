@@ -116,7 +116,7 @@ export default function AdminManagementPage() {
       )
       setAdmins(adminUsers)
     } catch (err) {
-      console.error('Error loading admins:', err)
+      console.error('Error loading admins:')
       setError(err.message)
     } finally {
       setLoading(false)

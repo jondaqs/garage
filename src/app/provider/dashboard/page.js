@@ -61,7 +61,7 @@ export default function ProviderDashboard() {
       if (!result.success) throw new Error(result.error)
       setStats(result)
     } catch (err) {
-      console.error('Dashboard error:', err)
+      console.error('Dashboard error:')
       setError(err.message)
     } finally {
       setLoading(false)

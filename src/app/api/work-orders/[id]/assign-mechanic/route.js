@@ -56,7 +56,7 @@ export async function POST(request, { params }) {
     )
     if (rpcErr) {
       console.error('[assign-mechanic] RPC error:', rpcErr.message)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
     if (!rpcResult.success) {
       return NextResponse.json({ error: rpcResult.error }, { status: 400 })

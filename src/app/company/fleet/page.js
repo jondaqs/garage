@@ -63,7 +63,7 @@ export default function FleetPage() {
         setPendingIds(new Set((pending ?? []).map(p => p.vehicle_id)))
       }
     } catch (err) {
-      console.error('Error fetching fleet:', err)
+      console.error('Error fetching fleet:')
       setError('Failed to load fleet')
     } finally {
       setLoading(false)
@@ -95,7 +95,7 @@ export default function FleetPage() {
       // *currently* inactive — i.e. vehicle.is_active = false.
       setInactiveFleet((data ?? []).filter(row => row.vehicle && row.vehicle.is_active === false))
     } catch (err) {
-      console.error('Inactive fetch error:', err)
+      console.error('Inactive fetch error:')
       setInactiveFleet([])
     } finally {
       setLoadingInactive(false)

@@ -116,7 +116,7 @@ export async function POST(request) {
       .insert({ name: cleanName, description: description?.trim() || null, service_type: 'service', is_active: true })
       .select('id, name').single()
 
-    if (svcErr) return NextResponse.json({ error: svcErr.message }, { status: 500 })
+    if (svcErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 
     // ── 4. Link to provider ───────────────────────────────────────────────────
     let providerName = null

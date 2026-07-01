@@ -103,7 +103,7 @@ export default function MemberProviderBookingsPage() {
       if (error) throw error
       setBookings(data || [])
     } catch (err) {
-      console.error('Member bookings load error:', err)
+      console.error('Member bookings load error:')
     } finally {
       setLoading(false)
     }

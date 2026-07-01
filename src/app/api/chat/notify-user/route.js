@@ -183,6 +183,6 @@ export async function POST(request) {
     return NextResponse.json({ success: true, notified: recipients.length, emailsSent, smsSent })
   } catch (err) {
     console.error('POST /api/chat/notify-user error:', err)
-    return NextResponse.json({ success: false, delivered: false, error: err.message }, { status: 200 })
+    return NextResponse.json({ success: false, delivered: false, error: 'Internal server error' }, { status: 200 })
   }
 }

@@ -82,7 +82,7 @@ export default function AddShopPage() {
         setFormData(f => ({ ...f, currency_id: providerData.currency_id }))
       }
     } catch (err) {
-      console.error('Error loading provider:', err)
+      console.error('Error loading provider:')
       setError('Failed to load provider information')
     }
   }
@@ -134,7 +134,7 @@ export default function AddShopPage() {
       }, 2000)
 
     } catch (err) {
-      console.error('Error adding shop:', err)
+      console.error('Error adding shop:')
       setError(err.message || 'Failed to add shop')
     } finally {
       setLoading(false)

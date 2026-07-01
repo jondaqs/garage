@@ -135,7 +135,7 @@ export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
         setIsPaid(false)
       }
     } catch (e) {
-      console.error('CheckoutAcceptanceCard load:', e.message)
+      console.error('CheckoutAcceptanceCard load:')
     } finally {
       setLoading(false)
     }
@@ -180,7 +180,7 @@ export default function CheckoutAcceptanceCard({ workOrderId, onDecided }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: reason.trim() }),
-      }).catch(e => console.warn('[decline-checkout-notify]', e.message))
+      }).catch(e => console.warn('[decline-checkout-notify]'))
       onDecided?.()
     } catch (e) { setError(e.message) }
     finally { setActing(false) }

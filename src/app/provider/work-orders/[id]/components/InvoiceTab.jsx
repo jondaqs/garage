@@ -93,7 +93,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
         .eq('work_order_id', workOrder.id)
         .maybeSingle()
 
-      if (invErr) { console.error('invoices query error:', invErr.message); setLoading(false); return }
+      if (invErr) { console.error('invoices query error:'); setLoading(false); return }
 
       if (inv) {
         const [{ data: items }, { data: receipt }] = await Promise.all([
@@ -112,7 +112,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
       } else {
         setInvoice(null)
       }
-    } catch (e) { console.error('loadInvoice threw:', e.message) }
+    } catch (e) { console.error('loadInvoice threw:') }
     finally { setLoading(false) }
   }, [workOrder.id])
 

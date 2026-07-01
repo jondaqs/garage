@@ -67,7 +67,7 @@ export default function ProviderLayout({ children }) {
 
       setProvider(providerData)
     } catch (error) {
-      console.error('Error checking user:', error)
+      console.error('Error checking user:')
       router.push('/auth/login')
     } finally {
       setLoading(false)

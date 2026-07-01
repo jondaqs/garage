@@ -219,6 +219,6 @@ export async function POST(req) {
     return NextResponse.json({ success: true, ...results })
   } catch (err) {
     console.error('[custom-plan-notify] error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

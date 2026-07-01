@@ -112,13 +112,13 @@ export default function PricingPage() {
               setRateSource(rateData.source)
             }
           } catch (e) {
-            console.error('Initial rate fetch error:', e)
+            console.error('Initial rate fetch error:')
           }
         }
         setRateLoading(false)
         setCurrencyReady(true)
       } catch (e) {
-        console.error('Pricing load error:', e)
+        console.error('Pricing load error:')
         setRateLoading(false)
         setCurrencyReady(true)
       } finally {
@@ -152,7 +152,7 @@ export default function PricingPage() {
         setConvSymbol(rateData.currency_symbol || selectedCurrency)
         setRateSource(rateData.source)
       } catch (e) {
-        console.error('Rate fetch error:', e)
+        console.error('Rate fetch error:')
         setConversionRate(1); setConvSymbol('$')
       } finally {
         setRateLoading(false)

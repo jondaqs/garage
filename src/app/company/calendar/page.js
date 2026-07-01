@@ -118,7 +118,7 @@ export default function CompanyCalendarPage() {
       setWorkOrders(woData || [])
 
     } catch (err) {
-      console.error('Company calendar error:', err)
+      console.error('Company calendar error:')
     } finally {
       setLoading(false)
     }

@@ -169,7 +169,7 @@ export default function TabbedFormModal({
         alert(data.error || `Failed to ${mode} item`)
       }
     } catch (error) {
-      console.error(`${mode} error:`, error)
+      console.error(`${mode} error:`)
       alert(`Failed to ${mode} item`)
     } finally {
       setSubmitting(false)

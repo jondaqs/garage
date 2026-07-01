@@ -36,7 +36,7 @@ export default function PendingInvitationsCard() {
         .order('invited_at', { ascending: false })
 
       if (error) {
-        console.error('Error loading invitations:', error)
+        console.error('Error loading invitations:')
         return
       }
 
@@ -65,7 +65,7 @@ export default function PendingInvitationsCard() {
       }
 
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:')
     } finally {
       setLoading(false)
     }
@@ -103,7 +103,7 @@ export default function PendingInvitationsCard() {
         alert(data.error || 'Failed to respond to invitation')
       }
     } catch (error) {
-      console.error('Response error:', error)
+      console.error('Response error:')
       alert('Failed to respond to invitation')
     } finally {
       setResponding(null)

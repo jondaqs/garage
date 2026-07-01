@@ -84,7 +84,7 @@ export default function SubscriptionTicketModal({
           subject: subject.trim(),
           description: description.trim(),
         }),
-      }).catch(e => console.warn('[ticket-notify] fire-and-forget failed:', e.message))
+      }).catch(e => console.warn('[ticket-notify] fire-and-forget failed:'))
     } catch (e) {
       setError(e.message || 'Failed to submit ticket')
     } finally {

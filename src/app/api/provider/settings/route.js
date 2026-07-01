@@ -52,7 +52,7 @@ export async function POST(request) {
         p_currency_id:      currency_id      || null,
       }
     )
-    if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+    if (rpcErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
 
     // ── 2. Get owner details for emails ─────────────────────────────────────

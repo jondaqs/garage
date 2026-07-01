@@ -83,7 +83,7 @@ export async function GET(request) {
       .order('name', { ascending: true })
 
     if (invErr) {
-      return NextResponse.json({ error: invErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // Fetch shops for this provider
@@ -197,7 +197,7 @@ export async function POST(request) {
 
     if (createErr) {
       console.error('Member inventory create error:', createErr)
-      return NextResponse.json({ error: createErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, item }, { status: 201 })

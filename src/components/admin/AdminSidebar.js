@@ -44,7 +44,7 @@ export default function AdminSidebar() {
       const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
       setAdminRole(getHighestAdminRole(codes))
     } catch (err) {
-      console.error('Error loading admin role:', err)
+      console.error('Error loading admin role:')
     }
   }
 
@@ -63,7 +63,7 @@ export default function AdminSidebar() {
       setPendingProviders(providerCount || 0)
       setPendingCompanies(companyCount || 0)
     } catch (error) {
-      console.error('Error loading badge counts:', error)
+      console.error('Error loading badge counts:')
     }
   }
 

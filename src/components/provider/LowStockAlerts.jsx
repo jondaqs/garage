@@ -27,7 +27,7 @@ export default function LowStockAlerts() {
         setLowStockItems(lowStock)
       }
     } catch (error) {
-      console.error('Load low stock error:', error)
+      console.error('Load low stock error:')
     } finally {
       setLoading(false)
     }

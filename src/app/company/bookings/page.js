@@ -128,7 +128,7 @@ export default function CompanyBookingsPage() {
       setBookings(filtered)
 
     } catch (error) {
-      console.error('Error fetching bookings:', error)
+      console.error('Error fetching bookings:')
     } finally {
       setLoading(false)
     }

@@ -129,7 +129,7 @@ export default function UserWorkOrderInvoicePage() {
           payment_method: payMethod,
           invoice_number: invoice.invoice.invoice_number,
         }),
-      }).catch(e => console.warn('[payment-notify]', e.message))
+      }).catch(e => console.warn('[payment-notify]'))
 
       await loadInvoice()
     } catch (err) {

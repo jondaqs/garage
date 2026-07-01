@@ -108,7 +108,7 @@ export default function MemberSearchProvidersPage() {
       })))
       setTotal(Number(rows[0]?.total_count || 0))
     } catch (e) {
-      console.error('search_providers_for_provider failed:', e)
+      console.error('search_providers_for_provider failed:')
       setProviders([])
       setTotal(0)
     } finally {
@@ -172,7 +172,7 @@ export default function MemberSearchProvidersPage() {
       if (error) throw error
       router.push(`/dashboard/my-teams/provider/${ownProviderId}/peer-chat?conversation=${convId}`)
     } catch (err) {
-      console.error('start_or_get_peer_conversation failed:', err)
+      console.error('start_or_get_peer_conversation failed:')
       alert(err.message || 'Could not start chat')
       setStartingChat(null)
     }

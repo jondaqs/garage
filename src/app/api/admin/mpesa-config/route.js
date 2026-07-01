@@ -90,7 +90,7 @@ export async function GET() {
       },
     })
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -195,7 +195,7 @@ export async function POST(request) {
         })
       } catch (encErr) {
         return NextResponse.json({
-          error: 'Encryption failed — the certificate may be invalid. Error: ' + encErr.message,
+          error: 'Encryption failed — the certificate may be invalid',
         }, { status: 400 })
       }
     }
@@ -246,7 +246,7 @@ export async function POST(request) {
       } catch (e) {
         return NextResponse.json({
           success: false,
-          error: `Connection failed: ${e.message}`,
+          error: 'Connection failed',
           environment: env,
         })
       }
@@ -255,6 +255,6 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err) {
     console.error('[mpesa-config] error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

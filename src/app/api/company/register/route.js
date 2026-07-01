@@ -58,7 +58,7 @@ export async function POST(request) {
         if (rpcError) {
             console.error('❌ register_company RPC error:', rpcError)
             return NextResponse.json({
-                error: `Failed to create company: ${rpcError.message}`
+                error: 'Failed to create company'
             }, { status: 500 })
         }
 
@@ -224,8 +224,6 @@ export async function POST(request) {
 
     } catch (error) {
         console.error('❌ Registration error:', error)
-        return NextResponse.json({
-            error: `Registration failed: ${error.message}`
-        }, { status: 500 })
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

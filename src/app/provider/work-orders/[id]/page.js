@@ -297,7 +297,7 @@ export default function WorkOrderDetailPage() {
 
       setMechanics([...seen.values()])
     } catch (e) {
-      console.error('loadMechanics error:', e.message)
+      console.error('loadMechanics error:')
     }
   }, [])
 

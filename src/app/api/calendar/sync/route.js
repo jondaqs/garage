@@ -71,7 +71,7 @@ export async function POST(request) {
         results.push({ bookingId: booking.id, eventId: createdEvent.id, success: true })
       } catch (error) {
         console.error(`Error syncing booking ${booking.id}:`, error)
-        results.push({ bookingId: booking.id, success: false, error: error.message })
+        results.push({ bookingId: booking.id, success: false, error: 'Internal server error' })
       }
     }
 

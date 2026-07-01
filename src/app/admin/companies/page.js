@@ -105,7 +105,7 @@ export default function AdminCompaniesPage() {
     const { data, error, count } = await query
 
     if (error) {
-      console.error('Error fetching companies:', error)
+      console.error('Error fetching companies:')
       setLoading(false)
       return
     }
@@ -201,7 +201,7 @@ export default function AdminCompaniesPage() {
 
       await fetchCompanies()
     } catch (err) {
-      console.error(`${action} failed:`, err)
+      console.error(`${action} failed:`)
       alert(`Failed to ${action} company: ${err.message}`)
     } finally {
       setProcessing(null)

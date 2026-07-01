@@ -93,7 +93,7 @@ export async function POST(request, context) {
 
   if (bErr) {
     console.error(`[reminder ${bookingId}] load error:`, bErr.message)
-    return NextResponse.json({ error: bErr.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
   if (!booking) {
     return NextResponse.json({ error: 'Booking not found' }, { status: 404 })

@@ -126,7 +126,7 @@ export default function CompanyBookServicePage() {
       setProviderTypes(types ?? [])
 
     } catch (err) {
-      console.error(err)
+      console.error("Booking failed")
       setError(err.message)
     } finally {
       setLoading(false)

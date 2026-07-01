@@ -102,7 +102,7 @@ function InboxTab({ supabase }) {
       setRows(data.rows || [])
       setTotal(data.total || 0)
     } catch (err) {
-      console.error('admin feedback load error', err)
+      console.error('admin feedback load error')
       setRows([])
       setTotal(0)
     } finally {

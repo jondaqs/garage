@@ -248,7 +248,7 @@ function OverviewTab({ supabase }) {
                 byType,
             })
         } catch (e) {
-            console.error('Stats error:', e)
+            console.error('Stats error:')
         } finally {
             setLoading(false)
         }
@@ -334,7 +334,7 @@ function SubscriptionsListTab({ supabase }) {
             setSubs(data || [])
             setTotal(count || 0)
         } catch (e) {
-            console.error('Load error:', e)
+            console.error('Load error:')
         } finally {
             setLoading(false)
         }
@@ -1973,7 +1973,7 @@ function InvoicesTab({ supabase }) {
       if (error) throw error
       setInvoices(data || [])
       setTotal(count || 0)
-    } catch (e) { console.error('Invoice load error:', e) }
+    } catch (e) { console.error('Invoice load error:') }
     finally { setLoading(false) }
   }
 
@@ -2026,7 +2026,7 @@ function InvoicesTab({ supabase }) {
   const downloadInvoice = async (inv) => {
     setDownloadingId(inv.id)
     try { await downloadHtmlAsPdf(buildSubscriptionInvoiceHtml({ ...buildInvArgs(inv), forPdf: true }), `Invoice-${inv.invoice_ref_no}`) }
-    catch (e) { console.error('PDF error:', e) }
+    catch (e) { console.error('PDF error:') }
     finally { setDownloadingId(null) }
   }
 
@@ -2209,7 +2209,7 @@ function ReceiptsTab({ supabase, deepLinkedReceipt }) {
       if (error) throw error
       setReceipts(data || [])
       setTotal(count || 0)
-    } catch (e) { console.error('Receipts load error:', e) }
+    } catch (e) { console.error('Receipts load error:') }
     finally { setLoading(false) }
   }
 
@@ -2232,7 +2232,7 @@ function ReceiptsTab({ supabase, deepLinkedReceipt }) {
   const downloadReceipt = async (r) => {
     setDownloadingId(r.id)
     try { await downloadHtmlAsPdf(buildSubscriptionReceiptHtml(buildRcptArgs(r)), `Receipt-${r.receipt_number}`) }
-    catch (e) { console.error('PDF error:', e) }
+    catch (e) { console.error('PDF error:') }
     finally { setDownloadingId(null) }
   }
 

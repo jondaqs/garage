@@ -36,7 +36,7 @@ export async function POST(request, { params }) {
       'send_estimate_for_approval',
       { p_work_order_id: workOrderId, p_provider_user_id: user.id }
     )
-    if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+    if (rpcErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
 
     const { work_order_number, provider_name, estimate, owner } = result

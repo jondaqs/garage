@@ -83,7 +83,7 @@ export async function POST(request, { params }) {
 
     if (rpcErr) {
       console.warn('[notify-invoice] RPC error (non-fatal):', rpcErr.message)
-      return NextResponse.json({ success: true, notified: false, error: rpcErr.message })
+      return NextResponse.json({ success: true, notified: false, error: 'Invoice notification failed' })
     }
 
     if (!rpcResult?.success) {

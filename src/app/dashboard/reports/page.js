@@ -226,7 +226,7 @@ export default function UserReportsPage() {
       })
 
     } catch (err) {
-      console.error('Reports error:', err)
+      console.error('Reports error:')
       setError('Failed to load report data')
     } finally {
       setLoading(false)

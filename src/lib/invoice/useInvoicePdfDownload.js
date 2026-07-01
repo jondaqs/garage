@@ -135,7 +135,7 @@ export function useInvoicePdfDownload() {
 
       pdf.save(`Invoice-${invoiceNumber || workOrderId}.pdf`)
     } catch (e) {
-      console.error('PDF download error:', e)
+      console.error('PDF download error:')
       setError(e.message || 'Could not generate PDF. Please try again.')
     } finally {
       if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe)

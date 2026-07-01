@@ -174,7 +174,7 @@ export default function AllProvidersPage() {
       setPendingDiffs(Object.fromEntries((pending || []).map(r => [r.service_provider_id, r])))
       if (page === 1 && statusFilter === 'all' && !debouncedSearch) setTotalAll(count)
     } catch (err) {
-      console.error('Error loading providers:', err)
+      console.error('Error loading providers:')
     } finally {
       setLoading(false)
     }
@@ -210,7 +210,7 @@ export default function AllProvidersPage() {
 
       await loadProviders()
     } catch (err) {
-      console.error(`${action} failed:`, err)
+      console.error(`${action} failed:`)
       alert(`Failed to ${action} provider: ${err.message}`)
     } finally {
       setProcessing(null)

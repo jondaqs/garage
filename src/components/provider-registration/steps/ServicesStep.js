@@ -51,7 +51,7 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
       console.log(`✅ Loaded ${servicesData?.length || 0} ${isDealership ? 'spare parts' : 'services'}`)
       setServices(servicesData || [])
     } catch (err) {
-      console.error('Error loading services:', err)
+      console.error('Error loading services:')
       setError(err.message || `Failed to load ${isDealership ? 'spare parts' : 'services'}`)
     } finally {
       setLoading(false)

@@ -93,7 +93,7 @@ export default function useProviderAccess() {
         })
 
         if (error || !data) {
-          console.error('check_provider_access error:', error)
+          console.error('check_provider_access error:')
           setCanWrite(false)
           setState(null)
           setReason('Unable to verify provider subscription status.')
@@ -118,7 +118,7 @@ export default function useProviderAccess() {
         setSubscriptionStatus(data.subscription_status)
         setReason(data.reason || '')
       } catch (err) {
-        console.error('useProviderAccess error:', err)
+        console.error('useProviderAccess error:')
         setCanWrite(false)
         setState(null)
       } finally {

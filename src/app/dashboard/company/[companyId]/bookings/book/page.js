@@ -123,7 +123,7 @@ export default function MemberBookServicePage() {
       setProviderTypes(types ?? [])
 
     } catch (err) {
-      console.error(err)
+      console.error("Booking failed")
       setError(err.message)
     } finally {
       setLoading(false)

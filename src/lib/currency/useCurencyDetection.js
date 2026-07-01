@@ -79,7 +79,7 @@ export function useCurrencyDetection({ overrideCurrencyCode, currencies = [], ba
         setMarginPct(data.margin_pct || 0)
         setRateSource(data.source || 'unknown')
       } catch (e) {
-        console.error('Currency rate fetch error:', e)
+        console.error('Currency rate fetch error:')
         // Fall back to base currency
         setConversionRate(1)
         setCurrencySymbol('$')

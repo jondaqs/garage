@@ -450,7 +450,7 @@ export default function Sidebar({ user }) {
         }
       }
     } catch (err) {
-      console.error('Sidebar membership fetch error:', err)
+      console.error('Sidebar membership fetch error:')
     } finally {
       setMembershipLoading(false)
     }
@@ -469,7 +469,7 @@ export default function Sidebar({ user }) {
         .eq('is_active', true)
 
       if (spuErr) {
-        console.error('SPU fetch error:', spuErr)
+        console.error('SPU fetch error:')
       }
 
       if (spuRows?.length) {
@@ -550,7 +550,7 @@ export default function Sidebar({ user }) {
             setProviderPendingByProvider(penCounts)
           }
         } catch (e) {
-          console.error('Sidebar member booking-counts fetch error:', e)
+          console.error('Sidebar member booking-counts fetch error:')
         }
 
         // Auto-open if already on my-teams path
@@ -561,7 +561,7 @@ export default function Sidebar({ user }) {
         }
       }
     } catch (err) {
-      console.error('Sidebar mechanic fetch error:', err)
+      console.error('Sidebar mechanic fetch error:')
     }
   }
 

@@ -144,7 +144,7 @@ export async function PUT(request, context) {
 
     if (updateError) {
       console.error('❌ Update error:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     console.log('✅ Update successful!')
@@ -185,7 +185,7 @@ export async function DELETE(request, context) {
 
     if (deleteError) {
       console.error('❌ Delete error:', deleteError)
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     console.log('✅ Delete successful!')
@@ -235,7 +235,7 @@ export async function PATCH(request, context) {
       .single()
 
     if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     const newStock = currentItem.stock + parseInt(adjustment)
@@ -266,7 +266,7 @@ export async function PATCH(request, context) {
 
     if (updateError) {
       console.error('❌ Stock update error:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     console.log(`✅ Stock adjusted: ${currentItem.stock} → ${newStock} (${adjustment > 0 ? '+' : ''}${adjustment})`)

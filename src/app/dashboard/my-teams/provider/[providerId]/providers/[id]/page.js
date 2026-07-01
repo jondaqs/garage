@@ -118,7 +118,7 @@ export default function MemberProviderPeerDetailPage() {
         .order('created_at', { ascending: false })
       setReviews(revData || [])
     } catch (e) {
-      console.error(e)
+      console.error('Operation failed')
     } finally {
       setLoading(false)
     }
@@ -137,7 +137,7 @@ export default function MemberProviderPeerDetailPage() {
       if (error) throw error
       router.push(`/dashboard/my-teams/provider/${ownProviderId}/peer-chat?conversation=${convId}`)
     } catch (err) {
-      console.error('start_or_get_peer_conversation failed:', err)
+      console.error('start_or_get_peer_conversation failed:')
       alert(err.message || 'Could not start chat')
       setStartingChat(false)
     }

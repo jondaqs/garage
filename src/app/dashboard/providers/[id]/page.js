@@ -81,7 +81,7 @@ export default function ProviderDetailPage() {
         .order('created_at', { ascending: false })
       setReviews(revData || [])
     } catch (e) {
-      console.error(e)
+      console.error('Operation failed')
     } finally {
       setLoading(false)
     }

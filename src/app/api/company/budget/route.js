@@ -40,7 +40,7 @@ async function requireAuth(supabase) {
 // RPC payloads are always { success: bool, error?: text, ... }.
 function rpcResponse(data, rpcError, defaultStatus = 200) {
   if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
   if (!data?.success) {
     // Map common business errors to clean HTTP statuses.

@@ -43,7 +43,7 @@ export default function AdminLayout({ children }) {
         return
       }
     } catch (error) {
-      console.error('Error checking admin:', error)
+      console.error('Error checking admin:')
       router.push('/auth/login')
     } finally {
       setLoading(false)

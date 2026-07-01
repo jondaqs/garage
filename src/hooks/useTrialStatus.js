@@ -150,7 +150,7 @@ export default function useTrialStatus() {
         access = false
       }
     } catch (err) {
-      console.error('useTrialStatus error:', err)
+      console.error('useTrialStatus error:')
       access = false // deny on error
     } finally {
       setCanAccessPremium(access)

@@ -88,7 +88,7 @@ export default function AdminDashboard() {
       setPendingCompanies(recentPendingCompanies || [])
 
     } catch (error) {
-      console.error('Error loading dashboard:', error)
+      console.error('Error loading dashboard:')
     } finally {
       setLoading(false)
     }
@@ -346,7 +346,7 @@ function EmailQueueWidget() {
       const data = await response.json()
       if (response.ok) setStats(data.statistics)
     } catch (error) {
-      console.error('Load email stats error:', error)
+      console.error('Load email stats error:')
     } finally {
       setLoading(false)
     }

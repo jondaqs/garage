@@ -52,7 +52,7 @@ export default function MemberBookingDetailPage() {
       if (fetchError) throw fetchError
       setBooking(data)
     } catch (err) {
-      console.error(err)
+      console.error('Operation failed')
       setError('Failed to load booking')
     } finally {
       setLoading(false)
@@ -73,7 +73,7 @@ export default function MemberBookingDetailPage() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to cancel')
       loadBooking()
     } catch (err) {
-      console.error(err)
+      console.error('Operation failed')
       setError('Failed to cancel booking: ' + err.message)
     } finally {
       setCancelling(false)

@@ -99,7 +99,7 @@ export default function ManageBookingPage() {
         }),
       }).then(r => r.json())
         .then(d => console.log('[acceptBooking] notify result:', d))
-        .catch(e => console.error('[acceptBooking] notify failed (non-fatal):', e.message))
+        .catch(e => console.error('[acceptBooking] notify failed (non-fatal):'))
 
       setSuccessMsg(`Work order ${data.work_order_number} created! Redirecting...`)
       await loadBooking()

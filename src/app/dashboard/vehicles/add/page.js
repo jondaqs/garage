@@ -54,7 +54,7 @@ export default function AddVehiclePage() {
           setLimitInfo(data)
         }
       } catch (err) {
-        console.error('Limit check error:', err)
+        console.error('Limit check error:')
       } finally {
         setLimitLoading(false)
       }
@@ -138,7 +138,7 @@ export default function AddVehiclePage() {
       setTimeout(() => router.push('/dashboard'), redirectDelay)
 
     } catch (err) {
-      console.error('Add vehicle error:', err)
+      console.error('Add vehicle error:')
       setError(err?.message || 'Failed to add vehicle. Please try again.')
     } finally {
       setLoading(false)

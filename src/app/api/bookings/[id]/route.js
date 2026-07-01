@@ -180,7 +180,7 @@ export async function PATCH(request, { params }) {
     const { error: upErr } = await supabase.from('bookings').update(patch).eq('id', id)
     if (upErr) {
       console.error(`${t} [7] booking update failed:`, upErr.message)
-      return NextResponse.json({ error: upErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
     console.log(`${t} [7] booking updated to "${statusCode}"`)
 

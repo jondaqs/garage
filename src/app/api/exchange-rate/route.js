@@ -36,7 +36,7 @@ async function resolveRate(supabase, baseId, quoteId) {
     .from('currencies')
     .select('id, code')
     .in('id', [baseId, quoteId])
-  if (lookupErr) return { error: lookupErr.message, status: 500 }
+  if (lookupErr) return { error: 'Exchange rate lookup failed', status: 500 }
 
   const baseRow  = rows?.find(r => r.id === baseId)
   const quoteRow = rows?.find(r => r.id === quoteId)
@@ -49,7 +49,7 @@ async function resolveRate(supabase, baseId, quoteId) {
     p_base_currency_id:  baseId,
     p_quote_currency_id: quoteId,
   })
-  if (rpcErr) return { error: rpcErr.message, status: 500 }
+  if (rpcErr) return { error: 'Exchange rate update failed', status: 500 }
   if (cached != null) {
     return { rate: Number(cached), source: 'cached', cached_at: new Date().toISOString() }
   }
@@ -70,7 +70,7 @@ async function resolveRate(supabase, baseId, quoteId) {
       return { error: `Rate provider returned no usable rate (${baseRow.code}->${quoteRow.code})`, status: 502 }
     }
   } catch (e) {
-    return { error: `Rate provider unreachable: ${e.message}`, status: 502 }
+    return { error: 'Rate provider unreachable', status: 502 }
   }
 
   // 4. Persist (best-effort; if the upsert fails we still return the live rate).

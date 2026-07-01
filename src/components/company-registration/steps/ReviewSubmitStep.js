@@ -40,7 +40,7 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       router.push('/company/dashboard')
       
     } catch (err) {
-      console.error('Submit error:', err)
+      console.error('Submit error:')
       setError(err.message)
       setSubmitting(false)
     }

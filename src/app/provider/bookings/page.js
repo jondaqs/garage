@@ -51,7 +51,7 @@ export default function ProviderBookingsPage() {
       if (error) throw error
       setBookings(data || [])
     } catch (error) {
-      console.error('Error loading bookings:', error)
+      console.error('Error loading bookings:')
     } finally {
       setLoading(false)
     }

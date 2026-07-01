@@ -142,7 +142,7 @@ export default function DashboardPage() {
         }
 
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('Error fetching data:')
       } finally {
         setLoading(false)
       }
@@ -173,7 +173,7 @@ export default function DashboardPage() {
         (data ?? []).filter(row => row.vehicle && row.vehicle.is_active === false)
       )
     } catch (err) {
-      console.error('Inactive fetch error:', err)
+      console.error('Inactive fetch error:')
       setInactiveVehicles([])
     } finally {
       setLoadingInactive(false)

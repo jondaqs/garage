@@ -113,7 +113,7 @@ export default function ProviderRegistrationFlow() {
         }
       }
     } catch (error) {
-      console.error('Error checking user:', error)
+      console.error('Error checking user:')
     } finally {
       setLoading(false)
     }

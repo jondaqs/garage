@@ -46,7 +46,7 @@ export default function TwoFactorSetup({ accentColor = 'blue' }) {
       const verified = data?.totp?.find(f => f.status === 'verified') || null
       setFactor(verified)
     } catch (e) {
-      console.error('Failed to load MFA factors:', e)
+      console.error('Failed to load MFA factors:')
     } finally {
       setLoading(false)
     }

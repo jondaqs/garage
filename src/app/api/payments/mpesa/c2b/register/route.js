@@ -86,6 +86,6 @@ export async function POST(request) {
     }, { status: 502 })
   } catch (err) {
     console.error('[c2b-register] error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

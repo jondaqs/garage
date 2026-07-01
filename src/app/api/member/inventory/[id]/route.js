@@ -116,7 +116,7 @@ export async function PUT(request, context) {
 
     if (updateErr) {
       console.error('Member inventory PUT error:', updateErr)
-      return NextResponse.json({ error: updateErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, item: updated })
@@ -143,7 +143,7 @@ export async function DELETE(request, context) {
 
     if (delErr) {
       console.error('Member inventory DELETE error:', delErr)
-      return NextResponse.json({ error: delErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

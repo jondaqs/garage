@@ -88,7 +88,7 @@ export default function SupportTicketModal({ isOpen, onClose, onSubmitted, supab
           subscriber_type: res.subscriber_type,
           entity_name: res.entity_name,
         }),
-      }).catch(e => console.warn('[support-notify] fire-and-forget failed:', e.message))
+      }).catch(e => console.warn('[support-notify] fire-and-forget failed:'))
     } catch (e) {
       setError(e.message || 'Failed to submit ticket')
     } finally {

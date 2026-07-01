@@ -194,6 +194,6 @@ export async function POST(request) {
     // Notifications are a side effect — never surface a 500 here, because the
     // user has already successfully sent their message. Returning 200 with a
     // delivered:false flag keeps the browser console clean.
-    return NextResponse.json({ success: false, delivered: false, error: err.message }, { status: 200 })
+    return NextResponse.json({ success: false, delivered: false, error: 'Internal server error' }, { status: 200 })
   }
 }

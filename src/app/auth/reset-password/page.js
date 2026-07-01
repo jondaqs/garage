@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
           setMfaVerified(true)
         }
       } catch (e) {
-        console.error('Session check failed:', e)
+        console.error('Session check failed:')
       } finally {
         setCheckingSession(false)
       }

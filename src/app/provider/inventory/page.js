@@ -48,7 +48,7 @@ export default function ProviderInventoryPage() {
         alert(data.error || 'Failed to load inventory')
       }
     } catch (error) {
-      console.error('Load inventory error:', error)
+      console.error('Load inventory error:')
       alert('Failed to load inventory')
     } finally {
       setLoading(false)
@@ -71,7 +71,7 @@ export default function ProviderInventoryPage() {
         alert(data.error || 'Failed to delete item')
       }
     } catch (error) {
-      console.error('Delete error:', error)
+      console.error('Delete error:')
       alert('Failed to delete item')
     }
   }

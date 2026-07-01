@@ -109,7 +109,7 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
       console.log('File uploaded successfully:', fileName)
 
     } catch (error) {
-      console.error('Upload error:', error)
+      console.error('Upload error:')
       setErrors(prev => ({ ...prev, [docType]: error.message }))
     } finally {
       setUploading(null)
@@ -147,7 +147,7 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
       setDocuments(prev => prev.filter(d => d.type !== docType))
 
     } catch (error) {
-      console.error('Delete error:', error)
+      console.error('Delete error:')
       alert('Failed to remove document. Please try again.')
     }
   }

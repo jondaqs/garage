@@ -77,7 +77,7 @@ export default function MyTeamsPage() {
       }))
 
       if (error) {
-        console.error('Error loading teams:', error)
+        console.error('Error loading teams:')
         return
       }
 
@@ -103,7 +103,7 @@ export default function MyTeamsPage() {
       setTeams(teamsWithShops)
 
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:')
     } finally {
       setLoading(false)
     }
@@ -124,7 +124,7 @@ export default function MyTeamsPage() {
         .gt('expires_at', new Date().toISOString())
         .order('invited_at', { ascending: false })
       setPendingInvitations(data || [])
-    } catch (e) { console.error('loadPendingInvitations error:', e) }
+    } catch (e) { console.error('loadPendingInvitations error:') }
   }
 
   const respondToInvitation = async (invitationId, action) => {
@@ -161,7 +161,7 @@ export default function MyTeamsPage() {
         .eq('id', mechanicId)
 
       if (error) {
-        console.error('Error leaving team:', error)
+        console.error('Error leaving team:')
         alert('Failed to leave team. Please try again.')
         return
       }
@@ -170,7 +170,7 @@ export default function MyTeamsPage() {
       await loadTeams()
 
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:')
       alert('Failed to leave team. Please try again.')
     } finally {
       setLeaving(null)
@@ -203,7 +203,7 @@ export default function MyTeamsPage() {
         .eq('id', mechanicId)
 
       if (error) {
-        console.error('Update error:', error)
+        console.error('Update error:')
         alert('Failed to update details')
         return
       }
@@ -214,7 +214,7 @@ export default function MyTeamsPage() {
       await loadTeams()
 
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:')
       alert('Failed to update details')
     }
   }

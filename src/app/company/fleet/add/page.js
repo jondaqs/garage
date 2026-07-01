@@ -162,7 +162,7 @@ export default function AddFleetVehiclePage() {
       setTimeout(() => router.push('/company/dashboard?tab=fleet'), redirectDelay)
 
     } catch (err) {
-      console.error('Add fleet vehicle error:', err)
+      console.error('Add fleet vehicle error:')
       setError(err?.message || 'Failed to add vehicle. Please try again.')
     } finally {
       setLoading(false)

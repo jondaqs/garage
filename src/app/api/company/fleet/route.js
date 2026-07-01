@@ -73,7 +73,7 @@ export async function GET(request) {
 
     if (fleetError) {
       console.error('❌ Fleet fetch error:', fleetError)
-      return NextResponse.json({ error: fleetError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -84,7 +84,7 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('❌ Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -186,7 +186,7 @@ export async function POST(request) {
 
     if (vehicleError) {
       console.error('❌ Vehicle creation error:', vehicleError)
-      return NextResponse.json({ error: `Failed to create vehicle: ${vehicleError.message}` }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create vehicle' }, { status: 500 })
     }
 
     // RLS on vehicle_ownership requires owner_user_id to match auth user
@@ -202,7 +202,7 @@ export async function POST(request) {
     if (ownershipError) {
       console.error('❌ Ownership creation error:', ownershipError)
       await supabase.from('vehicles').delete().eq('id', vehicle[0].id)
-      return NextResponse.json({ error: `Failed to assign ownership: ${ownershipError.message}` }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to assign ownership' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -215,6 +215,6 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('❌ Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

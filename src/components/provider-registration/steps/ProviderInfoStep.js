@@ -109,7 +109,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
       console.log('Calling nextStep...')
       nextStep()
     } catch (error) {
-      console.error('Error during form submission:', error)
+      console.error('Error during form submission:')
       alert('An error occurred. Please try again.')
     } finally {
       setIsSubmitting(false)

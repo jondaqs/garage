@@ -130,7 +130,7 @@ export default function NewBookingPage() {
       }))
 
     } catch (error) {
-      console.error('Error loading booking data:', error)
+      console.error('Error loading booking data:')
     } finally {
       setLoading(false)
     }
@@ -209,7 +209,7 @@ export default function NewBookingPage() {
       router.push('/dashboard/bookings')
 
     } catch (error) {
-      console.error('Error creating booking:', error)
+      console.error('Error creating booking:')
       alert('Failed to create booking: ' + error.message)
     } finally {
       setSubmitting(false)

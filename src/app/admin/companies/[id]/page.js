@@ -220,7 +220,7 @@ export default function CompanyDetailPage({ params }) {
       }
 
     } catch (error) {
-      console.error('Error fetching company details:', error)
+      console.error('Error fetching company details:')
       alert('Failed to load company details')
     } finally {
       setLoading(false)
@@ -316,7 +316,7 @@ export default function CompanyDetailPage({ params }) {
 
         }
       } catch (inviteNotifError) {
-        console.error('⚠️ Invitee notification error (non-fatal):', inviteNotifError)
+        console.error('⚠️ Invitee notification error (non-fatal):')
       }
 
       // Send approval email
@@ -329,7 +329,7 @@ export default function CompanyDetailPage({ params }) {
             companyId: company.id,
           })
         } catch (emailError) {
-          console.error('Approval email error (non-fatal):', emailError)
+          console.error('Approval email error (non-fatal):')
         }
       }
 
@@ -337,7 +337,7 @@ export default function CompanyDetailPage({ params }) {
       router.push('/admin/companies')
 
     } catch (error) {
-      console.error('Approval error:', error)
+      console.error('Approval error:')
       alert('Failed to approve company: ' + error.message)
     } finally {
       setProcessing(false)
@@ -396,7 +396,7 @@ export default function CompanyDetailPage({ params }) {
       router.push('/admin/companies')
 
     } catch (error) {
-      console.error('Rejection error:', error)
+      console.error('Rejection error:')
       alert('Failed to reject company')
     } finally {
       setProcessing(false)
@@ -457,7 +457,7 @@ export default function CompanyDetailPage({ params }) {
       fetchCompanyDetails()
 
     } catch (error) {
-      console.error('Request info error:', error)
+      console.error('Request info error:')
       alert('Failed to send information request')
     } finally {
       setProcessing(false)

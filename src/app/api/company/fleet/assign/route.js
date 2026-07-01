@@ -54,7 +54,7 @@ export async function GET() {
 
     if (rpcErr) {
       console.error('get_fleet_assignments RPC error:', rpcErr)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // The RPC returns a jsonb object with success, fleet, members, canManageFleet
@@ -100,7 +100,7 @@ export async function POST(request) {
 
     if (rpcErr) {
       console.error('assign_fleet_vehicle RPC error:', rpcErr)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     if (!data?.success) {

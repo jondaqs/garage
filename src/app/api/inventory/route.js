@@ -53,7 +53,7 @@ export async function GET() {
         .order('name', { ascending: true })
 
       if (invError) {
-        return NextResponse.json({ error: invError.message }, { status: 500 })
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
       }
 
       return NextResponse.json({ inventory, shops: [], readOnly: true })
@@ -67,7 +67,7 @@ export async function GET() {
       .order('name', { ascending: true })
 
     if (invError) {
-      return NextResponse.json({ error: invError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // Also fetch this provider's shops so the inventory form can populate
@@ -291,7 +291,7 @@ export async function POST(request) {
 
     if (createError) {
       console.error('Create inventory error:', createError)
-      return NextResponse.json({ error: createError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, item }, { status: 201 })

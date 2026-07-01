@@ -70,7 +70,7 @@ export default function AdminReportsPage() {
         loadRevenueStats(),
       ])
     } catch (err) {
-      console.error('Report load error:', err)
+      console.error('Report load error:')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -226,7 +226,7 @@ export default function AdminReportsPage() {
       .from('invoices')
       .select('total_amount, status, paid_at, issued_at, provider:service_providers_secure(currency:currencies(code, symbol))')
 
-    if (error) console.error('Invoices query failed:', error)
+    if (error) console.error('Invoices query failed:')
 
     if (!invoices || invoices.length === 0) {
       setRevenueStats([])

@@ -97,7 +97,7 @@ export async function POST(request) {
         if (inviteError) {
             console.error('Invite error:', inviteError)
             return NextResponse.json(
-                { error: 'Failed to create invitation: ' + inviteError.message },
+                { error: 'Failed to create invitation' },
                 { status: 500 }
             )
         }
@@ -143,7 +143,7 @@ export async function POST(request) {
     } catch (error) {
         console.error('💥 Unexpected error:', error)
         return NextResponse.json(
-            { error: 'Internal server error: ' + error.message },
+            { error: 'Internal server error' },
             { status: 500 }
         )
     }

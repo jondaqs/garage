@@ -191,7 +191,7 @@ export default function CompanyDashboard() {
       setRecentBookings(recentBookingsList)
 
     } catch (err) {
-      console.error('Dashboard error:', err)
+      console.error('Dashboard error:')
       setError(err.message)
     } finally {
       setLoading(false)

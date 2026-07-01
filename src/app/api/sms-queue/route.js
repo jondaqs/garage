@@ -65,7 +65,7 @@ export async function GET(request) {
     }
 
     const { data: messages, error, count } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 
     // Get counts by status
     const { data: allRows } = await sc
@@ -117,7 +117,7 @@ export async function DELETE(request) {
       .eq('status', 'sent')
       .lt('sent_at', cutoffDate.toISOString())
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 
     return NextResponse.json({
       success: true,

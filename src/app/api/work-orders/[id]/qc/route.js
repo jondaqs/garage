@@ -31,7 +31,7 @@ export async function POST(request, { params }) {
       p_notes:            notes || null,
     })
 
-    if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+    if (rpcErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
 
     return NextResponse.json({

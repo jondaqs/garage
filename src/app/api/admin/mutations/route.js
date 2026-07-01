@@ -132,7 +132,7 @@ export async function POST(request) {
 
     if (error) {
       console.error(`Admin mutation error [${table}.${operation}]:`, error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // ── 5. Auto-log admin action (skip if this IS the log table) ──────
@@ -152,7 +152,7 @@ export async function POST(request) {
   } catch (err) {
     console.error('Admin mutation error:', err)
     return NextResponse.json(
-      { error: err.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

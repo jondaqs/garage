@@ -90,7 +90,7 @@ export async function POST(request) {
 
     if (rpcErr) {
       console.error('[/api/provider/bookings] RPC error:', rpcErr)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     if (!rpcResult?.success) {

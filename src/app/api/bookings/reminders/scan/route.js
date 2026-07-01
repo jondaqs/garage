@@ -116,7 +116,7 @@ export async function POST(request) {
     const { data: candidates, error: candErr } = await q
     if (candErr) {
       console.error('[reminders/scan] candidate query:', candErr.message)
-      return NextResponse.json({ error: candErr.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // Filter precisely: booking start (date + time) within (now, now+24h]
@@ -143,7 +143,7 @@ export async function POST(request) {
       })
         .then(r => r.json().catch(() => ({})))
         .then(j => ({ id: b.id, booking_number: b.booking_number, status: j?.skipped ? 'skipped' : (j?.success ? 'fired' : 'failed'), detail: j }))
-        .catch(e => ({ id: b.id, booking_number: b.booking_number, status: 'failed', detail: { error: e.message } }))
+        .catch(e => ({ id: b.id, booking_number: b.booking_number, status: 'failed', detail: { error: 'Internal server error' } }))
     )
 
     // If the secret isn't actually configured AND we're not in service mode,
@@ -174,7 +174,7 @@ export async function POST(request) {
             detail: j,
           }
         } catch (e) {
-          return { id: b.id, booking_number: b.booking_number, status: 'failed', detail: { error: e.message } }
+          return { id: b.id, booking_number: b.booking_number, status: 'failed', detail: { error: 'Internal server error' } }
         }
       }))
     } else {

@@ -276,7 +276,7 @@ export default function CompanyReportsDashboardPage() {
       })
 
     } catch (err) {
-      console.error('Reports error:', err)
+      console.error('Reports error:')
       setError('Failed to load report data')
     } finally {
       setLoading(false)

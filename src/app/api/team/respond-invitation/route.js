@@ -79,7 +79,7 @@ export async function POST(request) {
 
       if (rpcErr) {
         console.error('accept_provider_invitation RPC error:', rpcErr)
-        return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
       }
 
       if (!result.success) {
@@ -109,6 +109,6 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Respond invitation error:', error)
-    return NextResponse.json({ error: 'Internal server error: ' + error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

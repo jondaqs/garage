@@ -316,7 +316,7 @@ export default function CompanySettingsPage() {
       // Reflect the new status locally so the pending banner appears.
       setStatus('pending_verification')
     } catch (e) {
-      console.error('owner_log_company_doc_change failed:', e)
+      console.error('owner_log_company_doc_change failed:')
       setDocError(
         'Document change saved, but the re-verification request could not be sent. ' +
         'Try saving your company profile to re-trigger admin review.'
@@ -339,7 +339,7 @@ export default function CompanySettingsPage() {
       const withType = (data || []).map(d => ({ ...d, docType: extractDocType(d.storage_path) }))
       setDocuments(withType)
     } catch (e) {
-      console.error('Documents load failed:', e)
+      console.error('Documents load failed:')
       setDocError(e.message)
     } finally {
       setDocsLoading(false)
@@ -389,7 +389,7 @@ export default function CompanySettingsPage() {
       setSuccess(`${file.name} uploaded. Submitted for re-verification.`)
       setTimeout(() => setSuccess(''), 3500)
     } catch (e) {
-      console.error('Upload failed:', e)
+      console.error('Upload failed:')
       setDocError(e.message)
     } finally {
       setUploadingType(null)
@@ -419,7 +419,7 @@ export default function CompanySettingsPage() {
       setSuccess(`${doc.file_name} deleted. Submitted for re-verification.`)
       setTimeout(() => setSuccess(''), 3500)
     } catch (e) {
-      console.error('Delete failed:', e)
+      console.error('Delete failed:')
       setDocError(e.message)
     }
   }
@@ -474,7 +474,7 @@ export default function CompanySettingsPage() {
       setSuccess(`${file.name} replaced previous file. Submitted for re-verification.`)
       setTimeout(() => setSuccess(''), 3500)
     } catch (e) {
-      console.error('Replace failed:', e)
+      console.error('Replace failed:')
       setDocError(e.message)
     } finally {
       setUploadingType(null)
@@ -489,7 +489,7 @@ export default function CompanySettingsPage() {
       if (error) throw error
       window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
     } catch (e) {
-      console.error('View failed:', e)
+      console.error('View failed:')
       setDocError(e.message)
     }
   }

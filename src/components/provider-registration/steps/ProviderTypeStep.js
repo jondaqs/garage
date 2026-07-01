@@ -35,7 +35,7 @@ export default function ProviderTypeStep({ data, updateData, nextStep, previousS
       setProviderTypes(types || [])
     } catch (err) {
       setError('Failed to load provider types')
-      console.error('Error:', err)
+      console.error('Error:')
     } finally {
       setLoading(false)
     }

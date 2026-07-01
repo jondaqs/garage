@@ -63,7 +63,7 @@ export default function BookingDetailPage() {
 
       setBooking(data)
     } catch (error) {
-      console.error('Error loading booking:', error)
+      console.error('Error loading booking:')
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -80,7 +80,7 @@ export default function BookingDetailPage() {
 
       setMessages(data || [])
     } catch (error) {
-      console.error('Error loading messages:', error)
+      console.error('Error loading messages:')
     }
   }
 
@@ -106,7 +106,7 @@ export default function BookingDetailPage() {
       setNewMessage('')
       loadMessages()
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('Error sending message:')
       alert('Failed to send message')
     } finally {
       setSending(false)
@@ -128,7 +128,7 @@ export default function BookingDetailPage() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to cancel')
       loadBooking()
     } catch (error) {
-      console.error('Error cancelling booking:', error)
+      console.error('Error cancelling booking:')
       alert('Failed to cancel: ' + error.message)
     } finally {
       setCancelling(false)

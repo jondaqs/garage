@@ -66,7 +66,7 @@ export async function GET(request) {
       .order('created_at', { ascending: true })
 
     if (membersError) {
-      return NextResponse.json({ error: membersError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     // Fetch profiles for all members using service role (bypasses RLS — server-side only)
@@ -107,7 +107,7 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('❌ Team GET error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -176,13 +176,13 @@ export async function PUT(request) {
       .select()
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, member: updated[0] })
 
   } catch (error) {
     console.error('❌ Team PUT error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
