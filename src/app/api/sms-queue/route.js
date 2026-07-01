@@ -23,15 +23,15 @@ const ADMIN_CODES = ['admin', 'platform_admin', 'moderator', 'support']
 
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) {
     return { error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
   }
 
   const { data: profile } = await supabase
     .from('user_profiles_secure')
     .select('id, user_roles(role:user_roles_lookup(code))')
-    .eq('auth_user_id', session.user.id)
+    .eq('auth_user_id', user.id)
     .single()
 
   const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
@@ -41,7 +41,7 @@ async function requireAdmin() {
     return { error: NextResponse.json({ error: 'Admin access required' }, { status: 403 }) }
   }
 
-  return { ok: true, session }
+  return { ok: true, user }
 }
 
 export async function GET(request) {

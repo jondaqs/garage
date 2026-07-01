@@ -27,15 +27,15 @@ function getServiceClient() {
 
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) {
     return { error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
   }
 
   const { data: callerProfile } = await supabase
     .from('user_profiles_secure')
     .select('id, user_roles(role:user_roles_lookup(code))')
-    .eq('auth_user_id', session.user.id)
+    .eq('auth_user_id', user.id)
     .single()
 
   const codes = callerProfile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
@@ -43,7 +43,7 @@ async function requireAdmin() {
     return { error: NextResponse.json({ error: 'Admin only' }, { status: 403 }) }
   }
 
-  return { ok: true, session }
+  return { ok: true, user }
 }
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ export async function POST(request) {
     if (action === 'save') {
       const activeProvider = body.active_provider || 'none'
 
-      const profileRes = await sc.from('user_profiles').select('id').eq('auth_user_id', auth.session.user.id).single()
+      const profileRes = await sc.from('user_profiles').select('id').eq('auth_user_id', auth.user.id).single()
 
       const { error } = await sc
         .from('platform_settings')

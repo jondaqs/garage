@@ -53,15 +53,15 @@ export async function POST(request) {
 
     // ── Verify caller is a platform admin ─────────────────────────
     const supabase = await getCallerClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    if (authErr || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const { data: callerProfile } = await supabase
       .from('user_profiles_secure')
       .select('id, user_roles(role:user_roles_lookup(code))')
-      .eq('auth_user_id', session.user.id)
+      .eq('auth_user_id', user.id)
       .single()
 
     const codes = callerProfile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
@@ -70,7 +70,7 @@ export async function POST(request) {
     }
 
     // Prevent self-ban
-    if (auth_user_id === session.user.id) {
+    if (auth_user_id === user.id) {
       return NextResponse.json({ error: 'Cannot ban your own account' }, { status: 400 })
     }
 
