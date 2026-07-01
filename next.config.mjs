@@ -10,15 +10,15 @@ const withPWA = withPWAModule({
 // ── Content Security Policy ────────────────────────────────────────────
 // Whitelists only the domains this app actually uses.
 // 'unsafe-inline' is required for Next.js inline scripts and React style objects.
-// 'unsafe-eval' can be removed in production if no runtime eval is needed —
-// test without it; if the app works, delete it for a tighter policy.
+// If something breaks after deploying, check the browser console for CSP violations —
+// it will say exactly which directive blocked which resource.
 
 const cspDirectives = [
   // Fallback for any resource type not listed below
   "default-src 'self'",
 
   // JavaScript — self + Next.js inline scripts + third-party payment/captcha
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://challenges.cloudflare.com",
+  "script-src 'self' 'unsafe-inline' https://js.paystack.co https://challenges.cloudflare.com",
 
   // CSS — self + inline styles (React style={} objects) + Google Fonts CSS
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
