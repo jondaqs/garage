@@ -21,6 +21,9 @@
  */
 
 import { sendAndQueueEmail } from './transport.js'
+import { escapeHtml } from '@/lib/validation'
+const h = (v) => escapeHtml(v ?? '')
+
 
 const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 const BRAND_NAME = 'Carfix-Connect'
@@ -65,6 +68,11 @@ export async function sendWalkInCreatedEmail(supabase, {
   createdAt,
   recipientIsOwner = false,
 }) {
+  // ── HTML-escape user-supplied values ──
+  recipientName = h(recipientName); recipientRole = h(recipientRole); vehiclePlate = h(vehiclePlate)
+  vehicleMake = h(vehicleMake); vehicleModel = h(vehicleModel); ownerInfo = h(ownerInfo)
+  initiatorName = h(initiatorName); initiatorRole = h(initiatorRole); problemDescription = h(problemDescription)
+  shopName = h(shopName); shopTown = h(shopTown)
   const workOrderUrl = `${APP_URL()}/provider/work-orders/${workOrderId}`
   const priorityLabel = priority && priority !== 'normal'
     ? priority.charAt(0).toUpperCase() + priority.slice(1)
@@ -225,6 +233,10 @@ export async function sendWalkInOwnerEmail(supabase, {
   priority,
   createdAt,
 }) {
+  // ── HTML-escape user-supplied values ──
+  customerName = h(customerName); vehiclePlate = h(vehiclePlate); vehicleMake = h(vehicleMake)
+  vehicleModel = h(vehicleModel); providerName = h(providerName); shopName = h(shopName)
+  shopTown = h(shopTown); problemDescription = h(problemDescription)
   const workOrderUrl  = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
   const priorityLabel = priority && priority !== 'normal'
     ? priority.charAt(0).toUpperCase() + priority.slice(1)
@@ -371,6 +383,11 @@ export async function sendWalkInFleetEmail(supabase, {
   priority,
   createdAt,
 }) {
+  // ── HTML-escape user-supplied values ──
+  recipientName = h(recipientName); recipientRole = h(recipientRole); companyName = h(companyName)
+  vehiclePlate = h(vehiclePlate); vehicleMake = h(vehicleMake); vehicleModel = h(vehicleModel)
+  providerName = h(providerName); shopName = h(shopName); shopTown = h(shopTown)
+  problemDescription = h(problemDescription)
   const workOrderUrl  = `${APP_URL()}/company/work-orders/${workOrderId}`
   const priorityLabel = priority && priority !== 'normal'
     ? priority.charAt(0).toUpperCase() + priority.slice(1)

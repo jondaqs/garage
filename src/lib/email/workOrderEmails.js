@@ -11,6 +11,9 @@
  */
 
 import { sendAndQueueEmail } from './transport.js'
+import { escapeHtml } from '@/lib/validation'
+const h = (v) => escapeHtml(v ?? '')
+
 
 const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 const BRAND_NAME = 'Carfix-Connect'
@@ -114,6 +117,8 @@ export async function sendEstimateApprovalEmail(supabase, {
   to, ownerName, workOrderNumber, providerName,
   vehiclePlate, estimate, workOrderId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  ownerName = h(ownerName); providerName = h(providerName); vehiclePlate = h(vehiclePlate)
   const approveUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
   const greeting   = ownerName ? `Hello ${ownerName},` : 'Hello,'
 
@@ -177,6 +182,8 @@ export async function sendEstimateApprovedEmail(supabase, {
   to, providerName, workOrderNumber, customerName, vehiclePlate,
   estimateTotal, workOrderId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  providerName = h(providerName); customerName = h(customerName); vehiclePlate = h(vehiclePlate)
   const woUrl = `${APP_URL()}/provider/work-orders/${workOrderId}`
 
   const bodyHtml = `
@@ -226,6 +233,8 @@ Open work order: ${woUrl}
 export async function sendEstimateRejectedEmail(supabase, {
   to, providerName, workOrderNumber, vehiclePlate, reason, workOrderId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  providerName = h(providerName); vehiclePlate = h(vehiclePlate); reason = h(reason)
   const woUrl = `${APP_URL()}/provider/work-orders/${workOrderId}`
 
   const bodyHtml = `
@@ -276,6 +285,8 @@ View: ${woUrl}
 export async function sendEstimateChangesRequestedEmail(supabase, {
   to, providerName, workOrderNumber, vehiclePlate, changes, workOrderId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  providerName = h(providerName); vehiclePlate = h(vehiclePlate); changes = h(changes)
   const woUrl = `${APP_URL()}/provider/work-orders/${workOrderId}`
 
   const bodyHtml = `
@@ -334,6 +345,8 @@ export async function sendWorkOrderCompletedEmail(supabase, {
   to, ownerName, workOrderNumber, providerName,
   vehiclePlate, workOrderId, providerPhone,
 }) {
+  // ── HTML-escape user-supplied values ──
+  ownerName = h(ownerName); providerName = h(providerName); vehiclePlate = h(vehiclePlate)
   const detailUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
   const greeting  = ownerName ? `Hello ${ownerName},` : 'Hello,'
 
@@ -393,6 +406,8 @@ export async function sendInvoiceEmail(supabase, {
   to, ownerName, workOrderNumber, providerName,
   invoiceNumber, totalAmount, workOrderId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  ownerName = h(ownerName); providerName = h(providerName)
   const detailUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
   const greeting  = ownerName ? `Hello ${ownerName},` : 'Hello,'
   const amount    = `KES ${Number(totalAmount || 0).toLocaleString()}`

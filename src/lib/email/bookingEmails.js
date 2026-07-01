@@ -14,6 +14,9 @@
  */
 
 import { sendAndQueueEmail } from './transport.js'
+import { escapeHtml } from '@/lib/validation'
+const h = (v) => escapeHtml(v ?? '')
+
 
 const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 const BRAND_NAME = 'Carfix-Connect'
@@ -49,6 +52,11 @@ export async function sendBookingConfirmationEmail(supabase, {
   isCompany            = false,
   isProviderInitiated  = false,    // true when the provider booked the customer
 }) {
+  // ── HTML-escape user-supplied values ──
+  customerName = h(customerName); providerName = h(providerName); shopName = h(shopName)
+  shopTown = h(shopTown); vehiclePlate = h(vehiclePlate); vehicleMake = h(vehicleMake)
+  vehicleModel = h(vehicleModel)
+  services = services.map(s => h(s))
   const bookingUrl = `${APP_URL()}/${isCompany ? 'company' : 'dashboard'}/bookings/${bookingId}`
   const servicesList = services.length > 0
     ? services.map(s => `<li style="padding:3px 0;color:#374151;">${s}</li>`).join('')
@@ -202,6 +210,11 @@ export async function sendNewBookingProviderEmail(supabase, {
   services = [],
   problemDescription,
 }) {
+  // ── HTML-escape user-supplied values ──
+  providerOwnerName = h(providerOwnerName); customerName = h(customerName); customerPhone = h(customerPhone)
+  vehiclePlate = h(vehiclePlate); vehicleMake = h(vehicleMake); vehicleModel = h(vehicleModel)
+  problemDescription = h(problemDescription)
+  services = services.map(s => h(s))
   const bookingUrl  = `${APP_URL()}/provider/bookings/${bookingId}`
   const servicesList = services.length > 0
     ? services.map(s => `<li style="padding:3px 0;color:#374151;">${s}</li>`).join('')
@@ -322,6 +335,11 @@ export async function sendBookingReminderEmail(supabase, {
   isCompany     = false,
   isForProvider = false,
 }) {
+  // ── HTML-escape user-supplied values ──
+  customerName = h(customerName); providerName = h(providerName); shopName = h(shopName)
+  shopTown = h(shopTown); vehiclePlate = h(vehiclePlate); vehicleMake = h(vehicleMake)
+  vehicleModel = h(vehicleModel)
+  services = services.map(s => h(s))
   const route = isForProvider ? 'provider' : (isCompany ? 'company' : 'dashboard')
   const bookingUrl = `${APP_URL()}/${route}/bookings/${bookingId}`
   const servicesList = services.length > 0

@@ -12,6 +12,9 @@
  */
 
 import { sendAndQueueEmail } from './transport.js'
+import { escapeHtml } from '@/lib/validation'
+const h = (v) => escapeHtml(v ?? '')
+
 
 const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
 const BRAND_NAME = 'Carfix-Connect'
@@ -36,6 +39,8 @@ export async function sendDetailsChangedAdminEmail(supabase, {
   ownerEmail,
   changesSummary = [],
 }) {
+  // ── HTML-escape user-supplied values ──
+  entityName = h(entityName); ownerName = h(ownerName); ownerEmail = h(ownerEmail)
   const adminEmail = process.env.ADMIN_EMAIL
   if (!adminEmail) {
     console.warn('⚠️  ADMIN_EMAIL not set — skipping details-change admin email')
@@ -145,6 +150,8 @@ export async function sendDetailsPendingEmail(supabase, {
   entityName,
   entityType,
 }) {
+  // ── HTML-escape user-supplied values ──
+  ownerName = h(ownerName); entityName = h(entityName)
   const typeLabel = entityType === 'company' ? 'company' : 'business'
   const dashUrl   = entityType === 'company'
     ? `${APP_URL()}/company/dashboard`

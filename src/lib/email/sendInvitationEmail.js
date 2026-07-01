@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { escapeHtml } from '@/lib/validation'
 
 export async function sendInvitationEmail(invitation_id) {
   console.log('📧 Email service called')
@@ -221,6 +222,10 @@ async function queueEmail(supabase, emailData) {
 }
 
 function generateInvitationEmail(providerName, recipientEmail, role, specialization, experienceYears) {
+  // HTML-escape user-supplied values
+  const h = (v) => escapeHtml(v ?? '')
+  providerName = h(providerName); role = h(role)
+  specialization = h(specialization); recipientEmail = h(recipientEmail)
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     'https://garage-mu-two.vercel.app'

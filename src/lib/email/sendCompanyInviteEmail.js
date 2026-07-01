@@ -41,6 +41,9 @@ export async function sendCompanyInviteEmail({
   invitationToken,
   permissions = {},
 }) {
+  // ── HTML-escape user-supplied values ──
+  inviteeName = h(inviteeName); companyName = h(companyName); inviterName = h(inviterName)
+  staffRole = h(staffRole)
   const acceptUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/company?token=${invitationToken}`
 
   const permissionsList = Object.entries(permissions)
@@ -87,6 +90,8 @@ export async function sendCompanyRegistrationEmail({
   registrationNumber,
   companyId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  ownerName = h(ownerName); companyName = h(companyName)
   const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/company/dashboard`
 
   const html = `
@@ -134,6 +139,8 @@ export async function sendAdminNewCompanyEmail({
   registrationNumber,
   companyId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  companyName = h(companyName); ownerName = h(ownerName); ownerEmail = h(ownerEmail)
   const reviewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/companies/${companyId}`
 
   const html = `
@@ -176,6 +183,8 @@ export async function sendCompanyApprovalEmail({
   companyName,
   companyId,
 }) {
+  // ── HTML-escape user-supplied values ──
+  ownerName = h(ownerName); companyName = h(companyName)
   const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/company/dashboard`
 
   const html = `
