@@ -142,8 +142,8 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </div>
       )}
 
-      {/* Desktop: table */}
-      <div className="hidden sm:block overflow-x-auto">
+      {/* Scrollable table */}
+      <div className="overflow-x-auto scroll-thin pb-1">
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
@@ -260,102 +260,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </table>
       </div>
 
-      {/* Mobile: cards */}
-      <div className="sm:hidden space-y-2">
-        {rows.map(row => {
-          const isEditing = editId === row.id
-          return (
-            <div key={row.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
-              {columns.map(c => (
-                <div key={c.key} className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide shrink-0">{c.label}</span>
-                  <div className="text-right min-w-0">
-                    {isEditing && c.editable !== false ? (
-                      c.type === 'boolean' ? (
-                        <button onClick={() => setEditData(d => ({ ...d, [c.key]: !d[c.key] }))}>
-                          {editData[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
-                        </button>
-                      ) : c.type === 'select' ? (
-                        <select value={editData[c.key] || ''} onChange={e => setEditData(d => ({ ...d, [c.key]: e.target.value }))}
-                          className={inp + ' py-1 text-xs'}>
-                          {c.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      ) : (
-                        <input type={c.type === 'number' ? 'number' : 'text'} value={editData[c.key] || ''}
-                          onChange={e => setEditData(d => ({ ...d, [c.key]: e.target.value }))}
-                          className={inp + ' py-1 text-xs max-w-[180px] ml-auto'} />
-                      )
-                    ) : (
-                      c.type === 'boolean' ? (
-                        !readOnly ? (
-                          <button onClick={() => toggleActive(row, c.key)} disabled={saving === row.id} className="disabled:opacity-50">
-                            {row[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
-                          </button>
-                        ) : (
-                          row[c.key]
-                            ? <span className="text-green-600 text-xs font-medium">Yes</span>
-                            : <span className="text-gray-400 text-xs">No</span>
-                        )
-                      ) : (
-                        <span className="text-sm text-gray-900 truncate block">{row[c.key] ?? <span className="text-gray-300">—</span>}</span>
-                      )
-                    )}
-                  </div>
-                </div>
-              ))}
-              {!readOnly && (
-                <div className="flex justify-end pt-1 border-t border-gray-100">
-                  {isEditing ? (
-                    <div className="flex gap-2">
-                      <button onClick={saveEdit} disabled={saving === row.id}
-                        className="px-3 py-1 text-xs text-white bg-green-600 rounded-md font-medium disabled:opacity-50">
-                        {saving === row.id ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={cancelEdit} className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded-md">Cancel</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => startEdit(row)} className="text-xs text-blue-600 font-medium">Edit</button>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-        {addMode && (
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-3 bg-blue-50/30 space-y-3">
-            {columns.map(c => (
-              <div key={c.key}>
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide block mb-1">{c.label}</label>
-                {c.editable === false ? (
-                  <p className="text-xs text-gray-300 italic">auto</p>
-                ) : c.type === 'boolean' ? (
-                  <button onClick={() => setNewData(d => ({ ...d, [c.key]: !d[c.key] }))}>
-                    {newData[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
-                  </button>
-                ) : c.type === 'select' ? (
-                  <select value={newData[c.key] || ''} onChange={e => setNewData(d => ({ ...d, [c.key]: e.target.value }))}
-                    className={inp + ' py-1.5 text-xs'}>
-                    {c.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                ) : (
-                  <input type={c.type === 'number' ? 'number' : 'text'} value={newData[c.key] || ''}
-                    onChange={e => setNewData(d => ({ ...d, [c.key]: e.target.value }))}
-                    placeholder={c.placeholder || c.label}
-                    className={inp + ' py-1.5 text-xs'} />
-                )}
-              </div>
-            ))}
-            <div className="flex gap-2 pt-1">
-              <button onClick={saveNew} disabled={saving === 'new'}
-                className="px-4 py-1.5 text-xs text-white bg-blue-600 rounded-md font-medium disabled:opacity-50">
-                {saving === 'new' ? 'Saving...' : 'Save'}
-              </button>
-              <button onClick={() => { setAddMode(false); setError('') }}
-                className="px-3 py-1.5 text-xs text-gray-500 bg-gray-100 rounded-md">Cancel</button>
-            </div>
-          </div>
-        )}
-      </div>
+
 
       {!readOnly && !addMode && (
         <button onClick={startAdd}
@@ -377,13 +282,35 @@ export default function AdminSettingsPage() {
 
   return (
     <div>
+      {/* Visible thin scrollbars */}
+      <style jsx global>{`
+        .scroll-thin::-webkit-scrollbar {
+          height: 6px;
+        }
+        .scroll-thin::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 3px;
+        }
+        .scroll-thin::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+        .scroll-thin::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+        .scroll-thin {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+      `}</style>
+
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-500 text-sm mt-1">Manage platform lookup data and configuration</p>
       </div>
 
       {/* Tabs — scrollable on mobile */}
-      <div className="overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-6">
+      <div className="overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-6 scroll-thin">
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl min-w-max sm:min-w-0 sm:flex-wrap">
           {TABS.map(t => {
             const Icon = t.icon
@@ -883,7 +810,7 @@ function MpesaSetupEditor() {
 
       {/* Env vars reference */}
       <Section title="Required Environment Variables" description="Set these in Vercel → Settings → Environment Variables. Redeploy after any change.">
-        <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto">
+        <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto scroll-thin pb-2">
           <p>MPESA_ENV=<span className="text-gray-500">{environment}</span></p>
           <p>MPESA_CONSUMER_KEY=<span className="text-gray-500">{consumerKey || 'your_consumer_key'}</span></p>
           <p>MPESA_CONSUMER_SECRET=<span className="text-gray-500">your_consumer_secret</span></p>
@@ -1131,7 +1058,7 @@ function SmsSetupEditor() {
       {/* ── Required Env Vars ── */}
       {activeProvider !== 'none' && (
         <Section title="Required Environment Variables" description="Set these in Vercel → Settings → Environment Variables. Redeploy after any change.">
-          <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto">
+          <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto scroll-thin pb-2">
             {activeProvider === 'africastalking' && (
               <>
                 <p>AT_API_KEY=<span className="text-gray-500">your_api_key_here</span></p>
