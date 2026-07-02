@@ -48,7 +48,7 @@ async function requireAdmin() {
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request) {
   const limited = adminLimiter.check(request)
   if (limited) return limited
 

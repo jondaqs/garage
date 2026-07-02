@@ -44,7 +44,7 @@ async function resolveCompanyId(supabase) {
 }
 
 // ── GET: fleet with assignments (via RPC) ───────────────────────────────────
-export async function GET() {
+export async function GET(request) {
   const limited = writeLimiter.check(request)
   if (limited) return limited
 

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { writeLimiter } from '@/lib/rateLimiters'
 
-export async function GET() {
+export async function GET(request) {
   const limited = writeLimiter.check(request)
   if (limited) return limited
 
