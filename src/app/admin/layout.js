@@ -12,6 +12,7 @@ export default function AdminLayout({ children }) {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [avatarUrl, setAvatarUrl] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     checkAdmin()
@@ -60,9 +61,9 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AdminSidebar />
+      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:ml-64">
-        <AdminHeader user={user} avatarUrl={avatarUrl} />
+        <AdminHeader user={user} avatarUrl={avatarUrl} onToggleSidebar={() => setSidebarOpen(o => !o)} />
         <main className="p-3 sm:p-6">{children}</main>
       </div>
     </div>

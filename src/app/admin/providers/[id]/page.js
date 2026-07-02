@@ -200,7 +200,7 @@ export default function ProviderDetailPage({ params }) {
           .order('created_at', { ascending: false })
 
         if (docsErr) {
-          console.error('Documents query failed:')
+          console.error('Documents query failed:', docsErr)
         }
 
         const docsWithUrls = await Promise.all(
@@ -287,7 +287,7 @@ export default function ProviderDetailPage({ params }) {
       }
 
     } catch (err) {
-      console.error('Error loading provider:')
+      console.error('Error loading provider:', err)
     } finally {
       setLoading(false)
     }
@@ -346,7 +346,7 @@ export default function ProviderDetailPage({ params }) {
         p_registration_verified: verChecks.registration_verified,
         p_location_verified:     verChecks.location_verified,
       })
-      if (rpcErr) console.error('Verification RPC error (non-blocking):')
+      if (rpcErr) console.error('Verification RPC error (non-blocking):', rpcErr)
       if (rpcResult && !rpcResult.success) console.error('Verification RPC failure:', rpcResult.error)
 
       await supabase.from('admin_action_logs').insert({
@@ -373,7 +373,7 @@ export default function ProviderDetailPage({ params }) {
       alert('Provider approved successfully')
       router.push('/admin/providers')
     } catch (err) {
-      console.error('Approval error:')
+      console.error('Approval error:', err)
       alert('Failed to approve provider: ' + err.message)
     } finally {
       setProcessing(false)
@@ -426,7 +426,7 @@ export default function ProviderDetailPage({ params }) {
       alert('Provider rejected')
       router.push('/admin/providers')
     } catch (err) {
-      console.error('Rejection error:')
+      console.error('Rejection error:', err)
       alert('Failed to reject provider')
     } finally {
       setProcessing(false)
@@ -468,7 +468,7 @@ export default function ProviderDetailPage({ params }) {
       setShowInfoModal(false)
       setAdditionalInfo('')
     } catch (err) {
-      console.error('Request info error:')
+      console.error('Request info error:', err)
       alert('Failed to send information request')
     } finally {
       setProcessing(false)

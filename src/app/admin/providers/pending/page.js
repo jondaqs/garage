@@ -58,7 +58,7 @@ export default function PendingProvidersPage() {
 
       setProviders(data || [])
     } catch (error) {
-      console.error('Error loading providers:')
+      console.error('Error loading providers:', error)
     } finally {
       setLoading(false)
     }
@@ -87,7 +87,7 @@ export default function PendingProvidersPage() {
       loadPendingProviders()
       alert('Provider approved successfully!')
     } catch (error) {
-      console.error('Error approving provider:')
+      console.error('Error approving provider:', error)
       alert('Failed to approve provider')
     }
   }
@@ -132,7 +132,7 @@ export default function PendingProvidersPage() {
       loadPendingProviders()
       alert('Provider rejected')
     } catch (error) {
-      console.error('Error rejecting provider:')
+      console.error('Error rejecting provider:', error)
       alert('Failed to reject provider')
     }
   }

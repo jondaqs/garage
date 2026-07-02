@@ -68,7 +68,8 @@ export default function PendingProvidersPage() {
       const merged = (pendingRows || []).map(r => ({ ...r, ...(detailsById[r.service_provider_id] || {}) }))
       setProviders(merged)
     } catch (err) {
-      console.error('Error loading providers:')
+      console.error('Error loading providers:', err?.message || err)
+      setLoadError(err?.message || 'Failed to load providers')
     } finally {
       setLoading(false)
     }
@@ -107,6 +108,11 @@ export default function PendingProvidersPage() {
 
   return (
     <div>
+      {loadError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <strong>Error:</strong> {loadError}
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pending Provider Registrations</h1>

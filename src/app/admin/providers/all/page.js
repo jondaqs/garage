@@ -174,7 +174,8 @@ export default function AllProvidersPage() {
       setPendingDiffs(Object.fromEntries((pending || []).map(r => [r.service_provider_id, r])))
       if (page === 1 && statusFilter === 'all' && !debouncedSearch) setTotalAll(count)
     } catch (err) {
-      console.error('Error loading providers:')
+      console.error('Error loading providers:', err?.message || err)
+      setLoadError(err?.message || 'Failed to load providers')
     } finally {
       setLoading(false)
     }
@@ -210,7 +211,7 @@ export default function AllProvidersPage() {
 
       await loadProviders()
     } catch (err) {
-      console.error(`${action} failed:`)
+      console.error(`${action} failed:`, err)
       alert(`Failed to ${action} provider: ${err.message}`)
     } finally {
       setProcessing(null)
@@ -256,6 +257,11 @@ export default function AllProvidersPage() {
 
   return (
     <div>
+      {loadError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <strong>Error:</strong> {loadError}
+        </div>
+      )}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">All Providers</h1>
