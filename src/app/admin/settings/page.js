@@ -142,7 +142,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </div>
       )}
 
-      {/* ── Desktop table ── */}
+      {/* Desktop: table */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -219,8 +219,6 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
                 </tr>
               )
             })}
-
-            {/* Add new row — desktop */}
             {addMode && (
               <tr className="bg-blue-50/50">
                 {columns.map(c => (
@@ -262,7 +260,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </table>
       </div>
 
-      {/* ── Mobile cards ── */}
+      {/* Mobile: cards */}
       <div className="sm:hidden space-y-2">
         {rows.map(row => {
           const isEditing = editId === row.id
@@ -270,8 +268,8 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
             <div key={row.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
               {columns.map(c => (
                 <div key={c.key} className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex-shrink-0">{c.label}</span>
-                  <div className="text-right">
+                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide shrink-0">{c.label}</span>
+                  <div className="text-right min-w-0">
                     {isEditing && c.editable !== false ? (
                       c.type === 'boolean' ? (
                         <button onClick={() => setEditData(d => ({ ...d, [c.key]: !d[c.key] }))}>
@@ -285,7 +283,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
                       ) : (
                         <input type={c.type === 'number' ? 'number' : 'text'} value={editData[c.key] || ''}
                           onChange={e => setEditData(d => ({ ...d, [c.key]: e.target.value }))}
-                          className={inp + ' py-1 text-xs w-40'} />
+                          className={inp + ' py-1 text-xs max-w-[180px] ml-auto'} />
                       )
                     ) : (
                       c.type === 'boolean' ? (
@@ -299,7 +297,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
                             : <span className="text-gray-400 text-xs">No</span>
                         )
                       ) : (
-                        <span className="text-sm text-gray-900">{row[c.key] ?? <span className="text-gray-300">—</span>}</span>
+                        <span className="text-sm text-gray-900 truncate block">{row[c.key] ?? <span className="text-gray-300">—</span>}</span>
                       )
                     )}
                   </div>
@@ -310,8 +308,8 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
                   {isEditing ? (
                     <div className="flex gap-2">
                       <button onClick={saveEdit} disabled={saving === row.id}
-                        className="px-3 py-1 text-xs text-green-700 bg-green-50 rounded-md font-medium disabled:opacity-50">
-                        {saving === row.id ? <Loader2 size={12} className="animate-spin inline" /> : 'Save'}
+                        className="px-3 py-1 text-xs text-white bg-green-600 rounded-md font-medium disabled:opacity-50">
+                        {saving === row.id ? 'Saving...' : 'Save'}
                       </button>
                       <button onClick={cancelEdit} className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded-md">Cancel</button>
                     </div>
@@ -323,36 +321,34 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
             </div>
           )
         })}
-
-        {/* Add new — mobile */}
         {addMode && (
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-3 bg-blue-50/30 space-y-2">
+          <div className="border-2 border-dashed border-blue-300 rounded-lg p-3 bg-blue-50/30 space-y-3">
             {columns.map(c => (
               <div key={c.key}>
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{c.label}</label>
+                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide block mb-1">{c.label}</label>
                 {c.editable === false ? (
                   <p className="text-xs text-gray-300 italic">auto</p>
                 ) : c.type === 'boolean' ? (
-                  <button onClick={() => setNewData(d => ({ ...d, [c.key]: !d[c.key] }))} className="block mt-0.5">
+                  <button onClick={() => setNewData(d => ({ ...d, [c.key]: !d[c.key] }))}>
                     {newData[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
                   </button>
                 ) : c.type === 'select' ? (
                   <select value={newData[c.key] || ''} onChange={e => setNewData(d => ({ ...d, [c.key]: e.target.value }))}
-                    className={inp + ' py-1.5 mt-0.5 text-xs'}>
+                    className={inp + ' py-1.5 text-xs'}>
                     {c.options?.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 ) : (
                   <input type={c.type === 'number' ? 'number' : 'text'} value={newData[c.key] || ''}
                     onChange={e => setNewData(d => ({ ...d, [c.key]: e.target.value }))}
                     placeholder={c.placeholder || c.label}
-                    className={inp + ' py-1.5 mt-0.5 text-xs'} />
+                    className={inp + ' py-1.5 text-xs'} />
                 )}
               </div>
             ))}
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-1">
               <button onClick={saveNew} disabled={saving === 'new'}
-                className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded-md font-medium disabled:opacity-50">
-                {saving === 'new' ? <Loader2 size={12} className="animate-spin inline" /> : 'Save'}
+                className="px-4 py-1.5 text-xs text-white bg-blue-600 rounded-md font-medium disabled:opacity-50">
+                {saving === 'new' ? 'Saving...' : 'Save'}
               </button>
               <button onClick={() => { setAddMode(false); setError('') }}
                 className="px-3 py-1.5 text-xs text-gray-500 bg-gray-100 rounded-md">Cancel</button>
@@ -386,15 +382,15 @@ export default function AdminSettingsPage() {
         <p className="text-gray-500 text-sm mt-1">Manage platform lookup data and configuration</p>
       </div>
 
-      {/* Tabs — scrollable on mobile, wraps on desktop */}
-      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-4 sm:mb-6 scrollbar-hide">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl sm:flex-wrap min-w-max sm:min-w-0">
+      {/* Tabs — scrollable on mobile */}
+      <div className="overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-6">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl min-w-max sm:min-w-0 sm:flex-wrap">
           {TABS.map(t => {
             const Icon = t.icon
             return (
               <button key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap sm:flex-1 sm:min-w-fit ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap sm:flex-1 sm:min-w-fit ${
                   tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>
                 <Icon size={14} /> {t.label}
@@ -762,7 +758,7 @@ function MpesaSetupEditor() {
             <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_PASSKEY</p>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <button onClick={testConnection} disabled={testing}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
             {testing ? <Loader2 size={14} className="animate-spin" /> : <Wifi size={14} />}
@@ -902,7 +898,7 @@ function MpesaSetupEditor() {
       {/* Save — only environment + certs */}
       <div className="flex justify-end">
         <button onClick={save} disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Environment & Certificates
         </button>
       </div>
