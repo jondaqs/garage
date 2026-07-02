@@ -142,8 +142,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </div>
       )}
 
-      {/* Scrollable table */}
-      <div className="overflow-x-auto scroll-thin pb-1">
+      <div className="overflow-x-auto rounded-xl border border-gray-200">
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
@@ -219,6 +218,8 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
                 </tr>
               )
             })}
+
+            {/* Add new row */}
             {addMode && (
               <tr className="bg-blue-50/50">
                 {columns.map(c => (
@@ -260,8 +261,6 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </table>
       </div>
 
-
-
       {!readOnly && !addMode && (
         <button onClick={startAdd}
           className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium">
@@ -282,45 +281,23 @@ export default function AdminSettingsPage() {
 
   return (
     <div>
-      {/* Visible thin scrollbars */}
-      <style jsx global>{`
-        .scroll-thin::-webkit-scrollbar {
-          height: 6px;
-        }
-        .scroll-thin::-webkit-scrollbar-track {
-          background: #f1f5f9;
-          border-radius: 3px;
-        }
-        .scroll-thin::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 3px;
-        }
-        .scroll-thin::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
-        .scroll-thin {
-          scrollbar-width: thin;
-          scrollbar-color: #cbd5e1 #f1f5f9;
-        }
-      `}</style>
-
-      <div className="mb-4 sm:mb-6">
+      <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-500 text-sm mt-1">Manage platform lookup data and configuration</p>
       </div>
 
-      {/* Tabs — scrollable on mobile */}
-      <div className="overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-6 scroll-thin">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl min-w-max sm:min-w-0 sm:flex-wrap">
+      {/* Tabs */}
+      <div className="overflow-x-auto -mx-4 px-4 mb-6">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit min-w-full">
           {TABS.map(t => {
             const Icon = t.icon
             return (
               <button key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap sm:flex-1 sm:min-w-fit ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                   tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>
-                <Icon size={14} /> {t.label}
+                <Icon size={14} /> <span className="hidden sm:inline">{t.label}</span>
               </button>
             )
           })}
@@ -685,7 +662,7 @@ function MpesaSetupEditor() {
             <p className="text-[10px] text-gray-400 mt-1">Env: MPESA_PASSKEY</p>
           </div>
         </div>
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
           <button onClick={testConnection} disabled={testing}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
             {testing ? <Loader2 size={14} className="animate-spin" /> : <Wifi size={14} />}
@@ -810,7 +787,7 @@ function MpesaSetupEditor() {
 
       {/* Env vars reference */}
       <Section title="Required Environment Variables" description="Set these in Vercel → Settings → Environment Variables. Redeploy after any change.">
-        <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto scroll-thin pb-2">
+        <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto">
           <p>MPESA_ENV=<span className="text-gray-500">{environment}</span></p>
           <p>MPESA_CONSUMER_KEY=<span className="text-gray-500">{consumerKey || 'your_consumer_key'}</span></p>
           <p>MPESA_CONSUMER_SECRET=<span className="text-gray-500">your_consumer_secret</span></p>
@@ -1042,7 +1019,7 @@ function SmsSetupEditor() {
               <p className="text-[10px] text-gray-400 mt-1">Env: CELCOM_SENDER_ID · ~KES 6,500/network to register</p>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
             <button onClick={checkBalance} disabled={balanceLoading || !envStatus.CELCOM_API_KEY}
               className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 disabled:opacity-50 border border-gray-200">
               {balanceLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
@@ -1058,7 +1035,7 @@ function SmsSetupEditor() {
       {/* ── Required Env Vars ── */}
       {activeProvider !== 'none' && (
         <Section title="Required Environment Variables" description="Set these in Vercel → Settings → Environment Variables. Redeploy after any change.">
-          <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto scroll-thin pb-2">
+          <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-green-400 space-y-1 overflow-x-auto">
             {activeProvider === 'africastalking' && (
               <>
                 <p>AT_API_KEY=<span className="text-gray-500">your_api_key_here</span></p>
@@ -1348,10 +1325,12 @@ function PaymentAccountsEditor({ supabase }) {
 
 function Section({ title, description, children }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-5">
-      <div className="mb-3 sm:mb-4">
-        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
+      <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+          {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        </div>
       </div>
       {children}
     </div>
