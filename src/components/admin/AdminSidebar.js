@@ -9,7 +9,7 @@ import {
   MessageSquareText,
   ChevronDown, ChevronRight, Car, Search,
   Calendar, ClipboardList, Wallet, History,
-  ExternalLink,
+  ExternalLink, X,
   CreditCard,
   LifeBuoy,
   Megaphone,
@@ -17,7 +17,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { ADMIN_ROLES, PERMISSIONS, ADMIN_ROLE_CODES, getHighestAdminRole } from '@/lib/admin/permissions'
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ isOpen = false, onClose = () => {} }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -44,7 +44,7 @@ export default function AdminSidebar() {
       const codes = profile?.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
       setAdminRole(getHighestAdminRole(codes))
     } catch (err) {
-      console.error('Error loading admin role:')
+      console.error('Error loading admin role:', err)
     }
   }
 
@@ -63,7 +63,7 @@ export default function AdminSidebar() {
       setPendingProviders(providerCount || 0)
       setPendingCompanies(companyCount || 0)
     } catch (error) {
-      console.error('Error loading badge counts:')
+      console.error('Error loading badge counts:', error)
     }
   }
 
@@ -94,23 +94,50 @@ export default function AdminSidebar() {
   ].filter(item => item.show)
 
   const handleSignOut = async () => {
+    onClose()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
   }
 
-  return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex flex-col flex-grow bg-gray-900 pt-5 pb-4 overflow-y-auto">
+  /** Navigate and close sidebar on mobile */
+  const navigateTo = (href) => {
+    onClose()
+    router.push(href)
+  }
 
-        {/* Logo */}
-        <div className="flex items-center flex-shrink-0 px-4">
-          <Shield className="text-blue-400 mr-2" size={32} />
-          <div>
-            <h2 className="text-lg font-bold text-white">Carfix-Connect Admin</h2>
-            <p className="text-xs text-gray-400">Admin Panel</p>
+  return (
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar — always visible on lg+, slides in on mobile when isOpen */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-64 flex flex-col
+        bg-gray-900 transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+      `}>
+        <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
+
+          {/* Logo + mobile close */}
+          <div className="flex items-center justify-between flex-shrink-0 px-4">
+            <div className="flex items-center">
+              <Shield className="text-blue-400 mr-2" size={32} />
+              <div>
+                <h2 className="text-lg font-bold text-white">Carfix-Connect Admin</h2>
+                <p className="text-xs text-gray-400">Admin Panel</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="lg:hidden p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-700">
+              <X size={20} />
+            </button>
           </div>
-        </div>
 
         {/* Navigation */}
         <nav className="mt-8 flex-1 px-2 space-y-1">
@@ -121,7 +148,7 @@ export default function AdminSidebar() {
             return (
               <button
                 key={item.name}
-                onClick={() => router.push(item.href)}
+                onClick={() => navigateTo(item.href)}
                 className={`
                   w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md transition-colors
                   ${isActive
@@ -180,7 +207,7 @@ export default function AdminSidebar() {
                 return (
                   <button
                     key={item.path}
-                    onClick={() => router.push(href)}
+                    onClick={() => navigateTo(href)}
                     className="w-full flex items-center px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
                   >
                     <Icon className="mr-2.5 flex-shrink-0 h-3.5 w-3.5 text-gray-500" />
@@ -203,7 +230,7 @@ export default function AdminSidebar() {
             </div>
           )}
           <button
-            onClick={() => router.push('/admin/feedback')}
+            onClick={() => navigateTo('/admin/feedback')}
             className="w-full group block"
           >
             <div className="flex items-center">
@@ -216,7 +243,7 @@ export default function AdminSidebar() {
             </div>
           </button>
           <button
-            onClick={() => router.push('/admin/support')}
+            onClick={() => navigateTo('/admin/support')}
             className="w-full group block"
           >
             <div className="flex items-center">
@@ -229,7 +256,7 @@ export default function AdminSidebar() {
             </div>
           </button>
           <button
-            onClick={() => router.push('/admin/service-broadcasts')}
+            onClick={() => navigateTo('/admin/service-broadcasts')}
             className="w-full group block"
           >
             <div className="flex items-center">
@@ -254,6 +281,7 @@ export default function AdminSidebar() {
         </div>
 
       </div>
-    </div>
+    </aside>
+    </>
   )
 }

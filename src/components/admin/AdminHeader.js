@@ -3,12 +3,15 @@
 import { Menu } from 'lucide-react'
 import NotificationBell from '@/components/NotificationBell'
 
-export default function AdminHeader({ user, avatarUrl }) {
+export default function AdminHeader({ user, avatarUrl, onToggleSidebar }) {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
-          <button className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+          >
             <Menu size={24} />
           </button>
 
