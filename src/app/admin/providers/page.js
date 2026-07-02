@@ -31,6 +31,7 @@ export default function PendingProvidersPage() {
 
   const [providers,  setProviders]  = useState([])
   const [loading,    setLoading]    = useState(true)
+  const [loadError,  setLoadError]  = useState(null)
   const [page,       setPage]       = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
@@ -38,6 +39,7 @@ export default function PendingProvidersPage() {
 
   const loadPendingProviders = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const from = (page - 1) * PAGE_SIZE
       const to   = from + PAGE_SIZE - 1
@@ -55,10 +57,10 @@ export default function PendingProvidersPage() {
       let detailsById = {}
       if (ids.length > 0) {
         const { data: details } = await supabase
-          .from('service_providers_secure')
+          .from('service_providers')
           .select(`
             id, registration_number, submitted_at, created_at, owner_user_id,
-            owner:user_profiles_secure(first_name, last_name, email, phone),
+            owner:user_profiles(first_name, last_name, email, phone),
             provider_type:service_provider_types(display_name)
           `)
           .in('id', ids)

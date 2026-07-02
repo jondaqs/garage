@@ -101,6 +101,7 @@ export default function AllProvidersPage() {
   const [providers,    setProviders]    = useState([])
   const [pendingDiffs, setPendingDiffs] = useState({})
   const [loading,      setLoading]      = useState(true)
+  const [loadError,    setLoadError]    = useState(null)
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [page,         setPage]         = useState(1)
@@ -120,6 +121,7 @@ export default function AllProvidersPage() {
 
   const loadProviders = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const from = (page - 1) * PAGE_SIZE
       const to   = from + PAGE_SIZE - 1
@@ -148,12 +150,12 @@ export default function AllProvidersPage() {
       } else {
         // No search term — direct query (plaintext columns still exist during transition)
         let query = supabase
-          .from('service_providers_secure')
+          .from('service_providers')
           .select(`
             id, name, status, is_active, is_verified, created_at, submitted_at,
-            owner:user_profiles_secure(id, auth_user_id, first_name, last_name, email),
+            owner:user_profiles(id, auth_user_id, first_name, last_name, email),
             provider_type:service_provider_types(display_name),
-            shops_secure(id)
+            shops(id)
           `, { count: 'exact' })
           .order('created_at', { ascending: false })
 
