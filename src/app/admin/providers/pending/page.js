@@ -27,7 +27,7 @@ export default function PendingProvidersPage() {
         .select(`
           id, name, description, status, is_active, is_verified,
           submitted_at, created_at, phone, email,
-          owner:user_profiles(
+          owner:user_profiles!service_providers_owner_user_id_fkey(
             id,
             first_name,
             last_name,

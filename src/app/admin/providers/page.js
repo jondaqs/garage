@@ -60,7 +60,7 @@ export default function PendingProvidersPage() {
           .from('service_providers')
           .select(`
             id, registration_number, submitted_at, created_at, owner_user_id,
-            owner:user_profiles(first_name, last_name, email, phone),
+            owner:user_profiles!service_providers_owner_user_id_fkey(first_name, last_name, email, phone),
             provider_type:service_provider_types(display_name)
           `)
           .in('id', ids)

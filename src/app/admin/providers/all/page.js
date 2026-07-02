@@ -153,7 +153,7 @@ export default function AllProvidersPage() {
           .from('service_providers')
           .select(`
             id, name, status, is_active, is_verified, created_at, submitted_at,
-            owner:user_profiles(id, auth_user_id, first_name, last_name, email),
+            owner:user_profiles!service_providers_owner_user_id_fkey(id, auth_user_id, first_name, last_name, email),
             provider_type:service_provider_types(display_name),
             shops(id)
           `, { count: 'exact' })
