@@ -142,7 +142,8 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      {/* ── Desktop table ── */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
@@ -219,7 +220,7 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
               )
             })}
 
-            {/* Add new row */}
+            {/* Add new row — desktop */}
             {addMode && (
               <tr className="bg-blue-50/50">
                 {columns.map(c => (
@@ -261,6 +262,105 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
         </table>
       </div>
 
+      {/* ── Mobile cards ── */}
+      <div className="sm:hidden space-y-2">
+        {rows.map(row => {
+          const isEditing = editId === row.id
+          return (
+            <div key={row.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+              {columns.map(c => (
+                <div key={c.key} className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex-shrink-0">{c.label}</span>
+                  <div className="text-right">
+                    {isEditing && c.editable !== false ? (
+                      c.type === 'boolean' ? (
+                        <button onClick={() => setEditData(d => ({ ...d, [c.key]: !d[c.key] }))}>
+                          {editData[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
+                        </button>
+                      ) : c.type === 'select' ? (
+                        <select value={editData[c.key] || ''} onChange={e => setEditData(d => ({ ...d, [c.key]: e.target.value }))}
+                          className={inp + ' py-1 text-xs'}>
+                          {c.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : (
+                        <input type={c.type === 'number' ? 'number' : 'text'} value={editData[c.key] || ''}
+                          onChange={e => setEditData(d => ({ ...d, [c.key]: e.target.value }))}
+                          className={inp + ' py-1 text-xs w-40'} />
+                      )
+                    ) : (
+                      c.type === 'boolean' ? (
+                        !readOnly ? (
+                          <button onClick={() => toggleActive(row, c.key)} disabled={saving === row.id} className="disabled:opacity-50">
+                            {row[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
+                          </button>
+                        ) : (
+                          row[c.key]
+                            ? <span className="text-green-600 text-xs font-medium">Yes</span>
+                            : <span className="text-gray-400 text-xs">No</span>
+                        )
+                      ) : (
+                        <span className="text-sm text-gray-900">{row[c.key] ?? <span className="text-gray-300">—</span>}</span>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+              {!readOnly && (
+                <div className="flex justify-end pt-1 border-t border-gray-100">
+                  {isEditing ? (
+                    <div className="flex gap-2">
+                      <button onClick={saveEdit} disabled={saving === row.id}
+                        className="px-3 py-1 text-xs text-green-700 bg-green-50 rounded-md font-medium disabled:opacity-50">
+                        {saving === row.id ? <Loader2 size={12} className="animate-spin inline" /> : 'Save'}
+                      </button>
+                      <button onClick={cancelEdit} className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded-md">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => startEdit(row)} className="text-xs text-blue-600 font-medium">Edit</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Add new — mobile */}
+        {addMode && (
+          <div className="border-2 border-dashed border-blue-300 rounded-lg p-3 bg-blue-50/30 space-y-2">
+            {columns.map(c => (
+              <div key={c.key}>
+                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{c.label}</label>
+                {c.editable === false ? (
+                  <p className="text-xs text-gray-300 italic">auto</p>
+                ) : c.type === 'boolean' ? (
+                  <button onClick={() => setNewData(d => ({ ...d, [c.key]: !d[c.key] }))} className="block mt-0.5">
+                    {newData[c.key] ? <ToggleRight size={20} className="text-green-600" /> : <ToggleLeft size={20} className="text-gray-400" />}
+                  </button>
+                ) : c.type === 'select' ? (
+                  <select value={newData[c.key] || ''} onChange={e => setNewData(d => ({ ...d, [c.key]: e.target.value }))}
+                    className={inp + ' py-1.5 mt-0.5 text-xs'}>
+                    {c.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : (
+                  <input type={c.type === 'number' ? 'number' : 'text'} value={newData[c.key] || ''}
+                    onChange={e => setNewData(d => ({ ...d, [c.key]: e.target.value }))}
+                    placeholder={c.placeholder || c.label}
+                    className={inp + ' py-1.5 mt-0.5 text-xs'} />
+                )}
+              </div>
+            ))}
+            <div className="flex gap-2 pt-2">
+              <button onClick={saveNew} disabled={saving === 'new'}
+                className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded-md font-medium disabled:opacity-50">
+                {saving === 'new' ? <Loader2 size={12} className="animate-spin inline" /> : 'Save'}
+              </button>
+              <button onClick={() => { setAddMode(false); setError('') }}
+                className="px-3 py-1.5 text-xs text-gray-500 bg-gray-100 rounded-md">Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {!readOnly && !addMode && (
         <button onClick={startAdd}
           className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg font-medium">
@@ -281,25 +381,27 @@ export default function AdminSettingsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-500 text-sm mt-1">Manage platform lookup data and configuration</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl flex-wrap mb-6">
-        {TABS.map(t => {
-          const Icon = t.icon
-          return (
-            <button key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors min-w-fit ${
-                tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}>
-              <Icon size={14} /> {t.label}
-            </button>
-          )
-        })}
+      {/* Tabs — scrollable on mobile, wraps on desktop */}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-4 sm:mb-6 scrollbar-hide">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl sm:flex-wrap min-w-max sm:min-w-0">
+          {TABS.map(t => {
+            const Icon = t.icon
+            return (
+              <button key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap sm:flex-1 sm:min-w-fit ${
+                  tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}>
+                <Icon size={14} /> {t.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Provider Types ── */}
@@ -1056,7 +1158,7 @@ function SmsSetupEditor() {
       {/* ── Test SMS ── */}
       {activeProvider !== 'none' && (
         <Section title="Test SMS" description="Sends a test using the field values above (overrides env vars for this test only — not saved).">
-          <div className="flex gap-2 items-end">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
             <div className="flex-1">
               <label className="text-xs font-semibold text-gray-600 block mb-1">Phone Number</label>
               <div className="relative">
@@ -1323,8 +1425,8 @@ function PaymentAccountsEditor({ supabase }) {
 
 function Section({ title, description, children }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <div className="mb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-5">
+      <div className="mb-3 sm:mb-4">
         <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
         {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
       </div>
