@@ -15,7 +15,7 @@ import { escapeHtml } from '@/lib/validation'
 const h = (v) => escapeHtml(v ?? '')
 
 
-const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com/'
 const BRAND_NAME = 'Carfix-Connect'
 
 // ─── Shared HTML wrapper ─────────────────────────────────────────────────────

@@ -228,7 +228,7 @@ function generateInvitationEmail(providerName, recipientEmail, role, specializat
   specialization = h(specialization); recipientEmail = h(recipientEmail)
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
-    'https://garage-mu-two.vercel.app'
+    'https://carfix-connect.com'
 
   const subject = `${providerName} has invited you to join their team`
 

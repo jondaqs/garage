@@ -38,7 +38,7 @@ function getServiceClient() {
 }
 
 function appUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com/'
 }
 
 export async function POST(request) {

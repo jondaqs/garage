@@ -10,7 +10,7 @@
 
 import { sendAndQueueSms } from './transport.js'
 
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com/'
 const BRAND   = 'Carfix-Connect'
 
 // ─── 1. Estimate ready for customer approval ──────────────────────────────────
@@ -133,6 +133,6 @@ export async function sendInvoiceSms(supabase, {
   const { sendSms } = await import('./transport.js')
   const amount = `KES ${Number(totalAmount || 0).toLocaleString()}`
   const greeting = ownerName ? `Hi ${ownerName.split(' ')[0]},` : 'Hi,'
-  const message = `${greeting} Your invoice of ${amount} for WO ${workOrderNumber} at ${providerName} is ready. Please arrange payment. View: ${process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'}/dashboard/work-orders/${workOrderId}`
+  const message = `${greeting} Your invoice of ${amount} for WO ${workOrderNumber} at ${providerName} is ready. Please arrange payment. View: ${process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com/'}/dashboard/work-orders/${workOrderId}`
   return sendSms(supabase, { phone, message })
 }

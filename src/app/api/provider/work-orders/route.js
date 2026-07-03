@@ -638,7 +638,7 @@ async function notifyCustomerBackground({
 async function sendWalkInInviteEmail({
   toEmail, ownerName, workOrderNumber, plateNumber, inviteToken, providerUserId, supabase
 }) {
-  const appUrl         = process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app'
+  const appUrl         = process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com'
   const mailjetApiKey  = process.env.MAILJET_API_KEY
   const mailjetSecret  = process.env.MAILJET_SECRET_KEY
   const fromEmail      = process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com'

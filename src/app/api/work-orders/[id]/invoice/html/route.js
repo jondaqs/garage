@@ -26,7 +26,7 @@ import { buildInvoiceHtml }                    from '@/lib/invoice/buildInvoiceH
 import { readLimiter } from '@/lib/rateLimiters'
 import { requireUUID } from '@/lib/validation'
 
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com/'
 
 function getServiceClient() {
   return createServiceClient(

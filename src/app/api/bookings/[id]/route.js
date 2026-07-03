@@ -26,7 +26,7 @@ function getServiceClient() {
   })
 }
 
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://garage-mu-two.vercel.app/'
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com/'
 const BRAND   = 'Carfix-Connect' 
 
 const fmtDate = (d) => d
