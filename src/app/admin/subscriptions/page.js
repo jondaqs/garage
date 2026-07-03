@@ -1,7 +1,7 @@
 // src/app/admin/subscriptions/page.js
 'use client'
 
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
+import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import SubscriptionReceiptCard from '@/components/SubscriptionReceiptCard'
@@ -9,7 +9,7 @@ import {
     CreditCard, Package, Percent, Gift, Calculator, Users, Building2, Wrench,
     Plus, Save, Trash2, X, CheckCircle, AlertCircle, Loader2, ToggleLeft, ToggleRight,
     ChevronDown, ChevronRight, Search, Filter, Eye, Ban, PlayCircle, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles, MessageSquarePlus, Globe
+    ArrowUpRight, ArrowDownRight, ArrowUp, ArrowDown, Clock, DollarSign, FileText, Zap, Store, Receipt, BadgeCheck, Banknote, Download, Sparkles, MessageSquarePlus, Globe, GripVertical, List, Type
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 import SaveCustomPlanModal from '@/components/subscription/SaveCustomPlanModal'
@@ -699,6 +699,7 @@ function PricingTiersTab({ supabase }) {
     const getCurrencyCode = (id) => currencies.find(c => c.id === id)?.code || '—'
 
     const startEdit = (tier) => {
+        const feats = (() => { try { return typeof tier.features === 'string' ? JSON.parse(tier.features) : (tier.features || []) } catch { return [] } })()
         setEditId(tier.id)
         setEditData({
             tier_name: tier.tier_name,
@@ -712,6 +713,10 @@ function PricingTiersTab({ supabase }) {
             min_monthly_clients: tier.min_monthly_clients, max_monthly_clients: tier.max_monthly_clients,
             is_active: tier.is_active,
             is_upper_limit: tier.is_upper_limit,
+            features_list: [...feats],
+            features_bulk: feats.join('\n'),
+            features_mode: 'list', // 'list' | 'bulk'
+            new_feature_text: '',
         })
     }
 
@@ -719,6 +724,22 @@ function PricingTiersTab({ supabase }) {
         setSaving(editId)
         try {
             const update = { ...editData }
+
+            // Build features array from whichever mode is active
+            let featuresList
+            if (update.features_mode === 'bulk') {
+                featuresList = (update.features_bulk || '').split('\n').map(f => f.trim()).filter(Boolean)
+            } else {
+                featuresList = (update.features_list || []).filter(f => f.trim())
+            }
+            update.features = JSON.stringify(featuresList)
+
+            // Remove UI-only fields
+            delete update.features_list
+            delete update.features_bulk
+            delete update.features_mode
+            delete update.new_feature_text
+
             // Coerce numerics
             for (const k of ['base_monthly_price', 'per_extra_vehicle_price', 'per_extra_staff_price', 'per_extra_client_price',
                 'min_vehicles', 'max_vehicles', 'min_staff', 'max_staff', 'min_monthly_clients', 'max_monthly_clients']) {
@@ -990,7 +1011,8 @@ function PricingTiersTab({ supabase }) {
                                     const isBasicPlus = (t.tier_code || '').includes('basic_plus')
                                     const features = (() => { try { return typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || []) } catch { return [] } })()
                                     return (
-                                        <tr key={t.id} className={`hover:bg-gray-50 cursor-pointer ${isEditing ? 'bg-blue-50' : ''} ${!t.is_active ? 'opacity-50' : ''} ${t.is_custom ? 'bg-purple-50/20' : ''}`}
+                                        <React.Fragment key={t.id}>
+                                        <tr className={`hover:bg-gray-50 cursor-pointer ${isEditing ? 'bg-blue-50' : ''} ${!t.is_active ? 'opacity-50' : ''} ${t.is_custom ? 'bg-purple-50/20' : ''}`}
                                             onClick={() => !isEditing && !t.is_custom && startEdit(t)}>
                                             <td className="py-2 px-2">
                                                 <div className="flex items-center gap-1.5">
@@ -1088,6 +1110,120 @@ function PricingTiersTab({ supabase }) {
                                                 )}
                                             </td>
                                         </tr>
+                                        {/* ── Features editor row (visible when editing) ── */}
+                                        {isEditing && (
+                                            <tr className="bg-blue-50/60 border-t-0">
+                                                <td colSpan={10} className="px-3 py-3">
+                                                    <div className="border border-blue-200 rounded-lg bg-white p-3">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                                                                <Zap size={10} /> Features ({(editData.features_mode === 'bulk'
+                                                                    ? (editData.features_bulk || '').split('\n').filter(f => f.trim()).length
+                                                                    : (editData.features_list || []).filter(f => f.trim()).length)})
+                                                            </p>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    if (editData.features_mode === 'list') {
+                                                                        setEditData(d => ({ ...d, features_mode: 'bulk', features_bulk: (d.features_list || []).join('\n') }))
+                                                                    } else {
+                                                                        setEditData(d => ({ ...d, features_mode: 'list', features_list: (d.features_bulk || '').split('\n').map(f => f.trim()).filter(Boolean) }))
+                                                                    }
+                                                                }}
+                                                                className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                                                            >
+                                                                {editData.features_mode === 'list' ? <><Type size={10} /> Bulk edit</> : <><List size={10} /> List edit</>}
+                                                            </button>
+                                                        </div>
+
+                                                        {editData.features_mode === 'bulk' ? (
+                                                            <textarea
+                                                                rows={Math.max(3, (editData.features_bulk || '').split('\n').length + 1)}
+                                                                placeholder={"Budget tracking\nExpense reports\nMaintenance history\n(one feature per line)"}
+                                                                value={editData.features_bulk || ''}
+                                                                onChange={e => setEditData(d => ({ ...d, features_bulk: e.target.value }))}
+                                                                onClick={e => e.stopPropagation()}
+                                                                className={inp + ' text-xs resize-y font-mono'}
+                                                            />
+                                                        ) : (
+                                                            <div className="space-y-1">
+                                                                {(editData.features_list || []).map((feat, fi) => (
+                                                                    <div key={fi} className="flex items-center gap-1 group">
+                                                                        <GripVertical size={12} className="text-gray-300 flex-shrink-0" />
+                                                                        <span className="text-[10px] text-gray-400 w-4 text-right flex-shrink-0">{fi + 1}</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={feat}
+                                                                            onChange={e => {
+                                                                                const updated = [...editData.features_list]
+                                                                                updated[fi] = e.target.value
+                                                                                setEditData(d => ({ ...d, features_list: updated }))
+                                                                            }}
+                                                                            onClick={e => e.stopPropagation()}
+                                                                            className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-blue-400 focus:border-blue-400 bg-white hover:border-gray-300 transition-colors"
+                                                                        />
+                                                                        <button
+                                                                            onClick={e => { e.stopPropagation(); const updated = [...editData.features_list]; [updated[fi - 1], updated[fi]] = [updated[fi], updated[fi - 1]]; setEditData(d => ({ ...d, features_list: updated })) }}
+                                                                            disabled={fi === 0}
+                                                                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-20 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            title="Move up"
+                                                                        >
+                                                                            <ArrowUp size={11} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={e => { e.stopPropagation(); const updated = [...editData.features_list]; [updated[fi], updated[fi + 1]] = [updated[fi + 1], updated[fi]]; setEditData(d => ({ ...d, features_list: updated })) }}
+                                                                            disabled={fi === editData.features_list.length - 1}
+                                                                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-20 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            title="Move down"
+                                                                        >
+                                                                            <ArrowDown size={11} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={e => { e.stopPropagation(); setEditData(d => ({ ...d, features_list: d.features_list.filter((_, i) => i !== fi) })) }}
+                                                                            className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            title="Remove feature"
+                                                                        >
+                                                                            <X size={11} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                                <div className="flex items-center gap-1 pt-1">
+                                                                    <Plus size={12} className="text-gray-300 flex-shrink-0" />
+                                                                    <span className="w-4 flex-shrink-0" />
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Add a feature…"
+                                                                        value={editData.new_feature_text || ''}
+                                                                        onChange={e => setEditData(d => ({ ...d, new_feature_text: e.target.value }))}
+                                                                        onKeyDown={e => {
+                                                                            if (e.key === 'Enter' && editData.new_feature_text?.trim()) {
+                                                                                e.preventDefault()
+                                                                                setEditData(d => ({ ...d, features_list: [...(d.features_list || []), d.new_feature_text.trim()], new_feature_text: '' }))
+                                                                            }
+                                                                        }}
+                                                                        onClick={e => e.stopPropagation()}
+                                                                        className="flex-1 px-2 py-1.5 border border-dashed border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-400 focus:border-blue-400 bg-gray-50 placeholder:text-gray-400"
+                                                                    />
+                                                                    <button
+                                                                        onClick={e => {
+                                                                            e.stopPropagation()
+                                                                            if (editData.new_feature_text?.trim()) {
+                                                                                setEditData(d => ({ ...d, features_list: [...(d.features_list || []), d.new_feature_text.trim()], new_feature_text: '' }))
+                                                                            }
+                                                                        }}
+                                                                        disabled={!editData.new_feature_text?.trim()}
+                                                                        className="px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                                                    >
+                                                                        <Plus size={11} /> Add
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        </React.Fragment>
                                     )
                                 })}
                             </tbody>
