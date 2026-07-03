@@ -5,7 +5,7 @@ import { Car, Check, ArrowRight, Sparkles, Star, Zap } from 'lucide-react'
 
 const ACCENT = '#3b82f6'
 
-// ── Support level per tier (added to the feature list) ──
+// ── Support level labels per tier (appended for display only) ──
 const SUPPORT_LEVELS = {
   ind_basic_plus: 'Basic support',
   ind_starter:    'Standard support',
@@ -14,18 +14,7 @@ const SUPPORT_LEVELS = {
   ind_fleet:      'Dedicated support',
 }
 
-// ── Features to REMOVE from specific tiers (after accumulation) ──
-const REMOVE_FROM_TIER = {
-  ind_starter: ['Budget tracking', 'Reminders', 'Service reminders'],
-  ind_growth:  ['Budget tracking', 'Reminders', 'Service reminders'],
-  ind_family:  ['Budget tracking', 'Reminders', 'Service reminders', 'Custom alerts', 'Priority support'],
-  ind_fleet:   ['Budget tracking', 'Reminders', 'Service reminders', 'Custom alerts', 'Priority support', 'Family sharing', 'Fleet overview', 'Bulk service booking'],
-}
-
-// ── Tiers that should show "Detailed analytics" (inserted above support) ──
-const ADD_DETAILED_ANALYTICS = new Set(['ind_basic_plus', 'ind_starter', 'ind_growth'])
-
-// Vehicle-count patterns to strip (these are covered by the subscription package)
+// Vehicle-count patterns to strip (already shown in the pricing section)
 const isVehicleFeature = (f) => /\d+\s*(–|-|to)\s*\d+\s*vehicle/i.test(f)
   || /^\d+\s*vehicle/i.test(f)
   || /^up\s*to\s*\d+\s*vehicle/i.test(f)
@@ -40,69 +29,27 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
   const basicPlusTier = tiers.find(t => t.tier_code === 'ind_basic_plus')
   const popularCode = basicPlusTier?.tier_code || (tiers.length >= 2 ? tiers[1]?.tier_code : null)
 
-  // Sort tiers by sort_order or price for accumulation
-  const sorted = [...tiers].sort((a, b) =>
-    (a.sort_order ?? a.base_monthly_price) - (b.sort_order ?? b.base_monthly_price)
-  )
-
   // Parse features for each tier
-  const parsedFeatures = {}
-  sorted.forEach(t => {
+  const parseFeatures = (tier) => {
     try {
-      parsedFeatures[t.tier_code] = typeof t.features === 'string' ? JSON.parse(t.features) : (t.features || [])
-    } catch { parsedFeatures[t.tier_code] = [] }
-  })
+      return typeof tier.features === 'string' ? JSON.parse(tier.features) : (tier.features || [])
+    } catch { return [] }
+  }
 
-  // Build cumulative features for paid tiers
+  // Build display features: use DB features as-is, only strip vehicle counts
+  // and normalize support labels
   const buildFeatures = (tier) => {
-    const isFree = Number(tier.base_monthly_price) === 0
-    const ownFeatures = parsedFeatures[tier.tier_code] || []
+    const dbFeatures = parseFeatures(tier)
 
-    // Free tier: show its own features as-is
-    if (isFree) return ownFeatures
+    // Filter out vehicle-count features (already shown in the pricing block)
+    let filtered = dbFeatures.filter(f => !isVehicleFeature(f))
 
-    // Paid tiers: accumulate from all lower tiers + own
-    const tierIdx = sorted.findIndex(t => t.tier_code === tier.tier_code)
-    const accumulated = []
-    const seen = new Set()
-
-    for (let i = 0; i <= tierIdx; i++) {
-      const code = sorted[i].tier_code
-      const feats = parsedFeatures[code] || []
-      feats.forEach(f => {
-        const key = f.toLowerCase().trim()
-        if (!seen.has(key)) {
-          seen.add(key)
-          accumulated.push(f)
-        }
-      })
-    }
-
-    // Filter out vehicle-count features
-    let filtered = accumulated.filter(f => !isVehicleFeature(f))
-
-    // Remove tier-specific features
-    const removals = REMOVE_FROM_TIER[tier.tier_code]
-    if (removals) {
-      const removalSet = new Set(removals.map(r => r.toLowerCase().trim()))
-      filtered = filtered.filter(f => !removalSet.has(f.toLowerCase().trim()))
-    }
-
-    // Also remove any support-level features from lower tiers
-    // (we'll add the correct one below)
+    // Remove any support-level strings from the DB list (we append the correct one)
     const allSupportValues = new Set(Object.values(SUPPORT_LEVELS).map(s => s.toLowerCase()))
     filtered = filtered.filter(f => !allSupportValues.has(f.toLowerCase().trim()))
 
-    // Add this tier's support level
+    // Append this tier's support level at the end
     const support = SUPPORT_LEVELS[tier.tier_code]
-
-    // Insert "Detailed analytics" above the support line for eligible tiers
-    if (ADD_DETAILED_ANALYTICS.has(tier.tier_code)) {
-      // Remove any existing "Detailed analytics" to avoid duplicates
-      filtered = filtered.filter(f => f.toLowerCase().trim() !== 'detailed analytics')
-      filtered.push('Detailed analytics')
-    }
-
     if (support) filtered.push(support)
 
     return filtered
