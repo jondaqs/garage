@@ -16,10 +16,14 @@ const SUPPORT_LEVELS = {
 
 // ── Features to REMOVE from specific tiers (after accumulation) ──
 const REMOVE_FROM_TIER = {
-  ind_growth: ['Priority support', 'Detailed analytics', 'Custom alerts'],
-  ind_family: ['Family sharing', 'Fleet overview', 'Bulk service booking'],
-  ind_fleet:  ['API access'],
+  ind_starter: ['Budget tracking', 'Reminders', 'Service reminders'],
+  ind_growth:  ['Budget tracking', 'Reminders', 'Service reminders'],
+  ind_family:  ['Budget tracking', 'Reminders', 'Service reminders', 'Custom alerts', 'Priority support'],
+  ind_fleet:   ['Budget tracking', 'Reminders', 'Service reminders', 'Custom alerts', 'Priority support', 'Family sharing', 'Fleet overview', 'Bulk service booking'],
 }
+
+// ── Tiers that should show "Detailed analytics" (inserted above support) ──
+const ADD_DETAILED_ANALYTICS = new Set(['ind_basic_plus', 'ind_starter', 'ind_growth'])
 
 // Vehicle-count patterns to strip (these are covered by the subscription package)
 const isVehicleFeature = (f) => /\d+\s*(–|-|to)\s*\d+\s*vehicle/i.test(f)
@@ -91,6 +95,14 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
 
     // Add this tier's support level
     const support = SUPPORT_LEVELS[tier.tier_code]
+
+    // Insert "Detailed analytics" above the support line for eligible tiers
+    if (ADD_DETAILED_ANALYTICS.has(tier.tier_code)) {
+      // Remove any existing "Detailed analytics" to avoid duplicates
+      filtered = filtered.filter(f => f.toLowerCase().trim() !== 'detailed analytics')
+      filtered.push('Detailed analytics')
+    }
+
     if (support) filtered.push(support)
 
     return filtered
