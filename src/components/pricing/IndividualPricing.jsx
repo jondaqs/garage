@@ -14,13 +14,6 @@ const SUPPORT_LEVELS = {
   ind_fleet:      'Dedicated support',
 }
 
-// Vehicle-count patterns to strip (already shown in the pricing section)
-const isVehicleFeature = (f) => /\d+\s*(–|-|to)\s*\d+\s*vehicle/i.test(f)
-  || /^\d+\s*vehicle/i.test(f)
-  || /^up\s*to\s*\d+\s*vehicle/i.test(f)
-  || /vehicle\s*limit/i.test(f)
-  || /vehicles?\s*included/i.test(f)
-
 export default function IndividualPricing({ tiers = [], period, trialConfig }) {
   if (!tiers.length) return <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No plans available</p>
 
@@ -36,17 +29,14 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
     } catch { return [] }
   }
 
-  // Build display features: use DB features as-is, only strip vehicle counts
-  // and normalize support labels
+  // Build display features: use DB features as-is,
+  // only normalize support labels
   const buildFeatures = (tier) => {
     const dbFeatures = parseFeatures(tier)
 
-    // Filter out vehicle-count features (already shown in the pricing block)
-    let filtered = dbFeatures.filter(f => !isVehicleFeature(f))
-
     // Remove any support-level strings from the DB list (we append the correct one)
     const allSupportValues = new Set(Object.values(SUPPORT_LEVELS).map(s => s.toLowerCase()))
-    filtered = filtered.filter(f => !allSupportValues.has(f.toLowerCase().trim()))
+    let filtered = dbFeatures.filter(f => !allSupportValues.has(f.toLowerCase().trim()))
 
     // Append this tier's support level at the end
     const support = SUPPORT_LEVELS[tier.tier_code]
