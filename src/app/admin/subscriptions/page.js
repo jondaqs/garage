@@ -493,6 +493,8 @@ function PackagesTab({ supabase }) {
     const [packages, setPackages] = useState([])
     const [loading, setLoading] = useState(true)
     const [generating, setGenerating] = useState(false)
+    const [syncing, setSyncing] = useState(false)
+    const [showSyncConfirm, setShowSyncConfirm] = useState(false)
     const [toast, setToast] = useState({ message: '', type: 'success' })
     const [customFilter, setCustomFilter] = useState('all') // 'all' | 'standard' | 'custom'
 
@@ -534,6 +536,23 @@ function PackagesTab({ supabase }) {
         await loadPackages()
     }
 
+    const syncFeatures = async () => {
+        setSyncing(true)
+        try {
+            const { data, error } = await supabase.rpc('sync_subscription_package_features')
+            if (error) throw error
+            const result = typeof data === 'string' ? JSON.parse(data) : data
+            if (!result.success) throw new Error(result.error)
+            setToast({ message: `Synced features to ${result.packages_updated} package${result.packages_updated !== 1 ? 's' : ''}`, type: 'success' })
+            setTimeout(() => setToast({ message: '' }), 4000)
+            await loadPackages()
+        } catch (e) {
+            setToast({ message: e.message, type: 'error' })
+        } finally {
+            setSyncing(false)
+        }
+    }
+
     if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
 
     const grouped = packages.reduce((acc, p) => {
@@ -573,11 +592,18 @@ function PackagesTab({ supabase }) {
                         </div>
                     )}
                 </div>
-                <button onClick={generateBatch} disabled={generating}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                    {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                    Generate from tiers
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setShowSyncConfirm(true)} disabled={syncing}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                        {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                        Sync features
+                    </button>
+                    <button onClick={generateBatch} disabled={generating}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                        {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                        Generate from tiers
+                    </button>
+                </div>
             </div>
 
             {Object.entries(grouped).map(([typeName, pkgs]) => (
@@ -651,6 +677,69 @@ function PackagesTab({ supabase }) {
                     </div>
                 </Section>
             ))}
+
+            {/* ── Sync features confirmation modal ── */}
+            {showSyncConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+                     onClick={() => setShowSyncConfirm(false)}>
+                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden"
+                         onClick={e => e.stopPropagation()}>
+                        <div className="px-6 pt-6 pb-4">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-amber-50 rounded-lg flex-shrink-0">
+                                    <AlertCircle size={20} className="text-amber-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-semibold text-gray-900">
+                                        Sync features to active packages?
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                                        This will update the <strong>feature list</strong> and <strong>description</strong> on
+                                        all active packages to match their pricing tier.
+                                    </p>
+                                    <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-600 space-y-1.5">
+                                        <p className="flex items-center gap-2">
+                                            <CheckCircle size={13} className="text-green-600 flex-shrink-0" />
+                                            Features and descriptions will be updated
+                                        </p>
+                                        <p className="flex items-center gap-2">
+                                            <CheckCircle size={13} className="text-green-600 flex-shrink-0" />
+                                            Subscribers will see the updated feature list
+                                        </p>
+                                        <p className="flex items-center gap-2">
+                                            <Ban size={13} className="text-gray-400 flex-shrink-0" />
+                                            Pricing will <strong>not</strong> change
+                                        </p>
+                                        <p className="flex items-center gap-2">
+                                            <Ban size={13} className="text-gray-400 flex-shrink-0" />
+                                            Vehicle, staff, shop, and client limits will <strong>not</strong> change
+                                        </p>
+                                    </div>
+                                    <p className="text-xs text-amber-600 mt-3">
+                                        Active subscribers will see the new features immediately.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                            <button
+                                onClick={() => setShowSyncConfirm(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => { setShowSyncConfirm(false); syncFeatures() }}
+                                disabled={syncing}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                            >
+                                {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                Yes, sync features
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -732,7 +821,7 @@ function PricingTiersTab({ supabase }) {
             } else {
                 featuresList = (update.features_list || []).filter(f => f.trim())
             }
-            update.features = JSON.stringify(featuresList)
+            update.features = featuresList
 
             // Remove UI-only fields
             delete update.features_list
@@ -802,7 +891,7 @@ function PricingTiersTab({ supabase }) {
                 per_extra_staff_price: Number(newTier.per_extra_staff_price) || 0,
                 per_extra_client_price: Number(newTier.per_extra_client_price) || 0,
                 currency_id: newTier.currency_id || currencies[0]?.id,
-                features: JSON.stringify(features),
+                features: features,
                 max_users_included: Number(newTier.max_users_included) || 1,
                 max_vehicles_included: Number(newTier.max_vehicles_included) || 1,
                 max_shops_included: Number(newTier.max_shops_included) || 0,
