@@ -174,7 +174,7 @@ function ResponsesView({ supabase, toast, setToast }) {
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase.from('service_broadcast_responses')
-      .select('*, service_broadcasts(broadcast_number, title), service_providers(name)')
+      .select('*, service_broadcasts!broadcast_id(broadcast_number, title), service_providers(name)')
       .order('created_at', { ascending: false })
     setItems(data || [])
     setLoading(false)
