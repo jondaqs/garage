@@ -27,7 +27,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   const searchParams = useSearchParams()
   const initialView = searchParams?.get('view') || 'browse'
   const [tab, setTab] = useState(initialView)
-  const providerAccess = useProviderAccess()
+  const providerAccess = useProviderAccess(providerIdProp || null)
 
   // Browse state
   const [allBroadcasts, setAllBroadcasts] = useState([])
@@ -81,12 +81,15 @@ function ProviderMarketplaceContent({ providerIdProp }) {
 
   const loadMyResponses = useCallback(async (initial = false) => {
     if (initial) setLoadingResponses(true); else setRefreshingResponses(true)
-    const { data } = await supabase.from('service_broadcast_responses')
+    let query = supabase.from('service_broadcast_responses')
       .select('*, service_broadcasts!broadcast_id(id, broadcast_number, title, description, status, poster_type, urgency, location, budget_estimate)')
       .order('created_at', { ascending: false })
+    // Scope to current provider so multi-provider members only see this org's responses
+    if (providerId) query = query.eq('provider_id', providerId)
+    const { data } = await query
     setMyResponses(data || [])
     if (initial) setLoadingResponses(false); else setRefreshingResponses(false)
-  }, [supabase])
+  }, [supabase, providerId])
 
   const loadMyBroadcasts = useCallback(async () => {
     setLoadingMyBroadcasts(true)

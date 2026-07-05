@@ -13,10 +13,10 @@ import useCompanyAccess from '@/hooks/useCompanyAccess'
  * Returns same shape as useCompanyAccess plus:
  *   providerId — the resolved provider ID
  */
-export default function useProviderAccess() {
+export default function useProviderAccess(providerIdOverride = null) {
   const supabase = createClient()
-  const [providerId, setProviderId] = useState(null)
-  const [resolving, setResolving] = useState(true)
+  const [providerId, setProviderId] = useState(providerIdOverride)
+  const [resolving, setResolving] = useState(!providerIdOverride)
 
   // Access state
   const [state, setState]                           = useState(null)
@@ -40,46 +40,50 @@ export default function useProviderAccess() {
   useEffect(() => {
     const resolve = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { setResolving(false); setLoading(false); return }
+        let pid = providerIdOverride
 
-        const { data: profile } = await supabase
-          .from('user_profiles_secure')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single()
-
-        if (!profile) { setResolving(false); setLoading(false); return }
-
-        // Check owner first
-        const { data: owned } = await supabase
-          .from('service_providers_secure')
-          .select('id')
-          .eq('owner_user_id', profile.id)
-          .maybeSingle()
-
-        let pid = owned?.id || null
-
-        // Fallback: check service_provider_users
         if (!pid) {
-          const { data: spu } = await supabase
-            .from('service_provider_users')
-            .select('service_provider_id')
-            .eq('user_id', profile.id)
-            .eq('is_active', true)
-            .maybeSingle()
-          pid = spu?.service_provider_id || null
-        }
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) { setResolving(false); setLoading(false); return }
 
-        // Fallback: check mechanics
-        if (!pid) {
-          const { data: mech } = await supabase
-            .from('mechanics')
-            .select('service_provider_id')
-            .eq('user_id', profile.id)
-            .eq('is_active', true)
+          const { data: profile } = await supabase
+            .from('user_profiles_secure')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .single()
+
+          if (!profile) { setResolving(false); setLoading(false); return }
+
+          // Check owner first
+          const { data: owned } = await supabase
+            .from('service_providers_secure')
+            .select('id')
+            .eq('owner_user_id', profile.id)
             .maybeSingle()
-          pid = mech?.service_provider_id || null
+
+          pid = owned?.id || null
+
+          // Fallback: check service_provider_users
+          if (!pid) {
+            const { data: spu } = await supabase
+              .from('service_provider_users')
+              .select('service_provider_id')
+              .eq('user_id', profile.id)
+              .eq('is_active', true)
+              .maybeSingle()
+            pid = spu?.service_provider_id || null
+          }
+
+          // Fallback: check mechanics
+          if (!pid) {
+            const { data: mech } = await supabase
+              .from('mechanics')
+              .select('service_provider_id')
+              .eq('user_id', profile.id)
+              .eq('is_active', true)
+              .maybeSingle()
+            pid = mech?.service_provider_id || null
+          }
         }
 
         setProviderId(pid)
