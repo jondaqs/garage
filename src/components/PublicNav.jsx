@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Car, ArrowRight, Menu, X, Download } from 'lucide-react'
+import { ArrowRight, Menu, X, Download } from 'lucide-react'
+import Image from 'next/image'
 
 const NAV_LINKS = [
   { label: 'About Us', path: '/about' },
@@ -218,7 +219,7 @@ export default function PublicNav() {
         {/* Logo */}
         <button className="pn-logo" onClick={() => router.push('/')}>
           <div className="pn-logo-icon">
-            <Car size={20} color="#fff" />
+            <Image src="/logo.png" alt="Carfix-Connect" width={28} height={28} style={{ objectFit: 'contain' }} />
           </div>
           <span className="gc-display pn-logo-text">Carfix-Connect</span>
         </button>
@@ -258,7 +259,7 @@ export default function PublicNav() {
         <div className="pn-drawer-header">
           <button className="pn-logo" onClick={() => router.push('/')} style={{ gap: 8 }}>
             <div className="pn-logo-icon" style={{ width: 32, height: 32 }}>
-              <Car size={17} color="#fff" />
+              <Image src="/logo.png" alt="Carfix-Connect" width={24} height={24} style={{ objectFit: 'contain' }} />
             </div>
             <span className="gc-display" style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>
               Carfix-Connect

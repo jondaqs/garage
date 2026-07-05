@@ -368,7 +368,7 @@ export default function LandingPage() {
           flexWrap: 'wrap', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Car size={16} color="rgba(255,255,255,0.3)" />
+            <img src="/logo.png" alt="" style={{ width: 20, height: 20, objectFit: 'contain', opacity: 0.4 }} />
             <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>

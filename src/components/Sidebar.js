@@ -736,7 +736,7 @@ export default function Sidebar({ user }) {
       {/* Logo */}
       <div className="p-6 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center">
-          <Car className="text-blue-600 mr-2" size={32} />
+          <img src="/logo.png" alt="Carfix-Connect" className="mr-2" style={{ width: 36, height: 36, objectFit: 'contain' }} />
           <h1 className="text-2xl font-bold text-gray-800">Carfix-Connect</h1>
         </div>
       </div>
