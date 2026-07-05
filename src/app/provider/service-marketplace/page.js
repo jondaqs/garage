@@ -67,28 +67,16 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   // Open or create a chat conversation with a requester
   const openChatWithRequester = async (requesterId) => {
     if (!providerId || !requesterId) return
-    // Check for existing conversation
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('user_id', requesterId)
-      .eq('service_provider_id', providerId)
-      .is('company_id', null)
-      .maybeSingle()
-    if (existing) {
-      router.push(`/provider/chat?conversation=${existing.id}`)
+    // Use RPC to create conversation (direct insert blocked by RLS — only the user side can insert)
+    const { data, error } = await supabase.rpc('open_provider_conversation', {
+      p_user_id: requesterId,
+      p_provider_id: providerId,
+    })
+    const res = typeof data === 'string' ? JSON.parse(data) : data
+    if (!error && res?.success) {
+      router.push(`/provider/chat?conversation=${res.conversation_id}`)
     } else {
-      // Create new conversation
-      const { data: newConv, error } = await supabase
-        .from('conversations')
-        .insert({ user_id: requesterId, service_provider_id: providerId })
-        .select('id')
-        .single()
-      if (!error && newConv) {
-        router.push(`/provider/chat?conversation=${newConv.id}`)
-      } else {
-        showToast('Could not open chat. Please try again.', 'error')
-      }
+      showToast(res?.error || 'Could not open chat. Please try again.', 'error')
     }
   }
 
@@ -108,19 +96,36 @@ function ProviderMarketplaceContent({ providerIdProp }) {
     if (initial) setLoadingBrowse(false); else setRefreshingBrowse(false)
   }, [supabase, profileId, providerId])
 
+  // Requester details for accepted responses (fetched separately from user_profiles_secure)
+  const [requesterDetails, setRequesterDetails] = useState({})
+
   const loadMyResponses = useCallback(async (initial = false) => {
     if (initial) setLoadingResponses(true); else setRefreshingResponses(true)
     let query = supabase.from('service_broadcast_responses')
-      .select(`*, service_broadcasts!broadcast_id(
-        id, broadcast_number, title, description, status, poster_type,
-        urgency, location, budget_estimate, posted_by,
-        requester:user_profiles!posted_by(id, first_name, last_name, phone, email, profile_picture_url)
-      )`)
+      .select('*, service_broadcasts!broadcast_id(id, broadcast_number, title, description, status, poster_type, urgency, location, budget_estimate, posted_by)')
       .order('created_at', { ascending: false })
     // Scope to current provider so multi-provider members only see this org's responses
     if (providerId) query = query.eq('provider_id', providerId)
     const { data } = await query
-    setMyResponses(data || [])
+    const responses = data || []
+    setMyResponses(responses)
+
+    // For accepted responses, fetch requester details from the secure (decrypted) view
+    const acceptedPosters = [...new Set(
+      responses
+        .filter(r => r.status === 'accepted' && r.service_broadcasts?.posted_by)
+        .map(r => r.service_broadcasts.posted_by)
+    )]
+    if (acceptedPosters.length > 0) {
+      const { data: profiles } = await supabase
+        .from('user_profiles_secure')
+        .select('id, first_name, last_name, phone, email, profile_picture_url')
+        .in('id', acceptedPosters)
+      const map = {}
+      ;(profiles || []).forEach(p => { map[p.id] = p })
+      setRequesterDetails(prev => ({ ...prev, ...map }))
+    }
+
     if (initial) setLoadingResponses(false); else setRefreshingResponses(false)
   }, [supabase, providerId])
 
@@ -354,29 +359,31 @@ function ProviderMarketplaceContent({ providerIdProp }) {
                           {r.estimated_duration && <span>{r.estimated_duration}</span>}
                           {r.availability && <span>{r.availability}</span>}
                         </div>
-                        {r.status === 'accepted' && (
+                        {r.status === 'accepted' && (() => {
+                          const req = b?.posted_by ? requesterDetails[b.posted_by] : null
+                          return (
                           <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
                             <p className="text-sm text-green-800 font-semibold flex items-center gap-1.5"><Star size={12} /> Your proposal was accepted!</p>
 
                             {/* Requester contact details */}
-                            {b?.requester && (
+                            {req && (
                               <div className="space-y-2">
                                 <p className="text-xs font-medium text-green-700 uppercase">Requester Details</p>
                                 <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-full bg-green-200 flex items-center justify-center text-green-800 text-xs font-bold shrink-0">
-                                    {b.requester.first_name?.[0] || '?'}{b.requester.last_name?.[0] || ''}
+                                    {req.first_name?.[0] || '?'}{req.last_name?.[0] || ''}
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="text-sm font-medium text-gray-900">{b.requester.first_name} {b.requester.last_name}</p>
+                                    <p className="text-sm font-medium text-gray-900">{req.first_name} {req.last_name}</p>
                                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                                      {b.requester.phone && (
-                                        <a href={`tel:${b.requester.phone}`} className="text-xs text-green-700 hover:underline flex items-center gap-0.5">
-                                          <Phone size={10} /> {b.requester.phone}
+                                      {req.phone && (
+                                        <a href={`tel:${req.phone}`} className="text-xs text-green-700 hover:underline flex items-center gap-0.5">
+                                          <Phone size={10} /> {req.phone}
                                         </a>
                                       )}
-                                      {b.requester.email && (
-                                        <a href={`mailto:${b.requester.email}`} className="text-xs text-green-700 hover:underline flex items-center gap-0.5">
-                                          <Mail size={10} /> {b.requester.email}
+                                      {req.email && (
+                                        <a href={`mailto:${req.email}`} className="text-xs text-green-700 hover:underline flex items-center gap-0.5">
+                                          <Mail size={10} /> {req.email}
                                         </a>
                                       )}
                                     </div>
@@ -385,12 +392,13 @@ function ProviderMarketplaceContent({ providerIdProp }) {
                               </div>
                             )}
 
-                            <button onClick={() => openChatWithRequester(b?.requester?.id)}
+                            <button onClick={() => openChatWithRequester(b?.posted_by)}
                               className="w-full py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 flex items-center justify-center gap-1.5">
                               <MessageSquare size={14} /> Chat with Requester
                             </button>
                           </div>
-                        )}
+                          )
+                        })()}
                       </div>
                     )}
                   </div>

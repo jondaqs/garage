@@ -61,7 +61,7 @@ function buildEmailHtml({ recipientName, subject, bodyText, ctaLabel, ctaUrl, ac
 }
 
 export async function POST(req) {
-  const limited = commsLimiter.check(request)
+  const limited = commsLimiter.check(req)
   if (limited) return limited
 
   try {
@@ -128,12 +128,13 @@ export async function POST(req) {
       }
 
     } else if (body.type === 'award') {
-      // Notify winning provider
+      // Notify winning provider (email + SMS)
       if (body.winner_provider_id) {
         const { data: provider } = await s.from('service_providers')
           .select('owner_user_id').eq('id', body.winner_provider_id).maybeSingle()
         if (provider?.owner_user_id) {
           const p = await getProfile(s, provider.owner_user_id)
+          const detailsUrl = `${APP_URL()}/provider/service-marketplace?view=responses&response=${body.response_id}`
           if (p?.email) {
             try {
               await sendAndQueueEmail(s, {
@@ -141,15 +142,28 @@ export async function POST(req) {
                 subject: `[${BRAND}] You've been selected! — ${body.broadcast_number}`,
                 html: buildEmailHtml({
                   recipientName: p.name,
-                  bodyText: `Congratulations! Your proposal for "<strong>${body.broadcast_title}</strong>" has been accepted. Contact the requester to coordinate next steps.`,
-                  ctaLabel: 'View Details', ctaUrl: `${APP_URL()}/provider/service-marketplace?view=responses&response=${body.response_id}`,
+                  bodyText: `Congratulations! Your proposal for "<strong>${body.broadcast_title}</strong>" has been accepted. View the request to see the requester's contact details and start a conversation.`,
+                  ctaLabel: 'View Details & Chat', ctaUrl: detailsUrl,
                   accentColor: '#059669',
                 }),
-                text: `${BRAND}: Your proposal for "${body.broadcast_title}" was accepted! View details in your dashboard.`,
+                text: `${BRAND}: Your proposal for "${body.broadcast_title}" was accepted! View requester details and chat: ${detailsUrl}`,
                 referenceTable: 'service_broadcasts', referenceId: body.broadcast_id,
               })
               results.emails_sent++
             } catch (e) { console.error('[broadcast-notify] award email failed:', e.message) }
+          }
+          if (p?.phone) {
+            try {
+              const normalised = normalisePhone(p.phone)
+              if (normalised) {
+                await sendAndQueueSms(s, {
+                  to: normalised,
+                  message: `${BRAND}: Your proposal for "${body.broadcast_title}" (${body.broadcast_number}) was accepted! View details: ${detailsUrl}`,
+                  referenceTable: 'service_broadcasts', referenceId: body.broadcast_id,
+                })
+                results.sms_sent++
+              }
+            } catch (e) { console.error('[broadcast-notify] award SMS failed:', e.message) }
           }
         }
       }
