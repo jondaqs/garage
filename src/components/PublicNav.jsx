@@ -78,7 +78,7 @@ export default function PublicNav() {
           background: none; border: none; cursor: pointer; padding: 0;
         }
         .pn-logo-icon {
-          width: 40px; height: 40px; border-radius: 10px;
+          width: 48px; height: 48px; border-radius: 12px;
           background: rgba(255,255,255,0.10);
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0; overflow: hidden;
@@ -88,7 +88,7 @@ export default function PublicNav() {
           letter-spacing: -0.02em;
         }
         @media (min-width: 640px) {
-          .pn-logo-icon { width: 44px; height: 44px; }
+          .pn-logo-icon { width: 52px; height: 52px; }
           .pn-logo-text { font-size: 22px; }
         }
 
@@ -219,7 +219,7 @@ export default function PublicNav() {
         {/* Logo */}
         <button className="pn-logo" onClick={() => router.push('/')}>
           <div className="pn-logo-icon">
-            <Image src="/logo.png" alt="Carfix-Connect" width={40} height={40} style={{ objectFit: 'contain' }} />
+            <Image src="/logo.png" alt="Carfix-Connect" width={48} height={48} style={{ objectFit: 'contain' }} />
           </div>
           <span className="gc-display pn-logo-text">Carfix-Connect</span>
         </button>
@@ -258,8 +258,8 @@ export default function PublicNav() {
       <div className={`pn-drawer ${mobileOpen ? 'open' : ''}`}>
         <div className="pn-drawer-header">
           <button className="pn-logo" onClick={() => router.push('/')} style={{ gap: 8 }}>
-            <div className="pn-logo-icon" style={{ width: 38, height: 38 }}>
-              <Image src="/logo.png" alt="Carfix-Connect" width={34} height={34} style={{ objectFit: 'contain' }} />
+            <div className="pn-logo-icon" style={{ width: 44, height: 44 }}>
+              <Image src="/logo.png" alt="Carfix-Connect" width={40} height={40} style={{ objectFit: 'contain' }} />
             </div>
             <span className="gc-display" style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>
               Carfix-Connect
