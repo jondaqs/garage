@@ -133,6 +133,10 @@ function ServiceRequestsContent({ subscriberType, entityId, canWrite = true, acc
         </div>
       </div>
 
+      <p className="text-sm text-gray-600 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2.5">
+        Describe what you need — verified service providers will send you proposals with pricing and availability. Review, compare, and accept the best fit.
+      </p>
+
       <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 text-[11px] w-fit">
         {['all', 'active', 'awarded', 'completed', 'cancelled'].map(f => (
           <button key={f} onClick={() => setStatusFilter(f)}
