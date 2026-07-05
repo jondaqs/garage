@@ -60,7 +60,10 @@ function ProviderMarketplaceContent({ providerIdProp }) {
       .select('*').eq('status', 'open').eq('is_hidden', false)
       .order('created_at', { ascending: false })
     if (profileId) query = query.neq('posted_by', profileId)
-    if (providerId) query = query.neq('service_provider_id', providerId)
+    // .neq() excludes NULLs in PostgreSQL (NULL != value → NULL → excluded),
+    // so individual/company broadcasts (service_provider_id IS NULL) vanish.
+    // Use .or() to keep NULLs while still excluding this provider's own posts.
+    if (providerId) query = query.or(`service_provider_id.neq.${providerId},service_provider_id.is.null`)
     const { data } = await query
     setAllBroadcasts(data || [])
     if (initial) setLoadingBrowse(false); else setRefreshingBrowse(false)
