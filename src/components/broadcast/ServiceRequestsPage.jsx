@@ -38,13 +38,29 @@ function ServiceRequestsContent({ subscriberType, entityId, canWrite = true, acc
 
   const load = useCallback(async (initial = false) => {
     if (initial) setLoading(true); else setRefreshing(true)
+
+    // Resolve current user's profile id to scope "my" broadcasts
+    let profileId = null
+    if (!entityId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single()
+        profileId = profile?.id
+      }
+    }
+
     let query = supabase.from('service_broadcasts').select('*').order('created_at', { ascending: false })
     // Scope to entity when viewing company/provider member context
     if (entityId && subscriberType === 'company') query = query.eq('company_id', entityId)
     else if (entityId && subscriberType === 'service_provider') query = query.eq('service_provider_id', entityId)
-    else if (subscriberType === 'individual') query = query.eq('poster_type', 'individual')
-    else if (subscriberType === 'company') query = query.eq('poster_type', 'company')
-    else if (subscriberType === 'service_provider') query = query.eq('poster_type', 'service_provider')
+    // Scope to the logged-in user's own broadcasts (not all broadcasts of that type)
+    else if (profileId) query = query.eq('posted_by', profileId).eq('poster_type', subscriberType)
+    else query = query.eq('poster_type', subscriberType)
+
     const { data } = await query
     setBroadcasts(data || [])
     if (initial) setLoading(false); else setRefreshing(false)
