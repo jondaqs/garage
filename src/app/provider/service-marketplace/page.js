@@ -72,7 +72,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   const loadMyResponses = useCallback(async (initial = false) => {
     if (initial) setLoadingResponses(true); else setRefreshingResponses(true)
     const { data } = await supabase.from('service_broadcast_responses')
-      .select('*, service_broadcasts(id, broadcast_number, title, description, status, poster_type, urgency, location, budget_estimate)')
+      .select('*, service_broadcasts!broadcast_id(id, broadcast_number, title, description, status, poster_type, urgency, location, budget_estimate)')
       .order('created_at', { ascending: false })
     setMyResponses(data || [])
     if (initial) setLoadingResponses(false); else setRefreshingResponses(false)
