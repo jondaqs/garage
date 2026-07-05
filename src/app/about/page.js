@@ -24,7 +24,7 @@ export default function AboutPage() {
     {
       icon: Heart,
       title: 'Local Focus',
-      body: "We're built for Kenyan roads and Kenyan drivers — Nairobi traffic, Mombasa heat, Eldoret cold mornings. Local context, local prices."
+      body: "We're Connecting Drivers to Trusted Vehicle Services. Local context, local prices."
     },
     {
       icon: Users,
@@ -35,7 +35,8 @@ export default function AboutPage() {
 
   const stats = [
     { value: 'Drivers',   label: 'Find verified workshops' },
-    { value: 'Garages',   label: 'Grow your customer base' },
+    { value: 'Vehicle Service Providers',   label: 'Grow your customer base' },
+    { value: 'Vehicle Service Providers',   label: 'Grow your visibility' },
     { value: 'Companies', label: 'Manage fleets with ease' },
     { value: 'One App',   label: 'Built around you' },
   ]
@@ -145,7 +146,7 @@ export default function AboutPage() {
               color: 'rgba(255,255,255,0.78)',
               maxWidth: 720,
             }}>
-              Carfix-Connect connects Kenyan drivers, garages, and fleet operators on one straightforward platform. We started because servicing a vehicle in this country is harder than it should be — too many phone calls, too much uncertainty, too many missing records. So we built the tool we wished existed.
+              Carfix-Connect connects drivers, garages, and fleet operators on one straightforward platform. We started because servicing a vehicle in this country is harder than it should be — too many phone calls, too much uncertainty, too many missing records. So we built the tool we wished existed.
             </p>
           </div>
         </div>
@@ -166,7 +167,7 @@ export default function AboutPage() {
               </h2>
             </div>
             <p style={{ fontSize: 16, lineHeight: 1.75, color: 'rgba(255,255,255,0.75)' }}>
-              To make every car service in Kenya feel as simple as ordering a ride. That means transparent pricing, verified providers, full service history at your fingertips, and reminders before things break — not after. For drivers, that's peace of mind. For garages, it's a steady book of trusted customers. For companies, it's complete visibility across every vehicle in the fleet.
+              To make every car service feel as simple as ordering a ride. That means tarcking work order progress, transparent pricing, verified providers, full service history at your fingertips, and reminders before things break — not after. For drivers, that's peace of mind. For garages, it's a steady book of trusted customers. For companies, it's complete visibility across every vehicle in the fleet.
             </p>
           </div>
 
@@ -270,7 +271,7 @@ export default function AboutPage() {
             <button onClick={() => router.push('/contact')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}>Contact</button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
           </p>
         </footer>
       </div>

@@ -11,7 +11,7 @@ import PublicNav from '@/components/PublicNav'
 
 // ─── Configure these once your business contact details are confirmed ──────
 const SUPPORT_EMAIL = 'info@carfix-connect.com'
-const SUPPORT_PHONE = '+254 700 000 000'
+const SUPPORT_PHONE = '+254 746004273'
 const SUPPORT_LOCATION = 'Nairobi, Kenya'
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -420,7 +420,7 @@ export default function ContactPage() {
             <button onClick={() => router.push('/contact')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}>Contact</button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
           </p>
         </footer>
       </div>

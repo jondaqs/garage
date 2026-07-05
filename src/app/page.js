@@ -398,7 +398,7 @@ export default function LandingPage() {
             </button>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
-            © {new Date().getFullYear()} Carfix-Connect. Built for Kenyan roads.
+            © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
           </p>
         </footer>
       </div>
