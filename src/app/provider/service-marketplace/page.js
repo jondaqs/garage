@@ -53,6 +53,16 @@ function ProviderMarketplaceContent({ providerIdProp }) {
   const [providerId, setProviderId] = useState(providerIdProp || null)
   const [identityReady, setIdentityReady] = useState(!!providerIdProp) // skip resolution if prop provided
 
+  // Toast
+  const [toast, setToast] = useState(null)
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 5000)
+  }
+
+  // Derive set of broadcast IDs the provider has already responded to
+  const respondedBroadcastIds = new Set(myResponses.map(r => r.broadcast_id))
+
   const loadBrowse = useCallback(async (initial = false) => {
     if (initial) setLoadingBrowse(true); else setRefreshingBrowse(true)
     // Exclude this user's own broadcasts AND their provider's broadcasts
@@ -229,10 +239,16 @@ function ProviderMarketplaceContent({ providerIdProp }) {
                           {b.preferred_start && <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded flex items-center gap-0.5"><Clock size={8} />Start: {fmtDate(b.preferred_start)}</span>}
                         </div>
                         <WriteGate canWrite={providerAccess.canWrite} state={providerAccess.state}>
-                        <button onClick={() => setRespondingTo(b)}
-                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-1.5">
-                          <FileText size={14} /> Submit Proposal
-                        </button>
+                        {respondedBroadcastIds.has(b.id) ? (
+                          <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-lg cursor-not-allowed">
+                            <CheckCircle size={14} /> Proposal Submitted
+                          </span>
+                        ) : (
+                          <button onClick={() => setRespondingTo(b)}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-1.5">
+                            <FileText size={14} /> Submit Proposal
+                          </button>
+                        )}
                         </WriteGate>
                       </div>
                     )}
@@ -358,7 +374,22 @@ function ProviderMarketplaceContent({ providerIdProp }) {
       <CreateBroadcastModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}
         onSubmitted={() => { loadMyBroadcasts(); loadBrowse() }} supabase={supabase} contextType="service_provider" />
       <RespondToBroadcastModal isOpen={!!respondingTo} onClose={() => setRespondingTo(null)}
-        onSubmitted={() => { loadMyResponses(); loadBrowse() }} supabase={supabase} broadcast={respondingTo} />
+        onSubmitted={(res) => { loadMyResponses(); loadBrowse(); showToast(`Proposal submitted for ${res.broadcast_number}`, 'success') }}
+        onError={(msg) => showToast(msg, 'error')}
+        supabase={supabase} broadcast={respondingTo} />
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-md w-full px-4`}>
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium ${
+            toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+            <span className="flex-1">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="opacity-50 hover:opacity-100">✕</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

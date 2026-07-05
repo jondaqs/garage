@@ -6,7 +6,7 @@ import { X, Loader2, CheckCircle, AlertCircle, Send, FileText } from 'lucide-rea
 
 const inp = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
-export default function RespondToBroadcastModal({ isOpen, onClose, onSubmitted, supabase, broadcast }) {
+export default function RespondToBroadcastModal({ isOpen, onClose, onSubmitted, onError, supabase, broadcast }) {
   const [proposal, setProposal] = useState('')
   const [quotedPrice, setQuotedPrice] = useState('')
   const [duration, setDuration] = useState('')
@@ -36,7 +36,15 @@ export default function RespondToBroadcastModal({ isOpen, onClose, onSubmitted, 
       })
       if (rpcErr) throw rpcErr
       const res = typeof data === 'string' ? JSON.parse(data) : data
-      if (!res.success) throw new Error(res.error)
+      if (!res.success) {
+        // Duplicate response — surface via toast and close modal
+        if (res.error && res.error.toLowerCase().includes('already responded')) {
+          if (onError) onError(res.error)
+          onClose()
+          return
+        }
+        throw new Error(res.error)
+      }
 
       setResult(res)
       if (onSubmitted) onSubmitted(res)
