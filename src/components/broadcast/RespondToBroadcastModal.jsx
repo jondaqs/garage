@@ -6,7 +6,7 @@ import { X, Loader2, CheckCircle, AlertCircle, Send, FileText } from 'lucide-rea
 
 const inp = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
-export default function RespondToBroadcastModal({ isOpen, onClose, onSubmitted, onError, supabase, broadcast }) {
+export default function RespondToBroadcastModal({ isOpen, onClose, onSubmitted, onError, supabase, broadcast, providerId }) {
   const [proposal, setProposal] = useState('')
   const [quotedPrice, setQuotedPrice] = useState('')
   const [duration, setDuration] = useState('')
@@ -33,6 +33,7 @@ export default function RespondToBroadcastModal({ isOpen, onClose, onSubmitted, 
         p_quoted_price: quotedPrice ? Number(quotedPrice) : null,
         p_estimated_duration: duration || null,
         p_availability: availability || null,
+        p_provider_id: providerId || null,
       })
       if (rpcErr) throw rpcErr
       const res = typeof data === 'string' ? JSON.parse(data) : data

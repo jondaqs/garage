@@ -379,7 +379,7 @@ function ProviderMarketplaceContent({ providerIdProp }) {
       <RespondToBroadcastModal isOpen={!!respondingTo} onClose={() => setRespondingTo(null)}
         onSubmitted={(res) => { loadMyResponses(); loadBrowse(); showToast(`Proposal submitted for ${res.broadcast_number}`, 'success') }}
         onError={(msg) => showToast(msg, 'error')}
-        supabase={supabase} broadcast={respondingTo} />
+        supabase={supabase} broadcast={respondingTo} providerId={providerId} />
 
       {/* Toast */}
       {toast && (
