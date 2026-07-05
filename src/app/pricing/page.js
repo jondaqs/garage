@@ -9,6 +9,7 @@ import { detectCurrencyFromBrowser, matchCurrencyInList } from '@/lib/currency/d
 import IndividualPricing from '@/components/pricing/IndividualPricing'
 import CompanyPricing from '@/components/pricing/CompanyPricing'
 import ProviderPricing from '@/components/pricing/ProviderPricing'
+import PublicNav from '@/components/PublicNav'
 
 const PERIODS = [
   { code: 'monthly',     label: 'Monthly' },
@@ -200,7 +201,6 @@ export default function PricingPage() {
         @media (max-width: 640px) {
           .gc-hero-title { font-size: 28px !important; }
           .gc-hero-sub { font-size: 14px !important; }
-          .gc-pricing-nav-links { display: none !important; }
           .gc-pricing-tab-desc { display: none; }
           .gc-pricing-footer { padding: 20px 16px !important; flex-direction: column !important; text-align: center; }
         }
@@ -214,39 +214,7 @@ export default function PricingPage() {
         <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.6 }} />
 
         {/* ── NAV ── */}
-        <nav style={{
-          position: 'relative', zIndex: 10,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 48px',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(8px)', background: 'rgba(255,255,255,0.03)',
-        }}>
-          <button onClick={() => router.push('/')}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer' }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Car size={20} color="#fff" />
-            </div>
-            <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Carfix-Connect</span>
-          </button>
-          <div className="gc-pricing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {[
-              { label: 'About Us', path: '/about', active: false },
-              { label: 'Pricing',  path: '/pricing', active: true },
-              { label: 'Contact',  path: '/contact', active: false },
-            ].map(n => (
-              <button key={n.path} onClick={() => router.push(n.path)} className="gc-nav-link" style={{
-                background: n.active ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: n.active ? '#fff' : 'rgba(255,255,255,0.75)',
-                border: 'none', padding: '10px 16px', borderRadius: 8,
-                fontSize: 14, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s ease',
-              }}>{n.label}</button>
-            ))}
-            <button onClick={() => router.push('/auth/login')} className="gc-btn-primary"
-              style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', marginLeft: 4 }}>
-              Sign In <ArrowRight size={15} />
-            </button>
-          </div>
-        </nav>
+        <PublicNav />
 
         {/* ── HERO ── */}
         <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '64px 24px 20px', maxWidth: 720, margin: '0 auto' }}>

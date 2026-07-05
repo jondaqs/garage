@@ -9,6 +9,11 @@ export const metadata = {
   manifest: '/manifest.json',
   themeColor: '#2563eb',
   viewport: 'width=device-width, initial-scale=1',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Carfix',
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: '32x32' },

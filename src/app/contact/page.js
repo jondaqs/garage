@@ -7,6 +7,7 @@ import {
   Car, ArrowRight, ArrowLeft, Mail, Phone, MapPin, MessageCircle,
   Send, CheckCircle2, AlertCircle
 } from 'lucide-react'
+import PublicNav from '@/components/PublicNav'
 
 // ─── Configure these once your business contact details are confirmed ──────
 const SUPPORT_EMAIL = 'info@carfix-connect.com'
@@ -154,79 +155,7 @@ export default function ContactPage() {
         }} />
 
         {/* ── NAV ── */}
-        <nav style={{
-          position: 'relative', zIndex: 10,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 48px',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(8px)',
-          background: 'rgba(255,255,255,0.03)',
-        }}>
-          <button
-            onClick={() => router.push('/')}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            <div style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: 'rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Car size={20} color="#fff" />
-            </div>
-            <span className="gc-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-              Carfix-Connect
-            </span>
-          </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => router.push('/about')}
-              className="gc-nav-link"
-              style={{
-                background: 'transparent',
-                color: 'rgba(255,255,255,0.75)',
-                border: 'none', padding: '10px 16px', borderRadius: 8,
-                fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              About Us
-            </button>
-            <button
-              onClick={() => router.push('/pricing')}
-               className="gc-nav-link"
-               style={{
-                 background: 'transparent',
-                 color: 'rgba(255,255,255,0.75)',
-                 border: 'none', padding: '10px 16px', borderRadius: 8,
-                 fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                 transition: 'all 0.2s ease',
-               }}
-             >
-               Pricing
-             </button>
-            <button
-              onClick={() => router.push('/contact')}
-              className="gc-nav-link"
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                color: '#fff',
-                border: 'none', padding: '10px 16px', borderRadius: 8,
-                fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              Contact Us
-            </button>
-            <button
-              onClick={() => router.push('/auth/login')}
-              className="gc-btn-primary"
-              style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', marginLeft: 4 }}
-            >
-              Sign In <ArrowRight size={15} />
-            </button>
-          </div>
-        </nav>
+        <PublicNav />
 
         {/* ── HERO ── */}
         <div style={{ position: 'relative', zIndex: 1, padding: '72px 48px 40px', maxWidth: 1100, margin: '0 auto' }}>
