@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, ArrowRight, User, Building2, Wrench, Loader2, Globe, ChevronDown } from 'lucide-react'
+import { ArrowRight, User, Building2, Wrench, Loader2, Globe, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { detectCurrencyFromBrowser, matchCurrencyInList } from '@/lib/currency/detectCurrency'
 import IndividualPricing from '@/components/pricing/IndividualPricing'
@@ -370,7 +370,7 @@ export default function PricingPage() {
           flexWrap: 'wrap', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Car size={16} color="rgba(255,255,255,0.3)" />
+            <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', opacity: 0.5 }} />
             <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
