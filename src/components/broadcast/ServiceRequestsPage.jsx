@@ -89,11 +89,25 @@ function ServiceRequestsContent({ subscriberType, entityId, canWrite = true, acc
     else { setExpandedId(id); loadResponses(id) }
   }
 
-  const awardBroadcast = async (broadcastId, responseId, providerName) => {
+  const awardBroadcast = async (broadcastId, responseId, providerName, providerId, broadcastTitle, broadcastNumber) => {
     if (!confirm(`Award this broadcast to ${providerName}? All other responses will be rejected.`)) return
     const { data } = await supabase.rpc('award_broadcast', { p_broadcast_id: broadcastId, p_response_id: responseId })
     const res = typeof data === 'string' ? JSON.parse(data) : data
-    if (res?.success) { await load(); loadResponses(broadcastId) }
+    if (res?.success) {
+      await load(); loadResponses(broadcastId)
+      // Send email/SMS notification to the winning provider
+      fetch('/api/service-broadcast/notify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'award',
+          broadcast_id: broadcastId,
+          broadcast_number: broadcastNumber || res.broadcast_number,
+          broadcast_title: broadcastTitle,
+          winner_provider_id: providerId,
+          response_id: responseId,
+        }),
+      }).catch(() => {})
+    }
     else alert(res?.error || 'Failed to award')
   }
 
@@ -215,7 +229,7 @@ function ServiceRequestsContent({ subscriberType, entityId, canWrite = true, acc
                                 {r.availability && <span>{r.availability}</span>}
                               </div>
                               {b.status === 'open' && r.status === 'submitted' && (
-                                <button onClick={() => awardBroadcast(b.id, r.id, r.service_providers?.name)}
+                                <button onClick={() => awardBroadcast(b.id, r.id, r.service_providers?.name, r.provider_id, b.title, b.broadcast_number)}
                                   className="mt-1 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 flex items-center gap-1">
                                   <Star size={10} /> Accept Proposal
                                 </button>
