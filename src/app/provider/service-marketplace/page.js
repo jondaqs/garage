@@ -74,9 +74,13 @@ function ProviderMarketplaceContent({ providerIdProp }) {
     })
     const res = typeof data === 'string' ? JSON.parse(data) : data
     if (!error && res?.success) {
-      router.push(`/provider/chat?conversation=${res.conversation_id}`)
+      // Route to correct chat page based on owner vs member context
+      const chatBase = providerIdProp
+        ? `/dashboard/my-teams/provider/${providerIdProp}/chat`
+        : '/provider/chat'
+      router.push(`${chatBase}?conversation=${res.conversation_id}`)
     } else {
-      showToast(res?.error || 'Could not open chat. Please try again.', 'error')
+      showToast(res?.error || error?.message || 'Could not open chat. Please try again.', 'error')
     }
   }
 

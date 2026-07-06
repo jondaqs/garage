@@ -234,12 +234,19 @@ function ServiceRequestsContent({ subscriberType, entityId, canWrite = true, acc
                                   <Star size={10} /> Accept Proposal
                                 </button>
                               )}
-                              {r.status === 'accepted' && r.provider_id && (
-                                <a href={`/dashboard/chat?provider=${r.provider_id}`}
-                                  className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white text-xs font-medium rounded-lg hover:bg-green-800">
-                                  <MessageSquare size={10} /> Chat with {r.service_providers?.name || 'Provider'}
-                                </a>
-                              )}
+                              {r.status === 'accepted' && r.provider_id && (() => {
+                                const chatUrl = subscriberType === 'company' && entityId
+                                  ? `/dashboard/company/${entityId}/chat?provider=${r.provider_id}`
+                                  : subscriberType === 'company'
+                                  ? `/company/chat?provider=${r.provider_id}`
+                                  : `/dashboard/chat?provider=${r.provider_id}`
+                                return (
+                                  <a href={chatUrl}
+                                    className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white text-xs font-medium rounded-lg hover:bg-green-800">
+                                    <MessageSquare size={10} /> Chat with {r.service_providers?.name || 'Provider'}
+                                  </a>
+                                )
+                              })()}
                             </div>
                           ))}
                         </div>
