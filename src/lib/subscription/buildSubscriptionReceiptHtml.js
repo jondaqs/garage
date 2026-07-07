@@ -235,7 +235,7 @@ export function buildSubscriptionReceiptHtml({
   <!-- Footer -->
   <div style="margin:16px 24px 28px;text-align:center;padding-top:16px;border-top:1px solid #f1f5f9;">
     <p style="margin:0 0 2px;font-size:11px;color:#94a3b8;">Thank you for your subscription.</p>
-    <p style="margin:0;font-size:10px;color:#cbd5e1;">Powered by ${BRAND} · Kenya</p>
+    <p style="margin:0;font-size:10px;color:#cbd5e1;">Powered by ${BRAND}</p>
   </div>
 </div>
 </td></tr>

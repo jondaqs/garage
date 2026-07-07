@@ -95,7 +95,7 @@ function buildPaymentEmailHtml({ providerName, invoiceNumber, receiptNumber,
   </td></tr>
 
   <tr><td style="background:#f8fafc;padding:14px 32px;border-top:1px solid #e2e8f0;text-align:center;">
-    <p style="margin:0;font-size:11px;color:#94a3b8;">© ${new Date().getFullYear()} ${BRAND} · Kenya</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;">© ${new Date().getFullYear()} ${BRAND}</p>
   </td></tr>
 </table>
 </td></tr>

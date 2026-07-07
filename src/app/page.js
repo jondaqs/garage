@@ -228,7 +228,7 @@ export default function LandingPage() {
           }}>
             <Zap size={13} color="#93c5fd" />
             <span style={{ fontSize: 12, color: '#bfdbfe', fontWeight: 500, letterSpacing: '0.04em' }}>
-              Kenya's #1 Vehicle Care Platform
+              Your #1 Platform for Connecting Vehicles to Service Providers
             </span>
           </div>
 
