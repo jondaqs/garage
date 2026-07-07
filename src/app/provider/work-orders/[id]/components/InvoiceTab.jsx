@@ -233,7 +233,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">%</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Default: 16% (Kenya VAT)</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Default: 16%</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">

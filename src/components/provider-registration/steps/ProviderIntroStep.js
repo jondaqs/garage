@@ -46,7 +46,7 @@ export default function ProviderIntroStep({ nextStep, previousStep }) {
           Welcome to Carfix-Connect Provider Network
         </h2>
         <p className="text-lg text-gray-600">
-          Join Kenya's leading automotive service platform
+          Join the leading automotive service platform
         </p>
       </div>
 

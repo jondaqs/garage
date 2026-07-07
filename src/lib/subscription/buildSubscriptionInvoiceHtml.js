@@ -298,7 +298,7 @@ export function buildSubscriptionInvoiceHtml({
   <tr>
     <td style="padding:16px 32px;text-align:center;border-top:1px solid #1e293b;background:#0f172a;">
       <p style="margin:0;font-size:11px;color:#475569;">
-        ${BRAND} · Vehicle Service Platform · Kenya<br>
+        ${BRAND} · Vehicle Service Platform<br>
         &copy; ${new Date().getFullYear()} ${BRAND}. This is an official subscription invoice.
       </p>
     </td>

@@ -59,7 +59,7 @@ function emailWrapper({ title, previewText, bodyHtml, ctaHref, ctaLabel, footerN
         <td style="background:#f9fafb;padding:20px 32px;border-top:1px solid #e5e7eb;text-align:center;">
           ${footerNote ? `<p style="margin:0 0 8px;font-size:12px;color:#6b7280;">${footerNote}</p>` : ''}
           <p style="margin:0;font-size:12px;color:#9ca3af;">
-            © ${new Date().getFullYear()} ${BRAND_NAME} · Vehicle Service Platform · Kenya
+            © ${new Date().getFullYear()} ${BRAND_NAME} · Vehicle Service Platform
           </p>
         </td>
       </tr>

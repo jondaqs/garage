@@ -224,7 +224,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
             placeholder="A123456789X"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Tax identification number (e.g., KRA PIN for Kenya)
+            Tax identification number (e.g., TAX PIN)
           </p>
         </div>
 
