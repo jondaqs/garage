@@ -92,13 +92,17 @@ function LookupTable({ supabase, tableName, columns, sortField = 'sort_order', d
     setSaving('new')
     setError('')
     try {
-      const insert = {}
+      const insert = { ...defaults }
       columns.filter(c => c.editable !== false).forEach(c => {
         let val = newData[c.key]
         if (c.type === 'boolean') val = val === true || val === 'true'
         if (c.type === 'number')  val = val === '' ? null : Number(val)
         insert[c.key] = val === '' ? null : val
       })
+      // Auto-derive 'name' from 'code' or 'display_name' when not set
+      if (!insert.name && (insert.code || insert.display_name)) {
+        insert.name = insert.code || insert.display_name.toLowerCase().replace(/\s+/g, '_')
+      }
       const { error: e } = await supabase.from(tableName).insert(insert)
       if (e) throw e
       setAddMode(false)
