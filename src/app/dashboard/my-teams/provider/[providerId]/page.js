@@ -1,4 +1,3 @@
-// → Drop this file at: src/components/Sidebar.js
 'use client'
 
 import {
@@ -464,7 +463,7 @@ export default function Sidebar({ user }) {
       // 1. Fetch service_provider_users (all roles)
       const { data: spuRows, error: spuErr } = await supabase
         .from('service_provider_users')
-        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat, service_provider:service_providers_secure(id, name)')
+        .select('id, role, service_provider_id, can_approve_work, can_manage_inventory, can_manage_team, can_send_estimates, can_send_invoice, can_chat, deactivation_requested_at, service_provider:service_providers_secure(id, name)')
         .eq('user_id', profile.id)
         .eq('is_active', true)
 
@@ -505,6 +504,7 @@ export default function Sidebar({ user }) {
             can_send_estimates:  !!(m.can_send_estimates   || mech?.can_send_estimates),
             can_send_invoice:    !!(m.can_send_invoice     || mech?.can_send_invoice),
             can_chat:            !!(m.can_chat             || mech?.can_chat),
+            pendingLeave:        !!m.deactivation_requested_at,
           }
         }))
 
@@ -915,7 +915,7 @@ export default function Sidebar({ user }) {
             {mechanicMemberships.map(m => {
               const isOpen = providerNavOpen[m.providerId] ?? false
               const pAccess = providerAccessMap[m.providerId]
-              const providerInactive = pAccess && !pAccess.canWrite
+              const providerInactive = (pAccess && !pAccess.canWrite) || m.pendingLeave
               return (
                 <div key={m.providerId} className="mb-2">
                   {/* Provider toggle */}
@@ -930,7 +930,11 @@ export default function Sidebar({ user }) {
                       <span className={`text-xs font-semibold truncate leading-tight ${providerInactive ? 'text-gray-400' : 'text-gray-700'}`}>
                         {m.providerName}
                       </span>
-                      {providerInactive && (
+                      {m.pendingLeave ? (
+                        <span className="text-[8px] normal-case tracking-normal px-1 py-0.5 rounded bg-yellow-100 text-yellow-700 border border-yellow-200 flex-shrink-0">
+                          Pending Leave
+                        </span>
+                      ) : providerInactive && (
                         <span className="text-[8px] normal-case tracking-normal px-1 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
                           Inactive
                         </span>
@@ -1009,7 +1013,7 @@ export default function Sidebar({ user }) {
                       </div>
 
                       {/* Subscription warning */}
-                      {providerInactive && (
+                      {providerInactive && !m.pendingLeave && (
                         <div className="mx-1 mb-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
                           <CreditCard size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
                           <p className="text-[11px] text-amber-700 leading-snug">
@@ -1020,7 +1024,20 @@ export default function Sidebar({ user }) {
                         </div>
                       )}
 
-                      {/* Provider nav items */}
+                      {/* Pending leave — block all provider access */}
+                      {m.pendingLeave && (
+                        <div className="mx-1 mb-1.5 px-3 py-2.5 rounded-lg bg-yellow-50 border border-yellow-200">
+                          <p className="text-[11px] font-semibold text-yellow-800 leading-snug">
+                            Your leave request is being reviewed.
+                          </p>
+                          <p className="text-[10px] text-yellow-600 mt-0.5 leading-snug">
+                            Access to this provider is suspended until the owner or a team manager confirms your departure.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Provider nav items — hidden when pending leave */}
+                      {!m.pendingLeave && (
                       <div className={providerInactive ? 'opacity-60' : ''}>
                       {/* Overview is provider-specific */}
                       <NavItem key={`${m.providerId}-overview`} compact item={{
@@ -1090,6 +1107,7 @@ export default function Sidebar({ user }) {
                           entry points together when a member belongs to multiple
                           providers. */}
                       </div>
+                      )}
                     </>
                   )}
                 </div>

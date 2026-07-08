@@ -119,6 +119,8 @@ export default function ProviderTeamPage() {
         experience_years:    m.experience_years,
         is_active:           m.is_active,
         is_verified:         m.is_verified,
+        pending_leave:       !!m.deactivation_requested_at,
+        deactivation_reason: m.deactivation_reason,
         // SPU-level permissions
         spu_can_approve_work:     m.spu_can_approve_work,
         spu_can_manage_inventory: m.spu_can_manage_inventory,
@@ -379,32 +381,48 @@ export default function ProviderTeamPage() {
     finally { setSavingMember(false) }
   }
 
-  const toggleMemberStatus = async (mechanicId, currentStatus) => {
+  const toggleMemberStatus = async (memberId, currentStatus, spuId, mechanicId) => {
     try {
-      const { error } = await supabase
-        .from('mechanics')
-        .update({ is_active: !currentStatus })
-        .eq('id', mechanicId)
+      const newStatus = !currentStatus
 
-      if (error) {
-        console.error('Toggle error:')
-        alert('Failed to update status')
-        return
+      // Update service_provider_users (primary membership record)
+      if (spuId) {
+        const { error: spuErr } = await supabase
+          .from('service_provider_users')
+          .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', spuId)
+        if (spuErr) {
+          console.error('SPU toggle error:', spuErr)
+          alert('Failed to update status')
+          return
+        }
+      }
+
+      // Update mechanics (if the member has a mechanic record)
+      if (mechanicId) {
+        const { error: mechErr } = await supabase
+          .from('mechanics')
+          .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', mechanicId)
+        if (mechErr) {
+          console.error('Mechanic toggle error:', mechErr)
+          // Non-fatal — SPU was already updated
+        }
       }
 
       // Update local state immediately
       setTeamMembers(prevMembers => 
         prevMembers.map(member => 
-          member.id === mechanicId 
-            ? { ...member, is_active: !currentStatus }
+          member.id === memberId 
+            ? { ...member, is_active: newStatus }
             : member
         )
       )
 
-      alert(`Team member ${!currentStatus ? 'activated' : 'deactivated'}`)
+      alert(`Team member ${newStatus ? 'activated' : 'deactivated'}`)
 
     } catch (error) {
-      console.error('Toggle status error:')
+      console.error('Toggle status error:', error)
       alert('Failed to update status')
     }
   }
@@ -654,6 +672,19 @@ export default function ProviderTeamPage() {
                   {!member.mechanic_id && member.bio && (
                     <p className="text-sm text-gray-500 mt-1 italic">"{member.bio}"</p>
                   )}
+
+                  {/* Pending leave banner */}
+                  {member.pending_leave && (
+                    <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
+                      <p className="text-xs font-semibold text-yellow-800 flex items-center gap-1">
+                        ⚠️ Has requested to leave the team
+                      </p>
+                      {member.deactivation_reason && (
+                        <p className="text-xs text-yellow-700 mt-0.5">Reason: &quot;{member.deactivation_reason}&quot;</p>
+                      )}
+                      <p className="text-xs text-yellow-600 mt-1">Review any pending duties or tools to return before confirming.</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
@@ -679,13 +710,15 @@ export default function ProviderTeamPage() {
                     )}
                   </div>
                   {member.role !== 'service_provider_owner' && (<>
-                    <button
-                      onClick={() => startEditMember(member)}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
-                    >
-                      <SettingsIcon size={13} /> Edit
-                    </button>
-                    {!member.is_verified && (
+                    {!member.pending_leave && (
+                      <button
+                        onClick={() => startEditMember(member)}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <SettingsIcon size={13} /> Edit
+                      </button>
+                    )}
+                    {!member.is_verified && !member.pending_leave && (
                       <button
                         onClick={() => verifyMember(member.id)}
                         className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
@@ -693,8 +726,22 @@ export default function ProviderTeamPage() {
                         Verify
                       </button>
                     )}
-                    <button
-                      onClick={() => toggleMemberStatus(member.id, member.is_active)}
+                    {member.pending_leave ? (
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Confirm departure of ${member.user?.first_name || 'this member'}? This will fully deactivate them.`)) return
+                          const { data } = await supabase.rpc('confirm_member_deactivation', { p_spu_id: member.spu_id })
+                          const res = typeof data === 'string' ? JSON.parse(data) : data
+                          if (res?.success) { alert(`${member.user?.first_name || 'Member'} has been deactivated.`); loadTeamMembers() }
+                          else alert(res?.error || 'Failed to confirm deactivation')
+                        }}
+                        className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        Confirm Departure
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => toggleMemberStatus(member.id, member.is_active, member.spu_id, member.mechanic_id)}
                       className={`px-3 py-1 text-sm rounded ${
                         member.is_active
                           ? 'bg-gray-600 text-white hover:bg-gray-700'
@@ -703,6 +750,7 @@ export default function ProviderTeamPage() {
                     >
                       {member.is_active ? 'Deactivate' : 'Activate'}
                     </button>
+                    )}
                     <button
                       onClick={() => removeMember(member.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"

@@ -46,6 +46,8 @@ export default function MyTeamsPage() {
           is_active,
           is_verified,
           joined_at,
+          deactivation_requested_at,
+          deactivation_reason,
           service_provider:service_providers_secure(
             id, name, phone, email, country
           )
@@ -74,6 +76,7 @@ export default function MyTeamsPage() {
         bio:             mechByProvider[spu.service_provider_id]?.bio || null,
         is_verified:     spu.is_verified || mechByProvider[spu.service_provider_id]?.is_verified || false,
         mechanic_id:     mechByProvider[spu.service_provider_id]?.id || null,
+        pending_leave:   !!spu.deactivation_requested_at,
       }))
 
       if (error) {
@@ -147,31 +150,40 @@ export default function MyTeamsPage() {
     finally { setResponding(null) }
   }
 
-  const handleLeaveTeam = async (mechanicId, providerName) => {
-    if (!confirm(`Are you sure you want to leave ${providerName}? This action cannot be undone.`)) {
+  const handleLeaveTeam = async (spuId, providerName) => {
+    const reason = prompt(`Why do you want to leave ${providerName}? (optional)`)
+    if (reason === null) return // user clicked Cancel on prompt
+
+    if (!confirm(`Submit a leave request for ${providerName}? The provider owner will review and confirm your departure.`)) {
       return
     }
 
-    setLeaving(mechanicId)
+    setLeaving(spuId)
 
     try {
-      const { error } = await supabase
-        .from('mechanics')
-        .update({ is_active: false })
-        .eq('id', mechanicId)
+      const { data, error } = await supabase.rpc('leave_provider_team', {
+        p_spu_id: spuId,
+        p_reason: reason || null,
+      })
 
       if (error) {
-        console.error('Error leaving team:')
-        alert('Failed to leave team. Please try again.')
+        console.error('Error requesting leave:', error)
+        alert('Failed to submit leave request. Please try again.')
         return
       }
 
-      alert(`You have left ${providerName}`)
+      const res = typeof data === 'string' ? JSON.parse(data) : data
+      if (!res?.success) {
+        alert(res?.error || 'Failed to submit leave request. Please try again.')
+        return
+      }
+
+      alert(`Leave request submitted for ${providerName}. The provider owner will review and confirm your departure.`)
       await loadTeams()
 
     } catch (error) {
-      console.error('Error:')
-      alert('Failed to leave team. Please try again.')
+      console.error('Error:', error)
+      alert('Failed to submit leave request. Please try again.')
     } finally {
       setLeaving(null)
     }
@@ -510,40 +522,70 @@ export default function MyTeamsPage() {
                           Provider Details
                         </button>
 
-                        {/* Work orders — all members */}
-                        <button
-                          onClick={() => router.push('/dashboard/my-teams/work-orders')}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                        >
-                          <ClipboardList size={16} />
-                          Work Orders
-                        </button>
+                        {/* Work orders — all members (disabled when pending leave) */}
+                        {!team.pending_leave && (
+                          <button
+                            onClick={() => router.push('/dashboard/my-teams/work-orders')}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                          >
+                            <ClipboardList size={16} />
+                            Work Orders
+                          </button>
+                        )}
 
-                        <button
-                          onClick={() => startEditing(team)}
-                          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-                        >
-                          <Edit2 size={16} />
-                          My Details
-                        </button>
+                        {!team.pending_leave && (
+                          <button
+                            onClick={() => startEditing(team)}
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                          >
+                            <Edit2 size={16} />
+                            My Details
+                          </button>
+                        )}
 
-                        <button
-                          onClick={() => handleLeaveTeam(team.id, team.service_provider?.name)}
-                          disabled={leaving === team.id}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 font-medium"
-                        >
-                          {leaving === team.id ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Leaving...
-                            </>
-                          ) : (
-                            <>
-                              <LogOut size={18} />
-                              Leave Team
-                            </>
-                          )}
-                        </button>
+                        {team.pending_leave ? (
+                          <div className="w-full space-y-2">
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                              <p className="text-sm font-semibold text-yellow-800 flex items-center gap-1.5">
+                                <Clock size={14} /> Leave Request Pending
+                              </p>
+                              <p className="text-xs text-yellow-700 mt-1">
+                                Awaiting confirmation from the provider owner or team manager.
+                                {team.deactivation_reason && <> Reason: &quot;{team.deactivation_reason}&quot;</>}
+                              </p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Cancel your leave request?')) return
+                                const { data } = await supabase.rpc('cancel_leave_request', { p_spu_id: team.id })
+                                const res = typeof data === 'string' ? JSON.parse(data) : data
+                                if (res?.success) { alert('Leave request cancelled.'); loadTeams() }
+                                else alert(res?.error || 'Failed to cancel')
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                            >
+                              Cancel Leave Request
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleLeaveTeam(team.id, team.service_provider?.name)}
+                            disabled={leaving === team.id}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 font-medium"
+                          >
+                            {leaving === team.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Submitting...
+                              </>
+                            ) : (
+                              <>
+                                <LogOut size={18} />
+                                Leave Team
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </>
                   )}

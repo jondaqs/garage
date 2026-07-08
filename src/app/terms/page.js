@@ -2,9 +2,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Car } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 
-const EFFECTIVE_DATE = '1 June 2025'
+const EFFECTIVE_DATE = '1 June 2026'
 
 export default function TermsPage() {
   const router = useRouter()
@@ -19,7 +19,7 @@ export default function TermsPage() {
             <ArrowLeft size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <Car size={18} className="text-blue-600" />
+            <img src="/logo.png" alt="GariCare" style={{ width: 24, height: 24, objectFit: 'contain' }} />
             <span className="font-bold text-gray-900 text-sm">Carfix-Connect</span>
           </div>
         </div>
