@@ -20,7 +20,7 @@ const FIELD_LABELS = {
   phone:               'Phone',
   website:             'Website',
   registration_number: 'Registration Number',
-  tax_id:              'Tax ID (KRA PIN)',
+  tax_id:              'Tax ID (TAX PIN)',
   industry:            'Industry',
   company_size:        'Company Size',
   physical_address:    'Physical Address',
@@ -36,7 +36,7 @@ const FIELD_LABELS = {
 // Document type labels — mirrors company settings Documents tab
 const DOC_TYPE_LABELS = {
   certificate_of_incorporation: 'Certificate of Incorporation',
-  tax_compliance:               'KRA PIN / Tax Compliance',
+  tax_compliance:               'TAX PIN / Tax Compliance',
   cr12:                         'CR12 / CR2 — Company Registry Extract',
   id_passport:                  'Director ID / Passport Copy',
 }
@@ -694,7 +694,7 @@ export default function CompanyDetailPage({ params }) {
               {[
                 { label: 'Legal Name', value: company.name },
                 { label: 'Registration Number', value: company.registration_number },
-                { label: 'Tax ID / KRA PIN', value: company.tax_id },
+                { label: 'Tax ID / TAX PIN', value: company.tax_id },
                 { label: 'Industry', value: company.industry },
                 { label: 'Company Size', value: company.company_size },
                 { label: 'Years in Operation', value: company.years_in_operation },
@@ -1130,7 +1130,7 @@ export default function CompanyDetailPage({ params }) {
               onChange={(e) => setAdditionalInfo(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={4}
-              placeholder="e.g. Please re-upload a clearer copy of the KRA PIN certificate..."
+              placeholder="e.g. Please re-upload a clearer copy of the TAX PIN certificate..."
             />
             <div className="flex gap-3">
               <button

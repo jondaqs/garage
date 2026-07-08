@@ -51,8 +51,8 @@ const DOCUMENT_TYPES = [
   },
   {
     id: 'tax_compliance',
-    label: 'KRA PIN Certificate / Tax Compliance',
-    description: 'Valid KRA PIN certificate or tax compliance certificate',
+    label: 'TAX PIN Certificate / Tax Compliance',
+    description: 'Valid TAX PIN certificate or tax compliance certificate',
     required: true,
   },
   {
@@ -654,7 +654,7 @@ export default function CompanySettingsPage() {
                 className={inp} placeholder="e.g. CPR/2018/123456" />
             </div>
             <div>
-              <label className={lbl}>KRA PIN / Tax ID</label>
+              <label className={lbl}>TAX PIN / Tax ID</label>
               <input type="text" value={company.tax_id} disabled={!isOwner}
                 onChange={e => setCompany(c => ({ ...c, tax_id: e.target.value }))}
                 className={inp} placeholder="e.g. P051234567X" />

@@ -27,13 +27,13 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
       id: 'tax_compliance', 
       label: 'Tax Compliance Certificate', 
       required: true,
-      description: 'Valid KRA tax compliance certificate'
+      description: 'Valid TAX tax compliance certificate'
     },
     { 
       id: 'kra_pin', 
-      label: 'KRA PIN Certificate', 
+      label: 'TAX PIN Certificate', 
       required: true,
-      description: 'Valid KRA PIN certificate for the company'
+      description: 'Valid TAX PIN certificate for the company'
     },
     { 
       id: 'insurance', 

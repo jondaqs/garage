@@ -212,7 +212,7 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
         {/* Tax ID */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tax ID / KRA PIN (Optional)
+            Tax ID / TAX PIN (Optional)
           </label>
           <input
             type="text"

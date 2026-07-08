@@ -79,7 +79,7 @@ export default function PendingProvidersPage() {
 
   const DOC_TYPE_SHORT = {
     business_license: 'Business Reg.',
-    tax_compliance:   'KRA PIN',
+    tax_compliance:   'TAX PIN',
     insurance:        'Insurance',
     id_passport:      'ID/Passport',
   }

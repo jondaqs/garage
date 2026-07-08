@@ -229,7 +229,7 @@ export async function middleware(request) {
     }
   }
 
-  // Provider owner → blocked from /provider/*
+  // Provider owner → blocked from /provider/* ONLY when explicitly suspended/deactivated
   if (role === 'provider' && pathname.startsWith('/provider')) {
     const { data: provider } = await supabase
       .from('service_providers_secure')
@@ -237,7 +237,10 @@ export async function middleware(request) {
       .eq('owner_user_id', profile.id)
       .single()
 
-    if (provider?.status === 'suspended' || provider?.status === 'deactivated' || provider?.is_active === false) {
+    // Only block for admin-initiated suspension/deactivation.
+    // Do NOT block for is_active=false alone — that's the normal state
+    // during pending_verification and the dashboard handles it with a banner.
+    if (provider?.status === 'suspended' || provider?.status === 'deactivated') {
       const url = new URL('/account/suspended', request.url)
       url.searchParams.set('reason', 'provider_suspended')
       return NextResponse.redirect(url)

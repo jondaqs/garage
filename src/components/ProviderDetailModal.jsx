@@ -227,7 +227,7 @@ export default function ProviderDetailModal({ provider, onClose, onBook, canBook
                     )}
                     {provider.kra_pin_verified && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
-                        <Shield size={12} /> KRA Pin
+                        <Shield size={12} /> TAX Pin
                       </span>
                     )}
                     {provider.registration_verified && (

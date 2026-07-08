@@ -322,7 +322,7 @@ export default function ProviderPeerDetailPage() {
                   )}
                   {provider.kra_pin_verified && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-xs font-medium">
-                      <Shield size={13} /> KRA Pin Verified
+                      <Shield size={13} /> TAX Pin Verified
                     </span>
                   )}
                   {provider.registration_verified && (

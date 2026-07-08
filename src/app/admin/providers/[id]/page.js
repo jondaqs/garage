@@ -21,7 +21,7 @@ const FIELD_LABELS = {
   description:         'Description',
   website:             'Website',
   registration_number: 'Registration Number',
-  tax_id:              'Tax ID (KRA PIN)',
+  tax_id:              'Tax ID (TAX PIN)',
   provider_type_id:    'Provider Type',
   currency_id:         'Currency',
   years_in_operation:  'Years in Operation',
@@ -32,7 +32,7 @@ const FIELD_LABELS = {
 // and the provider settings Documents tab. Anything else falls through as-is.
 const DOC_TYPE_LABELS = {
   business_license: 'Business Registration Certificate',
-  tax_compliance:   'KRA PIN / Tax Compliance',
+  tax_compliance:   'TAX PIN / Tax Compliance',
   insurance:        'Insurance Certificate',
   id_passport:      'ID / Passport Copy',
 }
@@ -695,7 +695,7 @@ export default function ProviderDetailPage({ params }) {
                 { label: 'Business Name',       value: provider.name },
                 { label: 'Provider Type',       value: provider.provider_type?.display_name },
                 { label: 'Registration Number', value: provider.registration_number },
-                { label: 'Tax ID / KRA PIN',    value: provider.tax_id },
+                { label: 'Tax ID / TAX PIN',    value: provider.tax_id },
                 { label: 'Years in Operation',  value: provider.years_in_operation },
                 { label: 'Currency',            value: provider.currency
                     ? `${provider.currency.code} — ${provider.currency.display_name}${provider.currency.symbol ? ` (${provider.currency.symbol})` : ''}`
@@ -798,8 +798,8 @@ export default function ProviderDetailPage({ params }) {
               {[
                 {
                   key: 'kra_pin_verified',
-                  label: 'KRA PIN / Tax Compliance',
-                  description: 'Valid KRA PIN certificate or tax compliance document verified',
+                  label: 'TAX PIN / Tax Compliance',
+                  description: 'Valid TAX PIN certificate or tax compliance document verified',
                   verifiedAt: provider.kra_pin_verified_at,
                   verifiedBy: verifierNames.kra_pin_verified_by,
                 },
@@ -853,7 +853,7 @@ export default function ProviderDetailPage({ params }) {
                 {(() => {
                   const dbScore = provider.verification_score || 0
                   const breakdown = [
-                    { label: 'KRA PIN verified',      pts: 25, met: verChecks.kra_pin_verified },
+                    { label: 'TAX PIN verified',      pts: 25, met: verChecks.kra_pin_verified },
                     { label: 'Registration verified',  pts: 25, met: verChecks.registration_verified },
                     { label: 'Location verified',      pts: 20, met: verChecks.location_verified },
                     { label: 'Documents uploaded',     pts: 10, met: documents.length > 0 },
@@ -1190,7 +1190,7 @@ export default function ProviderDetailPage({ params }) {
               onChange={(e) => setAdditionalInfo(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={4}
-              placeholder="e.g. Please re-upload a clearer copy of the KRA PIN certificate..."
+              placeholder="e.g. Please re-upload a clearer copy of the TAX PIN certificate..."
             />
             <div className="flex gap-3">
               <button

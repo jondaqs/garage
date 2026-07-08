@@ -80,7 +80,7 @@ export default function CompanyInfoStep({ data, updateData, nextStep, previousSt
 
         <div>
           <label className="block text-sm font-medium mb-2">
-            Tax ID / KRA PIN <span className="text-red-500">*</span>
+            Tax ID / TAX PIN <span className="text-red-500">*</span>
           </label>
           <input
             type="text"

@@ -22,7 +22,7 @@ const REQUIRED_DOCS = [
   { id: 'business_license',             label: 'Business License / Registration Certificate' },
   { id: 'certificate_of_incorporation', label: 'Certificate of Incorporation' },
   { id: 'tax_compliance',               label: 'Tax Compliance Certificate' },
-  { id: 'kra_pin',                      label: 'KRA PIN Certificate' },
+  { id: 'kra_pin',                      label: 'TAX PIN Certificate' },
   { id: 'insurance',                    label: 'Insurance Documents' },
 ]
 
@@ -275,7 +275,7 @@ export default function PendingInfoPage() {
             <input type="text" value={form.registration_number} onChange={e => setForm({...form, registration_number: e.target.value})} className={inp} placeholder="CPR/2024/12345" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Tax ID / KRA PIN</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tax ID / TAX PIN</label>
             <input type="text" value={form.tax_id} onChange={e => setForm({...form, tax_id: e.target.value})} className={inp} placeholder="A012345678Z" />
           </div>
         </div>

@@ -19,9 +19,9 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
     },
     { 
       id: 'tax_compliance', 
-      label: 'KRA PIN Certificate / Tax Compliance', 
+      label: 'TAX PIN Certificate / Tax Compliance', 
       required: true,
-      description: 'Valid KRA PIN certificate or tax compliance certificate'
+      description: 'Valid TAX PIN certificate or tax compliance certificate'
     },
     { 
       id: 'insurance', 
