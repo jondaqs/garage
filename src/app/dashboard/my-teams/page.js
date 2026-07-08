@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { piiHmac } from '@/lib/pii'
-import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin, ClipboardList, Wrench, ChevronRight, Shield } from 'lucide-react'
+import { Users, Building2, Calendar, Award, Phone, Mail, AlertCircle, LogOut, Edit2, MapPin, ClipboardList, Wrench, ChevronRight, Shield, Clock } from 'lucide-react'
 
 export default function MyTeamsPage() {
   const router   = useRouter()
