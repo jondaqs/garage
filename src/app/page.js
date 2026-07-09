@@ -389,6 +389,14 @@ export default function LandingPage() {
                Pricing
              </button>
             <button
+              onClick={() => router.push('/docs')}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+            >
+              Docs
+            </button>
+            <button
               onClick={() => router.push('/contact')}
               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
               onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
