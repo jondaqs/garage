@@ -654,7 +654,7 @@ export default function ProviderTeamPage() {
                   )}
 
                   {/* Pending leave banner */}
-                  {member.pending_leave && (
+                  {member.pending_leave && member.is_active && (
                     <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
                       <p className="text-xs font-semibold text-yellow-800 flex items-center gap-1">
                         ⚠️ Has requested to leave the team
