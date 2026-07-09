@@ -706,7 +706,7 @@ export default function ProviderTeamPage() {
                         Verify
                       </button>
                     )}
-                    {member.pending_leave ? (
+                    {member.pending_leave && member.is_active ? (
                       <button
                         onClick={async () => {
                           if (!confirm(`Confirm departure of ${member.user?.first_name || 'this member'}? This will fully deactivate them.`)) return
@@ -717,7 +717,7 @@ export default function ProviderTeamPage() {
                         }}
                         className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
                       >
-                        Confirm Departure
+                        Clear &amp; Deactivate
                       </button>
                     ) : (
                       <button
