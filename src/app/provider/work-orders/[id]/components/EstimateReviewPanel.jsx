@@ -40,6 +40,11 @@ export default function EstimateReviewPanel({
 
   const [vatRate, setVatRate] = useState(workOrder?.vat_rate ?? 16)
 
+  // Sync VAT rate when estimate prop updates (e.g. ServicesTab changed it)
+  useEffect(() => {
+    if (estimateProp?.vat_rate != null) setVatRate(estimateProp.vat_rate)
+  }, [estimateProp?.vat_rate])
+
   const fmt = (n) => `KES ${Number(n || 0).toLocaleString()}`
 
   // ── Computed totals from live services/parts state ───────────────────────
@@ -63,7 +68,7 @@ export default function EstimateReviewPanel({
   // ── Load line items (also drives totals) ─────────────────────────────────
   const fetchBreakdown = useCallback(async () => {
     try {
-      const [{ data: svcs }, { data: pts }] = await Promise.all([
+      const [{ data: svcs }, { data: pts }, { data: woRow }] = await Promise.all([
         supabase
           .from('work_order_services')
           .select('id, estimated_cost, notes, status:work_order_services_statuses!status_id(code), service:services(name)')
@@ -72,9 +77,15 @@ export default function EstimateReviewPanel({
           .from('work_order_parts')
           .select('id, quantity, unit_price, status:work_order_parts_statuses!status_id(code), spare_part:spare_parts(name, unit_price)')
           .eq('work_order_id', workOrder.id),
+        supabase
+          .from('work_orders')
+          .select('vat_rate')
+          .eq('id', workOrder.id)
+          .single(),
       ])
       setServices(svcs || [])
       setParts(pts || [])
+      if (woRow?.vat_rate != null) setVatRate(woRow.vat_rate)
     } catch {}
     finally { setEstimateLoading(false) }
   }, [workOrder.id])

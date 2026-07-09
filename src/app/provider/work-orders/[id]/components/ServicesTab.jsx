@@ -733,12 +733,14 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                       .eq('id', workOrder.id)
                     if (!error) {
                       const newTax = Math.round(estimate.subtotal * rate / 100 * 100) / 100
-                      setEstimate(prev => ({
-                        ...prev,
+                      const updated = {
+                        ...estimate,
                         vat_rate: rate,
                         tax: newTax,
                         total: Math.round((estimate.subtotal + newTax) * 100) / 100,
-                      }))
+                      }
+                      setEstimate(updated)
+                      onEstimateChange?.(updated)
                     }
                   }}
                   className="w-12 px-1 py-0.5 border border-blue-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500"
