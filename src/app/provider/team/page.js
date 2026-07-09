@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
   Users, UserPlus, Search, Mail, Shield, Award, Wrench,
-  Clock, Check, X, AlertCircle, MoreVertical, Trash2,
+  Clock, Check, X, AlertCircle, MoreVertical,
   Settings as SettingsIcon
 } from 'lucide-react'
 import useProviderAccess from '@/hooks/useProviderAccess'
@@ -473,30 +473,6 @@ export default function ProviderTeamPage() {
     }
   }
 
-  const removeMember = async (mechanicId) => {
-    if (!confirm('Are you sure you want to remove this team member?')) return
-
-    try {
-      const { error } = await supabase
-        .from('mechanics')
-        .delete()
-        .eq('id', mechanicId)
-
-      if (error) {
-        console.error('Remove error:')
-        alert('Failed to remove member')
-        return
-      }
-
-      alert('Team member removed')
-      const { data: { user } } = await supabase.auth.getUser()
-      await loadTeamMembers(user.id)
-    } catch (error) {
-      console.error('Remove error:')
-      alert('Failed to remove member')
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -601,7 +577,7 @@ export default function ProviderTeamPage() {
 
       {/* Team Members */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Team Members ({teamMembers.length})</h2>
+        <h2 className="text-lg font-semibold mb-4">Team Members ({teamMembers.filter(m => m.is_active).length} active{teamMembers.filter(m => !m.is_active).length > 0 ? `, ${teamMembers.filter(m => !m.is_active).length} inactive` : ''})</h2>
 
         {teamMembers.length === 0 ? (
           <div className="text-center py-12">
@@ -612,7 +588,11 @@ export default function ProviderTeamPage() {
         ) : (
           <div className="space-y-3">
             {teamMembers.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div key={member.id} className={`flex items-center justify-between p-4 border rounded-lg ${
+                !member.is_active ? 'border-gray-200 bg-gray-50 opacity-70' :
+                member.pending_leave ? 'border-yellow-200 bg-yellow-50/30' :
+                'border-gray-200'
+              }`}>
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -710,7 +690,7 @@ export default function ProviderTeamPage() {
                     )}
                   </div>
                   {member.role !== 'service_provider_owner' && (<>
-                    {!member.pending_leave && (
+                    {!member.pending_leave && member.is_active && (
                       <button
                         onClick={() => startEditMember(member)}
                         className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
@@ -718,7 +698,7 @@ export default function ProviderTeamPage() {
                         <SettingsIcon size={13} /> Edit
                       </button>
                     )}
-                    {!member.is_verified && !member.pending_leave && (
+                    {!member.is_verified && !member.pending_leave && member.is_active && (
                       <button
                         onClick={() => verifyMember(member.id)}
                         className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
@@ -751,12 +731,6 @@ export default function ProviderTeamPage() {
                       {member.is_active ? 'Deactivate' : 'Activate'}
                     </button>
                     )}
-                    <button
-                      onClick={() => removeMember(member.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <Trash2 size={18} />
-                    </button>
                   </>)}
                 </div>
               </div>
