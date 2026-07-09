@@ -717,7 +717,35 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
               <span>Subtotal</span><span>{fmt(estimate.subtotal)}</span>
             </div>
             <div className="flex justify-between text-gray-600">
-              <span>VAT (16%)</span><span>{fmt(estimate.tax)}</span>
+              <span className="flex items-center gap-1.5">
+                VAT (
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={estimate.vat_rate ?? 16}
+                  onChange={async (e) => {
+                    const rate = parseFloat(e.target.value) || 0
+                    const { error } = await supabase
+                      .from('work_orders')
+                      .update({ vat_rate: rate, updated_at: new Date().toISOString() })
+                      .eq('id', workOrder.id)
+                    if (!error) {
+                      const newTax = Math.round(estimate.subtotal * rate / 100 * 100) / 100
+                      setEstimate(prev => ({
+                        ...prev,
+                        vat_rate: rate,
+                        tax: newTax,
+                        total: Math.round((estimate.subtotal + newTax) * 100) / 100,
+                      }))
+                    }
+                  }}
+                  className="w-12 px-1 py-0.5 border border-blue-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500"
+                />
+                %)
+              </span>
+              <span>{fmt(estimate.tax)}</span>
             </div>
             <div className="flex justify-between font-bold text-blue-900 text-base border-t border-blue-300 pt-1.5">
               <span>Total</span><span>{fmt(estimate.total)}</span>

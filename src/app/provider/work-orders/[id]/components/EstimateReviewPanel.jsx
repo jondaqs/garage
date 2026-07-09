@@ -38,6 +38,8 @@ export default function EstimateReviewPanel({
   const [editing,         setEditing]         = useState(null)
   const [saving,          setSaving]          = useState(false)
 
+  const [vatRate, setVatRate] = useState(workOrder?.vat_rate ?? 16)
+
   const fmt = (n) => `KES ${Number(n || 0).toLocaleString()}`
 
   // ── Computed totals from live services/parts state ───────────────────────
@@ -50,8 +52,8 @@ export default function EstimateReviewPanel({
     .reduce((sum, p) => sum + Number(p.quantity || 0) * Number(p.unit_price || 0), 0)
 
   const subtotal = servicesTotal + partsTotal
-  const tax      = Math.round(subtotal * 0.16 * 100) / 100
-  const total    = Math.round(subtotal * 1.16 * 100) / 100
+  const tax      = Math.round(subtotal * vatRate / 100 * 100) / 100
+  const total    = Math.round((subtotal + tax) * 100) / 100
 
   // derive summary-compatible object for display
   const estimate = services.length > 0 || parts.length > 0
@@ -242,7 +244,34 @@ export default function EstimateReviewPanel({
                 <span className="font-medium">{fmt(partsTotal)}</span>
               </div>
               <div className="flex justify-between text-xs text-gray-400">
-                <span>VAT 16%</span>
+                <span className="flex items-center gap-1">
+                  VAT
+                  {canSend ? (
+                    <>
+                      {' ('}
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={vatRate}
+                        onChange={async (e) => {
+                          const rate = parseFloat(e.target.value) || 0
+                          setVatRate(rate)
+                          // Persist to work_orders
+                          await supabase
+                            .from('work_orders')
+                            .update({ vat_rate: rate, updated_at: new Date().toISOString() })
+                            .eq('id', workOrder.id)
+                        }}
+                        className="w-12 px-1 py-0.5 border border-violet-300 rounded text-xs text-center focus:ring-1 focus:ring-violet-500"
+                      />
+                      {'%)'}
+                    </>
+                  ) : (
+                    <span> {vatRate}%</span>
+                  )}
+                </span>
                 <span>{fmt(tax)}</span>
               </div>
               <div className="flex justify-between font-bold text-gray-900 border-t border-gray-100 pt-2">
