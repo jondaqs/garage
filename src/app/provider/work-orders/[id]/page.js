@@ -123,45 +123,46 @@ export default function WorkOrderDetailPage() {
       setError('')
       const { data: { user } } = await supabase.auth.getUser()
 
+      let woData = null
+
       // Try RPC first
       const { data: result, error: rpcErr } = await supabase.rpc(
         'get_work_order_with_details',
         { p_work_order_id: params.id, p_requesting_user_id: user.id }
       )
 
-      if (result?.data) {
-      }
-
       if (!rpcErr && result?.success) {
-        setWo(result.data)
-        return
+        woData = result.data
       }
 
+      // Fallback direct query if RPC didn't return data
+      if (!woData) {
+        const { data, error: fetchErr } = await supabase
+          .from('work_orders_secure')
+          .select(`
+            *,
+            status:work_order_statuses(code, display_name, sort_order),
+            vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture, color, vin),
+            service_provider:service_providers_secure(id, name, phone, email),
+            shop:shops_secure(name, town, county, street, phone),
+            mechanic:mechanics(
+              id, user_id, specialization,
+              user:user_profiles_secure!user_id(first_name, last_name, phone)
+            ),
+            booking:bookings_secure!booking_id(
+              booking_number, customer_user_id,
+              customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
+              booking_services(service:services(name), estimated_cost, notes)
+            )
+          `)
+          .eq('id', params.id)
+          .single()
 
-      // Fallback direct query — use _secure views for PII-decrypted fields
-      const { data, error: fetchErr } = await supabase
-        .from('work_orders_secure')
-        .select(`
-          *,
-          status:work_order_statuses(code, display_name, sort_order),
-          vehicle:vehicles_secure(plate_number, make, model, year_of_manufacture, color, vin),
-          service_provider:service_providers_secure(id, name, phone, email),
-          shop:shops_secure(name, town, county, street, phone),
-          mechanic:mechanics(
-            id, user_id, specialization,
-            user:user_profiles_secure(first_name, last_name, phone)
-          ),
-          booking:bookings_secure!booking_id(
-            booking_number, customer_user_id,
-            customer:user_profiles_secure!customer_user_id(first_name, last_name, phone, email),
-            booking_services(service:services(name), estimated_cost, notes)
-          )
-        `)
-        .eq('id', params.id)
-        .single()
+        if (fetchErr) throw fetchErr
+        woData = data
+      }
 
-      if (fetchErr) throw fetchErr
-      setWo(data)
+      setWo(woData)
 
       // Check if issues are populated (for Send Estimates gate)
       supabase.from('vehicle_issues')
@@ -184,14 +185,15 @@ export default function WorkOrderDetailPage() {
           // Check if owner
           const { data: provRow } = await supabase.from('service_providers_secure')
             .select('id').eq('owner_user_id', prof.id)
-            .eq('id', data.service_provider?.id).maybeSingle()
+            .eq('id', woData.service_provider?.id || woData.service_provider_id).maybeSingle()
           setIsOwner(!!provRow?.id)
 
           // Fetch SPU permissions for current user on this provider
+          const provId = woData.service_provider?.id || woData.service_provider_id
           const { data: spuRow } = await supabase.from('service_provider_users')
             .select('role, can_approve_work, can_manage_team, can_manage_inventory, can_send_estimates, can_send_invoice')
             .eq('user_id', prof.id)
-            .eq('service_provider_id', data.service_provider?.id)
+            .eq('service_provider_id', provId)
             .eq('is_active', true)
             .maybeSingle()
 
@@ -200,7 +202,7 @@ export default function WorkOrderDetailPage() {
           const { data: mechRow } = await supabase.from('mechanics')
             .select('can_approve_work, can_manage_team, can_manage_inventory, can_send_estimates, can_send_invoice')
             .eq('user_id', prof.id)
-            .eq('service_provider_id', data.service_provider?.id)
+            .eq('service_provider_id', provId)
             .eq('is_active', true)
             .maybeSingle()
 
@@ -219,13 +221,13 @@ export default function WorkOrderDetailPage() {
 
       // Resolve mechanic name — mechanic.user is null due to user_profiles RLS
       // Use get_team_member_profiles which is SECURITY DEFINER
-      if (data.assigned_mechanic_id && data.mechanic?.user_id) {
+      if (woData.assigned_mechanic_id && woData.mechanic?.user_id) {
         try {
           const { data: profiles } = await supabase.rpc(
             'get_team_member_profiles',
             { provider_owner_auth_id: user.id }
           )
-          const p = (profiles || []).find(pr => pr.user_id_from_mechanics === data.mechanic.user_id)
+          const p = (profiles || []).find(pr => pr.user_id_from_mechanics === woData.mechanic.user_id)
           if (p) setMechanicName(`${p.first_name || ''} ${p.last_name || ''}`.trim())
         } catch {}
       } else {
