@@ -183,13 +183,14 @@ export async function PUT(request) {
       .select()
 
     if (updateError) {
+      console.error('❌ Team PUT update error:', updateError.message, updateError.details, updateError.hint, updateError.code)
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, member: updated[0] })
+    return NextResponse.json({ success: true, member: updated?.[0] || null })
 
   } catch (error) {
-    console.error('❌ Team PUT error:', error)
+    console.error('❌ Team PUT error:', error?.message || error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
