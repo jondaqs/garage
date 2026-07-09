@@ -90,7 +90,7 @@ export default function ProviderWorkOrdersPage() {
           vehicle:vehicles_secure(plate_number, make, model),
           status:work_order_statuses(code, display_name, sort_order),
           shop:shops_secure(name, town),
-          mechanic:mechanics(user:user_profiles_secure(first_name, last_name)),
+          mechanic:mechanics(user:user_profiles_secure!user_id(first_name, last_name)),
           booking:bookings_secure!booking_id(booking_number)
         `)
         .eq('service_provider_id', provider.id)
