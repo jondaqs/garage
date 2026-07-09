@@ -245,6 +245,24 @@ export async function POST(request, { params }) {
 
             const memberName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Team Member'
 
+            // In-app notification
+            try {
+              await sc.from('notifications').insert({
+                user_id: u.id,
+                recipient_user_id: u.id,
+                type: 'estimate_approval',
+                notification_type: 'estimate_approval',
+                title: `Estimate Ready for Review — ${work_order_number}`,
+                message: `${provider_name} has sent an estimate${vehiclePlate ? ` for ${vehiclePlate}` : ''} totalling KES ${Number(estimate?.total || 0).toLocaleString()}. Please review and approve.`,
+                reference_table: 'work_orders',
+                reference_id: workOrderId,
+                reference_type: 'estimate_approval',
+                is_read: false,
+              })
+            } catch (e) {
+              console.error(`Estimate notification to company member ${u.id} failed:`, e.message)
+            }
+
             // Resolve email — fall back to auth.users if needed
             let memberEmail = u.email || null
             if (!memberEmail && u.auth_user_id) {
