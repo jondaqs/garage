@@ -43,7 +43,7 @@ export default function CommentsTab({ workOrder }) {
         .then(({ data }) => setCurrentProfileId(data?.id))
     })
     // Mark all comments as read when tab is opened
-    supabase.rpc('mark_comments_read', { p_work_order_id: workOrder.id }).catch(() => {})
+    supabase.rpc('mark_comments_read', { p_work_order_id: workOrder.id }).then(null, () => {})
   }, [loadComments])
 
   const handleSend = async () => {

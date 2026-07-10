@@ -238,7 +238,7 @@ export default function WorkOrderDetailPage() {
       // Fetch unread comment count
       supabase.rpc('get_unread_comment_count', { p_work_order_id: params.id })
         .then(({ data: count }) => setUnreadComments(count || 0))
-        .catch(() => {})
+        .then(null, () => {})
 
     } catch (err) {
       setError(err.message || 'Failed to load work order')

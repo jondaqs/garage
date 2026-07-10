@@ -54,7 +54,7 @@ export default function CustomerCommentsCard({ workOrderId }) {
     setExpanded(opening)
     if (opening && unreadCount > 0) {
       setUnreadCount(0)
-      supabase.rpc('mark_comments_read', { p_work_order_id: workOrderId }).catch(() => {})
+      supabase.rpc('mark_comments_read', { p_work_order_id: workOrderId }).then(null, () => {})
     }
   }
 
