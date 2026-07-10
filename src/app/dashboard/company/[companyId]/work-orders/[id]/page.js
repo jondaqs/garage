@@ -263,8 +263,9 @@ export default function CompanyMemberWorkOrderDetailPage() {
 
   const services = wo.services || []
   const parts    = wo.parts    || []
+  const vatRate  = wo.vat_rate ?? 16
   const subtotal = wo.subtotal || 0
-  const tax      = wo.tax      || subtotal * 0.16
+  const tax      = wo.tax      || Math.round(subtotal * vatRate / 100 * 100) / 100
   const total    = wo.total_amount || (subtotal + tax)
 
   // Issues from the diagnostic stage. Always returned by the RPC for every
@@ -525,7 +526,7 @@ export default function CompanyMemberWorkOrderDetailPage() {
                 <span>Subtotal</span><span>{fmt(subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-600">
-                <span>VAT (16%)</span><span>{fmt(tax)}</span>
+                <span>VAT ({vatRate}%)</span><span>{fmt(tax)}</span>
               </div>
               <div className="flex justify-between text-base font-bold text-gray-900 pt-1 border-t border-gray-300">
                 <span>Total</span>

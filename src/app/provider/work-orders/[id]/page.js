@@ -1402,7 +1402,7 @@ export default function WorkOrderDetailPage() {
                     {[
                       { label: 'Services', val: estimate.services_total },
                       { label: 'Parts',    val: estimate.parts_total    },
-                      { label: 'VAT 16%',  val: estimate.tax            },
+                      { label: `VAT ${estimate?.vat_rate ?? wo?.vat_rate ?? 16}%`,  val: estimate.tax            },
                       { label: 'Total',    val: estimate.total, bold: true },
                     ].map(({ label, val, bold }) => {
                       // Render in the work order's currency. The estimate

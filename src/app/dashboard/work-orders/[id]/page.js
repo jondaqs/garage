@@ -271,8 +271,9 @@ export default function CustomerWorkOrderPage() {
 
   const servicesTotal = services.reduce((s, sv) => s + Number(sv.actual_cost || sv.estimated_cost || 0), 0)
   const partsTotal    = parts.reduce((s, p) => s + (p.quantity * Number(p.unit_price || 0)), 0)
+  const vatRate        = wo.vat_rate ?? 16
   const subtotal      = wo.subtotal || (servicesTotal + partsTotal)
-  const tax           = wo.tax      || subtotal * 0.16
+  const tax           = wo.tax      || Math.round(subtotal * vatRate / 100 * 100) / 100
   const total         = wo.total_amount || (subtotal + tax)
 
   // ── Issue card renderer (shared between the inline list and the highlight) ──
@@ -579,7 +580,7 @@ export default function CustomerWorkOrderPage() {
                 <span>Subtotal</span><span>{fmt(subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-600">
-                <span>VAT (16%)</span><span>{fmt(tax)}</span>
+                <span>VAT ({vatRate}%)</span><span>{fmt(tax)}</span>
               </div>
               <div className="flex justify-between text-base font-bold text-gray-900 pt-1 border-t border-gray-300">
                 <span>Total</span><span className="text-green-700">{fmt(total)}</span>

@@ -212,9 +212,10 @@ export default function MechanicWorkOrderPage() {
             .filter(p => ['reserved','in_use'].includes(p.status?.code))
             .reduce((sum, p) => sum + Number(p.quantity || 0) * Number(p.unit_price || 0), 0)
           const subtotal = servicesTotal + partsTotal
-          const tax      = Math.round(subtotal * 0.16 * 100) / 100
-          const total    = Math.round(subtotal * 1.16 * 100) / 100
-          setEstimate({ success: true, services_total: servicesTotal, parts_total: partsTotal, subtotal, tax, total })
+          const vr       = wo?.vat_rate ?? 16
+          const tax      = Math.round(subtotal * vr / 100 * 100) / 100
+          const total    = Math.round((subtotal + tax) * 100) / 100
+          setEstimate({ success: true, services_total: servicesTotal, parts_total: partsTotal, subtotal, tax, total, vat_rate: vr })
         } catch {}
       })()
     } catch (err) {

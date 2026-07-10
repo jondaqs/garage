@@ -94,7 +94,7 @@ function estimateTable({ servicesTotal, partsTotal, tax, total, currency = 'KES'
             <td style="padding:6px 0;color:#374151;font-size:14px;text-align:right;">${fmt(partsTotal)}</td>
           </tr>
           <tr>
-            <td style="padding:6px 0;color:#374151;font-size:14px;border-top:1px solid #d1fae5;">VAT (16%)</td>
+            <td style="padding:6px 0;color:#374151;font-size:14px;border-top:1px solid #d1fae5;">VAT (${estimate?.vat_rate ?? 16}%)</td>
             <td style="padding:6px 0;color:#374151;font-size:14px;text-align:right;border-top:1px solid #d1fae5;">${fmt(tax)}</td>
           </tr>
           <tr>
@@ -158,7 +158,7 @@ ${providerName} has prepared a service estimate for work order ${workOrderNumber
 
 Services: KES ${Number(estimate?.services_total||0).toLocaleString()}
 Parts:    KES ${Number(estimate?.parts_total||0).toLocaleString()}
-VAT 16%:  KES ${Number(estimate?.tax||0).toLocaleString()}
+VAT ${estimate?.vat_rate ?? 16}%:  KES ${Number(estimate?.tax||0).toLocaleString()}
 TOTAL:    KES ${Number(estimate?.total||0).toLocaleString()}
 
 Review and approve here: ${approveUrl}
