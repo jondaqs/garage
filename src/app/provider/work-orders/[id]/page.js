@@ -90,6 +90,7 @@ export default function WorkOrderDetailPage() {
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState('')
   const [activeTab, setActiveTab]     = useState('overview')
+  const [unreadComments, setUnreadComments] = useState(0)
   const [sendingEstimate, setSendingEstimate] = useState(false)
   const [estimate, setEstimate]       = useState(null)
 
@@ -233,6 +234,12 @@ export default function WorkOrderDetailPage() {
       } else {
         setMechanicName('')
       }
+
+      // Fetch unread comment count
+      supabase.rpc('get_unread_comment_count', { p_work_order_id: params.id })
+        .then(({ data: count }) => setUnreadComments(count || 0))
+        .catch(() => {})
+
     } catch (err) {
       setError(err.message || 'Failed to load work order')
     } finally {
@@ -1045,7 +1052,10 @@ export default function WorkOrderDetailPage() {
             {TABS.map(tab => {
               const Icon = tab.icon
               return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                <button key={tab.id} onClick={() => {
+                    setActiveTab(tab.id)
+                    if (tab.id === 'comments' && unreadComments > 0) setUnreadComments(0)
+                  }}
                   className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                     activeTab === tab.id
                       ? 'border-green-600 text-green-700'
@@ -1053,6 +1063,11 @@ export default function WorkOrderDetailPage() {
                   }`}>
                   <Icon size={15} />
                   {tab.label}
+                  {tab.id === 'comments' && unreadComments > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                      {unreadComments}
+                    </span>
+                  )}
                 </button>
               )
             })}

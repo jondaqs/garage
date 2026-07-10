@@ -20,14 +20,16 @@ export default function CustomerCommentsCard({ workOrderId }) {
   const [comments, setComments] = useState([])
   const [loading,  setLoading]  = useState(true)
   const [expanded, setExpanded] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        const { data, error } = await supabase.rpc('get_customer_comments', {
-          p_work_order_id: workOrderId,
-        })
+        const [{ data, error }, { data: unread }] = await Promise.all([
+          supabase.rpc('get_customer_comments', { p_work_order_id: workOrderId }),
+          supabase.rpc('get_unread_comment_count', { p_work_order_id: workOrderId }),
+        ])
         if (cancelled) return
         if (error) {
           console.warn('CustomerCommentsCard RPC error:')
@@ -38,6 +40,7 @@ export default function CustomerCommentsCard({ workOrderId }) {
           console.warn('CustomerCommentsCard:', data?.error)
           setComments([])
         }
+        setUnreadCount(unread || 0)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -46,6 +49,15 @@ export default function CustomerCommentsCard({ workOrderId }) {
     return () => { cancelled = true }
   }, [workOrderId, supabase])
 
+  const handleExpand = () => {
+    const opening = !expanded
+    setExpanded(opening)
+    if (opening && unreadCount > 0) {
+      setUnreadCount(0)
+      supabase.rpc('mark_comments_read', { p_work_order_id: workOrderId }).catch(() => {})
+    }
+  }
+
   if (loading) return null
   if (comments.length === 0) return null
 
@@ -53,7 +65,7 @@ export default function CustomerCommentsCard({ workOrderId }) {
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <button
         type="button"
-        onClick={() => setExpanded(v => !v)}
+        onClick={handleExpand}
         aria-expanded={expanded}
         className="w-full px-5 py-3 border-b border-gray-100 flex items-center gap-2 hover:bg-gray-50 transition-colors"
       >
@@ -61,6 +73,11 @@ export default function CustomerCommentsCard({ workOrderId }) {
         <p className="font-semibold text-gray-900 text-sm flex-1 text-left">
           Notes from your provider ({comments.length})
         </p>
+        {unreadCount > 0 && (
+          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+            {unreadCount} new
+          </span>
+        )}
         {expanded
           ? <ChevronUp   size={16} className="text-gray-400 flex-shrink-0" />
           : <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />}
