@@ -77,7 +77,7 @@ function infoRow(label, value) {
   </tr>`
 }
 
-function estimateTable({ servicesTotal, partsTotal, tax, total, currency = 'KES' }) {
+function estimateTable({ servicesTotal, partsTotal, tax, total, vatRate = 16, currency = 'KES' }) {
   const fmt = (n) => `${currency} ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 0 })}`
   return `
   <table width="100%" cellpadding="0" cellspacing="0"
@@ -94,7 +94,7 @@ function estimateTable({ servicesTotal, partsTotal, tax, total, currency = 'KES'
             <td style="padding:6px 0;color:#374151;font-size:14px;text-align:right;">${fmt(partsTotal)}</td>
           </tr>
           <tr>
-            <td style="padding:6px 0;color:#374151;font-size:14px;border-top:1px solid #d1fae5;">VAT (${estimate?.vat_rate ?? 16}%)</td>
+            <td style="padding:6px 0;color:#374151;font-size:14px;border-top:1px solid #d1fae5;">VAT (${vatRate}%)</td>
             <td style="padding:6px 0;color:#374151;font-size:14px;text-align:right;border-top:1px solid #d1fae5;">${fmt(tax)}</td>
           </tr>
           <tr>
@@ -133,7 +133,7 @@ export async function sendEstimateApprovalEmail(supabase, {
       ${infoRow('Vehicle', vehiclePlate)}
       ${infoRow('Service Provider', providerName)}
     </table>
-    ${estimateTable({ servicesTotal: estimate?.services_total, partsTotal: estimate?.parts_total, tax: estimate?.tax, total: estimate?.total })}
+    ${estimateTable({ servicesTotal: estimate?.services_total, partsTotal: estimate?.parts_total, tax: estimate?.tax, total: estimate?.total, vatRate: estimate?.vat_rate ?? 16 })}
     <p style="color:#374151;font-size:14px;margin:0 0 12px;">
       Please review the estimate breakdown and either <strong>approve</strong> to authorise
       the work, <strong>reject</strong> to cancel, or <strong>request changes</strong> if
