@@ -538,7 +538,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
                 </button>
                 <button
                   onClick={handleCheckout}
-                  disabled={saving || !handoverAll}
+                  disabled={saving || !handoverAny}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors">
                   {saving
                     ? <Loader2 size={16} className="animate-spin" />
