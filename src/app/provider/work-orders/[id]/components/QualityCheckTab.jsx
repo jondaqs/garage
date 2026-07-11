@@ -160,9 +160,10 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
     </div>
   )
 
-  const isTerminal  = ['completed','cancelled','closed'].includes(statusCode)
+  const isTerminal  = ['completed','cancelled','closed','awaiting_customer_checkout'].includes(statusCode)
   const isQcStatus  = statusCode === 'quality_check'
   const isRework    = statusCode === 'rework'
+  const isPostQc    = ['completed','awaiting_customer_checkout','closed'].includes(statusCode)
   const qcPassed    = session?.qc_passed === true
   const qcFailed    = session?.qc_passed === false
 
@@ -480,11 +481,22 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
       )}
 
       {/* ── Not yet in QC (placeholder) ── */}
-      {!isQcStatus && !isRework && !isTerminal && (
+      {!isQcStatus && !isRework && !isTerminal && !isPostQc && (
         <div className="text-center py-10 text-gray-400">
           <ClipboardCheck className="mx-auto mb-2 opacity-40" size={32} />
           <p className="text-sm">QC checklist becomes available when the work order reaches Quality Check status.</p>
           <p className="text-xs mt-1 text-gray-400">Current status: {workOrder.status?.display_name}</p>
+        </div>
+      )}
+
+      {/* ── QC already completed (post-QC statuses) ── */}
+      {isPostQc && !isQcStatus && (
+        <div className="text-center py-10">
+          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+            <ClipboardCheck className="text-green-600" size={28} />
+          </div>
+          <p className="text-sm font-semibold text-gray-900">Quality check completed</p>
+          <p className="text-xs text-gray-500 mt-1">QC was passed and the work order has progressed to the next stage.</p>
         </div>
       )}
 
