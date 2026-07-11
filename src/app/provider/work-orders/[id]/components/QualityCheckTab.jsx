@@ -400,6 +400,51 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
             )}
           </div>
 
+          {/* QC results — always shown when QC was performed */}
+          {qcPassed && session && (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ClipboardCheck className="text-green-600" size={16} />
+                <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Quality Check Completed</p>
+                <span className="text-[10px] text-gray-400 ml-auto">
+                  {session.qc_performed_at && new Date(session.qc_performed_at).toLocaleString('en-KE', {
+                    dateStyle: 'medium', timeStyle: 'short'
+                  })}
+                </span>
+              </div>
+
+              {/* Individual checklist items — shown if saved */}
+              {session.qc_checklist && Object.keys(session.qc_checklist).length > 0 ? (
+                <div className="space-y-1.5">
+                  {QC_CHECKLIST.map(item => {
+                    const checked = session.qc_checklist[item.id]
+                    return (
+                      <div key={item.id} className="flex items-center gap-2.5 py-1">
+                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                          checked ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-300'
+                        }`}>
+                          {checked ? <Check size={12} strokeWidth={3} /> : <X size={10} strokeWidth={2} />}
+                        </div>
+                        <span className={`text-sm ${checked ? 'text-gray-800' : 'text-gray-400'}`}>
+                          {item.label}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-green-700">QC was passed and the work order has progressed to the next stage.</p>
+              )}
+
+              {session.qc_notes && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs font-medium text-gray-500 mb-1">QC Notes</p>
+                  <p className="text-sm text-gray-700">{session.qc_notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Invoice CTA — shown after completion.
               Visible to all provider team members so everyone sees that the
               work order has reached this state, but the action itself
@@ -489,57 +534,13 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
         </div>
       )}
 
-      {/* ── QC already completed (post-QC statuses) ── */}
-      {isPostQc && !isQcStatus && (
-        <div className="space-y-4">
-          <div className="text-center py-6">
-            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-              <ClipboardCheck className="text-green-600" size={28} />
-            </div>
-            <p className="text-sm font-semibold text-gray-900">Quality check completed</p>
-            <p className="text-xs text-gray-500 mt-1">QC was passed and the work order has progressed to the next stage.</p>
+      {/* ── QC already completed (non-terminal post-QC like awaiting_customer_checkout before it was added to isTerminal) ── */}
+      {isPostQc && !isQcStatus && !isTerminal && (
+        <div className="text-center py-6">
+          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+            <ClipboardCheck className="text-green-600" size={28} />
           </div>
-
-          {/* QC checklist results */}
-          {session?.qc_checklist && Object.keys(session.qc_checklist).length > 0 && (
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">QC Checklist</p>
-              <div className="space-y-1.5">
-                {QC_CHECKLIST.map(item => {
-                  const checked = session.qc_checklist[item.id]
-                  return (
-                    <div key={item.id} className="flex items-center gap-2.5 py-1">
-                      <div className={`w-4.5 h-4.5 rounded flex items-center justify-center flex-shrink-0 ${
-                        checked
-                          ? 'bg-green-100 text-green-600'
-                          : 'bg-gray-100 text-gray-300'
-                      }`}>
-                        {checked
-                          ? <Check size={12} strokeWidth={3} />
-                          : <X size={10} strokeWidth={2} />}
-                      </div>
-                      <span className={`text-sm ${checked ? 'text-gray-800' : 'text-gray-400'}`}>
-                        {item.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-              {session.qc_notes && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs font-medium text-gray-500 mb-1">QC Notes</p>
-                  <p className="text-sm text-gray-700">{session.qc_notes}</p>
-                </div>
-              )}
-              {session.qc_performed_at && (
-                <p className="text-[10px] text-gray-400 mt-2">
-                  Completed {new Date(session.qc_performed_at).toLocaleString('en-KE', {
-                    dateStyle: 'medium', timeStyle: 'short'
-                  })}
-                </p>
-              )}
-            </div>
-          )}
+          <p className="text-sm font-semibold text-gray-900">Quality check completed</p>
         </div>
       )}
 
