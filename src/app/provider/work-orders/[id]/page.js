@@ -93,6 +93,7 @@ export default function WorkOrderDetailPage() {
   const [unreadComments, setUnreadComments] = useState(0)
   const [sendingEstimate, setSendingEstimate] = useState(false)
   const [estimate, setEstimate]       = useState(null)
+  const [changesRequested, setChangesRequested] = useState(null) // latest changes_requested approval
 
   // Check-in
   const [showCheckin, setShowCheckin]           = useState(false)
@@ -238,6 +239,17 @@ export default function WorkOrderDetailPage() {
       // Fetch unread comment count
       supabase.rpc('get_unread_comment_count', { p_work_order_id: params.id })
         .then(({ data: count }) => setUnreadComments(count || 0))
+        .then(null, () => {})
+
+      // Fetch latest estimate change request (if any)
+      supabase.from('work_order_approvals')
+        .select('decision, decision_notes, approved_at')
+        .eq('work_order_id', params.id)
+        .eq('decision', 'changes_requested')
+        .order('approved_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => setChangesRequested(data))
         .then(null, () => {})
 
     } catch (err) {
@@ -1040,6 +1052,28 @@ export default function WorkOrderDetailPage() {
               The customer was not satisfied with the checkout submission. Go to the <span className="font-semibold text-red-700">Checkout tab</span> to
               review their reason, address any concerns and resubmit the checkout form.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Estimate changes requested banner ── */}
+      {changesRequested && statusCode === 'diagnosing' && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <MessageSquare size={18} className="text-amber-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Action needed — Customer requested changes to estimate</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              The customer has reviewed the estimate and requested modifications before approving.
+              Update the services and costs in the <span className="font-semibold text-amber-700">Services tab</span>, then re-send for approval.
+            </p>
+            {changesRequested.decision_notes && (
+              <div className="mt-2 px-3 py-2 bg-white border border-amber-200 rounded-lg">
+                <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Customer&apos;s feedback</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{changesRequested.decision_notes}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
