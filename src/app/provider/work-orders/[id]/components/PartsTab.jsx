@@ -557,7 +557,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                           </button>
                         )}
 
-                        {/* Mark installed — reserved or in_use → used */}
+                        {/* Mark Installed | Supplied — reserved or in_use → used */}
                         {['reserved','in_use'].includes(code) && !isEditing && !isEditingRt && !isMarking && (
                           <button
                             onClick={() => {
@@ -690,7 +690,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                           <button onClick={() => handleMarkUsed(p.id)} disabled={saving}
                             className="px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-1">
                             {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                            Mark Installed
+                            Mark Installed | Supplied
                           </button>
                           <button onClick={() => setMarkingUsed(m => { const n = {...m}; delete n[p.id]; return n })}
                             className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50">
