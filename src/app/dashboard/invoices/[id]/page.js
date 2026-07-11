@@ -243,7 +243,7 @@ export default function CustomerInvoicePage() {
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-600">
-              <span>VAT ({Math.round((inv.tax_rate || 0.16) * 100)}%)</span>
+              <span>VAT ({Math.round(((inv.tax_rate != null ? inv.tax_rate : 0)) * 100)}%)</span>
               <span>{fmt(inv.tax_amount)}</span>
             </div>
             <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-200">

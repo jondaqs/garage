@@ -181,7 +181,7 @@ export default function CompanyWorkOrderInvoicePage() {
   const isOverdue = inv.status === 'overdue'
   const services  = items.filter(i => i.item_type === 'service')
   const parts     = items.filter(i => i.item_type === 'part')
-  const tax       = Math.round((inv.tax_rate || 0.16) * 100)
+  const tax       = Math.round(((inv.tax_rate != null ? inv.tax_rate : 0)) * 100)
 
   const statusBadge = isPaid
     ? { bg: 'bg-green-100', text: 'text-green-700', label: 'Paid' }
