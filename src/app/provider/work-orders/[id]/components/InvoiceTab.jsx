@@ -31,7 +31,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
   const [error,        setError]        = useState('')
   const [success,      setSuccess]      = useState('')
   const [showItems,    setShowItems]    = useState(true)
-  const [vatPct,       setVatPct]       = useState('16')
+  const [vatPct,       setVatPct]       = useState(String(workOrder?.vat_rate ?? 16))
   const [discountPct,  setDiscountPct]  = useState('0')
   const [showPayForm,  setShowPayForm]  = useState(false)
   const [payMethod,    setPayMethod]    = useState('cash')
@@ -233,7 +233,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">%</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Default: 16%</p>
+                  <p className="text-[10px] text-gray-400 mt-1">From estimate: {workOrder?.vat_rate ?? 16}%</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">
@@ -440,7 +440,7 @@ export default function InvoiceTab({ workOrder, permissions = null }) {
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-500">
-              <span>VAT ({Math.round((inv.tax_rate || 0.16) * 100)}%)</span>
+              <span>VAT ({Math.round((inv.tax_rate || (workOrder?.vat_rate ?? 16) / 100) * 100)}%)</span>
               <span>{fmt(inv.tax_amount)}</span>
             </div>
             <div className="h-px bg-gray-200" />
