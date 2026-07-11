@@ -10,6 +10,7 @@ import {
 // Standard QC checklist items — mechanic ticks these before submitting
 const QC_CHECKLIST = [
   { id: 'all_services_done',   label: 'All requested services completed'          },
+  { id: 'all_parts_supplied',  label: 'All requested parts supplied'              },
   { id: 'parts_installed',     label: 'All reserved parts installed correctly'    },
   { id: 'no_leaks',            label: 'No fluid leaks detected'                   },
   { id: 'electrical_ok',       label: 'All electrical systems functioning'        },
@@ -72,13 +73,14 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
 
   useEffect(() => { loadSession() }, [loadSession])
 
+  const anyChecked  = checkCount > 0
   const allChecked  = QC_CHECKLIST.every(i => checklist[i.id])
   const checkCount  = QC_CHECKLIST.filter(i => checklist[i.id]).length
   const progress    = Math.round((checkCount / QC_CHECKLIST.length) * 100)
 
   // ── QC Pass ──────────────────────────────────────────────────────────────
   const handleQcPass = async () => {
-    if (!allChecked) { setError('Please complete all checklist items before passing QC'); return }
+    if (!anyChecked) { setError('Please complete at least one checklist item before passing QC'); return }
     setSubmitting(true); setError('')
     try {
       const resp = await fetch(`/api/work-orders/${workOrder.id}/qc`, {
@@ -265,7 +267,7 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
             <div className="flex gap-3">
               <button
                 onClick={handleQcPass}
-                disabled={submitting || !allChecked}
+                disabled={submitting || !anyChecked}
                 className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-semibold"
               >
                 {submitting
