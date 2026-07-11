@@ -1,12 +1,46 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
 
 export default function LandingPage() {
   const router = useRouter()
+  const canvasRef = useRef(null)
+
+  // Subtle animated grid
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    let animFrame
+    let offset = 0
+
+    const draw = () => {
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'
+      ctx.lineWidth = 1
+
+      const spacing = 60
+      // Vertical lines
+      for (let x = (offset % spacing); x < canvas.width; x += spacing) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke()
+      }
+      // Horizontal lines
+      for (let y = 0; y < canvas.height; y += spacing) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      }
+
+      offset += 0.3
+      animFrame = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(animFrame)
+  }, [])
 
   const roles = [
     {
@@ -14,9 +48,10 @@ export default function LandingPage() {
       label: 'Vehicle Owner',
       sub: 'Personal',
       description: 'Book services, track maintenance history, and keep your vehicles in top shape.',
-      bgGradient: 'from-blue-500/10 to-transparent hover:border-blue-500/40',
-      iconBg: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-      ctaColor: 'text-blue-400',
+      accent: '#3b82f6',
+      accentLight: 'rgba(59,130,246,0.12)',
+      border: 'rgba(59,130,246,0.3)',
+      cta: 'Get Started',
       route: '/auth/signup?type=normal',
       pill: 'Most Popular',
     },
@@ -25,9 +60,10 @@ export default function LandingPage() {
       label: 'Company Fleet',
       sub: 'Business',
       description: 'Centralise fleet maintenance, control budgets, and manage your entire team.',
-      bgGradient: 'from-purple-500/10 to-transparent hover:border-purple-500/40',
-      iconBg: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-      ctaColor: 'text-purple-400',
+      accent: '#8b5cf6',
+      accentLight: 'rgba(139,92,246,0.12)',
+      border: 'rgba(139,92,246,0.3)',
+      cta: 'Register Company',
       route: '/auth/company-signup',
       pill: null,
     },
@@ -36,9 +72,10 @@ export default function LandingPage() {
       label: 'Service Provider',
       sub: 'Garage / Workshop',
       description: 'Grow your workshop, accept online bookings, and build a loyal customer base.',
-      bgGradient: 'from-emerald-500/10 to-transparent hover:border-emerald-500/40',
-      iconBg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
-      ctaColor: 'text-emerald-400',
+      accent: '#10b981',
+      accentLight: 'rgba(16,185,129,0.12)',
+      border: 'rgba(16,185,129,0.3)',
+      cta: 'Register Business',
       route: '/auth/provider-signup',
       pill: null,
     },
@@ -54,152 +91,325 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white">
-      
-      {/* ── BACKGROUND GRAPHICS ── */}
-      {/* High-fidelity CSS Grid Mesh (Replaces Canvas for cleaner performance) */}
-      <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-      
-      {/* Ambient Radial Lighting Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-0 h-[600px] w-full max-w-7xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 blur-[120px] rounded-full opacity-60" />
-      <div className="absolute bottom-12 left-1/4 z-0 h-[350px] w-[350px] bg-blue-500/10 blur-[100px] rounded-full" />
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
-      {/* ── NAV ── */}
-      <div className="relative z-10">
+        .gc-root { font-family: 'DM Sans', sans-serif; }
+        .gc-display { font-family: 'Syne', sans-serif; }
+
+        .gc-btn-primary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 12px 24px; border-radius: 10px;
+          font-weight: 500; font-size: 14px; cursor: pointer;
+          transition: all 0.2s ease; border: none; outline: none;
+        }
+        .gc-btn-primary:hover { transform: translateY(-1px); }
+
+        .gc-nav-link:hover {
+          background: rgba(255,255,255,0.08) !important;
+          color: #fff !important;
+        }
+
+        .role-card {
+          background: rgba(0,0,0,0.25);
+          border: 1px solid rgba(255,255,255,0.14);
+          border-radius: 20px;
+          padding: 32px 28px;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+        }
+        .role-card::before {
+          content: '';
+          position: absolute; inset: 0;
+          background: var(--card-accent-light);
+          opacity: 0;
+          transition: opacity 0.25s ease;
+          border-radius: 20px;
+        }
+        .role-card:hover::before { opacity: 1; }
+        .role-card:hover {
+          border-color: var(--card-border);
+          transform: translateY(-4px);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+        }
+
+        .feat-card {
+          background: rgba(0,0,0,0.2);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 16px;
+          padding: 24px;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .feat-card:hover {
+          background: rgba(0,0,0,0.3);
+          border-color: rgba(255,255,255,0.2);
+        }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.7s ease both; }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+
+        @keyframes float {
+          0%,100% { transform: translateY(0px) rotate(-6deg); }
+          50%      { transform: translateY(-18px) rotate(-6deg); }
+        }
+        .float-car { animation: float 6s ease-in-out infinite; }
+
+        .pill {
+          display: inline-block;
+          padding: 3px 12px;
+          border-radius: 99px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        }
+      `}</style>
+
+      <div className="gc-root" style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 35%, #2563eb 60%, #4338ca 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+
+        {/* Animated grid canvas */}
+        <canvas ref={canvasRef} style={{
+          position: 'fixed', inset: 0, width: '100%', height: '100%',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
+        {/* Radial glow */}
+        <div style={{
+          position: 'fixed', top: '-20%', right: '-10%',
+          width: '600px', height: '600px',
+          background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+        <div style={{
+          position: 'fixed', bottom: '-20%', left: '-10%',
+          width: '500px', height: '500px',
+          background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
+        {/* ── NAV ── */}
         <PublicNav />
-      </div>
 
-      {/* ── HERO SECTION ── */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pt-24 pb-20 lg:pt-32 flex flex-col items-center text-center">
-        
-        {/* Decorative Floating Car Wireframe */}
-        <div className="absolute top-12 right-10 lg:right-24 opacity-[0.03] pointer-events-none animate-[pulse_8s_ease-in-out_infinite] hidden md:block">
-          <Car size={340} strokeWidth={1} />
-        </div>
+        {/* ── HERO ── */}
+        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '72px 24px 40px' }}>
 
-        {/* Dynamic Micro-Pill Tag */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 backdrop-blur-md shadow-2xl animate-fade-in mb-8">
-          <Zap size={14} className="text-blue-400 fill-blue-400/20" />
-          <span className="text-xs font-medium tracking-wide text-slate-300">
-            The modern standard for vehicle ecosystem connections
-          </span>
-        </div>
-
-        {/* Main Display Typography */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1] max-w-4xl mb-6 bg-gradient-to-b from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-          Your Vehicle. <br />
-          <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            Perfectly Cared For.
-          </span>
-        </h1>
-
-        <p className="text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed mb-16">
-          Connect effortlessly with vetted workshops, scale team operations via localized fleet tools, and control maintenance pipelines securely.
-        </p>
-
-        {/* ── INTERACTIVE ROLE PORTALS ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mb-32">
-          {roles.map((role) => {
-            const Icon = role.icon
-            return (
-              <div
-                key={role.label}
-                onClick={() => router.push(role.route)}
-                className={`group relative flex flex-col justify-between text-left p-8 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-xl hover:bg-gradient-to-b ${role.bgGradient} transition-all duration-300 ease-out cursor-pointer hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)]`}
-              >
-                <div>
-                  {/* Card Header & Conditional Pill */}
-                  <div className="flex items-center justify-between mb-6">
-                    <div className={`p-3 rounded-xl border ${role.iconBg}`}>
-                      <Icon size={22} />
-                    </div>
-                    {role.pill && (
-                      <span className="text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                        {role.pill}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Subtitle & Title */}
-                  <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 block mb-1">
-                    {role.sub}
-                  </span>
-                  <h3 className="text-xl font-bold text-white mb-3 tracking-tight group-hover:text-white transition-colors">
-                    {role.label}
-                  </h3>
-                  <p className="text-sm text-slate-400 leading-relaxed mb-8">
-                    {role.description}
-                  </p>
-                </div>
-
-                {/* Simulated Interactive Footer Button */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-800/60">
-                  <span className={`text-sm font-semibold ${role.ctaColor}`}>
-                    {role.cta}
-                  </span>
-                  <div className={`p-2 rounded-lg border ${role.iconBg} group-hover:translate-x-1 transition-transform duration-200`}>
-                    <ArrowRight size={14} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* ── CORE CAPABILITIES GRID ── */}
-        <div className="w-full max-w-5xl">
-          <div className="text-center mb-16">
-            <h2 className="text-[11px] font-bold tracking-widest uppercase text-blue-500 mb-3">
-              Why Carfix-Connect
-            </h2>
-            <p className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              Engineered for absolute operational clarity
-            </p>
+          {/* Floating car illustration */}
+          <div className="float-car" style={{
+            position: 'absolute', top: 0, right: '8%',
+            opacity: 0.07, pointerEvents: 'none',
+          }}>
+            <Car size={260} color="#fff" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((f) => {
-              const Icon = f.icon
+          <div className="fade-up" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 99, padding: '6px 16px', marginBottom: 28,
+          }}>
+            <Zap size={13} color="#93c5fd" />
+            <span style={{ fontSize: 12, color: '#bfdbfe', fontWeight: 500, letterSpacing: '0.04em' }}>
+              Your #1 Platform for Connecting Vehicles to Service Providers
+            </span>
+          </div>
+
+          <h1 className="gc-display fade-up delay-1" style={{
+            fontSize: 'clamp(36px, 5vw, 60px)',
+            fontWeight: 800,
+            color: '#ffffff',
+            lineHeight: 1.1,
+            letterSpacing: '-0.03em',
+            marginBottom: 24,
+          }}>
+            Your Vehicle,<br />
+            <span style={{ color: '#bfdbfe' }}>Perfectly Cared For.</span>
+          </h1>
+
+          <p className="fade-up delay-2" style={{
+            fontSize: 17, color: 'rgba(255,255,255,0.82)',
+            maxWidth: 500, margin: '0 auto 56px',
+            lineHeight: 1.75, fontWeight: 400,
+          }}>
+            Connect with verified garages, manage your fleet, and stay on top of every service — all in one place.
+          </p>
+
+          {/* ── ROLE CARDS ── */}
+          <div className="fade-up delay-3" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 20, maxWidth: 900, margin: '0 auto 80px',
+          }}>
+            {roles.map((role) => {
+              const Icon = role.icon
               return (
-                <div 
-                  key={f.title} 
-                  className="flex flex-col text-left p-6 rounded-xl bg-slate-900/20 border border-slate-900 hover:border-slate-800/80 hover:bg-slate-900/40 backdrop-blur-sm transition-all duration-200 group"
+                <div
+                  key={role.label}
+                  className="role-card"
+                  style={{
+                    '--card-accent-light': role.accentLight,
+                    '--card-border': role.border,
+                  }}
+                  onClick={() => router.push(role.route)}
                 >
-                  <div className="p-2.5 w-fit rounded-lg bg-slate-900 border border-slate-800 text-slate-400 mb-4 group-hover:text-slate-200 transition-colors">
-                    <Icon size={18} />
+                  {role.pill && (
+                    <div style={{ marginBottom: 16 }}>
+                      <span className="pill" style={{ background: role.accentLight, color: role.accent, border: `1px solid ${role.border}` }}>
+                        {role.pill}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 14,
+                    background: role.accentLight,
+                    border: `1px solid ${role.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 18,
+                  }}>
+                    <Icon size={24} color={role.accent} />
                   </div>
-                  <h4 className="text-sm font-bold text-slate-200 mb-2">{f.title}</h4>
-                  <p className="text-xs text-slate-400 leading-relaxed">{f.body}</p>
+
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                    {role.sub}
+                  </p>
+                  <h3 className="gc-display" style={{ fontSize: 20, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>
+                    {role.label}
+                  </h3>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65, marginBottom: 24 }}>
+                    {role.description}
+                  </p>
+
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: role.accent }}>
+                      {role.cta}
+                    </span>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: role.accentLight, border: `1px solid ${role.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <ArrowRight size={15} color={role.accent} />
+                    </div>
+                  </div>
                 </div>
               )
             })}
           </div>
         </div>
-      </main>
 
-      {/* ── FOOTER ── */}
-      <footer className="relative z-10 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md px-6 py-12 lg:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="" className="w-7 h-7 object-contain opacity-40 mix-blend-screen" />
-          <span className="text-sm font-bold tracking-tight text-slate-400">Carfix-Connect</span>
+        {/* ── FEATURES ── */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          maxWidth: 1000, margin: '0 auto',
+          padding: '0 24px 80px',
+        }}>
+          <div className="fade-up delay-4" style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+              Why Carfix-Connect
+            </p>
+            <h2 className="gc-display" style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+              Everything your vehicle needs
+            </h2>
+          </div>
+
+          <div className="fade-up delay-5" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 16,
+          }}>
+            {features.map((f) => {
+              const Icon = f.icon
+              return (
+                <div key={f.title} className="feat-card">
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    background: 'rgba(255,255,255,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 14,
+                  }}>
+                    <Icon size={18} color="rgba(255,255,255,0.85)" />
+                  </div>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>{f.title}</h4>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.65 }}>{f.body}</p>
+                </div>
+              )
+            })}
+          </div>
         </div>
-        
-        <div className="flex items-center gap-8 text-xs font-medium text-slate-500">
-          {['About', 'Pricing', 'Docs', 'Contact'].map((item) => (
+
+        {/* ── FOOTER ── */}
+        <footer style={{
+          position: 'relative', zIndex: 1,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          padding: '24px 48px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', opacity: 0.5 }} />
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
             <button
-              key={item}
-              onClick={() => router.push(`/${item.toLowerCase()}`)}
-              className="hover:text-slate-200 transition-colors"
+              onClick={() => router.push('/about')}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
             >
-              {item}
+              About
             </button>
-          ))}
-        </div>
-
-        <p className="text-xs text-slate-600">
-          © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
-        </p>
-      </footer>
-    </div>
+            <button
+               onClick={() => router.push('/pricing')}
+               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+               onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+             >
+               Pricing
+             </button>
+            <button
+              onClick={() => router.push('/docs')}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+            >
+              Docs
+            </button>
+            <button
+              onClick={() => router.push('/contact')}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
+            >
+              Contact
+            </button>
+          </div>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
+            © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
+          </p>
+        </footer>
+      </div>
+    </>
   )
 }
