@@ -19,7 +19,7 @@ export async function POST(request, { params }) {
     const { id: workOrderId } = await params
     if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
     const body                = await request.json().catch(() => ({}))
-    const { passed, notes: rawNotes }   = body
+    const { passed, notes: rawNotes, checklist }   = body
     if (typeof passed !== 'boolean') return NextResponse.json({ error: 'passed must be true or false' }, { status: 400 })
     const notes = sanitizeText(rawNotes, 2000)
 
@@ -37,6 +37,7 @@ export async function POST(request, { params }) {
       p_provider_user_id: user.id,
       p_passed:           passed,
       p_notes:            notes || null,
+      p_checklist:        checklist || null,
     })
 
     if (rpcErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

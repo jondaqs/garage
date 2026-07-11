@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   CheckCircle, XCircle, AlertCircle, Loader2,
-  ClipboardCheck, Car, RefreshCw, FileText, Lock
+  ClipboardCheck, Car, RefreshCw, FileText, Lock, Check, X
 } from 'lucide-react'
 
 // Standard QC checklist items — mechanic ticks these before submitting
@@ -86,7 +86,7 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
       const resp = await fetch(`/api/work-orders/${workOrder.id}/qc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passed: true, notes: qcNotes || null }),
+        body: JSON.stringify({ passed: true, notes: qcNotes || null, checklist }),
       })
       const data = await resp.json()
       if (!resp.ok || !data.success) throw new Error(data.error || 'QC submission failed')
@@ -491,12 +491,55 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
 
       {/* ── QC already completed (post-QC statuses) ── */}
       {isPostQc && !isQcStatus && (
-        <div className="text-center py-10">
-          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-            <ClipboardCheck className="text-green-600" size={28} />
+        <div className="space-y-4">
+          <div className="text-center py-6">
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+              <ClipboardCheck className="text-green-600" size={28} />
+            </div>
+            <p className="text-sm font-semibold text-gray-900">Quality check completed</p>
+            <p className="text-xs text-gray-500 mt-1">QC was passed and the work order has progressed to the next stage.</p>
           </div>
-          <p className="text-sm font-semibold text-gray-900">Quality check completed</p>
-          <p className="text-xs text-gray-500 mt-1">QC was passed and the work order has progressed to the next stage.</p>
+
+          {/* QC checklist results */}
+          {session?.qc_checklist && Object.keys(session.qc_checklist).length > 0 && (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">QC Checklist</p>
+              <div className="space-y-1.5">
+                {QC_CHECKLIST.map(item => {
+                  const checked = session.qc_checklist[item.id]
+                  return (
+                    <div key={item.id} className="flex items-center gap-2.5 py-1">
+                      <div className={`w-4.5 h-4.5 rounded flex items-center justify-center flex-shrink-0 ${
+                        checked
+                          ? 'bg-green-100 text-green-600'
+                          : 'bg-gray-100 text-gray-300'
+                      }`}>
+                        {checked
+                          ? <Check size={12} strokeWidth={3} />
+                          : <X size={10} strokeWidth={2} />}
+                      </div>
+                      <span className={`text-sm ${checked ? 'text-gray-800' : 'text-gray-400'}`}>
+                        {item.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              {session.qc_notes && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs font-medium text-gray-500 mb-1">QC Notes</p>
+                  <p className="text-sm text-gray-700">{session.qc_notes}</p>
+                </div>
+              )}
+              {session.qc_performed_at && (
+                <p className="text-[10px] text-gray-400 mt-2">
+                  Completed {new Date(session.qc_performed_at).toLocaleString('en-KE', {
+                    dateStyle: 'medium', timeStyle: 'short'
+                  })}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
