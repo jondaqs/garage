@@ -242,8 +242,6 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
 
   // ── Confirm checkout via RPC (atomic: checkout record + close WO + history) ──
   const handleCheckout = async () => {
-    if (!roadTestAny) { setError('Check at least one road-test item, or skip if not applicable (e.g. towing).'); return }
-    if (!handoverAny) { setError('Check at least one checkout item before confirming.'); return }
     setSaving(true); setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -453,7 +451,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
               Road Test ({roadTestDone}/{CHECKOUT_ROAD_TEST_ITEMS.length})
             </button>
             <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
-            <button onClick={() => { if (roadTestAny) setActiveSection('checkout') }}
+            <button onClick={() => setActiveSection('checkout') }
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                 activeSection === 'checkout'
                   ? 'bg-gray-900 text-white'
