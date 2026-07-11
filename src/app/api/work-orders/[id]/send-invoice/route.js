@@ -423,11 +423,6 @@ export async function POST(request, { params }) {
             Subject:  `Invoice ${inv.invoice_number} — KES ${Number(inv.total_amount).toLocaleString('en-KE')} · ${provRow?.name || BRAND}`,
             HTMLPart: buildEmailBody(rcpt),
             TextPart: `${BRAND}: Invoice ${inv.invoice_number} from ${provRow?.name}.\nVehicle: ${vehiclePlate}\nAmount Due: KES ${Number(inv.total_amount).toLocaleString('en-KE')}\n\nView & Pay: ${woUrl}`,
-            Attachments: [{
-              ContentType:   'text/html',
-              Filename:      `invoice-${inv.invoice_number}.html`,
-              Base64Content: Buffer.from(invoiceHtml).toString('base64'),
-            }],
           }
           const resp = await fetch('https://api.mailjet.com/v3.1/send', {
             method:  'POST',
