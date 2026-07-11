@@ -49,7 +49,7 @@ const STATUS_STYLES = {
 // Each predicate operates on a single work-order row from the list query.
 const needsEstimateApproval = (wo) => wo.status?.code === 'awaiting_approval'
 const needsCheckoutReview   = (wo) =>
-  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined
+  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined && !['closed','cancelled'].includes(wo.status?.code)
 const needsPayment          = (wo) => {
   // Supabase returns the related row(s) as either a single object or an
   // array depending on relationship-cardinality inference. Work-order →

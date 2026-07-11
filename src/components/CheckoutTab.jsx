@@ -2,7 +2,7 @@
 
 /**
  * CheckoutTab
- * Two-step checkout: Road Test → Vehicle Handover.
+ * Two-step checkout: Road Test → Vehicle Handover | Service Completion.
  * Persists results to work_order_checkouts table.
  * After confirmation the checklists remain visible as read-only.
  *
@@ -242,6 +242,10 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
 
   // ── Confirm checkout via RPC (atomic: checkout record + close WO + history) ──
   const handleCheckout = async () => {
+    const anyHandoverChecked = CHECKOUT_HANDOVER_ITEMS
+      .filter(i => i.id !== 'co_payment_confirmed')
+      .some(i => handover[i.id])
+    if (!anyHandoverChecked) { setError('Check at least one handover / service completion item before submitting.'); return }
     setSaving(true); setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -386,7 +390,7 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
           readonly={isLocked || isCheckedOut}
         />
         <ChecklistPanel
-          title="Vehicle Handover"
+          title="Vehicle Handover | Service Completion"
           icon={ClipboardCheck}
           color="text-emerald-600"
           items={CHECKOUT_HANDOVER_ITEMS}

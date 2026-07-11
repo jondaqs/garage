@@ -28,7 +28,7 @@ const STATUS_STYLES = {
 // fleet: estimate approval, checkout-form review, and invoice payment.
 const needsEstimateApproval = (wo) => wo.status?.code === 'awaiting_approval'
 const needsCheckoutReview   = (wo) =>
-  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined
+  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined && !['closed','cancelled'].includes(wo.status?.code)
 const needsPayment          = (wo) => {
   // Tolerant of either shape PostgREST returns for the one-to-one invoice.
   const inv = Array.isArray(wo.invoice) ? wo.invoice[0] : wo.invoice

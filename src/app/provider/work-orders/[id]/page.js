@@ -1025,7 +1025,7 @@ export default function WorkOrderDetailPage() {
       )}
 
       {/* ── Checkout request action banner ── */}
-      {wo.checkout_requested && !wo.checkout_request_satisfied && (
+      {wo.checkout_requested && !wo.checkout_request_satisfied && !['closed','cancelled'].includes(statusCode) && (
         <div className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-4 flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
             <BellRing size={18} className="text-blue-600" />

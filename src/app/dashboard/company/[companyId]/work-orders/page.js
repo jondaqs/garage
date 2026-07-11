@@ -29,7 +29,7 @@ const STATUS_STYLES = {
 // review, and invoice payment.
 const needsEstimateApproval = (wo) => wo.status?.code === 'awaiting_approval'
 const needsCheckoutReview   = (wo) =>
-  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined
+  wo.checkout_requested && !wo.checkout_request_satisfied && !wo.checkout_declined && !['closed','cancelled'].includes(wo.status?.code)
 const needsPayment          = (wo) => {
   // PostgREST may return the one-to-one invoice as either an object or a
   // single-element array; normalise here so this stays robust either way.
