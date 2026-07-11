@@ -16,14 +16,14 @@ const STATUS_STYLES = {
   cancelled:   'bg-red-100 text-red-600',
 }
 
-export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded, readOnly = false, onReApprovalNeeded }) {
+export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdded, readOnly = false, onReApprovalNeeded, isAdminOrOwner = false }) {
   // Resolve service_provider_id from either flat field or nested object (provider vs mechanic page)
   const providerSvcId = workOrder.service_provider_id || workOrder.service_provider?.id
 
   const estimateApproved = workOrder.status?.code === 'in_progress' ||
     ['in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
   // Also approved if WO status is 'approved' (customer approved estimate)
-  const customerApproved = ['approved','in_progress','quality_check','rework','completed','closed'].includes(workOrder.status?.code)
+  const customerApproved = ['approved','in_progress','quality_check','rework','completed','awaiting_customer_checkout','closed'].includes(workOrder.status?.code)
   const supabase = createClient()
 
   const [services, setServices]         = useState([])
@@ -78,7 +78,8 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
   }
 
   const hasBooking = !!workOrder.booking_id
-  const isTerminal = ['completed','cancelled','closed'].includes(workOrder.status?.code)
+  const isTerminal = ['completed','cancelled','closed','awaiting_customer_checkout'].includes(workOrder.status?.code)
+  const isLocked   = isTerminal && !isAdminOrOwner  // admin/owner can still add after completion
 
   const loadServices = useCallback(async () => {
     try {
@@ -410,7 +411,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       {services.length === 0 ? (
         <div className="text-center py-10 text-gray-400">
           <p className="text-sm">No services added yet.</p>
-          {!isTerminal && !readOnly && (
+          {!isLocked && !readOnly && (
             <button onClick={() => setShowAdd(true)}
               className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
               + Add the first service
@@ -453,7 +454,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                   </div>
 
                   {/* Action buttons */}
-                  {!isTerminal && !readOnly && (
+                  {!isLocked && !readOnly && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {/* Edit estimate — for pending services without pricing */}
                       {statusCode === 'pending' && !estimating[svc.id] && !isEditing && (
@@ -584,7 +585,7 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
       )}
 
       {/* Add service */}
-      {!isTerminal && !readOnly && (
+      {!isLocked && !readOnly && (
         <div>
           {!showAdd ? (
             <button onClick={() => setShowAdd(true)}

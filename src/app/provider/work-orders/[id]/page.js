@@ -1507,17 +1507,18 @@ export default function WorkOrderDetailPage() {
               onEstimateChange={setEstimate}
               onServiceAdded={() => setServiceCount(c => (c || 0) + 1)}
                 onReApprovalNeeded={handleReApprovalNeeded}
+              isAdminOrOwner={isAdminOrOwner}
             />
           )}
 
           {/* ── PARTS TAB ── */}
           {activeTab === 'parts' && (
-            <PartsTab workOrder={woWithProvider} onReApprovalNeeded={handleReApprovalNeeded} />
+            <PartsTab workOrder={woWithProvider} onReApprovalNeeded={handleReApprovalNeeded} isAdminOrOwner={isAdminOrOwner} />
           )}
 
           {/* ── ISSUES TAB ── */}
           {activeTab === 'issues' && (
-            <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} />
+            <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} isAdminOrOwner={isAdminOrOwner} />
           )}
 
           {/* ── INVOICE TAB ── */}

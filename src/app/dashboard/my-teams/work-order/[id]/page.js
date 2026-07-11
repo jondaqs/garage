@@ -1048,13 +1048,13 @@ export default function MechanicWorkOrderPage() {
             )}
 
             {activeTab === 'services' && (canApprove || isAdmin) && (
-              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} readOnly={isReadOnly} onReApprovalNeeded={handleReApprovalNeeded} />
+              <ServicesTab workOrder={woWithProvider} onEstimateChange={() => {}} onServiceAdded={() => setServiceCount(c => (c || 0) + 1)} readOnly={isReadOnly} onReApprovalNeeded={handleReApprovalNeeded} isAdminOrOwner={isAdminRole} />
             )}
             {activeTab === 'parts' && (canApprove || isAdmin) && (
-              <PartsTab workOrder={woWithProvider} readOnly={isReadOnly} onReApprovalNeeded={handleReApprovalNeeded} />
+              <PartsTab workOrder={woWithProvider} readOnly={isReadOnly} onReApprovalNeeded={handleReApprovalNeeded} isAdminOrOwner={isAdminRole} />
             )}
             {activeTab === 'issues' && (canApprove || isAdmin) && (
-              <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} readOnly={isReadOnly} />
+              <IssuesTab workOrder={woWithProvider} onIssueAdded={() => setIssueCount(c => (c || 0) + 1)} readOnly={isReadOnly} isAdminOrOwner={isAdminRole} />
             )}
             {activeTab === 'invoice' && (isAdmin || canSendInvoice) && (
               <InvoiceTab workOrder={woWithProvider} permissions={invoicePerms} />

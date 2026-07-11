@@ -18,7 +18,7 @@ const PART_STATUS_STYLES = {
   cancelled:     'bg-red-100 text-red-500 line-through',
 }
 
-export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeeded }) {
+export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeeded, isAdminOrOwner = false }) {
   const supabase = createClient()
 
   const [reservedParts, setReservedParts] = useState([])
@@ -60,9 +60,10 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
   const showToast = (msg) => { setError(msg); setTimeout(() => setError(''), 3500) }
 
   const statusCode    = workOrder.status?.code
-  const isTerminal    = ['completed','cancelled','closed'].includes(statusCode)
+  const isTerminal    = ['completed','cancelled','closed','awaiting_customer_checkout'].includes(statusCode)
+  const isLocked      = isTerminal && !isAdminOrOwner
   // Parts can only be transitioned after customer approves the estimate
-  const customerApproved = ['approved','in_progress','quality_check','rework','completed','closed'].includes(statusCode)
+  const customerApproved = ['approved','in_progress','quality_check','rework','completed','awaiting_customer_checkout','closed'].includes(statusCode)
 
   // Format a numeric value with the appropriate currency code/symbol.
   // Falls back to bare number if no currency is available.
@@ -457,7 +458,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
         <div className="text-center py-10 text-gray-400">
           <Package size={32} className="mx-auto mb-2 opacity-40" />
           <p className="text-sm">No parts reserved yet.</p>
-          {!isTerminal && !readOnly && (
+          {!isLocked && !readOnly && (
             <button onClick={() => setShowSearch(true)}
               className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
               + Reserve a part from inventory
@@ -522,7 +523,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
                     </div>
 
                     {/* Action buttons */}
-                    {!isTerminal && !readOnly && !isCancelled && !isUsed && (
+                    {!isLocked && !readOnly && !isCancelled && !isUsed && (
                       <div className="flex items-center gap-1 flex-shrink-0">
 
                         {/* Edit unit price — when reserved */}
@@ -742,7 +743,7 @@ export default function PartsTab({ workOrder, readOnly = false, onReApprovalNeed
       )}
 
       {/* Reserve Part button / search panel */}
-      {!isTerminal && !readOnly && (
+      {!isLocked && !readOnly && (
         <div>
           {!showSearch ? (
             <button onClick={() => setShowSearch(true)}

@@ -22,7 +22,7 @@ const STATUS_STYLES = {
   closed:           'bg-gray-100 text-gray-400',
 }
 
-export default function IssuesTab({ workOrder, onIssueAdded, readOnly = false }) {
+export default function IssuesTab({ workOrder, onIssueAdded, readOnly = false, isAdminOrOwner = false }) {
   const supabase = createClient()
 
   const [issues, setIssues]   = useState([])
@@ -35,7 +35,8 @@ export default function IssuesTab({ workOrder, onIssueAdded, readOnly = false })
     title: '', description: '', severity: 'medium', requires_approval: false
   })
 
-  const isTerminal = ['completed','cancelled','closed'].includes(workOrder.status?.code)
+  const isTerminal = ['completed','cancelled','closed','awaiting_customer_checkout'].includes(workOrder.status?.code)
+  const isLocked   = isTerminal && !isAdminOrOwner
 
   const loadIssues = useCallback(async () => {
     try {
@@ -127,7 +128,7 @@ export default function IssuesTab({ workOrder, onIssueAdded, readOnly = false })
         <div className="text-center py-10 text-gray-400">
           <Shield size={32} className="mx-auto mb-2 opacity-40" />
           <p className="text-sm">No issues documented yet.</p>
-          {!isTerminal && !readOnly && (
+          {!isLocked && !readOnly && (
             <button onClick={() => setShowForm(true)}
               className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">
               + Document an issue
@@ -180,7 +181,7 @@ export default function IssuesTab({ workOrder, onIssueAdded, readOnly = false })
       )}
 
       {/* Add issue form */}
-      {!isTerminal && !readOnly && (
+      {!isLocked && !readOnly && (
         <div>
           {!showForm ? (
             <button onClick={() => setShowForm(true)}

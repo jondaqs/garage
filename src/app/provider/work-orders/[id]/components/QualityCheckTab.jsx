@@ -73,9 +73,9 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
 
   useEffect(() => { loadSession() }, [loadSession])
 
+  const checkCount  = QC_CHECKLIST.filter(i => checklist[i.id]).length
   const anyChecked  = checkCount > 0
   const allChecked  = QC_CHECKLIST.every(i => checklist[i.id])
-  const checkCount  = QC_CHECKLIST.filter(i => checklist[i.id]).length
   const progress    = Math.round((checkCount / QC_CHECKLIST.length) * 100)
 
   // ── QC Pass ──────────────────────────────────────────────────────────────
