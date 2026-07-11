@@ -190,7 +190,9 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
 
   useEffect(() => { loadCheckout() }, [loadCheckout])
 
+  const roadTestAny  = CHECKOUT_ROAD_TEST_ITEMS.some(i => roadTest[i.id])
   const roadTestAll  = CHECKOUT_ROAD_TEST_ITEMS.every(i => roadTest[i.id])
+  const handoverAny  = CHECKOUT_HANDOVER_ITEMS.filter(i => i.id !== 'co_payment_confirmed').some(i => handover[i.id])
   const handoverAll  = CHECKOUT_HANDOVER_ITEMS.filter(i => i.id !== 'co_payment_confirmed').every(i => handover[i.id])
   const roadTestDone = CHECKOUT_ROAD_TEST_ITEMS.filter(i => roadTest[i.id]).length
   const handoverDone = CHECKOUT_HANDOVER_ITEMS.filter(i => handover[i.id]).length
@@ -240,8 +242,8 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
 
   // ── Confirm checkout via RPC (atomic: checkout record + close WO + history) ──
   const handleCheckout = async () => {
-    if (!roadTestAll) { setError('Complete all road-test items to proceed.'); return }
-    if (!handoverAll) { setError('Complete all checkout items before confirming.'); return }
+    if (!roadTestAny) { setError('Check at least one road-test item, or skip if not applicable (e.g. towing).'); return }
+    if (!handoverAny) { setError('Check at least one checkout item before confirming.'); return }
     setSaving(true); setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -442,23 +444,23 @@ export default function CheckoutTab({ workOrder, canCheckout = false, onStatusCh
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                 activeSection === 'road_test'
                   ? 'bg-gray-900 text-white'
-                  : roadTestAll ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                  : roadTestAny ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
               }`}>
-              {roadTestAll
+              {roadTestAny
                 ? <CheckCircle size={13} />
                 : <span className="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center text-[10px]">1</span>
               }
               Road Test ({roadTestDone}/{CHECKOUT_ROAD_TEST_ITEMS.length})
             </button>
             <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
-            <button onClick={() => { if (roadTestAll) setActiveSection('checkout') }}
+            <button onClick={() => { if (roadTestAny) setActiveSection('checkout') }}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                 activeSection === 'checkout'
                   ? 'bg-gray-900 text-white'
-                  : handoverAll ? 'bg-emerald-100 text-emerald-700'
-                  : roadTestAll ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                  : handoverAny ? 'bg-emerald-100 text-emerald-700'
+                  : roadTestAny ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400 cursor-not-allowed'
               }`}>
-              {handoverAll
+              {handoverAny
                 ? <CheckCircle size={13} />
                 : <span className="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center text-[10px]">2</span>
               }
