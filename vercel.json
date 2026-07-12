@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/refresh-exchange-rates",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/reminder-scan",
+      "schedule": "0 5 * * *"
     }
   ]
 }
