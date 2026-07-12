@@ -438,13 +438,27 @@ export default function MechanicWorkOrderPage() {
   const handleAdvanceStatus = async (newCode) => {
     setActing(true); setError(''); setSuccess('')
     try {
-      const { data: statusRow } = await supabase
-        .from('work_order_statuses').select('id').eq('code', newCode).single()
-      const { error: upErr } = await supabase
-        .from('work_orders')
-        .update({ status_id: statusRow.id, updated_at: new Date().toISOString() })
-        .eq('id', params.id)
-      if (upErr) throw upErr
+      // When starting service, use the RPC so a service_session row is created.
+      // Without this, submit_quality_check and complete_work_order have no
+      // session row to UPDATE, which is why service_sessions was always blank.
+      if (newCode === 'in_progress') {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: result, error: rpcErr } = await supabase.rpc('start_service_session', {
+          p_work_order_id: params.id,
+          p_provider_user_id: user.id,
+        })
+        if (rpcErr) throw rpcErr
+        if (!result?.success) throw new Error(result?.error || 'Failed to start service session')
+      } else {
+        // All other transitions: raw status update
+        const { data: statusRow } = await supabase
+          .from('work_order_statuses').select('id').eq('code', newCode).single()
+        const { error: upErr } = await supabase
+          .from('work_orders')
+          .update({ status_id: statusRow.id, updated_at: new Date().toISOString() })
+          .eq('id', params.id)
+        if (upErr) throw upErr
+      }
       setSuccess(`Status updated to ${newCode.replace(/_/g, ' ')}`)
       await load()
     } catch (err) { setError(err.message) }

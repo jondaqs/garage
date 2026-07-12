@@ -73,6 +73,29 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
 
   useEffect(() => { loadSession() }, [loadSession])
 
+  // Pre-populate checklist & completion form from saved session on load/reload.
+  // Without this, revisiting the tab after QC pass showed all items unchecked
+  // and hid the completion form (both were local state, never synced from DB).
+  useEffect(() => {
+    if (!session) return
+    if (session.qc_passed === true && session.qc_checklist && typeof session.qc_checklist === 'object') {
+      setChecklist(prev => {
+        const merged = { ...prev }
+        for (const key of Object.keys(merged)) {
+          if (session.qc_checklist[key] !== undefined) {
+            merged[key] = !!session.qc_checklist[key]
+          }
+        }
+        return merged
+      })
+      if (session.qc_notes) setQcNotes(session.qc_notes)
+      // Auto-show completion form if QC passed but not yet completed
+      if (!['completed','cancelled','closed','awaiting_customer_checkout'].includes(statusCode)) {
+        setShowCompleteForm(true)
+      }
+    }
+  }, [session, statusCode])
+
   const checkCount  = QC_CHECKLIST.filter(i => checklist[i.id]).length
   const anyChecked  = checkCount > 0
   const allChecked  = QC_CHECKLIST.every(i => checklist[i.id])
@@ -207,8 +230,8 @@ export default function QualityCheckTab({ workOrder, onStatusChange, canSendInvo
         </div>
       )}
 
-      {/* ── Active QC checklist (shown when in quality_check) ── */}
-      {isQcStatus && !isTerminal && (
+      {/* ── Active QC checklist (shown when in quality_check and QC not yet passed) ── */}
+      {isQcStatus && !isTerminal && !qcPassed && (
         <>
           {/* Progress bar */}
           <div>
