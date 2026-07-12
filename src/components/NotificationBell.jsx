@@ -24,6 +24,7 @@ const TYPE_CONFIG = {
 
   // Phase 6 — Recommendations & Reviews
   maintenance_recommendation:  { icon: Wrench,       bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Recommendation' },
+  service_reminder:            { icon: Bell,         bg: 'bg-orange-100', iconCls: 'text-orange-600', label: 'Service Due'    },
   new_review:                  { icon: Star,         bg: 'bg-yellow-100', iconCls: 'text-yellow-500', label: 'New Review'     },
 
   // Invoice & payment
@@ -67,6 +68,10 @@ function getNotificationHref(n, isProvider, isCompany) {
   if (!refId) return null
 
   if (refType === 'recommendation' || type === 'maintenance_recommendation') {
+    if (isCompany) return `/company/reminders`
+    return `/dashboard/reminders`
+  }
+  if (refType === 'reminder' || type === 'service_reminder') {
     if (isCompany) return `/company/reminders`
     return `/dashboard/reminders`
   }

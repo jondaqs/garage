@@ -94,6 +94,13 @@ export default function RecommendationsTab({ workOrder, canAdd = false }) {
       setShowForm(false)
       setForm({ service_id: '', note: '', recommended_mileage: '', recommended_date: '', priority: 'normal' })
       await loadRecs()
+
+      // Fire-and-forget: send email + SMS to the vehicle owner.
+      // The in-app notification is already created by the RPC.
+      // This is best-effort — failures are silent to the provider.
+      if (data.recommendation_id) {
+        fetch(`/api/recommendations/${data.recommendation_id}/notify`, { method: 'POST' }).catch(() => {})
+      }
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
   }
