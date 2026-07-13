@@ -224,7 +224,7 @@ export default function TeamPage() {
         <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowInviteForm(true)}
+            onClick={() => { setError(null); setShowInviteForm(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
           >
             <UserPlus className="w-4 h-4" /> Invite Member
@@ -554,6 +554,14 @@ export default function TeamPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Invite Team Member</h2>
+
+            {/* Error inside modal */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {error}
+              </div>
+            )}
+
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
