@@ -23,9 +23,10 @@ const TYPE_CONFIG = {
   estimate_changes_requested:  { icon: MessageSquare, bg: 'bg-amber-100',  iconCls: 'text-amber-600',  label: 'Changes Needed' },
 
   // Phase 6 — Recommendations & Reviews
-  maintenance_recommendation:  { icon: Wrench,       bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Recommendation' },
-  service_reminder:            { icon: Bell,         bg: 'bg-orange-100', iconCls: 'text-orange-600', label: 'Service Due'    },
-  new_review:                  { icon: Star,         bg: 'bg-yellow-100', iconCls: 'text-yellow-500', label: 'New Review'     },
+  maintenance_recommendation:        { icon: Wrench,       bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Recommendation' },
+  fleet_maintenance_recommendation:  { icon: Wrench,       bg: 'bg-purple-100', iconCls: 'text-purple-600', label: 'Fleet Recommendation' },
+  service_reminder:                  { icon: Bell,         bg: 'bg-orange-100', iconCls: 'text-orange-600', label: 'Service Due'    },
+  new_review:                        { icon: Star,         bg: 'bg-yellow-100', iconCls: 'text-yellow-500', label: 'New Review'     },
 
   // Invoice & payment
   invoice_issued:              { icon: FileText,     bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Invoice Ready'  },
@@ -70,6 +71,12 @@ function getNotificationHref(n, isProvider, isCompany) {
   if (refType === 'recommendation' || type === 'maintenance_recommendation') {
     if (isCompany) return `/company/reminders`
     return `/dashboard/reminders`
+  }
+  // Fleet recommendations: refId is the company_id (set by the SQL function).
+  // Owners see /company/reminders; members see /dashboard/company/{id}/reminders.
+  if (refType === 'fleet_recommendation' || type === 'fleet_maintenance_recommendation') {
+    if (isCompany) return `/company/reminders`
+    return `/dashboard/company/${refId}/reminders`
   }
   if (refType === 'reminder' || type === 'service_reminder') {
     if (isCompany) return `/company/reminders`

@@ -23,6 +23,7 @@ export default function Sidebar({ user }) {
   // declared before any useEffect that names them, or the first render will
   // throw a ReferenceError.
   const [remindersCount, setRemindersCount] = useState(0)
+  const [companyRemindersCount, setCompanyRemindersCount] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [profileId,      setProfileId]      = useState(null)
   const [mobileOpen,      setMobileOpen]      = useState(false)
@@ -92,6 +93,25 @@ export default function Sidebar({ user }) {
       setRemindersCount(count || 0)
     } catch {}
   }, [profileId])
+
+  const loadCompanyRemindersCount = useCallback(async () => {
+    if (!profileId || !companyMembership?.id) return
+    try {
+      // Count active (unacknowledged) recommendations for fleet vehicles
+      const { data: fleet } = await supabase
+        .from('vehicle_ownership')
+        .select('vehicle_id')
+        .eq('owner_company_id', companyMembership.id)
+      const vehicleIds = fleet?.map(f => f.vehicle_id) || []
+      if (vehicleIds.length === 0) { setCompanyRemindersCount(0); return }
+      const { count } = await supabase
+        .from('maintenance_recommendations')
+        .select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('is_acknowledged', false)
+      setCompanyRemindersCount(count || 0)
+    } catch {}
+  }, [profileId, companyMembership?.id])
 
   // ── Personal WO action count ────────────────────────────────────────────
   // Counts work orders where the user needs to take action:
@@ -197,6 +217,7 @@ export default function Sidebar({ user }) {
     if (!profileId) return
     loadUnreadMessages()
     loadRemindersCount()
+    loadCompanyRemindersCount()
     loadWoActionCount()
 
     // Subscribe to conversation changes so the message badge updates live.
@@ -220,11 +241,20 @@ export default function Sidebar({ user }) {
       }, () => loadRemindersCount())
       .subscribe()
 
+    // Company recommendations — listen for changes to refresh the badge.
+    const companyRecChannel = supabase
+      .channel(`sidebar-company-recs-${profileId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'maintenance_recommendations',
+      }, () => loadCompanyRemindersCount())
+      .subscribe()
+
     return () => {
       supabase.removeChannel(convChannel)
       supabase.removeChannel(remindChannel)
+      supabase.removeChannel(companyRecChannel)
     }
-  }, [profileId, loadUnreadMessages, loadRemindersCount, loadWoActionCount])
+  }, [profileId, loadUnreadMessages, loadRemindersCount, loadCompanyRemindersCount, loadWoActionCount])
 
   // ── Per-provider unread chat counts (Service Provider Membership) ───────
   // For each provider this user has can_chat on, sum provider_unread_count
@@ -610,7 +640,8 @@ export default function Sidebar({ user }) {
       // component with this portal's basePath. No badge for now — a fleet-
       // wide reminder count would need its own query + realtime channel
       // (mirroring the personal-nav pattern); can be added later.
-      { icon: Bell,         label: 'Reminders',   path: `${base}/reminders`,        everyone: true  },
+      { icon: Bell,         label: 'Reminders',   path: `${base}/reminders`,        everyone: true,
+        badge: companyRemindersCount > 0 ? companyRemindersCount : null },
       // Find Providers + Chat — both gated on can_chat (admins see them too).
       // Visually grouped: discover → message.
       ...(canChat ? [

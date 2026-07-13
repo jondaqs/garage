@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
-  Bell, BellOff, Calendar, Gauge, Car,
+  Bell, BellOff, Calendar, Gauge, Car, Wrench,
   CheckCircle, AlertCircle, Loader2, ChevronRight, Plus, RefreshCw
 } from 'lucide-react'
 import SubscriptionGate from '@/components/SubscriptionGate'
@@ -22,6 +22,15 @@ const PRIORITY_DOT = {
   high:   'bg-orange-500',
   urgent: 'bg-red-500',
 }
+const PRIORITY_TAG = {
+  low:    'bg-gray-100 text-gray-600',
+  normal: 'bg-blue-100 text-blue-700',
+  high:   'bg-orange-100 text-orange-700',
+  urgent: 'bg-red-100 text-red-700',
+}
+const PRIORITY_LABEL = {
+  low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent',
+}
 
 export default function RemindersPage() {
   const supabase = createClient()
@@ -32,6 +41,7 @@ export default function RemindersPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError]           = useState('')
   const [success, setSuccess]       = useState('')
+  const [filter, setFilter]         = useState('active')   // 'active' | 'dismissed' | 'all'
 
   useEffect(() => { loadReminders() }, [])
 
@@ -95,7 +105,7 @@ export default function RemindersPage() {
   }
 
   const active   = reminders.filter(r => r.is_active)
-  const past     = reminders.filter(r => !r.is_active)
+  const dismissed = reminders.filter(r => !r.is_active)
 
   // A reminder is overdue when the recommended SERVICE date has passed,
   // not when scheduled_at has passed. scheduled_at is the notification
@@ -107,6 +117,10 @@ export default function RemindersPage() {
     return r.scheduled_at && new Date(r.scheduled_at) < new Date()
   }
   const overdue  = active.filter(isReminderOverdue)
+
+  const filtered = filter === 'active' ? active
+    : filter === 'dismissed' ? dismissed
+    : reminders
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -120,23 +134,43 @@ export default function RemindersPage() {
       featureDescription="Get notified about upcoming maintenance, service due dates, and scheduled inspections."
     >
     <div className="max-w-2xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Bell size={24} className="text-green-600" /> Service Reminders
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Upcoming maintenance and service due dates for your vehicles
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Bell size={24} className="text-green-600" /> Service Reminders
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {active.length} active reminder{active.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-50"
+            title="Refresh reminders"
+          >
+            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+          </button>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-50"
-          title="Refresh reminders"
-        >
-          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-        </button>
+        {/* Filter */}
+        <div className="flex gap-2">
+          {[
+            { value: 'active',    label: 'Active'    },
+            { value: 'dismissed', label: 'Dismissed' },
+            { value: 'all',       label: 'All'       },
+          ].map(f => (
+            <button key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                filter === f.value
+                  ? 'bg-green-600 text-white'
+                  : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -167,43 +201,59 @@ export default function RemindersPage() {
         </div>
       )}
 
-      {active.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <Bell className="mx-auto text-gray-300 mb-4" size={44} />
-          <h3 className="text-base font-medium text-gray-900 mb-2">No active reminders</h3>
+          <h3 className="text-base font-medium text-gray-900 mb-2">
+            {filter === 'dismissed' ? 'No dismissed reminders' : filter === 'all' ? 'No reminders yet' : 'No active reminders'}
+          </h3>
           <p className="text-gray-500 text-sm">
-            Reminders are created automatically when your mechanic adds maintenance recommendations
-            after a service.
+            {filter === 'active'
+              ? 'Reminders are created automatically when your mechanic adds maintenance recommendations after a service.'
+              : 'Try switching the filter above.'}
           </p>
-          <button
-            onClick={() => router.push('/dashboard/bookings')}
-            className="mt-4 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-          >
-            Book a Service
-          </button>
+          {filter === 'active' && (
+            <button
+              onClick={() => router.push('/dashboard/bookings')}
+              className="mt-4 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+            >
+              Book a Service
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
-          {active.map(rem => {
+          {filtered.map(rem => {
             const rec      = rem.recommendation
             const priority = rec?.priority || 'normal'
-            const isOverdue = isReminderOverdue(rem)
+            const isOverdue = rem.is_active && isReminderOverdue(rem)
+            const isDismissed = !rem.is_active
 
             return (
               <div key={rem.id}
-                className={`rounded-xl border p-4 ${PRIORITY_COLORS[priority]} ${
-                  isOverdue ? 'border-red-300 bg-red-50/40' : ''
+                className={`rounded-xl border p-4 ${
+                  isDismissed
+                    ? 'border-gray-200 bg-gray-50 opacity-70'
+                    : isOverdue ? 'border-red-300 bg-red-50/40' : PRIORITY_COLORS[priority]
                 }`}>
                 <div className="flex items-start gap-3">
+                  {/* Priority dot */}
                   <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${
-                    isOverdue ? 'bg-red-500' : PRIORITY_DOT[priority]
+                    isDismissed ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : PRIORITY_DOT[priority]
                   }`} />
 
                   <div className="flex-1 min-w-0">
+                    {/* Title row — service name + priority tag + overdue badge */}
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <p className="font-semibold text-gray-900 text-sm">
-                        {rem.title || rec?.service?.name || 'Service Due'}
-                      </p>
+                      <span className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
+                        <Wrench size={13} className="text-gray-400" />
+                        {rec?.service?.name || rem.title || 'Service Due'}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        isDismissed ? 'bg-gray-200 text-gray-500' : PRIORITY_TAG[priority]
+                      }`}>
+                        {isDismissed ? 'Dismissed' : PRIORITY_LABEL[priority]}
+                      </span>
                       {isOverdue && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
                           OVERDUE
@@ -220,16 +270,13 @@ export default function RemindersPage() {
                       </p>
                     )}
 
-                    {/* Note */}
-                    {rem.message && (
-                      <p className="text-sm text-gray-700 mb-2">{rem.message}</p>
-                    )}
-                    {rec?.note && rec.note !== rem.message && (
-                      <p className="text-xs text-gray-500 italic mb-2">{rec.note}</p>
+                    {/* Mechanic note */}
+                    {rec?.note && (
+                      <p className="text-sm text-gray-700 mb-2">{rec.note}</p>
                     )}
 
-                    {/* Due trigger */}
-                    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                    {/* Due info + WO link */}
+                    <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                       {rec?.recommended_mileage && (
                         <span className="flex items-center gap-1">
                           <Gauge size={11} /> Due at {rec.recommended_mileage.toLocaleString()} km
@@ -243,18 +290,35 @@ export default function RemindersPage() {
                           })}
                         </span>
                       )}
+                      {rec?.work_order?.id && (
+                        <button
+                          onClick={() => router.push(`/dashboard/work-orders/${rec.work_order.id}`)}
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          WO {rec.work_order.work_order_number}
+                        </button>
+                      )}
                     </div>
+
+                    {/* CTA prompt — only for active reminders */}
+                    {!isDismissed && (rec?.recommended_date || rec?.recommended_mileage) && (
+                      <p className="text-xs text-green-700 mt-2 font-medium">
+                        Book a service now to stay on schedule.
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions */}
                   <div className="flex flex-col gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => router.push(`/dashboard/bookings/book?vehicle=${rem.vehicle?.id}`)}
-                      className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 whitespace-nowrap"
-                    >
-                      Book Service
-                    </button>
-                    {rec?.id && (
+                    {rem.vehicle?.id && (
+                      <button
+                        onClick={() => router.push(`/dashboard/bookings/book?vehicle=${rem.vehicle?.id}`)}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 whitespace-nowrap"
+                      >
+                        Book Service
+                      </button>
+                    )}
+                    {!isDismissed && rec?.id && (
                       <button
                         onClick={() => handleAcknowledgeRec(rec.id, rem.id)}
                         className="px-3 py-1.5 bg-white border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50 whitespace-nowrap"
@@ -262,62 +326,20 @@ export default function RemindersPage() {
                         Acknowledge
                       </button>
                     )}
-                    <button
-                      onClick={() => handleDismiss(rem.id)}
-                      className="px-3 py-1.5 text-gray-400 hover:text-gray-600 text-xs whitespace-nowrap"
-                    >
-                      Dismiss
-                    </button>
+                    {!isDismissed && (
+                      <button
+                        onClick={() => handleDismiss(rem.id)}
+                        className="px-3 py-1.5 text-gray-400 hover:text-gray-600 text-xs whitespace-nowrap"
+                      >
+                        Dismiss
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             )
           })}
         </div>
-      )}
-
-      {/* Past / dismissed reminders */}
-      {past.length > 0 && (
-        <details className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <summary className="px-5 py-3 cursor-pointer text-sm font-medium text-gray-500 hover:bg-gray-50 list-none flex items-center justify-between">
-            <span>{past.length} past / dismissed reminder{past.length > 1 ? 's' : ''}</span>
-            <ChevronRight size={16} />
-          </summary>
-          <div className="border-t border-gray-100 divide-y divide-gray-50">
-            {past.map(rem => (
-              <div key={rem.id} className="px-5 py-3 flex items-center gap-3 text-sm">
-                <BellOff size={14} className="text-gray-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0 opacity-60">
-                  <p className="font-medium text-gray-700">
-                    {rem.title || rem.recommendation?.service?.name || 'Service Reminder'}
-                  </p>
-                  {rem.vehicle && (
-                    <p className="text-xs text-gray-400">{rem.vehicle.plate_number}</p>
-                  )}
-                </div>
-                <span className="text-xs text-gray-400 flex-shrink-0">
-                  {rem.sent_at
-                    ? new Date(rem.sent_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })
-                    : 'Dismissed'
-                  }
-                </span>
-                {/* Book Service available even after acknowledgement — a
-                    past reminder still represents work the customer may
-                    want to schedule. Outside the .opacity-60 wrapper above
-                    so the button itself stays at full opacity even though
-                    the row text is dimmed. */}
-                {rem.vehicle?.id && (
-                  <button
-                    onClick={() => router.push(`/dashboard/bookings/book?vehicle=${rem.vehicle.id}`)}
-                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 whitespace-nowrap flex-shrink-0"
-                  >
-                    Book Service
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </details>
       )}
     </div>
     </SubscriptionGate>
