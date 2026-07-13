@@ -1,5 +1,5 @@
-// src/app/api/team/invite/route.js
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sendInvitationEmail } from '@/lib/email/sendInvitationEmail'
@@ -83,15 +83,23 @@ export async function POST(request) {
             )
         }
 
-        // Check if user is already an active member of this provider
-        const { data: existingProfile } = await supabase
-            .from('user_profiles_secure')
+        // Check if user is already an active member of this provider.
+        // Use email_idx (blind index) — avoids decrypting every row
+        // in user_profiles, scales with table growth.
+        const sc = createServiceClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY,
+            { auth: { autoRefreshToken: false, persistSession: false } }
+        )
+
+        const { data: existingProfile } = await sc
+            .from('user_profiles')
             .select('id')
-            .eq('email', email)
+            .eq('email_idx', emailIdx)
             .maybeSingle()
 
         if (existingProfile) {
-            const { data: existingMember } = await supabase
+            const { data: existingMember } = await sc
                 .from('service_provider_users')
                 .select('id')
                 .eq('service_provider_id', provider.id)

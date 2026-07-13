@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { sendCompanyInviteEmail } from '@/lib/email/sendCompanyInviteEmail'
 import { requireCanAddStaff } from '@/lib/guards/companyAccess'
 import { writeLimiter } from '@/lib/rateLimiters'
+import { piiHmac } from '@/lib/pii'
 
 export async function POST(request) {
   const limited = writeLimiter.check(request)
@@ -69,12 +71,16 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
     }
 
+    // Use blind index (email_idx) for the duplicate check — filtering on
+    // decrypted PII columns via RLS can fail depending on policy context.
+    const emailIdx = await piiHmac(supabase, inviteeEmail)
+
     // Check for duplicate pending invitation
     const { data: existingInvite } = await supabase
       .from('company_invitations_secure')
       .select('id')
       .eq('company_id', companyId)
-      .eq('email', inviteeEmail)
+      .eq('email_idx', emailIdx)
       .eq('status', 'pending')
       .maybeSingle()
 
@@ -85,16 +91,25 @@ export async function POST(request) {
       )
     }
 
-    // Check if user is already an active member of this company
-    const { data: existingProfile } = await supabase
-      .from('user_profiles_secure')
+    // Use service client for cross-table membership check (bypasses RLS)
+    const sc = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    // Check if user is already an active member of this company.
+    // Use email_idx (blind index) for the lookup — avoids decrypting
+    // every row in user_profiles, scales with table growth.
+    const { data: existingProfile } = await sc
+      .from('user_profiles')
       .select('id')
-      .eq('email', inviteeEmail)
+      .eq('email_idx', emailIdx)
       .maybeSingle()
 
     if (existingProfile) {
       // Check company_users membership
-      const { data: existingMember } = await supabase
+      const { data: existingMember } = await sc
         .from('company_users')
         .select('id')
         .eq('company_id', companyId)
@@ -110,8 +125,8 @@ export async function POST(request) {
       }
 
       // Check if they're the company owner
-      const { data: isOwner } = await supabase
-        .from('company_profiles_secure')
+      const { data: isOwner } = await sc
+        .from('company_profiles')
         .select('id')
         .eq('id', companyId)
         .eq('owner_user_id', existingProfile.id)
