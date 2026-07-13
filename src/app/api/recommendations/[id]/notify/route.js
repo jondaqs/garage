@@ -127,8 +127,6 @@ export async function POST(request, context) {
       return NextResponse.json({ success: true, skipped: true, reason: 'no_recipients_found' })
     }
 
-    const ownerName = [owner.first_name, owner.last_name].filter(Boolean).join(' ') || 'Customer'
-
     // ── Resolve vehicle ──────────────────────────────────────────────────
     const { data: vehicle } = await sc
       .from('vehicles_secure')
