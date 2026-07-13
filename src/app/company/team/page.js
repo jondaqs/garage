@@ -605,7 +605,7 @@ export default function TeamPage() {
                 className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                 {inviting ? 'Sending…' : 'Send Invitation'}
               </button>
-              <button onClick={() => setShowInviteForm(false)}
+              <button onClick={() => { setShowInviteForm(false); setError(null) }}
                 className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
                 Cancel
               </button>
