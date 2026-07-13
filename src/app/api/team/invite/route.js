@@ -83,6 +83,30 @@ export async function POST(request) {
             )
         }
 
+        // Check if user is already an active member of this provider
+        const { data: existingProfile } = await supabase
+            .from('user_profiles_secure')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle()
+
+        if (existingProfile) {
+            const { data: existingMember } = await supabase
+                .from('service_provider_users')
+                .select('id')
+                .eq('service_provider_id', provider.id)
+                .eq('user_id', existingProfile.id)
+                .eq('is_active', true)
+                .maybeSingle()
+
+            if (existingMember) {
+                return NextResponse.json(
+                    { error: 'This user is already an active member of your team' },
+                    { status: 400 }
+                )
+            }
+        }
+
         // Generate token
         const invitation_token = crypto.randomBytes(32).toString('base64url')
 

@@ -64,6 +64,67 @@ export async function POST(request) {
     const staffDenied = await requireCanAddStaff(supabase, companyId)
     if (staffDenied) return staffDenied
 
+    const inviteeEmail = body.email?.trim()?.toLowerCase()
+    if (!inviteeEmail || !inviteeEmail.includes('@')) {
+      return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
+    }
+
+    // Check for duplicate pending invitation
+    const { data: existingInvite } = await supabase
+      .from('company_invitations_secure')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('email', inviteeEmail)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (existingInvite) {
+      return NextResponse.json(
+        { error: 'A pending invitation already exists for this email' },
+        { status: 400 }
+      )
+    }
+
+    // Check if user is already an active member of this company
+    const { data: existingProfile } = await supabase
+      .from('user_profiles_secure')
+      .select('id')
+      .eq('email', inviteeEmail)
+      .maybeSingle()
+
+    if (existingProfile) {
+      // Check company_users membership
+      const { data: existingMember } = await supabase
+        .from('company_users')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('user_id', existingProfile.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (existingMember) {
+        return NextResponse.json(
+          { error: 'This user is already an active member of your company' },
+          { status: 400 }
+        )
+      }
+
+      // Check if they're the company owner
+      const { data: isOwner } = await supabase
+        .from('company_profiles_secure')
+        .select('id')
+        .eq('id', companyId)
+        .eq('owner_user_id', existingProfile.id)
+        .maybeSingle()
+
+      if (isOwner) {
+        return NextResponse.json(
+          { error: 'This user is the company owner and cannot be invited as a member' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Generate invitation token
     const inviteToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
     const expiresAt = new Date()
@@ -75,7 +136,7 @@ export async function POST(request) {
       .insert([{
         company_id:       companyId,
         invited_by:       userProfile.id,
-        email:            body.email,
+        email:            inviteeEmail,
         first_name:       body.firstName,
         last_name:        body.lastName,
         phone:            body.phone,
