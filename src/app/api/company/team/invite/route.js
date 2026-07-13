@@ -75,14 +75,13 @@ export async function POST(request) {
     const emailIdx = await piiHmac(supabase, inviteeEmail)
 
     if (!emailIdx) {
-      console.error('[company/invite] piiHmac returned null for email:', inviteeEmail?.substring(0, 3) + '***')
+      console.error('[company/invite] piiHmac returned null')
       return NextResponse.json(
         { error: 'Unable to process email. Please try again.' },
         { status: 500 }
       )
     }
 
-    console.log('[company/invite] checking duplicates for company:', companyId)
 
     // Check for duplicate pending invitation
     const { data: existingInvite, error: dupErr } = await supabase
@@ -123,7 +122,6 @@ export async function POST(request) {
     }
 
     if (existingProfile) {
-      console.log('[company/invite] found profile:', existingProfile.id, '— checking membership')
 
       // Check company_users membership
       const { data: existingMember, error: memErr } = await sc
@@ -139,7 +137,6 @@ export async function POST(request) {
       }
 
       if (existingMember) {
-        console.log('[company/invite] blocked — already a member:', existingMember.id)
         return NextResponse.json(
           { error: 'This user is already an active member of your company' },
           { status: 400 }
@@ -159,7 +156,6 @@ export async function POST(request) {
       }
 
       if (isOwner) {
-        console.log('[company/invite] blocked — is the company owner')
         return NextResponse.json(
           { error: 'This user is the company owner and cannot be invited as a member' },
           { status: 400 }
@@ -167,7 +163,6 @@ export async function POST(request) {
       }
     }
 
-    console.log('[company/invite] all checks passed — creating invitation')
 
     // Generate invitation token
     const inviteToken = Math.random().toString(36).substring(2) + Date.now().toString(36)

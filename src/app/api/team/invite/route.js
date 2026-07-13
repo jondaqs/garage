@@ -21,7 +21,6 @@ export async function POST(request) {
             const specialization = sanitizeText(rawSpec, 200)
             const experience_years = rawYears != null ? requireNumber(rawYears, { min: 0, max: 60, integer: true }) : null
 
-        console.log('📨 Invite route called for:', email)
 
         // Validate email
         if (!email || !email.includes('@')) {
@@ -70,14 +69,13 @@ export async function POST(request) {
         const emailIdx = await piiHmac(supabase, email)
 
         if (!emailIdx) {
-            console.error('[team/invite] piiHmac returned null for email:', email?.substring(0, 3) + '***')
+            console.error('[team/invite] piiHmac returned null')
             return NextResponse.json(
                 { error: 'Unable to process email. Please try again.' },
                 { status: 500 }
             )
         }
 
-        console.log('[team/invite] checking duplicates for provider:', provider.id)
 
         const { data: existing, error: dupErr } = await supabase
             .from('team_invitations_secure')
@@ -117,7 +115,6 @@ export async function POST(request) {
         }
 
         if (existingProfile) {
-            console.log('[team/invite] found profile:', existingProfile.id, '— checking membership')
 
             const { data: existingMember, error: memErr } = await sc
                 .from('service_provider_users')
@@ -132,7 +129,6 @@ export async function POST(request) {
             }
 
             if (existingMember) {
-                console.log('[team/invite] blocked — already a member:', existingMember.id)
                 return NextResponse.json(
                     { error: 'This user is already an active member of your team' },
                     { status: 400 }
@@ -168,7 +164,6 @@ export async function POST(request) {
             )
         }
 
-        console.log('✅ Invitation created:', invitation.id)
 
         // ============================================
         // SEND EMAIL NOTIFICATION
@@ -178,18 +173,14 @@ export async function POST(request) {
         const url = new URL(request.url)
         const emailApiUrl = `${url.origin}/api/team/send-invitation-email`
 
-        console.log('📧 Calling email API at:', emailApiUrl)
-        console.log('📧 Invitation ID:', invitation.id)
 
         try {
             const emailResponse = await sendInvitationEmail(invitation.id)
 
-            console.log('📧 Email service response:', emailResponse)
 
             if (emailResponse.error) {
                 console.error('❌ Email sending failed:', emailResponse.error)
             } else {
-                console.log('✅ Email notification sent successfully')
             }
 
         } catch (emailError) {
