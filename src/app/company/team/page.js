@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { UserPlus, Mail, Pencil, Check, X, Shield, Loader2, AlertCircle, Clock, Ban, Settings } from 'lucide-react'
+import { UserPlus, Upload, Mail, Pencil, Check, X, Shield, Loader2, AlertCircle, Clock, Ban, Settings } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 import WriteGate from '@/components/WriteGate'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
@@ -15,6 +16,7 @@ const ROLE_OPTIONS = [
 ]
 
 export default function TeamPage() {
+  const router = useRouter()
   const [members,        setMembers]        = useState([])
   const ownerAccess = useOwnerCompanyAccess()
   const [invitations,    setInvitations]    = useState([])
@@ -220,12 +222,20 @@ export default function TeamPage() {
           </p>
         </div>
         <WriteGate canWrite={ownerAccess.canWrite} state={ownerAccess.state}>
-        <button
-          onClick={() => setShowInviteForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-        >
-          <UserPlus className="w-4 h-4" /> Invite Member
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowInviteForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+          >
+            <UserPlus className="w-4 h-4" /> Invite Member
+          </button>
+          <button
+            onClick={() => router.push('/company/team/invite')}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+          >
+            <Upload className="w-4 h-4" /> Bulk Upload
+          </button>
+        </div>
         </WriteGate>
       </div>
 

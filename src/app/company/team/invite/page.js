@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { piiHmac } from '@/lib/pii';
 import CompanySubscriptionGate from '@/components/CompanySubscriptionGate';
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess';
 
@@ -42,60 +41,10 @@ export default function InviteTeamMemberPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      
-      // Get user's company
-      const { data: profile } = await supabase
-        .from('user_profiles_secure')
-        .select('id, company_id')
-        .eq('auth_user_id', user.id)
-        .single();
-      
-      if (!profile?.company_id) {
-        throw new Error('You are not associated with a company');
-      }
-      
-      // Check if user already exists (PII: search by blind index)
-      const phoneIdx = await piiHmac(supabase, singleInvite.phone);
-      const { data: existingUser } = await supabase
-        .from('user_profiles_secure')
-        .select('id, auth_user_id')
-        .eq('phone_idx', phoneIdx)
-        .maybeSingle();
-      
-      // Check if already a team member
-      if (existingUser) {
-        const { data: existingMember } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', existingUser.id)
-          .eq('company_id', profile.company_id)
-          .maybeSingle();
-        
-        if (existingMember) {
-          throw new Error('This user is already a team member');
-        }
-      }
-      
-      // Create invitation
-      const { error: inviteError } = await supabase
-        .from('company_invitations')
-        .insert({
-          company_id: profile.company_id,
-          email: singleInvite.email,
-          phone: singleInvite.phone,
-          first_name: singleInvite.firstName,
-          last_name: singleInvite.lastName,
-          staff_role: singleInvite.role,
-          is_admin: singleInvite.isAdmin,
-          invited_by: profile.id,
-          status: 'pending',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-        });
-      
-      if (inviteError) throw inviteError;
-      
-      // Send invitation email
-      await fetch('/api/company/team/invite', {
+
+      // Let the API handle everything: duplicate check, membership check,
+      // invitation insert, and email sending — all in one call.
+      const res = await fetch('/api/company/team/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -107,6 +56,12 @@ export default function InviteTeamMemberPage() {
           isAdmin:   singleInvite.isAdmin,
         }),
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send invitation');
+      }
       
       setSuccess('Invitation sent successfully!');
       setSingleInvite({
@@ -138,17 +93,6 @@ export default function InviteTeamMemberPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
-      // Get user's company
-      const { data: profile } = await supabase
-        .from('user_profiles_secure')
-        .select('id, company_id')
-        .eq('auth_user_id', user.id)
-        .single();
-      
-      if (!profile?.company_id) {
-        throw new Error('You are not associated with a company');
-      }
-      
       // Read CSV file
       const text = await bulkFile.text();
       const lines = text.split('\n').filter(line => line.trim());
@@ -161,46 +105,73 @@ export default function InviteTeamMemberPage() {
         throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
       }
       
-      // Process each row
-      const invitations = [];
+      // Parse rows
+      const rows = [];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map(v => v.trim());
         const row = {};
         headers.forEach((header, index) => {
           row[header] = values[index];
         });
-        
         if (row.email && row.first_name && row.last_name && row.phone) {
-          invitations.push({
-            company_id: profile.company_id,
-            email: row.email,
-            phone: row.phone,
-            first_name: row.first_name,
-            last_name: row.last_name,
-            staff_role: row.role || 'driver',
-            is_admin: row.is_admin?.toLowerCase() === 'true',
-            invited_by: profile.id,
-            status: 'pending',
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          });
+          rows.push(row);
         }
       }
       
-      if (invitations.length === 0) {
+      if (rows.length === 0) {
         throw new Error('No valid invitations found in file');
       }
-      
-      // Insert invitations
-      const { error: inviteError } = await supabase
-        .from('company_invitations')
-        .insert(invitations);
-      
-      if (inviteError) throw inviteError;
-      
-      setSuccess(`Successfully invited ${invitations.length} team member(s)!`);
-      setBulkFile(null);
-      
-      setTimeout(() => router.push('/company/dashboard?tab=team'), 2000);
+
+      // Send each invite through the API so duplicate/membership
+      // checks run per-row. Collect results for a summary.
+      const results = { sent: 0, skipped: [], failed: [] };
+
+      for (const row of rows) {
+        try {
+          const res = await fetch('/api/company/team/invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email:     row.email,
+              phone:     row.phone,
+              firstName: row.first_name,
+              lastName:  row.last_name,
+              role:      row.role || 'driver',
+              isAdmin:   row.is_admin?.toLowerCase() === 'true',
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            results.sent++;
+          } else {
+            results.skipped.push(`${row.email}: ${data.error || 'Failed'}`);
+          }
+        } catch {
+          results.failed.push(`${row.email}: Network error`);
+        }
+      }
+
+      // Build summary message
+      const parts = [`${results.sent} invitation(s) sent`];
+      if (results.skipped.length > 0) parts.push(`${results.skipped.length} skipped`);
+      if (results.failed.length > 0) parts.push(`${results.failed.length} failed`);
+
+      if (results.skipped.length > 0 || results.failed.length > 0) {
+        const details = [...results.skipped, ...results.failed].join('\n');
+        setError(`${parts.join(', ')}:\n${details}`);
+      }
+
+      if (results.sent > 0) {
+        setSuccess(`Successfully invited ${results.sent} team member(s)!`);
+        setBulkFile(null);
+        if (results.skipped.length === 0 && results.failed.length === 0) {
+          setTimeout(() => router.push('/company/dashboard?tab=team'), 2000);
+        }
+      } else {
+        if (!results.skipped.length && !results.failed.length) {
+          throw new Error('No invitations were sent');
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
