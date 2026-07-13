@@ -85,19 +85,24 @@ export default function Sidebar({ user }) {
   const loadRemindersCount = useCallback(async () => {
     if (!profileId) return
     try {
-      const { count } = await supabase
+      // Get active reminders, then filter out acknowledged ones client-side
+      // (the reminders table doesn't have is_acknowledged — it's on the
+      // joined recommendation, so we need a lightweight query)
+      const { data } = await supabase
         .from('reminders')
-        .select('id', { count: 'exact', head: true })
+        .select('id, is_active, recommendation:maintenance_recommendations(is_acknowledged)')
         .eq('user_id', profileId)
         .eq('is_active', true)
-      setRemindersCount(count || 0)
+      // Only count reminders whose recommendation is NOT acknowledged
+      const activeCount = (data || []).filter(r => !r.recommendation?.is_acknowledged).length
+      setRemindersCount(activeCount)
     } catch {}
   }, [profileId])
 
   const loadCompanyRemindersCount = useCallback(async () => {
     if (!profileId || !companyMembership?.id) return
     try {
-      // Count active (unacknowledged) recommendations for fleet vehicles
+      // Count active recommendations: not acknowledged AND not dismissed
       const { data: fleet } = await supabase
         .from('vehicle_ownership')
         .select('vehicle_id')
@@ -109,6 +114,7 @@ export default function Sidebar({ user }) {
         .select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds)
         .eq('is_acknowledged', false)
+        .eq('is_dismissed', false)
       setCompanyRemindersCount(count || 0)
     } catch {}
   }, [profileId, companyMembership?.id])
@@ -241,12 +247,18 @@ export default function Sidebar({ user }) {
       }, () => loadRemindersCount())
       .subscribe()
 
-    // Company recommendations — listen for changes to refresh the badge.
+    // Company recommendations — listen for changes to refresh both badges.
+    // Acknowledge/dismiss changes on maintenance_recommendations affect:
+    //   1. The company reminders badge (direct)
+    //   2. The individual reminders badge (via the joined is_acknowledged flag)
     const companyRecChannel = supabase
       .channel(`sidebar-company-recs-${profileId}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'maintenance_recommendations',
-      }, () => loadCompanyRemindersCount())
+      }, () => {
+        loadCompanyRemindersCount()
+        loadRemindersCount()
+      })
       .subscribe()
 
     return () => {

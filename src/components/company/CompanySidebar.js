@@ -57,8 +57,20 @@ export default function CompanySidebar({ company, userRole }) {
       }, () => loadUnreadMessages())
       .subscribe()
 
-    return () => { supabase.removeChannel(convChannel) }
-  }, [company?.id, loadUnreadMessages])
+    // Refresh recommendations badge when any recommendation is
+    // acknowledged, dismissed, or created.
+    const recChannel = supabase
+      .channel(`co-sidebar-recs-${company.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'maintenance_recommendations',
+      }, () => loadRecommendationsCount())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(convChannel)
+      supabase.removeChannel(recChannel)
+    }
+  }, [company?.id, loadUnreadMessages, loadRecommendationsCount])
 
   const loadPendingCount = async (companyId) => {
     try {
@@ -79,19 +91,23 @@ export default function CompanySidebar({ company, userRole }) {
     } catch {}
   }
 
-  const loadRecommendationsCount = async (companyId) => {
+  const loadRecommendationsCount = useCallback(async (companyId) => {
     try {
+      const cId = companyId || company?.id
+      if (!cId) return
       const { data: fleet } = await supabase
-        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', companyId)
+        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', cId)
       const vehicleIds = fleet?.map(f => f.vehicle_id) || []
-      if (vehicleIds.length === 0) return
+      if (vehicleIds.length === 0) { setRecommendationsCount(0); return }
 
       const { count } = await supabase
         .from('maintenance_recommendations').select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds).eq('is_acknowledged', false)
+        .in('vehicle_id', vehicleIds)
+        .eq('is_acknowledged', false)
+        .eq('is_dismissed', false)
       setRecommendationsCount(count || 0)
     } catch {}
-  }
+  }, [company?.id])
 
   const navigation = [
     { name: 'Dashboard',         href: '/company/dashboard',   icon: Home         },
