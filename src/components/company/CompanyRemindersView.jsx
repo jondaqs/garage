@@ -24,8 +24,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   Bell, Calendar, Gauge, Car, Wrench, RefreshCw,
-  CheckCircle, AlertCircle, Loader2, ChevronRight,
+  CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft,
 } from 'lucide-react'
+
+const PAGE_SIZE = 10
 
 const PRIORITY_BORDER = {
   low:    'border-gray-200 bg-white',
@@ -56,6 +58,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
   const [error,           setError]           = useState('')
   const [success,         setSuccess]         = useState('')
   const [filter,          setFilter]          = useState('active')   // 'active' | 'all' | 'acknowledged'
+  const [page,            setPage]            = useState(1)
 
   useEffect(() => { loadRecommendations() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -136,6 +139,11 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
     return true
   })
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const handleFilterChange = (f) => { setFilter(f); setPage(1) }
+
   const urgentCount = recommendations.filter(r => !r.is_acknowledged && r.priority === 'urgent').length
   const highCount   = recommendations.filter(r => !r.is_acknowledged && r.priority === 'high').length
   const activeCount = recommendations.filter(r => !r.is_acknowledged).length
@@ -176,7 +184,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
             { value: 'all',          label: 'All'          },
           ].map(f => (
             <button key={f.value}
-              onClick={() => setFilter(f.value)}
+              onClick={() => handleFilterChange(f.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 filter === f.value
                   ? 'bg-blue-600 text-white'
@@ -235,7 +243,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(rec => {
+          {paged.map(rec => {
             const isOverdue = rec.recommended_date && !rec.is_acknowledged
               && new Date(rec.recommended_date) < new Date()
 
@@ -361,6 +369,40 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-gray-500">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button key={p}
+                onClick={() => setPage(p)}
+                className={`w-8 h-8 rounded-lg text-xs font-medium ${
+                  p === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}>
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       )}
     </div>

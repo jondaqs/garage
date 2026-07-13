@@ -5,9 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   Bell, BellOff, Calendar, Gauge, Car, Wrench,
-  CheckCircle, AlertCircle, Loader2, ChevronRight, Plus, RefreshCw
+  CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft, Plus, RefreshCw
 } from 'lucide-react'
 import SubscriptionGate from '@/components/SubscriptionGate'
+
+const PAGE_SIZE = 10
 
 const PRIORITY_COLORS = {
   low:    'border-gray-200 bg-white',
@@ -42,6 +44,7 @@ export default function RemindersPage() {
   const [error, setError]           = useState('')
   const [success, setSuccess]       = useState('')
   const [filter, setFilter]         = useState('active')   // 'active' | 'dismissed' | 'all'
+  const [page, setPage]             = useState(1)
 
   useEffect(() => { loadReminders() }, [])
 
@@ -122,6 +125,12 @@ export default function RemindersPage() {
     : filter === 'dismissed' ? dismissed
     : reminders
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Reset to page 1 when filter changes
+  const handleFilterChange = (f) => { setFilter(f); setPage(1) }
+
   if (loading) return (
     <div className="flex justify-center items-center h-64">
       <Loader2 className="animate-spin text-green-600" size={32} />
@@ -161,7 +170,7 @@ export default function RemindersPage() {
             { value: 'all',       label: 'All'       },
           ].map(f => (
             <button key={f.value}
-              onClick={() => setFilter(f.value)}
+              onClick={() => handleFilterChange(f.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 filter === f.value
                   ? 'bg-green-600 text-white'
@@ -223,7 +232,7 @@ export default function RemindersPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(rem => {
+          {paged.map(rem => {
             const rec      = rem.recommendation
             const priority = rec?.priority || 'normal'
             const isOverdue = rem.is_active && isReminderOverdue(rem)
@@ -339,6 +348,40 @@ export default function RemindersPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-gray-500">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button key={p}
+                onClick={() => setPage(p)}
+                className={`w-8 h-8 rounded-lg text-xs font-medium ${
+                  p === page ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}>
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       )}
     </div>
