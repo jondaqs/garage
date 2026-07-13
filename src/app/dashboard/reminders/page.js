@@ -43,7 +43,7 @@ export default function RemindersPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError]           = useState('')
   const [success, setSuccess]       = useState('')
-  const [filter, setFilter]         = useState('active')   // 'active' | 'dismissed' | 'all'
+  const [filter, setFilter]         = useState('active')   // 'active' | 'acknowledged' | 'dismissed' | 'all'
   const [page, setPage]             = useState(1)
 
   useEffect(() => { loadReminders() }, [])
@@ -61,7 +61,7 @@ export default function RemindersPage() {
           scheduled_at, sent_at, is_active, created_at,
           vehicle:vehicles_secure(id, plate_number, make, model),
           recommendation:maintenance_recommendations(
-            id, note, priority, recommended_mileage, recommended_date,
+            id, note, priority, recommended_mileage, recommended_date, is_acknowledged,
             service:services(name),
             work_order:work_orders_secure(id, work_order_number)
           )
@@ -96,19 +96,24 @@ export default function RemindersPage() {
 
   const handleAcknowledgeRec = async (recId, reminderId) => {
     try {
+      // Only mark the recommendation as acknowledged.
+      // Do NOT set reminder.is_active = false — the day-before reminder
+      // must stay active so the cron sends it closer to the due date.
       await supabase.from('maintenance_recommendations')
         .update({ is_acknowledged: true, acknowledged_at: new Date().toISOString() })
         .eq('id', recId)
-      await supabase.from('reminders')
-        .update({ is_active: false, sent_at: new Date().toISOString() })
-        .eq('id', reminderId)
       setSuccess('Acknowledged — we\'ll remind you closer to the due date.')
       await loadReminders()
     } catch (e) { setError(e.message) }
   }
 
-  const active   = reminders.filter(r => r.is_active)
-  const dismissed = reminders.filter(r => !r.is_active)
+  // Three states:
+  //   Active:       is_active = true AND recommendation not acknowledged
+  //   Acknowledged: recommendation.is_acknowledged = true (reminder stays active for cron)
+  //   Dismissed:    is_active = false (user doesn't need this)
+  const active       = reminders.filter(r => r.is_active && !r.recommendation?.is_acknowledged)
+  const acknowledged = reminders.filter(r => r.recommendation?.is_acknowledged)
+  const dismissed    = reminders.filter(r => !r.is_active && !r.recommendation?.is_acknowledged)
 
   // A reminder is overdue when the recommended SERVICE date has passed,
   // not when scheduled_at has passed. scheduled_at is the notification
@@ -122,6 +127,7 @@ export default function RemindersPage() {
   const overdue  = active.filter(isReminderOverdue)
 
   const filtered = filter === 'active' ? active
+    : filter === 'acknowledged' ? acknowledged
     : filter === 'dismissed' ? dismissed
     : reminders
 
@@ -165,9 +171,10 @@ export default function RemindersPage() {
         {/* Filter */}
         <div className="flex gap-2">
           {[
-            { value: 'active',    label: 'Active'    },
-            { value: 'dismissed', label: 'Dismissed' },
-            { value: 'all',       label: 'All'       },
+            { value: 'active',       label: 'Active'       },
+            { value: 'acknowledged', label: 'Acknowledged' },
+            { value: 'dismissed',    label: 'Dismissed'    },
+            { value: 'all',          label: 'All'          },
           ].map(f => (
             <button key={f.value}
               onClick={() => handleFilterChange(f.value)}
@@ -214,7 +221,10 @@ export default function RemindersPage() {
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <Bell className="mx-auto text-gray-300 mb-4" size={44} />
           <h3 className="text-base font-medium text-gray-900 mb-2">
-            {filter === 'dismissed' ? 'No dismissed reminders' : filter === 'all' ? 'No reminders yet' : 'No active reminders'}
+            {filter === 'acknowledged' ? 'No acknowledged reminders'
+              : filter === 'dismissed' ? 'No dismissed reminders'
+              : filter === 'all' ? 'No reminders yet'
+              : 'No active reminders'}
           </h3>
           <p className="text-gray-500 text-sm">
             {filter === 'active'
@@ -236,19 +246,21 @@ export default function RemindersPage() {
             const rec      = rem.recommendation
             const priority = rec?.priority || 'normal'
             const isOverdue = rem.is_active && isReminderOverdue(rem)
-            const isDismissed = !rem.is_active
+            const isDismissed = !rem.is_active && !rem.recommendation?.is_acknowledged
+            const isAcknowledged = !!rem.recommendation?.is_acknowledged
+            const isInactive = isDismissed || isAcknowledged
 
             return (
               <div key={rem.id}
                 className={`rounded-xl border p-4 ${
-                  isDismissed
+                  isInactive
                     ? 'border-gray-200 bg-gray-50 opacity-70'
                     : isOverdue ? 'border-red-300 bg-red-50/40' : PRIORITY_COLORS[priority]
                 }`}>
                 <div className="flex items-start gap-3">
                   {/* Priority dot */}
                   <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${
-                    isDismissed ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : PRIORITY_DOT[priority]
+                    isInactive ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : PRIORITY_DOT[priority]
                   }`} />
 
                   <div className="flex-1 min-w-0">
@@ -259,9 +271,9 @@ export default function RemindersPage() {
                         {rec?.service?.name || rem.title || 'Service Due'}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        isDismissed ? 'bg-gray-200 text-gray-500' : PRIORITY_TAG[priority]
+                        isInactive ? 'bg-gray-200 text-gray-500' : PRIORITY_TAG[priority]
                       }`}>
-                        {isDismissed ? 'Dismissed' : PRIORITY_LABEL[priority]}
+                        {isAcknowledged ? 'Acknowledged' : isDismissed ? 'Dismissed' : PRIORITY_LABEL[priority]}
                       </span>
                       {isOverdue && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
@@ -310,7 +322,7 @@ export default function RemindersPage() {
                     </div>
 
                     {/* CTA prompt — only for active reminders */}
-                    {!isDismissed && (rec?.recommended_date || rec?.recommended_mileage) && (
+                    {!isInactive && (rec?.recommended_date || rec?.recommended_mileage) && (
                       <p className="text-xs text-green-700 mt-2 font-medium">
                         Book a service now to stay on schedule.
                       </p>
@@ -327,7 +339,7 @@ export default function RemindersPage() {
                         Book Service
                       </button>
                     )}
-                    {!isDismissed && rec?.id && (
+                    {!isInactive && rec?.id && (
                       <button
                         onClick={() => handleAcknowledgeRec(rec.id, rem.id)}
                         className="px-3 py-1.5 bg-white border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50 whitespace-nowrap"
@@ -335,7 +347,7 @@ export default function RemindersPage() {
                         Acknowledge
                       </button>
                     )}
-                    {!isDismissed && (
+                    {!isInactive && (
                       <button
                         onClick={() => handleDismiss(rem.id)}
                         className="px-3 py-1.5 text-gray-400 hover:text-gray-600 text-xs whitespace-nowrap"

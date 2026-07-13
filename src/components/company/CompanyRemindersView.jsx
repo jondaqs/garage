@@ -93,7 +93,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
         .from('maintenance_recommendations')
         .select(`
           id, note, priority, recommended_mileage, recommended_date,
-          is_acknowledged, acknowledged_at, created_at,
+          is_acknowledged, acknowledged_at, is_dismissed, dismissed_at, created_at,
           service:services(id, name),
           vehicle:vehicles_secure(id, plate_number, make, model),
           mechanic:mechanics(user:user_profiles_secure!user_id(first_name, last_name)),
@@ -124,7 +124,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
         .update({ is_acknowledged: true, acknowledged_at: new Date().toISOString() })
         .eq('id', recId)
       if (err) throw err
-      setSuccess('Recommendation acknowledged')
+      setSuccess('Acknowledged — we\'ll remind you closer to the due date.')
       setRecommendations(prev => prev.map(r =>
         r.id === recId
           ? { ...r, is_acknowledged: true, acknowledged_at: new Date().toISOString() }
@@ -133,9 +133,30 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
     } catch (e) { setError(e.message) }
   }
 
+  const handleDismiss = async (recId) => {
+    try {
+      const { error: err } = await supabase
+        .from('maintenance_recommendations')
+        .update({ is_dismissed: true, dismissed_at: new Date().toISOString() })
+        .eq('id', recId)
+      if (err) throw err
+      setSuccess('Recommendation dismissed')
+      setRecommendations(prev => prev.map(r =>
+        r.id === recId
+          ? { ...r, is_dismissed: true, dismissed_at: new Date().toISOString() }
+          : r
+      ))
+    } catch (e) { setError(e.message) }
+  }
+
+  // Three states:
+  //   Active:       not acknowledged AND not dismissed
+  //   Acknowledged: user said "remind me closer to the date"
+  //   Dismissed:    user doesn't need this recommendation
   const filtered = recommendations.filter(r => {
-    if (filter === 'active')       return !r.is_acknowledged
-    if (filter === 'acknowledged') return r.is_acknowledged
+    if (filter === 'active')       return !r.is_acknowledged && !r.is_dismissed
+    if (filter === 'acknowledged') return r.is_acknowledged && !r.is_dismissed
+    if (filter === 'dismissed')    return r.is_dismissed
     return true
   })
 
@@ -144,9 +165,9 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
 
   const handleFilterChange = (f) => { setFilter(f); setPage(1) }
 
-  const urgentCount = recommendations.filter(r => !r.is_acknowledged && r.priority === 'urgent').length
-  const highCount   = recommendations.filter(r => !r.is_acknowledged && r.priority === 'high').length
-  const activeCount = recommendations.filter(r => !r.is_acknowledged).length
+  const urgentCount = recommendations.filter(r => !r.is_acknowledged && !r.is_dismissed && r.priority === 'urgent').length
+  const highCount   = recommendations.filter(r => !r.is_acknowledged && !r.is_dismissed && r.priority === 'high').length
+  const activeCount = recommendations.filter(r => !r.is_acknowledged && !r.is_dismissed).length
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -181,6 +202,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
           {[
             { value: 'active',       label: 'Active'       },
             { value: 'acknowledged', label: 'Acknowledged' },
+            { value: 'dismissed',    label: 'Dismissed'    },
             { value: 'all',          label: 'All'          },
           ].map(f => (
             <button key={f.value}
@@ -233,7 +255,10 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <Bell className="mx-auto text-gray-300 mb-4" size={44} />
           <h3 className="text-base font-medium text-gray-900 mb-2">
-            {filter === 'acknowledged' ? 'No acknowledged recommendations' : 'No active recommendations'}
+            {filter === 'acknowledged' ? 'No acknowledged recommendations'
+              : filter === 'dismissed' ? 'No dismissed recommendations'
+              : filter === 'all' ? 'No recommendations yet'
+              : 'No active recommendations'}
           </h3>
           <p className="text-gray-500 text-sm">
             {filter === 'active'
@@ -244,13 +269,14 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
       ) : (
         <div className="space-y-3">
           {paged.map(rec => {
-            const isOverdue = rec.recommended_date && !rec.is_acknowledged
+            const isOverdue = rec.recommended_date && !rec.is_acknowledged && !rec.is_dismissed
               && new Date(rec.recommended_date) < new Date()
+            const isInactive = rec.is_acknowledged || rec.is_dismissed
 
             return (
               <div key={rec.id}
                 className={`rounded-xl border p-4 ${
-                  rec.is_acknowledged
+                  isInactive
                     ? 'border-gray-200 bg-gray-50 opacity-70'
                     : isOverdue
                       ? 'border-red-300 bg-red-50/40'
@@ -259,7 +285,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
                 <div className="flex items-start gap-3">
                   {/* Priority dot */}
                   <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${
-                    rec.is_acknowledged ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : PRIORITY_DOT[rec.priority]
+                    isInactive ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : PRIORITY_DOT[rec.priority]
                   }`} />
 
                   <div className="flex-1 min-w-0">
@@ -272,11 +298,11 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
                         </span>
                       )}
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        rec.is_acknowledged
+                        isInactive
                           ? 'bg-gray-200 text-gray-500'
                           : PRIORITY_TAG[rec.priority]
                       }`}>
-                        {rec.is_acknowledged ? 'Acknowledged' : PRIORITY_LABEL[rec.priority]}
+                        {rec.is_dismissed ? 'Dismissed' : rec.is_acknowledged ? 'Acknowledged' : PRIORITY_LABEL[rec.priority]}
                       </span>
                       {isOverdue && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">OVERDUE</span>
@@ -331,7 +357,14 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
                       )}
                     </div>
 
-                    {/* Acknowledged info */}
+                    {/* CTA prompt — only for active recommendations */}
+                    {!isInactive && (rec.recommended_date || rec.recommended_mileage) && (
+                      <p className="text-xs text-blue-700 mt-2 font-medium">
+                        Book a service now to stay on schedule.
+                      </p>
+                    )}
+
+                    {/* Status info */}
                     {rec.is_acknowledged && rec.acknowledged_at && (
                       <p className="text-xs text-gray-400 mt-2">
                         Acknowledged {new Date(rec.acknowledged_at).toLocaleDateString('en-KE', {
@@ -339,14 +372,16 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
                         })}
                       </p>
                     )}
+                    {rec.is_dismissed && rec.dismissed_at && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        Dismissed {new Date(rec.dismissed_at).toLocaleDateString('en-KE', {
+                          day: 'numeric', month: 'short', year: 'numeric'
+                        })}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Actions
-                      Book Service stays available even after acknowledgement —
-                      acknowledging a recommendation only suppresses the priority
-                      surfacing, the underlying need to book a service is still
-                      something the user may want to act on later.
-                      Acknowledge button is naturally gated to unacknowledged items. */}
+                  {/* Actions */}
                   <div className="flex flex-col gap-2 flex-shrink-0">
                     {rec.vehicle?.id && (
                       <button
@@ -356,12 +391,20 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
                         Book Service
                       </button>
                     )}
-                    {!rec.is_acknowledged && (
+                    {!isInactive && (
                       <button
                         onClick={() => handleAcknowledge(rec.id)}
                         className="px-3 py-1.5 bg-white border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50 whitespace-nowrap"
                       >
                         Acknowledge
+                      </button>
+                    )}
+                    {!isInactive && (
+                      <button
+                        onClick={() => handleDismiss(rec.id)}
+                        className="px-3 py-1.5 text-gray-400 hover:text-gray-600 text-xs whitespace-nowrap"
+                      >
+                        Dismiss
                       </button>
                     )}
                   </div>
