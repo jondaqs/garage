@@ -23,7 +23,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
-  Bell, Calendar, Gauge, Car, Wrench,
+  Bell, Calendar, Gauge, Car, Wrench, RefreshCw,
   CheckCircle, AlertCircle, Loader2, ChevronRight,
 } from 'lucide-react'
 
@@ -52,6 +52,7 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
 
   const [recommendations, setRecommendations] = useState([])
   const [loading,         setLoading]         = useState(true)
+  const [refreshing,      setRefreshing]      = useState(false)
   const [error,           setError]           = useState('')
   const [success,         setSuccess]         = useState('')
   const [filter,          setFilter]          = useState('active')   // 'active' | 'all' | 'acknowledged'
@@ -107,6 +108,12 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
     }
   }
 
+  const handleRefresh = async () => {
+    setRefreshing(true); setError(''); setSuccess('')
+    await loadRecommendations()
+    setRefreshing(false)
+  }
+
   const handleAcknowledge = async (recId) => {
     try {
       const { error: err } = await supabase
@@ -143,13 +150,23 @@ export default function CompanyRemindersView({ basePath = '/company' }) {
     <div className="max-w-3xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Bell size={24} className="text-blue-600" /> Fleet Maintenance Recommendations
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {activeCount} active across your fleet
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Bell size={24} className="text-blue-600" /> Fleet Maintenance Recommendations
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {activeCount} active across your fleet
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-50"
+            title="Refresh recommendations"
+          >
+            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+          </button>
         </div>
         {/* Filter */}
         <div className="flex gap-2">

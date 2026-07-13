@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
   Bell, BellOff, Calendar, Gauge, Car,
-  CheckCircle, AlertCircle, Loader2, ChevronRight, Plus
+  CheckCircle, AlertCircle, Loader2, ChevronRight, Plus, RefreshCw
 } from 'lucide-react'
 import SubscriptionGate from '@/components/SubscriptionGate'
 
@@ -29,6 +29,7 @@ export default function RemindersPage() {
 
   const [reminders, setReminders]   = useState([])
   const [loading, setLoading]       = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError]           = useState('')
   const [success, setSuccess]       = useState('')
 
@@ -64,6 +65,12 @@ export default function RemindersPage() {
     }
   }
 
+  const handleRefresh = async () => {
+    setRefreshing(true); setError(''); setSuccess('')
+    await loadReminders()
+    setRefreshing(false)
+  }
+
   const handleDismiss = async (reminderId) => {
     try {
       await supabase.from('reminders')
@@ -89,7 +96,17 @@ export default function RemindersPage() {
 
   const active   = reminders.filter(r => r.is_active)
   const past     = reminders.filter(r => !r.is_active)
-  const overdue  = active.filter(r => r.scheduled_at && new Date(r.scheduled_at) < new Date())
+
+  // A reminder is overdue when the recommended SERVICE date has passed,
+  // not when scheduled_at has passed. scheduled_at is the notification
+  // fire time (e.g. day-before), which is always before the due date.
+  const isReminderOverdue = (r) => {
+    const recDate = r.recommendation?.recommended_date
+    if (recDate) return new Date(recDate) < new Date(new Date().toDateString())
+    // Mileage-only: fall back to scheduled_at as a rough proxy
+    return r.scheduled_at && new Date(r.scheduled_at) < new Date()
+  }
+  const overdue  = active.filter(isReminderOverdue)
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -103,13 +120,23 @@ export default function RemindersPage() {
       featureDescription="Get notified about upcoming maintenance, service due dates, and scheduled inspections."
     >
     <div className="max-w-2xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Bell size={24} className="text-green-600" /> Service Reminders
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Upcoming maintenance and service due dates for your vehicles
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Bell size={24} className="text-green-600" /> Service Reminders
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Upcoming maintenance and service due dates for your vehicles
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-50"
+          title="Refresh reminders"
+        >
+          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+        </button>
       </div>
 
       {error && (
@@ -160,7 +187,7 @@ export default function RemindersPage() {
           {active.map(rem => {
             const rec      = rem.recommendation
             const priority = rec?.priority || 'normal'
-            const isOverdue = rem.scheduled_at && new Date(rem.scheduled_at) < new Date()
+            const isOverdue = isReminderOverdue(rem)
 
             return (
               <div key={rem.id}
