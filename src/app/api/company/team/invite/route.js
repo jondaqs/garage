@@ -71,18 +71,31 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
     }
 
-    // Use blind index (email_idx) for the duplicate check — filtering on
-    // decrypted PII columns via RLS can fail depending on policy context.
+    // Use blind index (email_idx) for lookups — avoids decrypting PII columns.
     const emailIdx = await piiHmac(supabase, inviteeEmail)
 
+    if (!emailIdx) {
+      console.error('[company/invite] piiHmac returned null for email:', inviteeEmail?.substring(0, 3) + '***')
+      return NextResponse.json(
+        { error: 'Unable to process email. Please try again.' },
+        { status: 500 }
+      )
+    }
+
+    console.log('[company/invite] checking duplicates for company:', companyId)
+
     // Check for duplicate pending invitation
-    const { data: existingInvite } = await supabase
+    const { data: existingInvite, error: dupErr } = await supabase
       .from('company_invitations_secure')
       .select('id')
       .eq('company_id', companyId)
       .eq('email_idx', emailIdx)
       .eq('status', 'pending')
       .maybeSingle()
+
+    if (dupErr) {
+      console.error('[company/invite] duplicate check error:', dupErr.message)
+    }
 
     if (existingInvite) {
       return NextResponse.json(
@@ -91,7 +104,7 @@ export async function POST(request) {
       )
     }
 
-    // Use service client for cross-table membership check (bypasses RLS)
+    // Service client for cross-table membership check (bypasses RLS)
     const sc = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -99,17 +112,21 @@ export async function POST(request) {
     )
 
     // Check if user is already an active member of this company.
-    // Use email_idx (blind index) for the lookup — avoids decrypting
-    // every row in user_profiles, scales with table growth.
-    const { data: existingProfile } = await sc
+    const { data: existingProfile, error: profErr } = await sc
       .from('user_profiles')
       .select('id')
       .eq('email_idx', emailIdx)
       .maybeSingle()
 
+    if (profErr) {
+      console.error('[company/invite] profile lookup error:', profErr.message)
+    }
+
     if (existingProfile) {
+      console.log('[company/invite] found profile:', existingProfile.id, '— checking membership')
+
       // Check company_users membership
-      const { data: existingMember } = await sc
+      const { data: existingMember, error: memErr } = await sc
         .from('company_users')
         .select('id')
         .eq('company_id', companyId)
@@ -117,7 +134,12 @@ export async function POST(request) {
         .eq('is_active', true)
         .maybeSingle()
 
+      if (memErr) {
+        console.error('[company/invite] membership check error:', memErr.message)
+      }
+
       if (existingMember) {
+        console.log('[company/invite] blocked — already a member:', existingMember.id)
         return NextResponse.json(
           { error: 'This user is already an active member of your company' },
           { status: 400 }
@@ -125,20 +147,27 @@ export async function POST(request) {
       }
 
       // Check if they're the company owner
-      const { data: isOwner } = await sc
+      const { data: isOwner, error: ownErr } = await sc
         .from('company_profiles')
         .select('id')
         .eq('id', companyId)
         .eq('owner_user_id', existingProfile.id)
         .maybeSingle()
 
+      if (ownErr) {
+        console.error('[company/invite] owner check error:', ownErr.message)
+      }
+
       if (isOwner) {
+        console.log('[company/invite] blocked — is the company owner')
         return NextResponse.json(
           { error: 'This user is the company owner and cannot be invited as a member' },
           { status: 400 }
         )
       }
     }
+
+    console.log('[company/invite] all checks passed — creating invitation')
 
     // Generate invitation token
     const inviteToken = Math.random().toString(36).substring(2) + Date.now().toString(36)

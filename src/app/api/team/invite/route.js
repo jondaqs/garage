@@ -68,13 +68,28 @@ export async function POST(request) {
 
         // Check for duplicate pending invitation (PII: search by blind index)
         const emailIdx = await piiHmac(supabase, email)
-        const { data: existing } = await supabase
+
+        if (!emailIdx) {
+            console.error('[team/invite] piiHmac returned null for email:', email?.substring(0, 3) + '***')
+            return NextResponse.json(
+                { error: 'Unable to process email. Please try again.' },
+                { status: 500 }
+            )
+        }
+
+        console.log('[team/invite] checking duplicates for provider:', provider.id)
+
+        const { data: existing, error: dupErr } = await supabase
             .from('team_invitations_secure')
             .select('id')
             .eq('service_provider_id', provider.id)
             .eq('invited_email_idx', emailIdx)
             .eq('status', 'pending')
             .maybeSingle()
+
+        if (dupErr) {
+            console.error('[team/invite] duplicate check error:', dupErr.message)
+        }
 
         if (existing) {
             return NextResponse.json(
@@ -84,22 +99,27 @@ export async function POST(request) {
         }
 
         // Check if user is already an active member of this provider.
-        // Use email_idx (blind index) — avoids decrypting every row
-        // in user_profiles, scales with table growth.
+        // Uses email_idx (blind index) on the base table via service client.
         const sc = createServiceClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL,
             process.env.SUPABASE_SERVICE_ROLE_KEY,
             { auth: { autoRefreshToken: false, persistSession: false } }
         )
 
-        const { data: existingProfile } = await sc
+        const { data: existingProfile, error: profErr } = await sc
             .from('user_profiles')
             .select('id')
             .eq('email_idx', emailIdx)
             .maybeSingle()
 
+        if (profErr) {
+            console.error('[team/invite] profile lookup error:', profErr.message)
+        }
+
         if (existingProfile) {
-            const { data: existingMember } = await sc
+            console.log('[team/invite] found profile:', existingProfile.id, '— checking membership')
+
+            const { data: existingMember, error: memErr } = await sc
                 .from('service_provider_users')
                 .select('id')
                 .eq('service_provider_id', provider.id)
@@ -107,7 +127,12 @@ export async function POST(request) {
                 .eq('is_active', true)
                 .maybeSingle()
 
+            if (memErr) {
+                console.error('[team/invite] membership check error:', memErr.message)
+            }
+
             if (existingMember) {
+                console.log('[team/invite] blocked — already a member:', existingMember.id)
                 return NextResponse.json(
                     { error: 'This user is already an active member of your team' },
                     { status: 400 }
