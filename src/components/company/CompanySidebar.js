@@ -39,6 +39,24 @@ export default function CompanySidebar({ company, userRole }) {
     } catch {}
   }, [company?.id])
 
+  const loadRecommendationsCount = useCallback(async (companyId) => {
+    try {
+      const cId = companyId || company?.id
+      if (!cId) return
+      const { data: fleet } = await supabase
+        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', cId)
+      const vehicleIds = fleet?.map(f => f.vehicle_id) || []
+      if (vehicleIds.length === 0) { setRecommendationsCount(0); return }
+
+      const { count } = await supabase
+        .from('maintenance_recommendations').select('id', { count: 'exact', head: true })
+        .in('vehicle_id', vehicleIds)
+        .eq('is_acknowledged', false)
+        .eq('is_dismissed', false)
+      setRecommendationsCount(count || 0)
+    } catch {}
+  }, [company?.id])
+
   // ── Initial load + realtime ──────────────────────────────────────────────
   // Without realtime here, the badge stayed stale until the page was reloaded;
   // a new message would arrive, the page state would update, but the sidebar
@@ -90,24 +108,6 @@ export default function CompanySidebar({ company, userRole }) {
       setPendingApprovalCount(count || 0)
     } catch {}
   }
-
-  const loadRecommendationsCount = useCallback(async (companyId) => {
-    try {
-      const cId = companyId || company?.id
-      if (!cId) return
-      const { data: fleet } = await supabase
-        .from('vehicle_ownership').select('vehicle_id').eq('owner_company_id', cId)
-      const vehicleIds = fleet?.map(f => f.vehicle_id) || []
-      if (vehicleIds.length === 0) { setRecommendationsCount(0); return }
-
-      const { count } = await supabase
-        .from('maintenance_recommendations').select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds)
-        .eq('is_acknowledged', false)
-        .eq('is_dismissed', false)
-      setRecommendationsCount(count || 0)
-    } catch {}
-  }, [company?.id])
 
   const navigation = [
     { name: 'Dashboard',         href: '/company/dashboard',   icon: Home         },
