@@ -129,6 +129,43 @@ export default function PendingProvidersPage() {
 
       if (rejectError) throw rejectError
 
+      // Audit log
+      await supabase.from('admin_action_logs').insert({
+        admin_user_id: adminProfile.id,
+        action_type:   'reject_provider',
+        target_type:   'service_provider',
+        target_id:     providerId,
+        action_data:   { reason },
+      })
+
+      // In-app notification to provider owner
+      const { data: providerData } = await supabase
+        .from('service_providers_secure')
+        .select('owner_user_id, name')
+        .eq('id', providerId)
+        .maybeSingle()
+
+      if (providerData?.owner_user_id) {
+        await supabase.from('notifications').insert({
+          user_id:           providerData.owner_user_id,
+          recipient_user_id: providerData.owner_user_id,
+          type:              'provider_rejected',
+          notification_type: 'provider_rejected',
+          reference_type:    'service_provider',
+          reference_id:      providerId,
+          title:   'Application Not Approved',
+          message: `Your application for ${providerData.name || 'your business'} was not approved. Reason: ${reason}. You can reapply after addressing the issues.`,
+          is_read: false,
+        })
+      }
+
+      // Send rejection email + SMS (best-effort, fire-and-forget)
+      fetch(`/api/admin/providers/${providerId}/reject-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejectionReason: reason }),
+      }).catch(() => {})
+
       // Refresh list
       loadPendingProviders()
       alert('Provider rejected')

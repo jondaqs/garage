@@ -423,6 +423,13 @@ export default function ProviderDetailPage({ params }) {
         is_read: false,
       })
 
+      // Send rejection email + SMS (best-effort, fire-and-forget)
+      fetch(`/api/admin/providers/${provider.id}/reject-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejectionReason }),
+      }).catch(() => {})
+
       alert('Provider rejected')
       router.push('/admin/providers')
     } catch (err) {
