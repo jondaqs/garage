@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
@@ -8,6 +8,20 @@ import PublicNav from '@/components/PublicNav'
 export default function LandingPage() {
   const router = useRouter()
   const canvasRef = useRef(null)
+  const [theme, setTheme] = useState('dark')
+
+  // Sync with theme set by PublicNav
+  useEffect(() => {
+    const saved = localStorage.getItem('gc-theme')
+    if (saved) setTheme(saved)
+
+    const observer = new MutationObserver(() => {
+      const t = document.documentElement.getAttribute('data-theme')
+      if (t) setTheme(t)
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [])
 
   // Subtle animated grid
   useEffect(() => {
@@ -22,15 +36,14 @@ export default function LandingPage() {
       canvas.height = canvas.offsetHeight
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)'
+      const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)'
       ctx.lineWidth = 1
 
       const spacing = 60
-      // Vertical lines
       for (let x = (offset % spacing); x < canvas.width; x += spacing) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke()
       }
-      // Horizontal lines
       for (let y = 0; y < canvas.height; y += spacing) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
       }
@@ -48,9 +61,10 @@ export default function LandingPage() {
       label: 'Vehicle Owner',
       sub: 'Personal',
       description: 'Book services, track maintenance history, and keep your vehicles in top shape.',
-      accent: '#3b82f6',
-      accentLight: 'rgba(59,130,246,0.12)',
-      border: 'rgba(59,130,246,0.3)',
+      accent: 'var(--accent-teal)',
+      accentRaw: '#00F5D4',
+      accentLight: 'var(--role-teal-bg)',
+      border: 'var(--role-teal-border)',
       cta: 'Get Started',
       route: '/auth/signup?type=normal',
       pill: 'Most Popular',
@@ -60,9 +74,10 @@ export default function LandingPage() {
       label: 'Company Fleet',
       sub: 'Business',
       description: 'Centralise fleet maintenance, control budgets, and manage your entire team.',
-      accent: '#8b5cf6',
-      accentLight: 'rgba(139,92,246,0.12)',
-      border: 'rgba(139,92,246,0.3)',
+      accent: 'var(--accent-purple)',
+      accentRaw: '#7B2CBF',
+      accentLight: 'var(--role-purple-bg)',
+      border: 'var(--role-purple-border)',
       cta: 'Register Company',
       route: '/auth/company-signup',
       pill: null,
@@ -72,9 +87,10 @@ export default function LandingPage() {
       label: 'Service Provider',
       sub: 'Garage / Workshop',
       description: 'Grow your workshop, accept online bookings, and build a loyal customer base.',
-      accent: '#10b981',
-      accentLight: 'rgba(16,185,129,0.12)',
-      border: 'rgba(16,185,129,0.3)',
+      accent: 'var(--accent-teal)',
+      accentRaw: '#00F5D4',
+      accentLight: 'var(--role-teal-bg)',
+      border: 'var(--role-teal-border)',
       cta: 'Register Business',
       route: '/auth/provider-signup',
       pill: null,
@@ -93,7 +109,73 @@ export default function LandingPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+        /* ── THEME TOKENS ── */
+        :root,
+        [data-theme="dark"] {
+          --brand-dark: #0B0D17;
+          --surface: #16192B;
+          --surface-light: #1F233B;
+          --accent-teal: #00F5D4;
+          --accent-teal-glow: rgba(0,245,212,0.25);
+          --accent-purple: #7B2CBF;
+          --accent-purple-bg: rgba(123,44,191,0.12);
+          --accent-purple-border: rgba(123,44,191,0.3);
+          --text-primary: #FFFFFF;
+          --text-secondary: rgba(255,255,255,0.6);
+          --text-muted: rgba(255,255,255,0.4);
+          --border: rgba(255,255,255,0.08);
+          --nav-bg: rgba(11,13,23,0.8);
+          --hover-bg: rgba(255,255,255,0.06);
+          --card-bg: rgba(22,25,43,0.7);
+          --card-border: rgba(255,255,255,0.08);
+          --feat-bg: rgba(22,25,43,0.5);
+          --hero-gradient: linear-gradient(135deg, #0B0D17 0%, #16192B 50%, #1a1040 100%);
+          --glow-purple: rgba(123,44,191,0.12);
+          --glow-teal: rgba(0,245,212,0.06);
+          --role-teal-bg: rgba(0,245,212,0.1);
+          --role-teal-border: rgba(0,245,212,0.25);
+          --role-purple-bg: rgba(123,44,191,0.1);
+          --role-purple-border: rgba(123,44,191,0.25);
+          --icon-feat-bg: rgba(255,255,255,0.06);
+          --footer-name: rgba(255,255,255,0.3);
+          --footer-link: rgba(255,255,255,0.45);
+          --footer-link-hover: rgba(255,255,255,0.85);
+          --footer-copy: rgba(255,255,255,0.25);
+        }
+
+        [data-theme="light"] {
+          --brand-dark: #F6F7FB;
+          --surface: #FFFFFF;
+          --surface-light: #EEF0F6;
+          --accent-teal: #00B89F;
+          --accent-teal-glow: rgba(0,184,159,0.2);
+          --accent-purple: #7B2CBF;
+          --accent-purple-bg: rgba(123,44,191,0.08);
+          --accent-purple-border: rgba(123,44,191,0.2);
+          --text-primary: #0B0D17;
+          --text-secondary: rgba(11,13,23,0.6);
+          --text-muted: rgba(11,13,23,0.4);
+          --border: rgba(11,13,23,0.1);
+          --nav-bg: rgba(246,247,251,0.85);
+          --hover-bg: rgba(11,13,23,0.04);
+          --card-bg: #FFFFFF;
+          --card-border: rgba(11,13,23,0.1);
+          --feat-bg: #FFFFFF;
+          --hero-gradient: linear-gradient(135deg, #F6F7FB 0%, #EEF0F6 50%, #E8E4F0 100%);
+          --glow-purple: rgba(123,44,191,0.06);
+          --glow-teal: rgba(0,184,159,0.05);
+          --role-teal-bg: rgba(0,184,159,0.08);
+          --role-teal-border: rgba(0,184,159,0.2);
+          --role-purple-bg: rgba(123,44,191,0.06);
+          --role-purple-border: rgba(123,44,191,0.18);
+          --icon-feat-bg: rgba(11,13,23,0.05);
+          --footer-name: rgba(11,13,23,0.3);
+          --footer-link: rgba(11,13,23,0.5);
+          --footer-link-hover: rgba(11,13,23,0.85);
+          --footer-copy: rgba(11,13,23,0.35);
+        }
 
         .gc-root { font-family: 'DM Sans', sans-serif; }
         .gc-display { font-family: 'Syne', sans-serif; }
@@ -101,19 +183,14 @@ export default function LandingPage() {
         .gc-btn-primary {
           display: inline-flex; align-items: center; gap: 8px;
           padding: 12px 24px; border-radius: 10px;
-          font-weight: 500; font-size: 14px; cursor: pointer;
+          font-weight: 600; font-size: 14px; cursor: pointer;
           transition: all 0.2s ease; border: none; outline: none;
         }
         .gc-btn-primary:hover { transform: translateY(-1px); }
 
-        .gc-nav-link:hover {
-          background: rgba(255,255,255,0.08) !important;
-          color: #fff !important;
-        }
-
         .role-card {
-          background: rgba(0,0,0,0.25);
-          border: 1px solid rgba(255,255,255,0.14);
+          background: var(--card-bg);
+          border: 1px solid var(--card-border);
           border-radius: 20px;
           padding: 32px 28px;
           cursor: pointer;
@@ -123,33 +200,24 @@ export default function LandingPage() {
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
         }
-        .role-card::before {
-          content: '';
-          position: absolute; inset: 0;
-          background: var(--card-accent-light);
-          opacity: 0;
-          transition: opacity 0.25s ease;
-          border-radius: 20px;
-        }
-        .role-card:hover::before { opacity: 1; }
         .role-card:hover {
-          border-color: var(--card-border);
+          border-color: var(--card-hover-border, var(--card-border));
           transform: translateY(-4px);
-          box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.15);
         }
 
         .feat-card {
-          background: rgba(0,0,0,0.2);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: var(--feat-bg);
+          border: 1px solid var(--card-border);
           border-radius: 16px;
           padding: 24px;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          transition: background 0.2s ease, border-color 0.2s ease;
+          transition: border-color 0.2s ease, transform 0.2s ease;
         }
         .feat-card:hover {
-          background: rgba(0,0,0,0.3);
-          border-color: rgba(255,255,255,0.2);
+          border-color: var(--accent-teal);
+          transform: translateY(-2px);
         }
 
         @keyframes fadeUp {
@@ -165,69 +233,77 @@ export default function LandingPage() {
 
         @keyframes float {
           0%,100% { transform: translateY(0px) rotate(-6deg); }
-          50%      { transform: translateY(-18px) rotate(-6deg); }
+          50%     { transform: translateY(-18px) rotate(-6deg); }
         }
         .float-car { animation: float 6s ease-in-out infinite; }
 
         .pill {
-          display: inline-block;
-          padding: 3px 12px;
-          border-radius: 99px;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.05em;
+          display: inline-block; padding: 3px 12px;
+          border-radius: 99px; font-size: 11px;
+          font-weight: 600; letter-spacing: 0.05em;
           text-transform: uppercase;
+        }
+
+        /* Hide duplicate mobile controls on desktop */
+        @media (min-width: 768px) {
+          .md-hidden-flex { display: none !important; }
         }
       `}</style>
 
       <div className="gc-root" style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 35%, #2563eb 60%, #4338ca 100%)',
+        background: 'var(--hero-gradient)',
         position: 'relative',
         overflow: 'hidden',
+        transition: 'background 0.3s ease',
       }}>
-
         {/* Animated grid canvas */}
         <canvas ref={canvasRef} style={{
           position: 'fixed', inset: 0, width: '100%', height: '100%',
           pointerEvents: 'none', zIndex: 0,
         }} />
 
-        {/* Radial glow */}
+        {/* Glow orbs */}
         <div style={{
           position: 'fixed', top: '-20%', right: '-10%',
           width: '600px', height: '600px',
-          background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--glow-purple) 0%, transparent 70%)',
           pointerEvents: 'none', zIndex: 0,
         }} />
         <div style={{
-          position: 'fixed', bottom: '-20%', left: '-10%',
+          position: 'fixed', bottom: '-10%', left: '-5%',
           width: '500px', height: '500px',
-          background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--glow-teal) 0%, transparent 70%)',
           pointerEvents: 'none', zIndex: 0,
         }} />
 
-        {/* ── NAV ── */}
         <PublicNav />
 
         {/* ── HERO ── */}
-        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '72px 24px 40px' }}>
-
-          {/* Floating car illustration */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          maxWidth: 1000, margin: '0 auto',
+          padding: '80px 24px 40px',
+          textAlign: 'center',
+        }}>
           <div className="float-car" style={{
             position: 'absolute', top: 0, right: '8%',
-            opacity: 0.07, pointerEvents: 'none',
+            opacity: 0.05, pointerEvents: 'none',
           }}>
-            <Car size={260} color="#fff" />
+            <Car size={260} color="var(--text-primary)" />
           </div>
 
           <div className="fade-up" style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: 99, padding: '6px 16px', marginBottom: 28,
           }}>
-            <Zap size={13} color="#93c5fd" />
-            <span style={{ fontSize: 12, color: '#bfdbfe', fontWeight: 500, letterSpacing: '0.04em' }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: 'var(--accent-teal)',
+              display: 'inline-block', animation: 'pulse 2s ease infinite',
+            }} />
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, letterSpacing: '0.04em' }}>
               Your #1 Platform for Connecting Vehicles to Service Providers
             </span>
           </div>
@@ -235,17 +311,22 @@ export default function LandingPage() {
           <h1 className="gc-display fade-up delay-1" style={{
             fontSize: 'clamp(36px, 5vw, 60px)',
             fontWeight: 800,
-            color: '#ffffff',
+            color: 'var(--text-primary)',
             lineHeight: 1.1,
             letterSpacing: '-0.03em',
             marginBottom: 24,
           }}>
             Your Vehicle,<br />
-            <span style={{ color: '#bfdbfe' }}>Perfectly Cared For.</span>
+            <span style={{
+              background: 'linear-gradient(135deg, var(--accent-teal), var(--accent-purple))',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>Perfectly Cared For.</span>
           </h1>
 
           <p className="fade-up delay-2" style={{
-            fontSize: 17, color: 'rgba(255,255,255,0.82)',
+            fontSize: 17, color: 'var(--text-secondary)',
             maxWidth: 500, margin: '0 auto 56px',
             lineHeight: 1.75, fontWeight: 400,
           }}>
@@ -264,15 +345,16 @@ export default function LandingPage() {
                 <div
                   key={role.label}
                   className="role-card"
-                  style={{
-                    '--card-accent-light': role.accentLight,
-                    '--card-border': role.border,
-                  }}
+                  style={{ '--card-hover-border': role.border }}
                   onClick={() => router.push(role.route)}
                 >
                   {role.pill && (
                     <div style={{ marginBottom: 16 }}>
-                      <span className="pill" style={{ background: role.accentLight, color: role.accent, border: `1px solid ${role.border}` }}>
+                      <span className="pill" style={{
+                        background: role.accentLight,
+                        color: role.accent,
+                        border: `1px solid ${role.accentRaw}33`,
+                      }}>
                         {role.pill}
                       </span>
                     </div>
@@ -281,36 +363,35 @@ export default function LandingPage() {
                   <div style={{
                     width: 52, height: 52, borderRadius: 14,
                     background: role.accentLight,
-                    border: `1px solid ${role.border}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     marginBottom: 18,
                   }}>
-                    <Icon size={24} color={role.accent} />
+                    <Icon size={24} color={role.accentRaw} />
                   </div>
 
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
                     {role.sub}
                   </p>
-                  <h3 className="gc-display" style={{ fontSize: 20, fontWeight: 700, color: '#ffffff', marginBottom: 10 }}>
+                  <h3 className="gc-display" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
                     {role.label}
                   </h3>
-                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65, marginBottom: 24 }}>
+                  <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: 24 }}>
                     {role.description}
                   </p>
 
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)',
+                    paddingTop: 20, borderTop: '1px solid var(--border)',
                   }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: role.accent }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: role.accentRaw }}>
                       {role.cta}
                     </span>
                     <div style={{
                       width: 32, height: 32, borderRadius: 8,
-                      background: role.accentLight, border: `1px solid ${role.border}`,
+                      background: role.accentLight,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <ArrowRight size={15} color={role.accent} />
+                      <ArrowRight size={15} color={role.accentRaw} />
                     </div>
                   </div>
                 </div>
@@ -326,10 +407,10 @@ export default function LandingPage() {
           padding: '0 24px 80px',
         }}>
           <div className="fade-up delay-4" style={{ textAlign: 'center', marginBottom: 40 }}>
-            <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+            <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
               Why Carfix-Connect
             </p>
-            <h2 className="gc-display" style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            <h2 className="gc-display" style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               Everything your vehicle needs
             </h2>
           </div>
@@ -345,14 +426,14 @@ export default function LandingPage() {
                 <div key={f.title} className="feat-card">
                   <div style={{
                     width: 40, height: 40, borderRadius: 10,
-                    background: 'rgba(255,255,255,0.08)',
+                    background: 'var(--icon-feat-bg)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     marginBottom: 14,
                   }}>
-                    <Icon size={18} color="rgba(255,255,255,0.85)" />
+                    <Icon size={18} color="var(--accent-teal)" />
                   </div>
-                  <h4 style={{ fontSize: 15, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>{f.title}</h4>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.65 }}>{f.body}</p>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>{f.title}</h4>
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>{f.body}</p>
                 </div>
               )
             })}
@@ -362,50 +443,29 @@ export default function LandingPage() {
         {/* ── FOOTER ── */}
         <footer style={{
           position: 'relative', zIndex: 1,
-          borderTop: '1px solid rgba(255,255,255,0.08)',
+          borderTop: '1px solid var(--border)',
           padding: '24px 48px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexWrap: 'wrap', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', opacity: 0.5 }} />
-            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'var(--footer-name)' }}>Carfix-Connect</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-            <button
-              onClick={() => router.push('/about')}
-              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
-            >
-              About
-            </button>
-            <button
-               onClick={() => router.push('/pricing')}
-               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
-               onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
-             >
-               Pricing
-             </button>
-            <button
-              onClick={() => router.push('/docs')}
-              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
-            >
-              Docs
-            </button>
-            <button
-              onClick={() => router.push('/contact')}
-              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
-            >
-              Contact
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'var(--footer-link)' }}>
+            {['about', 'pricing', 'docs', 'contact'].map(p => (
+              <button
+                key={p}
+                onClick={() => router.push(`/${p}`)}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0, textTransform: 'capitalize' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--footer-link-hover)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--footer-link)'}
+              >
+                {p === 'docs' ? 'Docs' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
           </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
+          <p style={{ fontSize: 13, color: 'var(--footer-copy)' }}>
             © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
           </p>
         </footer>

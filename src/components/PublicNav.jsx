@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowRight, Menu, X, Download } from 'lucide-react'
+import { ArrowRight, Menu, X, Download, Sun, Moon } from 'lucide-react'
 import Image from 'next/image'
 
 const NAV_LINKS = [
@@ -20,10 +20,28 @@ export default function PublicNav() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [isInstallable, setIsInstallable] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
+  const [theme, setTheme] = useState('dark')
+
+  // ── Theme initialization ──
+  useEffect(() => {
+    const saved = localStorage.getItem('gc-theme')
+    if (saved === 'light' || saved === 'dark') {
+      setTheme(saved)
+      document.documentElement.setAttribute('data-theme', saved)
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark')
+    }
+  }, [])
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    localStorage.setItem('gc-theme', next)
+    document.documentElement.setAttribute('data-theme', next)
+  }
 
   // ── PWA install prompt capture ──
   useEffect(() => {
-    // Check if already installed (standalone mode)
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true
     setIsStandalone(standalone)
@@ -48,10 +66,8 @@ export default function PublicNav() {
     }
   }
 
-  // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -66,9 +82,9 @@ export default function PublicNav() {
           position: relative; z-index: 50;
           display: flex; align-items: center; justify-content: space-between;
           padding: 16px 24px;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
-          backdrop-filter: blur(8px);
-          background: rgba(255,255,255,0.03);
+          border-bottom: 1px solid var(--border);
+          backdrop-filter: blur(12px);
+          background: var(--nav-bg);
         }
         @media (min-width: 640px) {
           .pn-nav { padding: 20px 48px; }
@@ -78,13 +94,10 @@ export default function PublicNav() {
           display: flex; align-items: center; gap: 10px;
           background: none; border: none; cursor: pointer; padding: 0;
         }
-        .pn-logo-icon {
-          width: 48px; height: 48px;
-          flex-shrink: 0;
-        }
+        .pn-logo-icon { width: 48px; height: 48px; flex-shrink: 0; }
         .pn-logo-icon img { width: 100%; height: 100%; object-fit: contain; }
         .pn-logo-text {
-          font-size: 20px; font-weight: 800; color: #fff;
+          font-size: 20px; font-weight: 800; color: var(--text-primary);
           letter-spacing: -0.02em;
         }
         @media (min-width: 640px) {
@@ -92,60 +105,67 @@ export default function PublicNav() {
           .pn-logo-text { font-size: 22px; }
         }
 
-        /* ── Desktop links ── */
-        .pn-desktop-links {
-          display: none; align-items: center; gap: 8px;
-        }
-        @media (min-width: 768px) {
-          .pn-desktop-links { display: flex; }
-        }
+        .pn-desktop-links { display: none; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .pn-desktop-links { display: flex; } }
+
         .pn-link {
-          background: transparent; color: rgba(255,255,255,0.75);
+          background: transparent; color: var(--text-secondary);
           border: none; padding: 10px 16px; border-radius: 8px;
           font-size: 14px; font-weight: 500; cursor: pointer;
           transition: all 0.2s ease;
         }
-        .pn-link:hover { background: rgba(255,255,255,0.08); color: #fff; }
-        .pn-link-active { background: rgba(255,255,255,0.08); color: #fff; }
+        .pn-link:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .pn-link-active { background: var(--hover-bg); color: var(--text-primary); }
+
         .pn-signin {
           display: inline-flex; align-items: center; gap: 6px;
-          background: rgba(255,255,255,0.12); color: #fff;
-          border: 1px solid rgba(255,255,255,0.2);
+          background: var(--accent-teal); color: var(--brand-dark);
+          border: none;
           padding: 10px 20px; border-radius: 10px;
-          font-size: 14px; font-weight: 600; cursor: pointer;
+          font-size: 14px; font-weight: 700; cursor: pointer;
           transition: all 0.2s ease; margin-left: 4px;
+          box-shadow: 0 0 20px var(--accent-teal-glow);
         }
-        .pn-signin:hover { background: rgba(255,255,255,0.18); }
+        .pn-signin:hover { opacity: 0.9; transform: translateY(-1px); }
 
         .pn-install-btn {
           display: inline-flex; align-items: center; gap: 6px;
-          background: rgba(37,99,235,0.2); color: #93c5fd;
-          border: 1px solid rgba(59,130,246,0.3);
+          background: var(--accent-purple-bg); color: var(--accent-purple);
+          border: 1px solid var(--accent-purple-border);
           padding: 8px 14px; border-radius: 8px;
           font-size: 13px; font-weight: 600; cursor: pointer;
           transition: all 0.2s ease;
         }
-        .pn-install-btn:hover { background: rgba(37,99,235,0.3); color: #bfdbfe; }
+        .pn-install-btn:hover { opacity: 0.85; }
 
-        /* ── Hamburger button ── */
+        /* ── Theme toggle ── */
+        .pn-theme-toggle {
+          display: flex; align-items: center; justify-content: center;
+          width: 38px; height: 38px; border-radius: 10px;
+          background: var(--surface); border: 1px solid var(--border);
+          cursor: pointer; color: var(--text-secondary);
+          transition: all 0.2s ease;
+        }
+        .pn-theme-toggle:hover {
+          background: var(--hover-bg); color: var(--accent-teal);
+          border-color: var(--accent-teal);
+        }
+
+        /* ── Hamburger ── */
         .pn-hamburger {
           display: flex; align-items: center; justify-content: center;
           width: 40px; height: 40px; border-radius: 10px;
-          background: rgba(255,255,255,0.08); border: none;
-          cursor: pointer; color: #fff; transition: all 0.2s ease;
+          background: var(--surface); border: 1px solid var(--border);
+          cursor: pointer; color: var(--text-primary); transition: all 0.2s ease;
         }
-        .pn-hamburger:hover { background: rgba(255,255,255,0.14); }
-        @media (min-width: 768px) {
-          .pn-hamburger { display: none; }
-        }
+        .pn-hamburger:hover { background: var(--hover-bg); }
+        @media (min-width: 768px) { .pn-hamburger { display: none; } }
 
         /* ── Mobile overlay ── */
         .pn-overlay {
           position: fixed; inset: 0; z-index: 100;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(4px);
-          opacity: 0; pointer-events: none;
-          transition: opacity 0.25s ease;
+          background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+          opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
         }
         .pn-overlay.open { opacity: 1; pointer-events: auto; }
 
@@ -153,7 +173,7 @@ export default function PublicNav() {
         .pn-drawer {
           position: fixed; top: 0; right: 0; bottom: 0;
           z-index: 101; width: 280px; max-width: 85vw;
-          background: #111; border-left: 1px solid rgba(255,255,255,0.1);
+          background: var(--brand-dark); border-left: 1px solid var(--border);
           display: flex; flex-direction: column;
           transform: translateX(100%);
           transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
@@ -162,61 +182,65 @@ export default function PublicNav() {
 
         .pn-drawer-header {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 20px;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
+          padding: 16px 20px; border-bottom: 1px solid var(--border);
         }
         .pn-drawer-close {
           display: flex; align-items: center; justify-content: center;
           width: 36px; height: 36px; border-radius: 8px;
-          background: rgba(255,255,255,0.08); border: none;
-          cursor: pointer; color: #fff; transition: all 0.2s ease;
+          background: var(--surface); border: none;
+          cursor: pointer; color: var(--text-primary); transition: all 0.2s ease;
         }
-        .pn-drawer-close:hover { background: rgba(255,255,255,0.14); }
+        .pn-drawer-close:hover { background: var(--hover-bg); }
 
         .pn-drawer-links {
-          flex: 1; display: flex; flex-direction: column;
-          padding: 12px 12px;
+          flex: 1; display: flex; flex-direction: column; padding: 12px;
         }
         .pn-drawer-link {
           display: flex; align-items: center; gap: 10px;
-          background: transparent; color: rgba(255,255,255,0.7);
+          background: transparent; color: var(--text-secondary);
           border: none; padding: 14px 16px; border-radius: 10px;
           font-size: 16px; font-weight: 500; cursor: pointer;
           transition: all 0.15s ease; text-align: left; width: 100%;
         }
-        .pn-drawer-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
-        .pn-drawer-link-active {
-          background: rgba(255,255,255,0.08); color: #fff; font-weight: 600;
-        }
+        .pn-drawer-link:hover { background: var(--hover-bg); color: var(--text-primary); }
+        .pn-drawer-link-active { background: var(--hover-bg); color: var(--text-primary); font-weight: 600; }
 
         .pn-drawer-footer {
-          padding: 16px;
-          border-top: 1px solid rgba(255,255,255,0.08);
+          padding: 16px; border-top: 1px solid var(--border);
           display: flex; flex-direction: column; gap: 10px;
         }
         .pn-drawer-signin {
           display: flex; align-items: center; justify-content: center; gap: 8px;
-          background: rgba(255,255,255,0.12); color: #fff;
-          border: 1px solid rgba(255,255,255,0.2);
+          background: var(--accent-teal); color: var(--brand-dark);
+          border: none;
           padding: 14px 0; border-radius: 10px;
-          font-size: 15px; font-weight: 600; cursor: pointer;
+          font-size: 15px; font-weight: 700; cursor: pointer;
           transition: all 0.2s ease; width: 100%;
         }
-        .pn-drawer-signin:hover { background: rgba(255,255,255,0.18); }
+        .pn-drawer-signin:hover { opacity: 0.9; }
 
         .pn-drawer-install {
           display: flex; align-items: center; justify-content: center; gap: 8px;
-          background: rgba(37,99,235,0.15); color: #93c5fd;
-          border: 1px solid rgba(59,130,246,0.25);
+          background: var(--accent-purple-bg); color: var(--accent-purple);
+          border: 1px solid var(--accent-purple-border);
           padding: 12px 0; border-radius: 10px;
           font-size: 14px; font-weight: 600; cursor: pointer;
           transition: all 0.2s ease; width: 100%;
         }
-        .pn-drawer-install:hover { background: rgba(37,99,235,0.25); }
+        .pn-drawer-install:hover { opacity: 0.85; }
+
+        .pn-drawer-theme {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          background: var(--surface); color: var(--text-secondary);
+          border: 1px solid var(--border);
+          padding: 12px 0; border-radius: 10px;
+          font-size: 14px; font-weight: 500; cursor: pointer;
+          transition: all 0.2s ease; width: 100%;
+        }
+        .pn-drawer-theme:hover { color: var(--accent-teal); border-color: var(--accent-teal); }
       `}</style>
 
       <nav className="pn-nav">
-        {/* Logo */}
         <button className="pn-logo" onClick={() => router.push('/')}>
           <div className="pn-logo-icon">
             <Image src="/logo.png" alt="Carfix-Connect" width={56} height={56} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -224,7 +248,6 @@ export default function PublicNav() {
           <span className="gc-display pn-logo-text">Carfix-Connect</span>
         </button>
 
-        {/* Desktop links */}
         <div className="pn-desktop-links">
           {NAV_LINKS.map(n => (
             <button
@@ -240,28 +263,33 @@ export default function PublicNav() {
               <Download size={14} /> Install App
             </button>
           )}
+          <button onClick={toggleTheme} className="pn-theme-toggle" aria-label="Toggle theme">
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
           <button onClick={() => router.push('/auth/login')} className="pn-signin">
             Sign In <ArrowRight size={15} />
           </button>
         </div>
 
-        {/* Hamburger (mobile only) */}
-        <button className="pn-hamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-          <Menu size={22} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="md-hidden-flex">
+          <button onClick={toggleTheme} className="pn-theme-toggle" style={{ display: 'flex' }}>
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button className="pn-hamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+            <Menu size={22} />
+          </button>
+        </div>
       </nav>
 
-      {/* Mobile overlay */}
       <div className={`pn-overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
-      {/* Mobile drawer */}
       <div className={`pn-drawer ${mobileOpen ? 'open' : ''}`}>
         <div className="pn-drawer-header">
           <button className="pn-logo" onClick={() => router.push('/')} style={{ gap: 8 }}>
             <div className="pn-logo-icon" style={{ width: 44, height: 44 }}>
               <Image src="/logo.png" alt="Carfix-Connect" width={44} height={44} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <span className="gc-display" style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>
+            <span className="gc-display" style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>
               Carfix-Connect
             </span>
           </button>
@@ -289,6 +317,10 @@ export default function PublicNav() {
         </div>
 
         <div className="pn-drawer-footer">
+          <button onClick={toggleTheme} className="pn-drawer-theme">
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
           {isInstallable && !isStandalone && (
             <button onClick={handleInstall} className="pn-drawer-install">
               <Download size={16} /> Install App
