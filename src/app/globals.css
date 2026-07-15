@@ -68,6 +68,49 @@
   --footer-copy: rgba(11,13,23,0.35);
 }
 
+/* ── BLUE-THEMED PAGES (about, contact, pricing, how-it-works) ── */
+.blue-theme {
+  --brand-dark: #0a1628;
+  --surface: rgba(30,58,138,0.3);
+  --surface-light: rgba(30,58,138,0.5);
+  --accent-teal: #60a5fa;
+  --accent-teal-glow: rgba(96,165,250,0.25);
+  --accent-purple: #8b5cf6;
+  --accent-purple-bg: rgba(139,92,246,0.12);
+  --accent-purple-border: rgba(139,92,246,0.3);
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255,255,255,0.75);
+  --text-muted: rgba(255,255,255,0.5);
+  --border: rgba(255,255,255,0.1);
+  --nav-bg: rgba(10,22,40,0.8);
+  --hover-bg: rgba(255,255,255,0.08);
+  --footer-name: rgba(255,255,255,0.3);
+  --footer-link: rgba(255,255,255,0.45);
+  --footer-link-hover: rgba(255,255,255,0.85);
+  --footer-copy: rgba(255,255,255,0.25);
+}
+
+[data-theme="light"] .blue-theme {
+  --brand-dark: #F0F4FF;
+  --surface: #FFFFFF;
+  --surface-light: #E0E8FF;
+  --accent-teal: #2563eb;
+  --accent-teal-glow: rgba(37,99,235,0.2);
+  --accent-purple: #7c3aed;
+  --accent-purple-bg: rgba(124,58,237,0.08);
+  --accent-purple-border: rgba(124,58,237,0.2);
+  --text-primary: #0a1628;
+  --text-secondary: rgba(10,22,40,0.65);
+  --text-muted: rgba(10,22,40,0.4);
+  --border: rgba(10,22,40,0.1);
+  --nav-bg: rgba(240,244,255,0.85);
+  --hover-bg: rgba(10,22,40,0.04);
+  --footer-name: rgba(10,22,40,0.3);
+  --footer-link: rgba(10,22,40,0.5);
+  --footer-link-hover: rgba(10,22,40,0.85);
+  --footer-copy: rgba(10,22,40,0.35);
+}
+
 /* Custom calendar styles */
 .rbc-calendar {
   font-family: inherit;

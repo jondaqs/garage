@@ -86,7 +86,7 @@ export default function AboutPage() {
         .delay-3 { animation-delay: 0.3s; }
       `}</style>
 
-      <div className="gc-root" style={{
+      <div className="gc-root blue-theme" style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #0a1628 0%, #1e3a8a 60%, #1e40af 100%)',
         color: '#fff',
