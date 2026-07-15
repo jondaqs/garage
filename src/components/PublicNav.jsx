@@ -9,7 +9,7 @@ import Image from 'next/image'
 const NAV_LINKS = [
   { label: 'About Us', path: '/about' },
   { label: 'Pricing',  path: '/pricing' },
-  { label: 'Docs',     path: '/docs' },
+  { label: 'How It Works',     path: '/how-it-works' },
   { label: 'Contact Us', path: '/contact' },
 ]
 

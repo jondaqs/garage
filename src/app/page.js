@@ -322,7 +322,7 @@ export default function LandingPage() {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-            }}>Perfectly Cared For.</span>
+            }}>Seamlessly Connected to Expert Care.</span>
           </h1>
 
           <p className="fade-up delay-2" style={{
@@ -444,16 +444,23 @@ export default function LandingPage() {
         <footer style={{
           position: 'relative', zIndex: 1,
           borderTop: '1px solid var(--border)',
-          padding: '24px 48px',
+          background: 'linear-gradient(180deg, transparent 0%, var(--surface) 30%)',
+          padding: '40px 48px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexWrap: 'wrap', gap: 12,
         }}>
+          {/* Add a teal glow line at the top */}
+          <div style={{
+            position: 'absolute', top: 0, left: '10%', right: '10%', height: 1,
+            background: 'linear-gradient(90deg, transparent, var(--accent-teal), var(--accent-purple), transparent)',
+            opacity: 0.4,
+          }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', opacity: 0.5 }} />
             <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'var(--footer-name)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'var(--footer-link)' }}>
-            {['about', 'pricing', 'docs', 'contact'].map(p => (
+            {['about', 'pricing', 'how-it-works', 'contact'].map(p => (
               <button
                 key={p}
                 onClick={() => router.push(`/${p}`)}
@@ -461,7 +468,7 @@ export default function LandingPage() {
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--footer-link-hover)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--footer-link)'}
               >
-                {p === 'docs' ? 'Docs' : p.charAt(0).toUpperCase() + p.slice(1)}
+                {p === 'how-it-works' ? 'How It Works' : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
             ))}
           </div>
