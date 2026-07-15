@@ -245,7 +245,12 @@ export default function PublicNav() {
           <div className="pn-logo-icon">
             <Image src="/logo.png" alt="Carfix-Connect" width={56} height={56} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
-          <span className="gc-display pn-logo-text">Carfix-Connect</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span className="gc-display pn-logo-text">Carfix-Connect</span>
+            <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.04em', marginTop: -2 }}>
+              Drive Confident. Stay Connected to Expert Care.
+            </span>
+          </div>
         </button>
 
         <div className="pn-desktop-links">
@@ -289,9 +294,12 @@ export default function PublicNav() {
             <div className="pn-logo-icon" style={{ width: 44, height: 44 }}>
               <Image src="/logo.png" alt="Carfix-Connect" width={44} height={44} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <span className="gc-display" style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>
-              Carfix-Connect
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="gc-display" style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>Carfix-Connect</span>
+              <span style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.04em', marginTop: -1 }}>
+                Drive Confident. Stay Connected to Expert Care.
+              </span>
+            </div>
           </button>
           <button className="pn-drawer-close" onClick={() => setMobileOpen(false)} aria-label="Close menu">
             <X size={18} />
