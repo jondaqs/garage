@@ -2,6 +2,72 @@
 @import 'leaflet/dist/leaflet.css';
 @import 'react-big-calendar/lib/css/react-big-calendar.css';
 
+/* ── THEME TOKENS ── */
+:root,
+[data-theme="dark"] {
+  --brand-dark: #0B0D17;
+  --surface: #16192B;
+  --surface-light: #1F233B;
+  --accent-teal: #00F5D4;
+  --accent-teal-glow: rgba(0,245,212,0.25);
+  --accent-purple: #7B2CBF;
+  --accent-purple-bg: rgba(123,44,191,0.12);
+  --accent-purple-border: rgba(123,44,191,0.3);
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255,255,255,0.6);
+  --text-muted: rgba(255,255,255,0.4);
+  --border: rgba(255,255,255,0.08);
+  --nav-bg: rgba(11,13,23,0.8);
+  --hover-bg: rgba(255,255,255,0.06);
+  --card-bg: rgba(22,25,43,0.7);
+  --card-border: rgba(255,255,255,0.08);
+  --feat-bg: rgba(22,25,43,0.5);
+  --hero-gradient: linear-gradient(135deg, #0B0D17 0%, #16192B 50%, #1a1040 100%);
+  --glow-purple: rgba(123,44,191,0.12);
+  --glow-teal: rgba(0,245,212,0.06);
+  --role-teal-bg: rgba(0,245,212,0.1);
+  --role-teal-border: rgba(0,245,212,0.25);
+  --role-purple-bg: rgba(123,44,191,0.1);
+  --role-purple-border: rgba(123,44,191,0.25);
+  --icon-feat-bg: rgba(255,255,255,0.06);
+  --footer-name: rgba(255,255,255,0.3);
+  --footer-link: rgba(255,255,255,0.45);
+  --footer-link-hover: rgba(255,255,255,0.85);
+  --footer-copy: rgba(255,255,255,0.25);
+}
+
+[data-theme="light"] {
+  --brand-dark: #F6F7FB;
+  --surface: #FFFFFF;
+  --surface-light: #EEF0F6;
+  --accent-teal: #00B89F;
+  --accent-teal-glow: rgba(0,184,159,0.2);
+  --accent-purple: #7B2CBF;
+  --accent-purple-bg: rgba(123,44,191,0.08);
+  --accent-purple-border: rgba(123,44,191,0.2);
+  --text-primary: #0B0D17;
+  --text-secondary: rgba(11,13,23,0.6);
+  --text-muted: rgba(11,13,23,0.4);
+  --border: rgba(11,13,23,0.1);
+  --nav-bg: rgba(246,247,251,0.85);
+  --hover-bg: rgba(11,13,23,0.04);
+  --card-bg: #FFFFFF;
+  --card-border: rgba(11,13,23,0.1);
+  --feat-bg: #FFFFFF;
+  --hero-gradient: linear-gradient(135deg, #F6F7FB 0%, #EEF0F6 50%, #E8E4F0 100%);
+  --glow-purple: rgba(123,44,191,0.06);
+  --glow-teal: rgba(0,184,159,0.05);
+  --role-teal-bg: rgba(0,184,159,0.08);
+  --role-teal-border: rgba(0,184,159,0.2);
+  --role-purple-bg: rgba(123,44,191,0.06);
+  --role-purple-border: rgba(123,44,191,0.18);
+  --icon-feat-bg: rgba(11,13,23,0.05);
+  --footer-name: rgba(11,13,23,0.3);
+  --footer-link: rgba(11,13,23,0.5);
+  --footer-link-hover: rgba(11,13,23,0.85);
+  --footer-copy: rgba(11,13,23,0.35);
+}
+
 /* Custom calendar styles */
 .rbc-calendar {
   font-family: inherit;
