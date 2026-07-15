@@ -440,6 +440,23 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* ── CTA BANNER ── */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          textAlign: 'center',
+          padding: '60px 24px',
+        }}>
+          <p className="gc-display" style={{
+            fontSize: 'clamp(20px, 3vw, 32px)',
+            fontWeight: 700,
+            color: 'var(--text-muted)',
+            letterSpacing: '-0.01em',
+            fontStyle: 'italic',
+          }}>
+            Bridging the Gap Between Your Car and Expert Care.
+          </p>
+        </div>
+
         {/* ── FOOTER ── */}
         <footer style={{
           position: 'relative', zIndex: 1,
