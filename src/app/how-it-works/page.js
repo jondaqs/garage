@@ -562,17 +562,17 @@ export default function DocsPage() {
             {/* ───────── SECURITY ───────── */}
             <Section id="security" icon={Shield} title="Security & Privacy" accent="#ef4444">
               <div className="grid sm:grid-cols-2 gap-3">
-                <Feature icon={Lock} title="Row-Level Security">
-                  Every database table uses Supabase Row-Level Security. You can only access records you own or are explicitly permitted to view through your role memberships. No API call can bypass these rules.
+                <Feature icon={Shield} title="Data Protection">
+                  Your personal information is encrypted and stored securely. Only you and people you explicitly authorise can access your records — no exceptions.
                 </Feature>
-                <Feature icon={Shield} title="PII Encryption">
-                  Sensitive personal information (phone numbers, registration numbers, tax IDs) is encrypted at rest using PGP symmetric encryption. HMAC-based indexing allows searching on encrypted fields without exposing plaintext data.
+                <Feature icon={Lock} title="Access Control">
+                  Every action on the platform is verified against your role and permissions. Whether you're a vehicle owner, team member, or provider staff, you only see and do what you're meant to.
                 </Feature>
                 <Feature icon={Lock} title="Two-Factor Authentication">
                   Optional TOTP-based MFA adds a second layer of protection. Set it up from your profile page using any standard authenticator app.
                 </Feature>
-                <Feature icon={Shield} title="Secure Views">
-                  The database exposes data through secure views that automatically decrypt PII for authorised users while hiding sensitive columns from others.
+                <Feature icon={Shield} title="Continuous Monitoring">
+                  We regularly review and strengthen our security measures to stay ahead of threats. Your trust is the foundation everything else is built on.
                 </Feature>
               </div>
             </Section>
