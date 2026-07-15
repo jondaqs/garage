@@ -120,20 +120,20 @@ export default function DocsPage() {
 
       <div className="gc-root" style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 35%, #2563eb 60%, #4338ca 100%)',
+        background: 'var(--hero-gradient)',
       }}>
         <PublicNav />
 
         {/* Hero */}
         <div className="text-center py-16 px-6" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-6">
-            <FileText size={13} className="text-blue-300" />
-            <span className="text-xs text-blue-200 font-medium tracking-wide">Documentation</span>
+          <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-6" style={{ background: 'var(--role-teal-bg)', border: '1px solid var(--role-teal-border)' }}>
+            <FileText size={13} style={{ color: 'var(--accent-teal)' }} />
+            <span className="text-xs font-medium tracking-wide" style={{ color: 'var(--text-secondary)' }}>Documentation</span>
           </div>
-          <h1 className="gc-display text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4">
+          <h1 className="gc-display text-4xl md:text-5xl font-extrabold tracking-tight mb-4" style={{ color: 'var(--text-primary)' }}>
             How Carfix-Connect Works
           </h1>
-          <p className="text-blue-100/75 text-lg max-w-lg mx-auto leading-relaxed">
+          <p className="text-lg max-w-lg mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             Everything you need to know about managing vehicles, bookings, work orders, and teams on the platform.
           </p>
         </div>
@@ -653,13 +653,27 @@ export default function DocsPage() {
           </main>
         </div>
 
-        {/* Footer */}
-        <footer className="border-t border-white/8 px-6 sm:px-12 py-6 flex items-center justify-between flex-wrap gap-3" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="" style={{ width: 32, height: 32, objectFit: 'contain', opacity: 0.4 }} />
-            <span className="gc-display text-sm font-bold text-white/30">Carfix-Connect</span>
+        <footer className="gc-pricing-footer" style={{
+          position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)',
+          padding: '24px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', opacity: 0.5 }} />
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'var(--footer-name)' }}>Carfix-Connect</span>
           </div>
-          <p className="text-xs text-white/25">© {new Date().getFullYear()} Carfix-Connect. All rights reserved.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'var(--footer-link)' }}>
+            {[{l:'About',p:'/about'},{l:'Pricing',p:'/pricing'},{l:'How It Works',p:'/docs'},{l:'Contact',p:'/contact'}].map(link => (
+              <button key={link.l} onClick={() => router.push(link.p)}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--footer-link-hover)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--footer-link)'}
+              >{link.l}</button>
+            ))}
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--footer-copy)' }}>
+            © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
+          </p>
         </footer>
       </div>
     </>

@@ -64,7 +64,8 @@ export default function PricingPage() {
     const draw = () => {
       canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1
+      const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)'
       const sp = 60
       for (let x = (offset % sp); x < canvas.width; x += sp) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke() }
       for (let y = 0; y < canvas.height; y += sp) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke() }
@@ -208,7 +209,7 @@ export default function PricingPage() {
 
       <div className="gc-root" style={{
         minHeight: '100vh',
-        background: 'linear-gradient(145deg, #0a0a0a 0%, #141414 50%, #0d0d0d 100%)',
+        background: 'var(--hero-gradient)',
         color: '#fff', overflowX: 'hidden',
       }}>
         <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.6 }} />
@@ -218,10 +219,10 @@ export default function PricingPage() {
 
         {/* ── HERO ── */}
         <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '64px 24px 20px', maxWidth: 720, margin: '0 auto' }}>
-          <h1 className="gc-display gc-hero-title" style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.025em', margin: '0 0 16px' }}>
+          <h1 className="gc-display gc-hero-title" style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.025em', margin: '0 0 16px', color: 'var(--text-primary)' }}>
             Simple, transparent pricing
           </h1>
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.55)', maxWidth: 520, margin: '0 auto', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 16, color: 'var(--text-secondary)', maxWidth: 520, margin: '0 auto', lineHeight: 1.6 }}>
             Start free and scale as you grow. No hidden fees, no surprises.
           </p>
         </div>
@@ -365,24 +366,24 @@ export default function PricingPage() {
 
         {/* ── FOOTER ── */}
         <footer className="gc-pricing-footer" style={{
-          position: 'relative', zIndex: 1, borderTop: '1px solid rgba(255,255,255,0.06)',
+          position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)',
           padding: '24px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexWrap: 'wrap', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', opacity: 0.5 }} />
-            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>Carfix-Connect</span>
+            <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'var(--footer-name)' }}>Carfix-Connect</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-            {['About', 'Pricing', 'Contact'].map(link => (
-              <button key={link} onClick={() => router.push(`/${link.toLowerCase()}`)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'var(--footer-link)' }}>
+            {[{l:'About',p:'/about'},{l:'Pricing',p:'/pricing'},{l:'How It Works',p:'/docs'},{l:'Contact',p:'/contact'}].map(link => (
+              <button key={link.l} onClick={() => router.push(link.p)}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
-                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}
-              >{link}</button>
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--footer-link-hover)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--footer-link)'}
+              >{link.l}</button>
             ))}
           </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
+          <p style={{ fontSize: 13, color: 'var(--footer-copy)' }}>
             © {new Date().getFullYear()} Carfix-Connect. Connecting Drivers to Trusted Vehicle Services.
           </p>
         </footer>
