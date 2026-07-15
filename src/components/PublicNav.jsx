@@ -238,6 +238,10 @@ export default function PublicNav() {
           transition: all 0.2s ease; width: 100%;
         }
         .pn-drawer-theme:hover { color: var(--accent-teal); border-color: var(--accent-teal); }
+        .md-hidden-flex { display: flex; align-items: center; gap: 8px; }
+          @media (min-width: 768px) {
+          .md-hidden-flex { display: none !important; }
+        }
       `}</style>
 
       <nav className="pn-nav">

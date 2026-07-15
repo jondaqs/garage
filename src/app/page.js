@@ -447,8 +447,8 @@ export default function LandingPage() {
           padding: '60px 24px',
         }}>
           <p className="gc-display" style={{
-            fontSize: 'clamp(20px, 3vw, 32px)',
-            fontWeight: 700,
+            fontSize: 'clamp(10px, 3vw, 16px)',
+            fontWeight: 500,
             color: 'var(--text-muted)',
             letterSpacing: '-0.01em',
             fontStyle: 'italic',
