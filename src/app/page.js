@@ -238,7 +238,7 @@ export default function LandingPage() {
               display: 'inline-block', animation: 'pulse 2s ease infinite',
             }} />
             <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, letterSpacing: '0.04em' }}>
-              Your #1 Platform for Connecting Vehicles to Service Providers
+              Your #1 Kenya Platform for Connecting Vehicles to Service Providers
             </span>
           </div>
 

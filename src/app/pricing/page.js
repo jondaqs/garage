@@ -375,7 +375,7 @@ export default function PricingPage() {
             <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'var(--footer-name)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'var(--footer-link)' }}>
-            {[{l:'About',p:'/about'},{l:'Pricing',p:'/pricing'},{l:'How It Works',p:'/docs'},{l:'Contact',p:'/contact'}].map(link => (
+            {[{l:'About',p:'/about'},{l:'Pricing',p:'/pricing'},{l:'How It Works',p:'/how-it-works'},{l:'Contact',p:'/contact'}].map(link => (
               <button key={link.l} onClick={() => router.push(link.p)}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--footer-link-hover)'}
