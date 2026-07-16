@@ -31,70 +31,43 @@ export default function ProvidersPage() {
   const [descSearch,  setDescSearch]  = useState('')
   const [typeFilter,  setTypeFilter]  = useState('')
   const [locationFilter, setLocationFilter] = useState('')
+  const [countryFilter,  setCountryFilter]  = useState('')
   const [verifiedOnly,   setVerifiedOnly]   = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      let q = supabase
-        .from('service_providers_secure')
-        .select(`
-          id, name, description, is_verified, phone, email, website,
-          years_in_operation, kra_pin_verified, registration_verified, location_verified,
-          verification_score, owner_profile_picture_url,
-          provider_type:service_provider_types(id, display_name, code, description),
-          shops_secure(id, name, town, county, latitude, longitude),
-          provider_reviews(rating),
-          service_provider_services(service:services(id, name))
-        `, { count: 'exact' })
-        .eq('status', 'active')
-        .eq('is_searchable', true)
-        .eq('is_active', true)
-
-      if (search)       q = q.ilike('name', `%${search}%`)
-      if (descSearch)   q = q.ilike('description', `%${descSearch}%`)
-      if (typeFilter)   q = q.eq('provider_type_id', typeFilter)
-      if (verifiedOnly) q = q.eq('is_verified', true)
-      if (locationFilter) {
-        // Filter by shop town/county — we can't do a direct join filter with count in one call,
-        // so we'll post-filter after fetch
-      }
-
-      const { data, count, error } = await q
-        .order('is_verified', { ascending: false })
-        .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1)
+      const { data, error } = await supabase.rpc('search_providers_for_user', {
+        p_search:           search       || null,
+        p_description:      descSearch   || null,
+        p_provider_type_id: typeFilter   || null,
+        p_location:         locationFilter || null,
+        p_country:          countryFilter  || null,
+        p_verified_only:    verifiedOnly,
+        p_limit:            ITEMS_PER_PAGE,
+        p_offset:           page * ITEMS_PER_PAGE,
+      })
 
       if (error) throw error
 
-      let results = (data || []).map(p => ({
+      const results = (data || []).map(p => ({
         ...p,
-        avgRating:   p.provider_reviews?.length
-          ? p.provider_reviews.reduce((s, r) => s + r.rating, 0) / p.provider_reviews.length
-          : 0,
-        reviewCount: p.provider_reviews?.length || 0,
-        services:    (p.service_provider_services || []).map(s => s.service).filter(Boolean),
+        shops:       typeof p.shops === 'string' ? JSON.parse(p.shops) : (p.shops || []),
+        services:    typeof p.services === 'string' ? JSON.parse(p.services) : (p.services || []),
+        provider_type: typeof p.provider_type === 'string' ? JSON.parse(p.provider_type) : p.provider_type,
+        avgRating:   Number(p.avg_rating) || 0,
+        reviewCount: Number(p.review_count) || 0,
+        owner_profile_picture_url: p.owner_profile_picture_url,
       }))
 
-      // Post-filter by location
-      if (locationFilter.trim()) {
-        const loc = locationFilter.toLowerCase()
-        results = results.filter(p =>
-          p.shops?.some(s =>
-            s.town?.toLowerCase().includes(loc) ||
-            s.county?.toLowerCase().includes(loc) ||
-            s.name?.toLowerCase().includes(loc)
-          )
-        )
-      }
-
       setProviders(results)
-      setTotal(count || 0)
+      setTotal(results[0]?.total_count || 0)
     } catch (e) {
-      console.error('Operation failed')
+      console.error('Operation failed', e)
     } finally {
       setLoading(false)
     }
-  }, [search, descSearch, typeFilter, locationFilter, verifiedOnly, page])
+  }, [search, descSearch, typeFilter, locationFilter, countryFilter, verifiedOnly, page])
 
   useEffect(() => { load() }, [load])
 
@@ -107,7 +80,7 @@ export default function ProvidersPage() {
   }, [])
 
   // Reset page when filters change
-  useEffect(() => { setPage(0) }, [search, descSearch, typeFilter, locationFilter, verifiedOnly])
+  useEffect(() => { setPage(0) }, [search, descSearch, typeFilter, locationFilter, countryFilter, verifiedOnly])
 
   // Map rendering
   useEffect(() => {
@@ -216,15 +189,24 @@ export default function ProvidersPage() {
             >
               <SlidersHorizontal size={15} />
               Filters
-              {(typeFilter || locationFilter || verifiedOnly) && (
+              {(typeFilter || locationFilter || countryFilter || verifiedOnly) && (
                 <span className="w-2 h-2 rounded-full bg-orange-400" />
               )}
             </button>
           </div>
 
-          {/* Expanded filters — location, type, verified */}
+          {/* Expanded filters — country, location, type, verified */}
           {filtersOpen && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
+              <div className="relative">
+                <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  value={countryFilter}
+                  onChange={e => setCountryFilter(e.target.value)}
+                  placeholder="Country…"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
               <div className="relative">
                 <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
@@ -253,9 +235,9 @@ export default function ProvidersPage() {
                 />
                 <span className="text-sm text-gray-700 font-medium">Verified only</span>
               </label>
-              {(typeFilter || locationFilter || verifiedOnly || descSearch || search) && (
+              {(typeFilter || locationFilter || countryFilter || verifiedOnly || descSearch || search) && (
                 <button
-                  onClick={() => { setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setVerifiedOnly(false) }}
+                  onClick={() => { setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setCountryFilter(''); setVerifiedOnly(false) }}
                   className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 px-3 py-2"
                 >
                   <X size={13} /> Clear all
@@ -418,7 +400,7 @@ function ProviderCard({ provider: p, onClick, onChat }) {
         {primaryShop && (
           <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
             <MapPin size={11} className="flex-shrink-0" />
-            {[primaryShop.town, primaryShop.county].filter(Boolean).join(', ')}
+            {[primaryShop.town, primaryShop.county, primaryShop.country].filter(Boolean).join(', ')}
           </div>
         )}
 

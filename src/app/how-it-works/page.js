@@ -604,7 +604,7 @@ export default function DocsPage() {
                   <p>Your account enters view-only mode. You can still log in and see all your data, but creating new bookings, work orders, and other write operations are disabled until you subscribe. An "Inactive" badge appears in your sidebar.</p>
                 </Accordion>
                 <Accordion title="How do I add a vehicle?">
-                  <p>From your personal dashboard, click <strong>Add Vehicle</strong>. Enter the plate number (validated for Kenyan format), make, model, year, colour, and optional VIN. The vehicle is linked to your ownership immediately.</p>
+                  <p>From your personal dashboard, click <strong>Add Vehicle</strong>. Enter the plate number, make, model, year, colour, and optional VIN. The vehicle is linked to your ownership immediately.</p>
                 </Accordion>
                 <Accordion title="How does the checkout process work?">
                   <p>After a service is completed and paid for, the provider submits a checkout form including a road-test checklist (engine smooth, no unusual noise, brakes responsive, etc.) and vehicle condition notes. You then review and accept the checkout, which closes the work order. If you decline, the provider can address your concerns and resubmit.</p>
@@ -616,7 +616,7 @@ export default function DocsPage() {
                   <p>There are two sources: you can set your own reminders based on mileage or calendar dates, and mechanics can leave recommendations after servicing your vehicle (e.g. "next oil change at 45,000 km"). Both types appear in your Reminders section and can trigger notifications.</p>
                 </Accordion>
                 <Accordion title="What currencies are supported?">
-                  <p>The platform primarily operates in KES (Kenyan Shillings) but supports multiple currencies for invoicing, budgets, and subscription payments. Exchange rates are tracked within the system.</p>
+                  <p>The platform primarily operates in Local Currency and supports multiple currencies for invoicing, budgets, and subscription payments. Exchange rates are tracked within the system.</p>
                 </Accordion>
                 <Accordion title="Is my data safe?">
                   <p>Yes. All data is protected by row-level security policies, sensitive PII is encrypted at rest, and the platform supports two-factor authentication. Only you and explicitly authorised roles can access your records.</p>

@@ -33,6 +33,7 @@ export default function ProviderSearchProvidersPage() {
   const [descSearch,     setDescSearch]     = useState('')
   const [typeFilter,     setTypeFilter]     = useState('')
   const [locationFilter, setLocationFilter] = useState('')
+  const [countryFilter,  setCountryFilter]  = useState('')
   const [verifiedOnly,   setVerifiedOnly]   = useState(false)
 
   // ── Load providers via RPC (excludes caller's own provider server-side) ──
@@ -44,6 +45,7 @@ export default function ProviderSearchProvidersPage() {
         p_description:      descSearch      || null,
         p_provider_type_id: typeFilter      || null,
         p_location:         locationFilter  || null,
+        p_country:          countryFilter   || null,
         p_verified_only:    verifiedOnly,
         p_limit:            ITEMS_PER_PAGE,
         p_offset:           page * ITEMS_PER_PAGE,
@@ -65,7 +67,7 @@ export default function ProviderSearchProvidersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, descSearch, typeFilter, locationFilter, verifiedOnly, page])
+  }, [search, descSearch, typeFilter, locationFilter, countryFilter, verifiedOnly, page])
 
   useEffect(() => { load() }, [load])
 
@@ -78,7 +80,7 @@ export default function ProviderSearchProvidersPage() {
   }, [])
 
   // Reset page when filters change
-  useEffect(() => { setPage(0) }, [search, descSearch, typeFilter, locationFilter, verifiedOnly])
+  useEffect(() => { setPage(0) }, [search, descSearch, typeFilter, locationFilter, countryFilter, verifiedOnly])
 
   // ── Map rendering (mirrors existing dashboard/company providers page) ──
   useEffect(() => {
@@ -194,7 +196,7 @@ export default function ProviderSearchProvidersPage() {
             >
               <SlidersHorizontal size={15} />
               Filters
-              {(typeFilter || locationFilter || verifiedOnly) && (
+              {(typeFilter || locationFilter || countryFilter || verifiedOnly) && (
                 <span className="w-2 h-2 rounded-full bg-orange-400" />
               )}
             </button>
@@ -202,7 +204,16 @@ export default function ProviderSearchProvidersPage() {
 
           {/* Expanded filters — location, type, verified */}
           {filtersOpen && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-3">
+              <div className="relative">
+                <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  value={countryFilter}
+                  onChange={e => setCountryFilter(e.target.value)}
+                  placeholder="Country…"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
               <div className="relative">
                 <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
@@ -231,9 +242,9 @@ export default function ProviderSearchProvidersPage() {
                 />
                 <span className="text-sm text-gray-700 font-medium">Verified only</span>
               </label>
-              {(typeFilter || locationFilter || verifiedOnly || descSearch || search) && (
+              {(typeFilter || locationFilter || countryFilter || verifiedOnly || descSearch || search) && (
                 <button
-                  onClick={() => { setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setVerifiedOnly(false) }}
+                  onClick={() => { setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setCountryFilter(''); setVerifiedOnly(false) }}
                   className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 px-3 py-2"
                 >
                   <X size={13} /> Clear all
@@ -398,7 +409,7 @@ function ProviderCard({ provider: p, starting, onClick, onChat }) {
         {primaryShop && (
           <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
             <MapPin size={11} className="flex-shrink-0" />
-            {[primaryShop.town, primaryShop.county].filter(Boolean).join(', ')}
+            {[primaryShop.town, primaryShop.county, primaryShop.country].filter(Boolean).join(', ')}
           </div>
         )}
 
