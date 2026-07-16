@@ -167,7 +167,7 @@ export default function AboutPage() {
               </h2>
             </div>
             <p style={{ fontSize: 16, lineHeight: 1.75, color: 'rgba(255,255,255,0.75)' }}>
-              To make every car service feel as simple as ordering a ride. That means tarcking work order progress, transparent pricing, verified providers, full service history at your fingertips, and reminders before things break — not after. For drivers, that's peace of mind. For garages, it's a steady book of trusted customers. For companies, it's complete visibility across every vehicle in the fleet.
+              To make every car service feel as simple as ordering a ride. That means tracking work order progress, transparent pricing, verified providers, full service history at your fingertips, and reminders before things break — not after. For drivers, that's peace of mind. For garages, it's a steady book of trusted customers. For companies, it's complete visibility across every vehicle in the fleet.
             </p>
           </div>
 
