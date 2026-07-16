@@ -146,7 +146,7 @@ export default function AboutPage() {
               color: 'rgba(255,255,255,0.78)',
               maxWidth: 720,
             }}>
-              Carfix-Connect connects drivers, garages, and fleet operators on one straightforward platform. We started because servicing a vehicle in this country is harder than it should be — too many phone calls, too much uncertainty, too many missing records. So we built the tool we wished existed.
+              Carfix-Connect connects drivers, garages, and fleet operators on one straightforward platform. We started because servicing a vehicle can be harder than it should be — too many phone calls, too much uncertainty, too many missing records. So we built the tool we wished existed.
             </p>
           </div>
         </div>
