@@ -11,7 +11,7 @@ import PublicNav from '@/components/PublicNav'
 
 // ─── Configure these once your business contact details are confirmed ──────
 const SUPPORT_EMAIL = 'info@carfix-connect.com'
-const SUPPORT_PHONE = '+254 746004273'
+const SUPPORT_PHONE = '+254 796996045'
 const SUPPORT_LOCATION = 'Nairobi, Kenya'
 // ───────────────────────────────────────────────────────────────────────────
 
