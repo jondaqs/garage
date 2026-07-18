@@ -6,7 +6,7 @@ import { Wrench, Check, ArrowRight, Sparkles, Users, UserCheck, Store } from 'lu
 const ACCENT = '#10b981'
 
 export default function ProviderPricing({ tiers = [], period, trialConfig, shopTiers = [] }) {
-  if (!tiers.length) return <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No plans available</p>
+  if (!tiers.length) return <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No plans available</p>
 
   const popular = tiers.length >= 3 ? tiers[1] : tiers[0]
 
@@ -20,7 +20,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
         }}>
           <Sparkles size={16} color={ACCENT} />
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', margin: 0 }}>
-            <strong style={{ color: '#fff' }}>First {trialConfig.trial_duration_months} months free</strong> — grow your workshop with zero upfront cost.
+            <strong style={{ color: 'var(--text-primary)' }}>First {trialConfig.trial_duration_months} months free</strong> — grow your workshop with zero upfront cost.
           </p>
         </div>
       )}
@@ -38,7 +38,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
             <div key={t.tier_code} style={{
               position: 'relative',
               background: isPop ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${isPop ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}`,
+              border: `1px solid ${isPop ? 'rgba(16,185,129,0.4)' : 'var(--border)'}`,
               borderRadius: 16, padding: '32px 24px 28px',
               display: 'flex', flexDirection: 'column',
               transition: 'all 0.25s ease',
@@ -46,7 +46,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
               {isPop && (
                 <div style={{
                   position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-                  background: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700,
+                  background: ACCENT, color: 'var(--text-primary)', fontSize: 11, fontWeight: 700,
                   padding: '4px 14px', borderRadius: 20, letterSpacing: '0.04em',
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
@@ -62,7 +62,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
                 }}>
                   <Wrench size={18} color={ACCENT} />
                 </div>
-                <h3 className="gc-display" style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
+                <h3 className="gc-display" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   {t.tier_name}
                 </h3>
               </div>
@@ -71,23 +71,23 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, color: 'rgba(255,255,255,0.6)',
-                  background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 6,
+                  fontSize: 11, color: 'var(--text-secondary)',
+                  background: 'var(--border)', padding: '3px 8px', borderRadius: 6,
                 }}>
                   <Users size={11} /> {staffRange} staff
                 </span>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, color: 'rgba(255,255,255,0.6)',
-                  background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 6,
+                  fontSize: 11, color: 'var(--text-secondary)',
+                  background: 'var(--border)', padding: '3px 8px', borderRadius: 6,
                 }}>
                   <UserCheck size={11} /> {clientRange} clients/mo
                 </span>
                 {t.max_shops_included && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    fontSize: 11, color: 'rgba(255,255,255,0.6)',
-                    background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 6,
+                    fontSize: 11, color: 'var(--text-secondary)',
+                    background: 'var(--border)', padding: '3px 8px', borderRadius: 6,
                   }}>
                     <Store size={11} /> {t.max_shops_included} shop{t.max_shops_included > 1 ? 's' : ''}
                   </span>
@@ -97,12 +97,12 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
               {/* Price */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>{t.currency_symbol || '$'}</span>
-                  <span className="gc-display" style={{ fontSize: 36, fontWeight: 800, color: '#fff' }}>
+                  <span style={{ fontSize: 14, color: 'var(--text-desc)' }}>{t.currency_symbol || '$'}</span>
+                  <span className="gc-display" style={{ fontSize: 36, fontWeight: 800, color: 'var(--text-primary)' }}>
                     {Number(price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   {period === 'monthly' ? '/month' : `for ${period.replace('_', '-')}`}
                   {period !== 'monthly' && Number(t[`${period}_savings`] || 0) > 0 && (
                     <span style={{ color: '#10b981', marginLeft: 6, fontWeight: 600 }}>
@@ -111,7 +111,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
                   )}
                 </p>
                 {period !== 'monthly' && (
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
                     ≈ {t.currency_symbol || '$'}{Number(monthly).toFixed(2)}/mo equivalent
                   </p>
                 )}
@@ -119,12 +119,12 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
 
               {/* Features */}
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
                   What's included
                 </p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {features.map((f, j) => (
-                    <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+                    <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--text-feature)', marginBottom: 8 }}>
                       <Check size={14} style={{ color: ACCENT, marginTop: 2, flexShrink: 0 }} /> {f}
                     </li>
                   ))}
@@ -138,8 +138,8 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
                   borderRadius: 10, border: 'none', cursor: 'pointer',
                   fontSize: 14, fontWeight: 600,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  background: isPop ? ACCENT : 'rgba(255,255,255,0.1)',
-                  color: '#fff', transition: 'all 0.2s ease',
+                  background: isPop ? ACCENT : 'var(--border)',
+                  color: 'var(--text-primary)', transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.opacity = '0.9' }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.opacity = '1' }}
@@ -163,19 +163,19 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
               Multi-shop add-on
             </h4>
           </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 14, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-desc)', marginBottom: 14, lineHeight: 1.5 }}>
             Your first shop is always included. Additional shops are priced modestly since your plan already covers staff and client capacity.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {shopTiers.filter(s => s.is_active).map(s => (
               <div key={s.tier_code} style={{
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                background: 'var(--hover-bg)', border: '1px solid rgba(255,255,255,0.08)',
                 borderRadius: 8, padding: '10px 14px', minWidth: 100, textAlign: 'center',
               }}>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', margin: '0 0 4px', fontWeight: 500 }}>
+                <p style={{ fontSize: 11, color: 'var(--text-desc)', margin: '0 0 4px', fontWeight: 500 }}>
                   {s.min_shops <= 1 ? '1 shop' : s.max_shops ? `${s.min_shops}–${s.max_shops}` : `${s.min_shops}+`}
                 </p>
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0 }}>
+                <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   {s.is_upper_limit
                     ? `${s.currency_symbol || '$'}${Number(s.flat_monthly_price || 0).toFixed(0)} flat`
                     : Number(s.per_shop_monthly_price) === 0

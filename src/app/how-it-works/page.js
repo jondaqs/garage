@@ -21,21 +21,21 @@ const Section = ({ id, icon: Icon, title, accent, children }) => (
           <Icon size={20} style={{ color: accent }} />
         </div>
       )}
-      <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
+      <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>{title}</h2>
     </div>
-    <div className="space-y-4 text-[15px] leading-relaxed text-blue-100/80">
+    <div className="space-y-4 text-[15px] leading-relaxed" style={{ color: 'var(--text-feature)' }}>
       {children}
     </div>
   </section>
 )
 
 const Feature = ({ icon: Icon, title, children }) => (
-  <div className="bg-white/[0.04] border border-white/10 rounded-xl p-5 hover:bg-white/[0.07] transition">
+  <div className="rounded-xl p-5 transition" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
     <div className="flex items-start gap-3">
-      {Icon && <Icon size={18} className="text-blue-300 mt-0.5 flex-shrink-0" />}
+      {Icon && <Icon size={18} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-teal)' }} />}
       <div>
-        <h4 className="text-sm font-semibold text-white mb-1">{title}</h4>
-        <p className="text-sm text-blue-100/70 leading-relaxed">{children}</p>
+        <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{title}</h4>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{children}</p>
       </div>
     </div>
   </div>
@@ -44,13 +44,14 @@ const Feature = ({ icon: Icon, title, children }) => (
 const Accordion = ({ title, defaultOpen = false, children }) => {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border border-white/10 rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left bg-white/[0.03] hover:bg-white/[0.06] transition">
-        <span className="font-semibold text-white text-[15px]">{title}</span>
-        {open ? <ChevronDown size={16} className="text-white/50" /> : <ChevronRight size={16} className="text-white/50" />}
+        className="w-full flex items-center justify-between px-5 py-4 text-left transition"
+        style={{ background: 'var(--hover-bg)' }}>
+        <span className="font-semibold text-[15px]" style={{ color: 'var(--text-primary)' }}>{title}</span>
+        {open ? <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />}
       </button>
-      {open && <div className="px-5 py-4 text-sm text-blue-100/75 leading-relaxed border-t border-white/5">{children}</div>}
+      {open && <div className="px-5 py-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)', borderTop: '1px solid var(--border)' }}>{children}</div>}
     </div>
   )
 }
@@ -66,12 +67,13 @@ const StatusBadge = ({ label, color }) => (
 const WoStep = ({ step, title, desc }) => (
   <div className="flex gap-3">
     <div className="flex flex-col items-center">
-      <div className="w-7 h-7 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-xs font-bold text-blue-300">{step}</div>
-      <div className="flex-1 w-px bg-white/10 mt-1" />
+      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+        style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--accent-teal)' }}>{step}</div>
+      <div className="flex-1 w-px mt-1" style={{ background: 'var(--border)' }} />
     </div>
     <div className="pb-6">
-      <p className="text-sm font-semibold text-white">{title}</p>
-      <p className="text-sm text-blue-100/65 mt-0.5">{desc}</p>
+      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</p>
+      <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>{desc}</p>
     </div>
   </div>
 )
@@ -116,6 +118,9 @@ export default function DocsPage() {
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
         .gc-root { font-family: 'DM Sans', sans-serif; }
         .gc-display { font-family: 'Syne', sans-serif; }
+        .hiw-text-primary { color: var(--text-primary); }
+        .hiw-text-secondary { color: var(--text-secondary); }
+        .hiw-card { background: var(--hover-bg); border: 1px solid var(--border); }
       `}</style>
 
       <div className="gc-root" style={{
@@ -144,14 +149,15 @@ export default function DocsPage() {
           {/* Sticky sidebar TOC — desktop */}
           <aside className="hidden lg:block w-56 flex-shrink-0">
             <nav className="sticky top-24 space-y-0.5">
-              <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-3 px-3">On this page</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-3 px-3" style={{ color: 'var(--text-muted)' }}>On this page</p>
               {TOC_ITEMS.map(t => (
                 <a key={t.id} href={`#${t.id}`}
-                  className={`block px-3 py-1.5 rounded-lg text-[13px] transition ${
-                    activeSection === t.id
-                      ? 'bg-white/10 text-white font-semibold'
-                      : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                  }`}>
+                  className="block px-3 py-1.5 rounded-lg text-[13px] transition"
+                  style={{
+                    background: activeSection === t.id ? 'var(--surface-btn)' : 'transparent',
+                    color: activeSection === t.id ? 'var(--text-primary)' : 'var(--text-desc)',
+                    fontWeight: activeSection === t.id ? 600 : 400,
+                  }}>
                   {t.label}
                 </a>
               ))}
@@ -164,7 +170,7 @@ export default function DocsPage() {
             {/* ───────── PLATFORM OVERVIEW ───────── */}
             <Section id="overview" icon={Zap} title="Platform Overview" accent="#60a5fa">
               <p>
-                Carfix-Connect is a vehicle service management platform that connects three types of users: <strong className="text-white">individual vehicle owners</strong>, <strong className="text-white">company fleet managers</strong>, and <strong className="text-white">service providers</strong> (garages, workshops, mobile mechanics). The platform handles the complete lifecycle from booking a service appointment through to invoicing and payment, with real-time communication at every step.
+                Carfix-Connect is a vehicle service management platform that connects three types of users: <strong style={{ color: 'var(--text-primary)' }}>individual vehicle owners</strong>, <strong style={{ color: 'var(--text-primary)' }}>company fleet managers</strong>, and <strong style={{ color: 'var(--text-primary)' }}>service providers</strong> (garages, workshops, mobile mechanics). The platform handles the complete lifecycle from booking a service appointment through to invoicing and payment, with real-time communication at every step.
               </p>
               <p>
                 Every account starts as an individual. From there, you can register a company to manage fleet vehicles, or register as a service provider to accept bookings and manage a workshop. A single person can hold all three roles simultaneously — for example, a garage owner who also has personal cars and manages a company fleet.
@@ -175,10 +181,10 @@ export default function DocsPage() {
                   { icon: Building2, label: 'Company', desc: 'Manage fleet, team, and budgets', color: '#8b5cf6' },
                   { icon: Wrench, label: 'Service Provider', desc: 'Accept work and run your garage', color: '#10b981' },
                 ].map(r => (
-                  <div key={r.label} className="bg-white/[0.04] border border-white/10 rounded-xl p-4 text-center">
+                  <div key={r.label} className=" rounded-xl p-4 text-center">
                     <r.icon size={24} className="mx-auto mb-2" style={{ color: r.color }} />
-                    <p className="text-sm font-semibold text-white">{r.label}</p>
-                    <p className="text-xs text-blue-100/60 mt-1">{r.desc}</p>
+                    <p className="text-sm font-semibold hiw-text-primary">{r.label}</p>
+                    <p className="text-xs hiw-text-secondary mt-1">{r.desc}</p>
                   </div>
                 ))}
               </div>
@@ -277,17 +283,17 @@ export default function DocsPage() {
                 </Feature>
               </div>
 
-              <div className="mt-6 bg-white/[0.04] border border-white/10 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-white mb-2">Company Membership</h4>
-                <p className="text-sm text-blue-100/70">
-                  If you join a company (via invitation or during company registration), a <strong className="text-white">My Company</strong> section appears in your sidebar. Depending on your assigned permissions, you can view fleet vehicles, manage bookings, approve work orders, chat with providers on behalf of the company, manage budgets, and more. Each permission (WO access, estimates, payments, checkout, fleet management, team management, and chat) is independently configurable by the company admin.
+              <div className="mt-6 hiw-card rounded-xl p-5">
+                <h4 className="text-sm font-semibold hiw-text-primary mb-2">Company Membership</h4>
+                <p className="text-sm hiw-text-secondary">
+                  If you join a company (via invitation or during company registration), a <strong style={{ color: 'var(--text-primary)' }}>My Company</strong> section appears in your sidebar. Depending on your assigned permissions, you can view fleet vehicles, manage bookings, approve work orders, chat with providers on behalf of the company, manage budgets, and more. Each permission (WO access, estimates, payments, checkout, fleet management, team management, and chat) is independently configurable by the company admin.
                 </p>
               </div>
 
-              <div className="mt-3 bg-white/[0.04] border border-white/10 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-white mb-2">Service Provider Team Membership</h4>
-                <p className="text-sm text-blue-100/70">
-                  If you are added to a service provider as a mechanic or team member, a <strong className="text-white">Service Provider Membership</strong> section appears in your sidebar. You can view assigned work orders, manage bookings, handle inventory (if permitted), chat with customers and other providers, and access analytics — all scoped to the provider you belong to. Your role (owner, admin, accountant, manager, senior mechanic, mechanic) and specific permissions are shown as badges.
+              <div className="mt-3 hiw-card rounded-xl p-5">
+                <h4 className="text-sm font-semibold hiw-text-primary mb-2">Service Provider Team Membership</h4>
+                <p className="text-sm hiw-text-secondary">
+                  If you are added to a service provider as a mechanic or team member, a <strong style={{ color: 'var(--text-primary)' }}>Service Provider Membership</strong> section appears in your sidebar. You can view assigned work orders, manage bookings, handle inventory (if permitted), chat with customers and other providers, and access analytics — all scoped to the provider you belong to. Your role (owner, admin, accountant, manager, senior mechanic, mechanic) and specific permissions are shown as badges.
                 </p>
               </div>
             </Section>
@@ -332,10 +338,10 @@ export default function DocsPage() {
                 </Feature>
               </div>
 
-              <div className="mt-4 bg-white/[0.04] border border-white/10 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-white mb-2">Verification Workflow</h4>
-                <p className="text-sm text-blue-100/70">
-                  After registration, a company enters <strong className="text-white">Pending Verification</strong>. Platform admins review the submitted details and documents. If anything is missing, the company is moved to <strong className="text-white">Pending Info</strong> — an "Action Required" alert appears in the sidebar prompting the owner to supply the missing information and resubmit. Once everything checks out, the company is marked <strong className="text-white">Active</strong>.
+              <div className="mt-4 hiw-card rounded-xl p-5">
+                <h4 className="text-sm font-semibold hiw-text-primary mb-2">Verification Workflow</h4>
+                <p className="text-sm hiw-text-secondary">
+                  After registration, a company enters <strong style={{ color: 'var(--text-primary)' }}>Pending Verification</strong>. Platform admins review the submitted details and documents. If anything is missing, the company is moved to <strong style={{ color: 'var(--text-primary)' }}>Pending Info</strong> — an "Action Required" alert appears in the sidebar prompting the owner to supply the missing information and resubmit. Once everything checks out, the company is marked <strong style={{ color: 'var(--text-primary)' }}>Active</strong>.
                 </p>
               </div>
             </Section>
@@ -383,9 +389,9 @@ export default function DocsPage() {
                 </Feature>
               </div>
 
-              <div className="mt-4 bg-white/[0.04] border border-white/10 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-white mb-2">Provider Verification & Searchability</h4>
-                <p className="text-sm text-blue-100/70">
+              <div className="mt-4 hiw-card rounded-xl p-5">
+                <h4 className="text-sm font-semibold hiw-text-primary mb-2">Provider Verification & Searchability</h4>
+                <p className="text-sm hiw-text-secondary">
                   Providers must be verified by platform admins before they become searchable. A verified provider with an active subscription (or within their trial period) appears in search results. The verification badge builds customer trust and distinguishes you from unverified listings.
                 </p>
               </div>
@@ -398,7 +404,7 @@ export default function DocsPage() {
                 Work orders are the heart of Carfix-Connect. They track a vehicle service job from start to finish. Here is the complete lifecycle:
               </p>
 
-              <div className="mt-4 bg-white/[0.04] border border-white/10 rounded-xl p-6">
+              <div className="mt-4 hiw-card rounded-xl p-6">
                 <WoStep step="1" title="Vehicle Check-In" desc="The vehicle arrives at the workshop. The provider creates a work order linked to the vehicle and records initial mileage and the customer's problem description." />
                 <WoStep step="2" title="Diagnostics & Service List" desc="The mechanic inspects the vehicle, identifies services needed, checks parts availability, and builds a list of work order services with estimated costs." />
                 <WoStep step="3" title="Estimate & Approval" desc="The estimate is sent to the vehicle owner (or company fleet manager). The owner reviews the breakdown of services and parts, then approves, requests changes, or rejects the estimate." />
@@ -413,14 +419,14 @@ export default function DocsPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-white">Closed</p>
-                    <p className="text-sm text-blue-100/65 mt-0.5">Service records and vehicle history are updated. Maintenance recommendations may be added. The vehicle owner can leave feedback.</p>
+                    <p className="text-sm font-semibold hiw-text-primary">Closed</p>
+                    <p className="text-sm hiw-text-secondary mt-0.5">Service records and vehicle history are updated. Maintenance recommendations may be added. The vehicle owner can leave feedback.</p>
                   </div>
                 </div>
               </div>
 
               <p className="mt-4 text-sm">
-                <strong className="text-white">Work order statuses:</strong> Draft → Awaiting Approval → Approved → In Progress → Quality Check → Completed → Awaiting Customer Checkout → Closed. If rejected at any stage, a work order can be cancelled.
+                <strong style={{ color: 'var(--text-primary)' }}>Work order statuses:</strong> Draft → Awaiting Approval → Approved → In Progress → Quality Check → Completed → Awaiting Customer Checkout → Closed. If rejected at any stage, a work order can be cancelled.
               </p>
             </Section>
 
@@ -472,20 +478,20 @@ export default function DocsPage() {
                 Carfix-Connect offers three types of real-time messaging:
               </p>
               <div className="grid sm:grid-cols-3 gap-3 mt-2">
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">
+                <div className=" rounded-xl p-4">
                   <MessageSquare size={20} className="text-blue-400 mb-2" />
-                  <p className="text-sm font-semibold text-white">Customer ↔ Provider</p>
-                  <p className="text-xs text-blue-100/60 mt-1">Vehicle owners chat with service providers about their cars. Each conversation is scoped to a provider. Unread counts update in real time.</p>
+                  <p className="text-sm font-semibold hiw-text-primary">Customer ↔ Provider</p>
+                  <p className="text-xs hiw-text-secondary mt-1">Vehicle owners chat with service providers about their cars. Each conversation is scoped to a provider. Unread counts update in real time.</p>
                 </div>
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">
+                <div className=" rounded-xl p-4">
                   <Building2 size={20} className="text-purple-400 mb-2" />
-                  <p className="text-sm font-semibold text-white">Company ↔ Provider</p>
-                  <p className="text-xs text-blue-100/60 mt-1">Company team members with chat permission can message providers on behalf of the company. Company chat is tracked separately from personal conversations.</p>
+                  <p className="text-sm font-semibold hiw-text-primary">Company ↔ Provider</p>
+                  <p className="text-xs hiw-text-secondary mt-1">Company team members with chat permission can message providers on behalf of the company. Company chat is tracked separately from personal conversations.</p>
                 </div>
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">
+                <div className=" rounded-xl p-4">
                   <Wrench size={20} className="text-green-400 mb-2" />
-                  <p className="text-sm font-semibold text-white">Provider ↔ Provider</p>
-                  <p className="text-xs text-blue-100/60 mt-1">Peer chat lets providers communicate with each other for referrals, parts sourcing, or collaboration. Separate from customer-facing chat.</p>
+                  <p className="text-sm font-semibold hiw-text-primary">Provider ↔ Provider</p>
+                  <p className="text-xs hiw-text-secondary mt-1">Peer chat lets providers communicate with each other for referrals, parts sourcing, or collaboration. Separate from customer-facing chat.</p>
                 </div>
               </div>
               <p className="mt-3">
@@ -629,22 +635,24 @@ export default function DocsPage() {
 
 
             {/* Footer CTA */}
-            <div className="mt-12 bg-white/[0.06] border border-white/15 rounded-2xl p-8 text-center">
-              <h3 className="gc-display text-xl font-bold text-white mb-3">Ready to get started?</h3>
-              <p className="text-sm text-blue-100/70 mb-6 max-w-md mx-auto">
+            <div className="mt-12 rounded-2xl p-8 text-center" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
+              <h3 className="gc-display text-xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Ready to get started?</h3>
+              <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
                 Join Carfix-Connect today and experience a smarter way to manage vehicle services.
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <button onClick={() => router.push('/auth/signup?type=normal')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-blue-500 text-white hover:bg-blue-400 transition">
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-blue-500 hiw-text-primary hover:bg-blue-400 transition">
                   <User size={16} /> Sign Up Free
                 </button>
                 <button onClick={() => router.push('/auth/company-signup')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-white border border-white/20 hover:bg-white/15 transition">
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+                  style={{ background: 'var(--surface-btn)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                   <Building2 size={16} /> Register Company
                 </button>
                 <button onClick={() => router.push('/auth/provider-signup')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-white border border-white/20 hover:bg-white/15 transition">
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+                  style={{ background: 'var(--surface-btn)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                   <Wrench size={16} /> Register as Provider
                 </button>
               </div>

@@ -15,7 +15,7 @@ const SUPPORT_LEVELS = {
 }
 
 export default function IndividualPricing({ tiers = [], period, trialConfig }) {
-  if (!tiers.length) return <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No plans available</p>
+  if (!tiers.length) return <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No plans available</p>
 
   // Identify special tiers
   const freeTier = tiers.find(t => Number(t.base_monthly_price) === 0)
@@ -62,7 +62,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
           <div key={t.tier_code} style={{
             position: 'relative',
             background: isPop ? 'rgba(59,130,246,0.08)' : isFree ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${isPop ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
+            border: `1px solid ${isPop ? 'rgba(59,130,246,0.4)' : 'var(--border)'}`,
             borderRadius: 16,
             padding: '32px 24px 28px',
             display: 'flex', flexDirection: 'column',
@@ -72,7 +72,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
             {isPop && (
               <div style={{
                 position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-                background: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700,
+                background: ACCENT, color: 'var(--text-primary)', fontSize: 11, fontWeight: 700,
                 padding: '4px 14px', borderRadius: 20, letterSpacing: '0.04em',
                 display: 'flex', alignItems: 'center', gap: 4,
               }}>
@@ -100,14 +100,14 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                 {isFree ? <Car size={18} color="#10b981" /> : isBasicPlus ? <Zap size={18} color={ACCENT} /> : <Star size={18} color="#a855f7" />}
               </div>
               <div>
-                <h3 className="gc-display" style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
+                <h3 className="gc-display" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   {t.tier_name}
                 </h3>
               </div>
             </div>
 
             {/* Description */}
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 20px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-desc)', margin: '0 0 20px', lineHeight: 1.5 }}>
               {t.tier_description || t.description || `${t.min_vehicles}${t.max_vehicles ? '–' + t.max_vehicles : '+'} vehicles`}
             </p>
 
@@ -116,19 +116,19 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               {isFree ? (
                 <div>
                   <span className="gc-display" style={{ fontSize: 36, fontWeight: 800, color: '#10b981' }}>Free</span>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                     {trialConfig?.free_vehicle_count || 1} vehicle included
                   </p>
                 </div>
               ) : (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                    <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>{t.currency_symbol || '$'}</span>
-                    <span className="gc-display" style={{ fontSize: 36, fontWeight: 800, color: '#fff' }}>
+                    <span style={{ fontSize: 14, color: 'var(--text-desc)' }}>{t.currency_symbol || '$'}</span>
+                    <span className="gc-display" style={{ fontSize: 36, fontWeight: 800, color: 'var(--text-primary)' }}>
                       {Number(price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     {period === 'monthly' ? '/month' : `for ${period.replace('_', '-')}`}
                     {period !== 'monthly' && Number(t[`${period.replace('-', '_')}_savings`] || 0) > 0 && (
                       <span style={{ color: '#10b981', marginLeft: 6, fontWeight: 600 }}>
@@ -137,7 +137,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                     )}
                   </p>
                   {period !== 'monthly' && (
-                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                    <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
                       ≈ {t.currency_symbol || '$'}{Number(monthly).toFixed(2)}/mo equivalent
                     </p>
                   )}
@@ -151,7 +151,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                 background: 'rgba(59,130,246,0.06)',
                 border: '1px solid rgba(59,130,246,0.15)',
                 borderRadius: 10, padding: '10px 12px', marginBottom: 16,
-                fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
+                fontSize: 11, color: 'var(--text-desc)', lineHeight: 1.5,
               }}>
                 <span style={{ color: ACCENT, fontWeight: 600 }}>Want more?</span>{' '}
                 Upgrade to Basic Plus for budgets, reports, reminders & full history — just {basicPlusTier.currency_symbol || '$'}{Number(basicPlusTier.base_monthly_price).toFixed(2)}/mo
@@ -160,12 +160,12 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
 
             {/* Features list */}
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
                 What's included
               </p>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {features.map((f, j) => (
-                  <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+                  <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--text-feature)', marginBottom: 8 }}>
                     <Check size={14} style={{ color: isFree ? '#10b981' : isBasicPlus ? ACCENT : '#a855f7', marginTop: 2, flexShrink: 0 }} />
                     {f}
                   </li>
@@ -175,13 +175,13 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
               {/* Show what's NOT included in free tier */}
               {isFree && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
                     Available with Basic Plus
                   </p>
                   {premiumFeatures.map((f, j) => (
                     <p key={j} style={{
                       display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
-                      color: 'rgba(255,255,255,0.25)', marginBottom: 6,
+                      color: 'var(--text-faint)', marginBottom: 6,
                     }}>
                       <Zap size={12} style={{ color: 'rgba(59,130,246,0.4)', flexShrink: 0 }} />
                       {f}
@@ -199,7 +199,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                 borderRadius: 10, border: 'none', cursor: 'pointer',
                 fontSize: 14, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: isFree ? 'rgba(16,185,129,0.15)' : (isPop ? ACCENT : 'rgba(255,255,255,0.1)'),
+                background: isFree ? 'rgba(16,185,129,0.15)' : (isPop ? ACCENT : 'var(--border)'),
                 color: isFree ? '#10b981' : '#fff',
                 transition: 'all 0.2s ease',
               }}

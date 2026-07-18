@@ -198,7 +198,7 @@ export default function PricingPage() {
           padding: 10px 20px; border-radius: 10px; border: none;
           font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
         }
-        .gc-nav-link:hover { background: rgba(255,255,255,0.08) !important; color: #fff !important; }
+        .gc-nav-link:hover { background: var(--hover-bg) !important; color: var(--text-primary) !important; }
         @media (max-width: 640px) {
           .gc-hero-title { font-size: 28px !important; }
           .gc-hero-sub { font-size: 14px !important; }
@@ -210,7 +210,7 @@ export default function PricingPage() {
       <div className="gc-root" style={{
         minHeight: '100vh',
         background: 'var(--hero-gradient)',
-        color: '#fff', overflowX: 'hidden',
+        color: 'var(--text-primary)', overflowX: 'hidden',
       }}>
         <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.6 }} />
 
@@ -234,14 +234,14 @@ export default function PricingPage() {
             <div style={{ position: 'relative' }}>
               <button onClick={() => setShowCurrDropdown(!showCurrDropdown)} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--hover-bg)', border: '1px solid var(--border)',
                 borderRadius: 10, padding: '8px 16px', cursor: 'pointer',
-                color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 500,
+                color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500,
                 transition: 'all 0.2s ease',
               }}>
                 <Globe size={14} />
-                <span style={{ fontWeight: 600, color: '#fff' }}>{selectedCurrency}</span>
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{convSymbol !== '$' || selectedCurrency === 'USD' ? convSymbol : ''}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedCurrency}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{convSymbol !== '$' || selectedCurrency === 'USD' ? convSymbol : ''}</span>
                 {rateLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <ChevronDown size={14} />}
               </button>
 
@@ -250,7 +250,7 @@ export default function PricingPage() {
                   <div onClick={() => setShowCurrDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
                   <div style={{
                     position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',
-                    background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
                     borderRadius: 12, padding: 6, zIndex: 30, minWidth: 200,
                     maxHeight: 280, overflowY: 'auto',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
@@ -269,7 +269,7 @@ export default function PricingPage() {
                         onMouseLeave={e => e.currentTarget.style.background = c.code === selectedCurrency ? 'rgba(255,255,255,0.08)' : 'transparent'}
                       >
                         <span>{c.symbol} {c.code}</span>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{c.display_name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{c.display_name}</span>
                       </button>
                     ))}
                   </div>
@@ -280,10 +280,10 @@ export default function PricingPage() {
             {selectedCurrency !== 'USD' && conversionRate > 1 && !rateLoading && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12,
-                fontSize: 11, color: 'rgba(255,255,255,0.35)',
+                fontSize: 11, color: 'var(--text-dim)',
               }}>
                 <span>1 USD = {convSymbol}{conversionRate.toFixed(2)}</span>
-                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                <span style={{ color: 'var(--text-faint)' }}>·</span>
                 <span>incl. {marginPct}% forex margin</span>
               </div>
             )}
@@ -292,7 +292,7 @@ export default function PricingPage() {
           {/* ── TAB SELECTOR ── */}
           <div style={{
             display: 'flex', justifyContent: 'center', gap: 6,
-            background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 6,
+            background: 'var(--hover-bg)', borderRadius: 14, padding: 6,
             marginBottom: 32, maxWidth: 560, margin: '0 auto 32px',
             flexWrap: 'wrap',
           }}>
