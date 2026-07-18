@@ -1,10 +1,11 @@
 // src/components/PublicNav.jsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowRight, Menu, X, Download, Sun, Moon } from 'lucide-react'
+import { ArrowRight, Menu, X, Download, Sun, Moon, LayoutDashboard } from 'lucide-react'
 import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
 
 const NAV_LINKS = [
   { label: 'About Us', path: '/about' },
@@ -12,6 +13,27 @@ const NAV_LINKS = [
   { label: 'How It Works',     path: '/how-it-works' },
   { label: 'Contact Us', path: '/contact' },
 ]
+
+const ADMIN_CODES = ['admin', 'platform_admin', 'moderator', 'support', 'reviewer']
+
+/**
+ * Resolve the user's primary role from their user_roles entries.
+ * Priority: admin > provider > company > member > user
+ */
+function resolveDashboardPath(roleCodes) {
+  if (roleCodes.some(c => ADMIN_CODES.includes(c))) return '/admin/dashboard'
+  if (roleCodes.includes('service_provider_owner'))  return '/provider/dashboard'
+  if (roleCodes.includes('company_owner'))            return '/company/dashboard'
+  // company_member and individual both go to /dashboard
+  return '/dashboard'
+}
+
+function resolveDashboardLabel(roleCodes) {
+  if (roleCodes.some(c => ADMIN_CODES.includes(c))) return 'Admin Panel'
+  if (roleCodes.includes('service_provider_owner'))  return 'Provider Dashboard'
+  if (roleCodes.includes('company_owner'))            return 'Fleet Dashboard'
+  return 'My Dashboard'
+}
 
 export default function PublicNav() {
   const router = useRouter()
@@ -21,6 +43,75 @@ export default function PublicNav() {
   const [isInstallable, setIsInstallable] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
   const [theme, setTheme] = useState('dark')
+
+  // ── Auth state ──
+  const [authLoading, setAuthLoading] = useState(true)
+  const [session, setSession] = useState(null)
+  const [dashboardPath, setDashboardPath] = useState('/dashboard')
+  const [dashboardLabel, setDashboardLabel] = useState('My Dashboard')
+
+  // ── Resolve auth + role on mount ──
+  const resolveAuth = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+
+      if (!currentSession) {
+        setSession(null)
+        setAuthLoading(false)
+        return
+      }
+
+      setSession(currentSession)
+
+      // Query user_profiles_secure → user_roles → user_roles_lookup
+      // Same join the middleware uses
+      const { data: profile } = await supabase
+        .from('user_profiles_secure')
+        .select(`
+          id,
+          user_roles (
+            role:user_roles_lookup(code)
+          )
+        `)
+        .eq('auth_user_id', currentSession.user.id)
+        .single()
+
+      if (profile) {
+        const codes = profile.user_roles
+          ?.map(ur => ur.role?.code)
+          .filter(Boolean) ?? []
+
+        setDashboardPath(resolveDashboardPath(codes))
+        setDashboardLabel(resolveDashboardLabel(codes))
+      }
+    } catch {
+      // Silently fail — treat as unauthenticated
+      setSession(null)
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    resolveAuth()
+
+    // Listen for sign-in / sign-out events so the button updates live
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        if (!newSession) {
+          setSession(null)
+          setAuthLoading(false)
+        } else {
+          // Re-resolve when session changes (e.g. login in another tab)
+          resolveAuth()
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [resolveAuth])
 
   // ── Theme initialization ──
   useEffect(() => {
@@ -75,6 +166,17 @@ export default function PublicNav() {
 
   const isActive = (path) => pathname === path
 
+  // ── Determine what the primary CTA button should show ──
+  const isLoggedIn = !authLoading && !!session
+
+  const handleCtaClick = () => {
+    if (isLoggedIn) {
+      router.push(dashboardPath)
+    } else {
+      router.push('/auth/login')
+    }
+  }
+
   return (
     <>
       <style>{`
@@ -127,6 +229,15 @@ export default function PublicNav() {
           box-shadow: 0 0 20px var(--accent-teal-glow);
         }
         .pn-signin:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .pn-cta-loading {
+          display: inline-flex; align-items: center; gap: 6px;
+          background: var(--surface); color: var(--text-muted);
+          border: 1px solid var(--border);
+          padding: 10px 20px; border-radius: 10px;
+          font-size: 14px; font-weight: 600; cursor: default;
+          margin-left: 4px;
+        }
 
         .pn-install-btn {
           display: inline-flex; align-items: center; gap: 6px;
@@ -275,9 +386,26 @@ export default function PublicNav() {
           <button onClick={toggleTheme} className="pn-theme-toggle" aria-label="Toggle theme">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
-          <button onClick={() => router.push('/auth/login')} className="pn-signin">
-            Sign In <ArrowRight size={15} />
-          </button>
+
+          {/* ── Auth-aware CTA button ── */}
+          {authLoading ? (
+            <span className="pn-cta-loading">
+              <span style={{
+                width: 14, height: 14, border: '2px solid var(--border)',
+                borderTopColor: 'var(--text-muted)', borderRadius: '50%',
+                display: 'inline-block',
+                animation: 'pn-spin 0.6s linear infinite',
+              }} />
+            </span>
+          ) : isLoggedIn ? (
+            <button onClick={handleCtaClick} className="pn-signin">
+              <LayoutDashboard size={15} /> {dashboardLabel} <ArrowRight size={15} />
+            </button>
+          ) : (
+            <button onClick={handleCtaClick} className="pn-signin">
+              Sign In <ArrowRight size={15} />
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="md-hidden-flex">
@@ -338,11 +466,35 @@ export default function PublicNav() {
               <Download size={16} /> Install App
             </button>
           )}
-          <button onClick={() => router.push('/auth/login')} className="pn-drawer-signin">
-            Sign In <ArrowRight size={16} />
-          </button>
+
+          {/* ── Auth-aware mobile CTA button ── */}
+          {authLoading ? (
+            <span className="pn-drawer-signin" style={{ opacity: 0.5, cursor: 'default' }}>
+              <span style={{
+                width: 16, height: 16, border: '2px solid var(--brand-dark)',
+                borderTopColor: 'transparent', borderRadius: '50%',
+                display: 'inline-block',
+                animation: 'pn-spin 0.6s linear infinite',
+              }} />
+            </span>
+          ) : isLoggedIn ? (
+            <button onClick={handleCtaClick} className="pn-drawer-signin">
+              <LayoutDashboard size={16} /> {dashboardLabel} <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button onClick={() => router.push('/auth/login')} className="pn-drawer-signin">
+              Sign In <ArrowRight size={16} />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Spinner keyframe for loading state */}
+      <style>{`
+        @keyframes pn-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   )
 }
