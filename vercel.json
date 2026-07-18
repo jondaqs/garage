@@ -1,12 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron/refresh-exchange-rates",
-      "schedule": "0 12 * * *"
+      "path": "/api/cron/expire-subscriptions",
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/reminder-scan",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-exchange-rates",
+      "schedule": "0 12 * * *"
     }
   ]
 }

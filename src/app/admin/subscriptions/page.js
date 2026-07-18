@@ -103,6 +103,16 @@ function StatusBadge({ code }) {
     )
 }
 
+/**
+ * Compute the effective display status for a subscription row.
+ * Even before the cron flips status_id, show 'expired' if the view
+ * says expiry_status === 'expired' and the raw status is still 'active'.
+ */
+function getEffectiveStatus(sub) {
+    if (sub.status_code === 'active' && sub.expiry_status === 'expired') return 'expired'
+    return sub.status_code
+}
+
 // ─── Toast ──────────────────────────────────────────────────────
 function Toast({ message, type = 'success', onDismiss }) {
     if (!message) return null
@@ -326,7 +336,15 @@ function SubscriptionsListTab({ supabase }) {
                 .order('created_at', { ascending: false })
                 .range((page - 1) * pageSize, page * pageSize - 1)
 
-            if (statusFilter !== 'all') q = q.eq('status_code', statusFilter)
+            if (statusFilter === 'expired') {
+                // Include both DB-expired AND active-but-past-expiry subscriptions
+                q = q.or('status_code.eq.expired,expiry_status.eq.expired')
+            } else if (statusFilter === 'active') {
+                // Only truly active (not past expiry)
+                q = q.eq('status_code', 'active').neq('expiry_status', 'expired')
+            } else if (statusFilter !== 'all') {
+                q = q.eq('status_code', statusFilter)
+            }
             if (typeFilter !== 'all') q = q.eq('subscription_type_code', typeFilter)
 
             const { data, count, error } = await q
@@ -435,11 +453,14 @@ function SubscriptionsListTab({ supabase }) {
                                             <span className="text-xs text-gray-500 capitalize">{s.subscriber_type?.replace(/_/g, ' ')}</span>
                                         </td>
                                         <td className="py-2.5 px-3 text-xs text-gray-600">{s.package_name}</td>
-                                        <td className="py-2.5 px-3"><StatusBadge code={s.status_code} /></td>
+                                        <td className="py-2.5 px-3"><StatusBadge code={getEffectiveStatus(s)} /></td>
                                         <td className="py-2.5 px-3">
                                             <p className="text-xs text-gray-600">{s.expiry_date}</p>
                                             {s.expiry_status === 'expiring_soon' && (
                                                 <p className="text-[10px] text-red-500 font-medium">{s.days_until_expiry}d left</p>
+                                            )}
+                                            {s.expiry_status === 'expired' && (
+                                                <p className="text-[10px] text-gray-500 font-medium">Expired {Math.abs(s.days_until_expiry || 0)}d ago</p>
                                             )}
                                         </td>
                                         <td className="py-2.5 px-3 text-xs font-medium text-gray-700">
@@ -453,7 +474,7 @@ function SubscriptionsListTab({ supabase }) {
                                                         {acting === s.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                                                     </button>
                                                 )}
-                                                {['active', 'dormant'].includes(s.status_code) && (
+                                                {['active', 'dormant'].includes(s.status_code) && getEffectiveStatus(s) !== 'expired' && (
                                                     <button onClick={() => doAction(s.id, 'suspend')} disabled={acting === s.id}
                                                         className="p-1.5 text-yellow-700 hover:bg-yellow-50 rounded disabled:opacity-50" title="Suspend">
                                                         <Ban size={14} />
@@ -465,7 +486,7 @@ function SubscriptionsListTab({ supabase }) {
                                                         {acting === s.id ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
                                                     </button>
                                                 )}
-                                                {!['cancelled', 'blocked'].includes(s.status_code) && (
+                                                {!['cancelled', 'blocked', 'expired'].includes(getEffectiveStatus(s)) && (
                                                     <button onClick={() => doAction(s.id, 'cancel')} disabled={acting === s.id}
                                                         className="p-1.5 text-red-600 hover:bg-red-50 rounded disabled:opacity-50" title="Cancel">
                                                         <X size={14} />
