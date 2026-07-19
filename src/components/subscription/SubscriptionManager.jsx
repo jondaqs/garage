@@ -95,6 +95,21 @@ const STATUS_COLORS = {
   overdue: 'bg-red-100 text-red-800',
 }
 
+/**
+ * Compute the display status code for a subscription row.
+ * The DB status_id may still be 'active' even after expiry_date passes
+ * (until the daily cron flips it). The view's expiry_status field is the truth.
+ */
+function getEffectiveStatus(sub) {
+  if (sub.status_code === 'active' && sub.expiry_status === 'expired') return 'expired'
+  return sub.status_code
+}
+
+function getEffectiveStatusName(sub) {
+  if (sub.status_code === 'active' && sub.expiry_status === 'expired') return 'Expired'
+  return sub.status_name
+}
+
 const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmt = (n, sym = '') => `${sym}${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -780,12 +795,14 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             <div className="flex items-center gap-3">
               <CreditCard size={18} className="text-blue-400" />
               <div>
-                <h2 className="text-white font-bold text-sm">Active Subscription</h2>
+                <h2 className="text-white font-bold text-sm">
+                  {getEffectiveStatus(activeSub) === 'expired' ? 'Expired Subscription' : 'Active Subscription'}
+                </h2>
                 <p className="text-gray-400 text-xs">{activeSub.subscription_number}</p>
               </div>
             </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[activeSub.status_code] || 'bg-gray-100'}`}>
-              {activeSub.status_name}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[getEffectiveStatus(activeSub)] || 'bg-gray-100'}`}>
+              {getEffectiveStatusName(activeSub)}
             </span>
           </div>
           <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -800,7 +817,10 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
             <div>
               <p className="text-xs text-gray-500 font-medium">Expires</p>
               <p className="text-sm font-semibold text-gray-900">{fmtD(activeSub.expiry_date)}</p>
-              {activeSub.days_until_expiry <= 7 && activeSub.days_until_expiry >= 0 && (
+              {activeSub.expiry_status === 'expired' && (
+                <p className="text-xs text-red-600 font-medium">Expired {Math.abs(activeSub.days_until_expiry || 0)}d ago</p>
+              )}
+              {activeSub.expiry_status !== 'expired' && activeSub.days_until_expiry <= 7 && activeSub.days_until_expiry >= 0 && (
                 <p className="text-xs text-red-500 font-medium">{activeSub.days_until_expiry} days left</p>
               )}
             </div>
@@ -1058,8 +1078,8 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
                         <p className="text-sm font-semibold text-gray-900">{s.package_name}</p>
                         <p className="text-xs text-gray-500">{s.subscription_number} · {fmtD(s.start_date)} – {fmtD(s.expiry_date)}</p>
                       </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status_code] || 'bg-gray-100'}`}>
-                        {s.status_name}
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[getEffectiveStatus(s)] || 'bg-gray-100'}`}>
+                        {getEffectiveStatusName(s)}
                       </span>
                     </div>
                   ))}
