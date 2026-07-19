@@ -107,7 +107,7 @@ export default function CompanyPricing({ tiers = [], period, trialConfig }) {
                   </p>
                 )}
                 {(() => {
-                  if (Number(monthly) <= 0) return null
+                  if (Number(monthly) <= 0 || t.is_upper_limit) return null
                   const maxV = t.max_vehicles || t.min_vehicles
                   const maxS = t.max_staff || t.min_staff
                   const sym = t.currency_symbol || '$'

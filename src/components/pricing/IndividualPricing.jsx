@@ -143,7 +143,7 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                   )}
                   {(() => {
                     const maxCars = t.max_vehicles || t.min_vehicles
-                    if (!maxCars || maxCars <= 1 || Number(monthly) <= 0) return null
+                    if (!maxCars || maxCars <= 1 || Number(monthly) <= 0 || t.is_upper_limit) return null
                     const perCar = (Number(monthly) / maxCars).toFixed(2)
                     return (
                       <p style={{ fontSize: 11, color: '#10b981', marginTop: 4, fontWeight: 500 }}>

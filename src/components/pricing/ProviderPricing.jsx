@@ -116,7 +116,7 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
                   </p>
                 )}
                 {(() => {
-                  if (Number(monthly) <= 0) return null
+                  if (Number(monthly) <= 0 || t.is_upper_limit) return null
                   const maxC = t.max_monthly_clients || t.min_monthly_clients
                   const shops = t.max_shops_included || 1
                   const sym = t.currency_symbol || '$'
