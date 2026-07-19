@@ -370,6 +370,16 @@ export default function ProviderDetailPage({ params }) {
         is_read: false,
       })
 
+      // Send approval email + SMS (best-effort, fire-and-forget)
+      fetch(`/api/admin/providers/${provider.id}/status-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'approve',
+          isReverification: !!pendingDiff?.is_reverification,
+        }),
+      }).catch(() => {})
+
       alert('Provider approved successfully')
       router.push('/admin/providers')
     } catch (err) {
@@ -470,6 +480,16 @@ export default function ProviderDetailPage({ params }) {
         message: `Please provide the following for ${provider.name}: ${additionalInfo}`,
         is_read: false,
       })
+
+      // Send info-request email + SMS (best-effort, fire-and-forget)
+      fetch(`/api/admin/providers/${provider.id}/status-notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'request_info',
+          infoRequested: additionalInfo,
+        }),
+      }).catch(() => {})
 
       alert('Information request sent')
       setShowInfoModal(false)
