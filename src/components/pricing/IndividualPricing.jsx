@@ -141,6 +141,16 @@ export default function IndividualPricing({ tiers = [], period, trialConfig }) {
                       ≈ {t.currency_symbol || '$'}{Number(monthly).toFixed(2)}/mo equivalent
                     </p>
                   )}
+                  {(() => {
+                    const maxCars = t.max_vehicles || t.min_vehicles
+                    if (!maxCars || maxCars <= 1 || Number(monthly) <= 0) return null
+                    const perCar = (Number(monthly) / maxCars).toFixed(2)
+                    return (
+                      <p style={{ fontSize: 11, color: '#10b981', marginTop: 4, fontWeight: 500 }}>
+                        ≈ {t.currency_symbol || '$'}{perCar}/car/month
+                      </p>
+                    )
+                  })()}
                 </div>
               )}
             </div>

@@ -106,6 +106,21 @@ export default function CompanyPricing({ tiers = [], period, trialConfig }) {
                     ≈ {t.currency_symbol || '$'}{Number(monthly).toFixed(2)}/mo equivalent
                   </p>
                 )}
+                {(() => {
+                  if (Number(monthly) <= 0) return null
+                  const maxV = t.max_vehicles || t.min_vehicles
+                  const maxS = t.max_staff || t.min_staff
+                  const sym = t.currency_symbol || '$'
+                  const parts = []
+                  if (maxV > 1) parts.push(`${sym}${(Number(monthly) / maxV).toFixed(2)}/vehicle`)
+                  if (maxS > 1) parts.push(`${sym}${(Number(monthly) / maxS).toFixed(2)}/staff`)
+                  if (!parts.length) return null
+                  return (
+                    <p style={{ fontSize: 11, color: ACCENT, marginTop: 4, fontWeight: 500 }}>
+                      ≈ {parts.join(' · ')}/mo
+                    </p>
+                  )
+                })()}
               </div>
 
               {/* Features */}

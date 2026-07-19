@@ -115,6 +115,21 @@ export default function ProviderPricing({ tiers = [], period, trialConfig, shopT
                     ≈ {t.currency_symbol || '$'}{Number(monthly).toFixed(2)}/mo equivalent
                   </p>
                 )}
+                {(() => {
+                  if (Number(monthly) <= 0) return null
+                  const maxC = t.max_monthly_clients || t.min_monthly_clients
+                  const shops = t.max_shops_included || 1
+                  const sym = t.currency_symbol || '$'
+                  const parts = []
+                  if (maxC > 1) parts.push(`${sym}${(Number(monthly) / maxC).toFixed(2)}/client`)
+                  if (shops > 1) parts.push(`${sym}${(Number(monthly) / shops).toFixed(2)}/shop`)
+                  if (!parts.length) return null
+                  return (
+                    <p style={{ fontSize: 11, color: ACCENT, marginTop: 4, fontWeight: 500 }}>
+                      ≈ {parts.join(' · ')}/mo
+                    </p>
+                  )
+                })()}
               </div>
 
               {/* Features */}
