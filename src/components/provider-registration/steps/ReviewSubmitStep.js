@@ -61,8 +61,6 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       if (rpcError) throw rpcError
       if (!result?.success) throw new Error(result?.error || 'Registration failed')
 
-      console.log('✅ Provider registered:', result.provider_id)
-
       setSuccess(true)
 
       // Refresh the session to pick up the new role
@@ -75,7 +73,6 @@ export default function ReviewSubmitStep({ data, previousStep, userProfile }) {
       }, 2000)
 
     } catch (err) {
-      console.error('Submission error:')
       setError(err.message || 'Failed to submit registration. Please try again.')
     } finally {
       setSubmitting(false)

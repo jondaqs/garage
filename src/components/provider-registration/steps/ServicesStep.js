@@ -40,18 +40,11 @@ export default function ServicesStep({ data, updateData, nextStep, previousStep 
         .order('display_name', { ascending: true })
 
       if (fetchError) {
-        console.error('❌ Error fetching services:', {
-          code: fetchError.code,
-          message: fetchError.message,
-          details: fetchError.details
-        })
         throw new Error(`Failed to load ${isDealership ? 'spare parts' : 'services'}: ${fetchError.message}`)
       }
 
-      console.log(`✅ Loaded ${servicesData?.length || 0} ${isDealership ? 'spare parts' : 'services'}`)
       setServices(servicesData || [])
     } catch (err) {
-      console.error('Error loading services:')
       setError(err.message || `Failed to load ${isDealership ? 'spare parts' : 'services'}`)
     } finally {
       setLoading(false)

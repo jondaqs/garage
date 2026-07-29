@@ -106,10 +106,7 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
         }]
       })
 
-      console.log('File uploaded successfully:', fileName)
-
     } catch (error) {
-      console.error('Upload error:')
       setErrors(prev => ({ ...prev, [docType]: error.message }))
     } finally {
       setUploading(null)
@@ -147,8 +144,7 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
       setDocuments(prev => prev.filter(d => d.type !== docType))
 
     } catch (error) {
-      console.error('Delete error:')
-      alert('Failed to remove document. Please try again.')
+      setErrors(prev => ({ ...prev, [docType]: 'Failed to remove document. Please try again.' }))
     }
   }
 
@@ -160,7 +156,8 @@ export default function DocumentsStep({ nextStep, previousStep, data, updateData
     )
 
     if (missingDocs.length > 0) {
-      alert(`Please upload the following required documents:\n${missingDocs.map(d => '• ' + d.label).join('\n')}`)
+      const missing = missingDocs.reduce((acc, d) => ({ ...acc, [d.id]: `${d.label} is required` }), {})
+      setErrors(prev => ({ ...prev, ...missing }))
       return
     }
 

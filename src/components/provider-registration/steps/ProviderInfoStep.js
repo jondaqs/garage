@@ -67,50 +67,27 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Prevent double submission
-    if (isSubmitting) {
-      console.log('Already submitting, please wait...')
-      return
-    }
+    if (isSubmitting) return
 
-    console.log('Form submitted, validating...')
-    
-    if (!validate()) {
-      console.log('Validation failed:', errors)
-      return
-    }
+    if (!validate()) return
 
-    console.log('Validation passed, form data:', formData)
-
-    // ✅ FIX 1: Check correct prop name
-    if (typeof updateData !== 'function') {
-      console.error('updateData is not a function:', updateData)
-      alert('Configuration error: updateData callback is missing')
-      return
-    }
-
-    if (typeof nextStep !== 'function') {
-      console.error('nextStep is not a function:', nextStep)
-      alert('Configuration error: nextStep callback is missing')
+    if (typeof updateData !== 'function' || typeof nextStep !== 'function') {
+      setErrors(prev => ({ ...prev, form: 'Something went wrong. Please refresh and try again.' }))
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      // ✅ FIX 2: Wrap in providerInfo to match ReviewSubmitStep expectations
-      console.log('Calling updateData with providerInfo wrapper...')
+      // Wrap in providerInfo to match ReviewSubmitStep expectations
       updateData({ providerInfo: formData })
       
       // Small delay to ensure state updates
       await new Promise(resolve => setTimeout(resolve, 100))
       
-      // Move to next step
-      console.log('Calling nextStep...')
       nextStep()
     } catch (error) {
-      console.error('Error during form submission:')
-      alert('An error occurred. Please try again.')
+      setErrors(prev => ({ ...prev, form: 'An error occurred. Please try again.' }))
     } finally {
       setIsSubmitting(false)
     }
@@ -119,8 +96,6 @@ export default function ProviderInfoStep({ data, updateData, nextStep, previousS
   const handleBack = () => {
     if (typeof previousStep === 'function') {
       previousStep()
-    } else {
-      console.error('previousStep is not a function')
     }
   }
 

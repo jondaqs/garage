@@ -113,7 +113,7 @@ export default function ProviderRegistrationFlow() {
         }
       }
     } catch (error) {
-      console.error('Error checking user:')
+      // Auth check failed silently — user will start at step 0
     } finally {
       setLoading(false)
     }

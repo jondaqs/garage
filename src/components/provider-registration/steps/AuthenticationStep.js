@@ -25,6 +25,7 @@ export default function AuthenticationStep({
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
 
   // ── Turnstile CAPTCHA ──────────────────────────────────────────────────
   const [turnstileToken, setTurnstileToken] = useState('')
@@ -121,7 +122,7 @@ export default function AuthenticationStep({
       if (authData.user) {
         if (!authData.user.email_confirmed_at) {
           setError('')
-          alert('✅ Account created! Please check your email to verify your account before continuing.')
+          setInfoMessage('Account created! Please check your email to verify your account before continuing.')
           setLoading(false)
           return
         }
@@ -135,7 +136,6 @@ export default function AuthenticationStep({
           .single()
 
         if (profileError) {
-          console.error('Profile fetch error:')
           throw new Error('Profile creation failed. Please contact support or try again.')
         }
 
@@ -353,6 +353,12 @@ export default function AuthenticationStep({
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
             {error}
+          </div>
+        )}
+
+        {infoMessage && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+            {infoMessage}
           </div>
         )}
 
