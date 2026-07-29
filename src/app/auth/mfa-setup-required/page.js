@@ -41,13 +41,7 @@ function MfaSetupRequiredInner() {
           return
         }
 
-        // Clean up any leftover unverified factors
-        const unverified = factors?.totp?.find(f => f.status === 'unverified')
-        if (unverified) {
-          await supabase.auth.mfa.unenroll({ factorId: unverified.id })
-        }
-
-        // Start enrollment automatically
+        // Start enrollment (handles cleanup of unverified factors internally)
         await startEnroll()
       } catch (e) {
         setError(e.message)
@@ -92,6 +86,13 @@ function MfaSetupRequiredInner() {
   const startEnroll = async () => {
     setError('')
     try {
+      // Clean up any leftover unverified factor from a previous attempt
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const unverified = factors?.totp?.find(f => f.status === 'unverified')
+      if (unverified) {
+        await supabase.auth.mfa.unenroll({ factorId: unverified.id })
+      }
+
       const { data, error: err } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'Carfix-Connect Authenticator',
