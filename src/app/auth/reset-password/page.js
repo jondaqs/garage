@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Car, Lock, Eye, EyeOff, Loader2, CheckCircle,
+  Lock, Eye, EyeOff, Loader2, CheckCircle,
   ShieldCheck, AlertTriangle, Shield,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -165,7 +165,7 @@ export default function ResetPasswordPage() {
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center space-y-5">
             <div className="flex items-center justify-center">
-              <Car className="text-blue-600 mr-2" size={40} />
+              <img src="/logo.png" alt="Carfix-Connect" className="h-10 w-auto mr-2" />
               <h1 className="text-3xl font-bold text-gray-800">Carfix-Connect</h1>
             </div>
 
@@ -205,7 +205,7 @@ export default function ResetPasswordPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Car className="text-blue-600 mr-2" size={40} />
+              <img src="/logo.png" alt="Carfix-Connect" className="h-10 w-auto mr-2" />
               <h1 className="text-3xl font-bold text-gray-800">Carfix-Connect</h1>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">

@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ShieldCheck, Loader2, Car, AlertTriangle } from 'lucide-react'
+import { ShieldCheck, Loader2, AlertTriangle } from 'lucide-react'
 
 function MfaVerifyInner() {
   const router       = useRouter()
@@ -122,8 +122,8 @@ function MfaVerifyInner() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4">
-            <Car size={28} className="text-white" />
+          <div className="mb-4">
+            <img src="/logo.png" alt="Carfix-Connect" className="h-14 w-auto mx-auto" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Carfix-Connect</h1>
         </div>

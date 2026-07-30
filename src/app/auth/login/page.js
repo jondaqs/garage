@@ -3,7 +3,7 @@
 import React, { Suspense, useState, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Car, Mail, Lock, Eye, EyeOff, Chrome, CheckCircle } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Chrome, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import Script from 'next/script'
 
@@ -248,7 +248,7 @@ function LoginPageInner() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Car className="text-blue-600 mr-2" size={40} />
+              <img src="/logo.png" alt="Carfix-Connect" className="h-10 w-auto mr-2" />
               <h1 className="text-3xl font-bold text-gray-800">Carfix-Connect</h1>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">Welcome Back</h2>

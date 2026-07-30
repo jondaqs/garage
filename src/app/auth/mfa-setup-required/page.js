@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ShieldCheck, ShieldAlert, Loader2, Car, AlertTriangle,
+  ShieldCheck, ShieldAlert, Loader2, AlertTriangle,
   Copy, CheckCircle, Eye, EyeOff, Smartphone, LogOut,
 } from 'lucide-react'
 
@@ -41,7 +41,13 @@ function MfaSetupRequiredInner() {
           return
         }
 
-        // Start enrollment (handles cleanup of unverified factors internally)
+        // Clean up any leftover unverified factors
+        const unverified = factors?.totp?.find(f => f.status === 'unverified')
+        if (unverified) {
+          await supabase.auth.mfa.unenroll({ factorId: unverified.id })
+        }
+
+        // Start enrollment automatically
         await startEnroll()
       } catch (e) {
         setError(e.message)
@@ -86,13 +92,6 @@ function MfaSetupRequiredInner() {
   const startEnroll = async () => {
     setError('')
     try {
-      // Clean up any leftover unverified factor from a previous attempt
-      const { data: factors } = await supabase.auth.mfa.listFactors()
-      const unverified = factors?.totp?.find(f => f.status === 'unverified')
-      if (unverified) {
-        await supabase.auth.mfa.unenroll({ factorId: unverified.id })
-      }
-
       const { data, error: err } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'Carfix-Connect Authenticator',
@@ -178,8 +177,8 @@ function MfaSetupRequiredInner() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4">
-            <Car size={28} className="text-white" />
+          <div className="mb-4">
+            <img src="/logo.png" alt="Carfix-Connect" className="h-14 w-auto mx-auto" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Carfix-Connect</h1>
         </div>
