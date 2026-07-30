@@ -325,7 +325,7 @@ export default function NotificationBell({ isAdmin = false, isProvider = false, 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 max-h-[520px] overflow-hidden flex flex-col">
+          <div className="fixed inset-x-0 top-14 mx-2 sm:absolute sm:inset-x-auto sm:top-auto sm:mx-0 sm:right-0 sm:mt-2 w-auto sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 max-h-[75vh] sm:max-h-[520px] overflow-hidden flex flex-col">
 
             {/* Header */}
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
