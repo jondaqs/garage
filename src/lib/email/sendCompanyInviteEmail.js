@@ -8,7 +8,7 @@ function mailjetClient() {
   return {
     auth: `Basic ${Buffer.from(`${MAILJET_API_KEY}:${MAILJET_SECRET_KEY}`).toString('base64')}`,
     from: {
-      Email: process.env.FROM_EMAIL || 'noreply@survlinx.com',
+      Email: process.env.FROM_EMAIL || 'noreply@carfix-connect.com',
       Name: process.env.FROM_NAME || 'Carfix-Connect',
     },
   }

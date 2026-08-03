@@ -641,7 +641,7 @@ async function sendWalkInInviteEmail({
   const appUrl         = process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com'
   const mailjetApiKey  = process.env.MAILJET_API_KEY
   const mailjetSecret  = process.env.MAILJET_SECRET_KEY
-  const fromEmail      = process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com'
+  const fromEmail      = process.env.MAILJET_FROM_EMAIL || 'noreply@carfix-connect.com'
   const fromName       = process.env.MAILJET_FROM_NAME  || 'Carfix-Connect'
 
   if (!mailjetApiKey || !mailjetSecret) {

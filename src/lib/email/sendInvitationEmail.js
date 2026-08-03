@@ -48,7 +48,7 @@ export async function sendInvitationEmail(invitation_id) {
     const mailjetFromEmail =
       process.env.MAILJET_FROM_EMAIL ||
       process.env.MAILJET_SENDER_EMAIL ||
-      'noreply@survlinx.com'
+      'noreply@carfix-connect.com'
 
     const mailjetFromName =
       process.env.MAILJET_FROM_NAME ||

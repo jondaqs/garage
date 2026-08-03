@@ -384,7 +384,7 @@ export async function POST(request, { params }) {
       return {
         auth: `Basic ${Buffer.from(`${apiKey}:${secretKey}`).toString('base64')}`,
         from: {
-          Email: process.env.MAILJET_FROM_EMAIL || 'noreply@survlinx.com',
+          Email: process.env.MAILJET_FROM_EMAIL || 'noreply@carfix-connect.com',
           Name:  process.env.MAILJET_FROM_NAME  || BRAND,
         },
       }
