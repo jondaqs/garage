@@ -95,6 +95,43 @@ export default function AddVehiclePage() {
 
     try {
       const plate = vehicleForm.plateNumber.trim().toUpperCase()
+      const vin = vehicleForm.vin.trim().toUpperCase()
+
+      // Pre-check: is this plate already registered to an active vehicle?
+      const { data: existingByPlate } = await supabase
+        .from('vehicles')
+        .select('id, is_active')
+        .eq('plate_number', plate)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (existingByPlate) {
+        setError(
+          `A vehicle with plate number ${plate} is already registered on the platform. ` +
+          'If this is your vehicle, it may already be linked to another account. ' +
+          'Please contact support if you believe this is an error.'
+        )
+        setLoading(false)
+        return
+      }
+
+      // Pre-check: is this VIN already registered to an active vehicle?
+      const { data: existingByVin } = await supabase
+        .from('vehicles')
+        .select('id, is_active')
+        .eq('vin', vin)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (existingByVin) {
+        setError(
+          `A vehicle with this VIN is already registered on the platform. ` +
+          'Each VIN can only be linked to one active vehicle record. ' +
+          'Please check the VIN and try again, or contact support for assistance.'
+        )
+        setLoading(false)
+        return
+      }
 
       const { data: result, error: rpcError } = await supabase.rpc('add_vehicle_with_ownership', {
         p_plate_number:        plate,
@@ -102,7 +139,7 @@ export default function AddVehiclePage() {
         p_model:               vehicleForm.model,
         p_year_of_manufacture: vehicleForm.year ? parseInt(vehicleForm.year) : null,
         p_color:               vehicleForm.color || null,
-        p_vin:                 vehicleForm.vin.trim().toUpperCase(),
+        p_vin:                 vin,
         p_owner_user_id:       profileId,
       })
 
@@ -138,8 +175,17 @@ export default function AddVehiclePage() {
       setTimeout(() => router.push('/dashboard'), redirectDelay)
 
     } catch (err) {
-      console.error('Add vehicle error:')
-      setError(err?.message || 'Failed to add vehicle. Please try again.')
+      const msg = err?.message || ''
+      // Map known RPC error messages to user-friendly versions
+      if (msg.includes('plate number is already registered')) {
+        setError(`The plate number ${vehicleForm.plateNumber.toUpperCase()} is already registered to an active vehicle. If this is your vehicle, please contact support.`)
+      } else if (msg.includes('VIN is already registered')) {
+        setError('A vehicle with this VIN is already registered. Please check the VIN and try again.')
+      } else if (msg.includes('plate number you entered is already on file')) {
+        setError('This plate number is linked to a different vehicle in our system. If you\'ve reused this plate on a new car, please contact support to resolve this.')
+      } else {
+        setError(msg || 'Failed to add vehicle. Please try again.')
+      }
     } finally {
       setLoading(false)
     }

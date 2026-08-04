@@ -111,27 +111,51 @@ export default function AddCompanyFleetVehiclePage() {
 
     try {
       const plate = form.plateNumber.trim().toUpperCase()
+      const vin = form.vin.trim().toUpperCase()
 
-      // Duplicate detection is owned by add_fleet_vehicle_with_ownership:
-      //   * Active collision → RPC raises a clear error.
-      //   * Inactive collision → RPC reactivates the existing row under
-      //     this company, preserving service history.
-      // No client-side pre-check — a naive SELECT can't tell active
-      // from inactive and would block legitimate re-registrations of
-      // soft-deleted vehicles.
+      // Pre-check: is this plate already on an active vehicle?
+      const { data: existingByPlate } = await supabase
+        .from('vehicles')
+        .select('id, is_active')
+        .eq('plate_number', plate)
+        .eq('is_active', true)
+        .maybeSingle()
 
-      // Single atomic RPC — inserts vehicle + ownership (+ optional mileage history)
-      // SECURITY DEFINER sidesteps the RLS chicken-and-egg.
-      //
-      // Returns JSONB: { success, vehicle_id, reactivated, immutable_overrides }.
-      // See add_fleet_vehicle_with_ownership for the full contract.
+      if (existingByPlate) {
+        setError(
+          `A vehicle with plate number ${plate} is already registered on the platform. ` +
+          'If this vehicle belongs to your company, it may be linked to another account. ' +
+          'Please contact support to transfer ownership.'
+        )
+        setLoading(false)
+        return
+      }
+
+      // Pre-check: is this VIN already on an active vehicle?
+      const { data: existingByVin } = await supabase
+        .from('vehicles')
+        .select('id, is_active')
+        .eq('vin', vin)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (existingByVin) {
+        setError(
+          `A vehicle with this VIN is already registered on the platform. ` +
+          'Each VIN can only be linked to one active vehicle. ' +
+          'Please verify the VIN or contact support for assistance.'
+        )
+        setLoading(false)
+        return
+      }
+
       const { data: result, error: rpcError } = await supabase.rpc('add_fleet_vehicle_with_ownership', {
         p_plate_number:        plate,
         p_make:                form.make,
         p_model:               form.model,
         p_year_of_manufacture: form.year ? parseInt(form.year) : null,
         p_color:               form.color || null,
-        p_vin:                 form.vin.trim().toUpperCase(),
+        p_vin:                 vin,
         p_mileage:             form.mileage ? parseInt(form.mileage) : null,
         p_owner_user_id:       profileId,
         p_owner_company_id:    companyId,
@@ -158,8 +182,16 @@ export default function AddCompanyFleetVehiclePage() {
       setTimeout(() => router.push(`/dashboard/company/${companyId}/fleet`), redirectDelay)
 
     } catch (err) {
-      console.error('Add fleet vehicle error:')
-      setError(err?.message || 'Failed to add vehicle. Please try again.')
+      const msg = err?.message || ''
+      if (msg.includes('plate number is already registered')) {
+        setError(`The plate number ${form.plateNumber.toUpperCase()} is already registered to an active vehicle. If this is your fleet vehicle, please contact support.`)
+      } else if (msg.includes('VIN is already registered')) {
+        setError('A vehicle with this VIN is already registered. Please check the VIN and try again.')
+      } else if (msg.includes('plate number you entered is already on file')) {
+        setError('This plate number is linked to a different vehicle in our system. If you\'ve reused this plate on a new vehicle, please contact support to resolve this.')
+      } else {
+        setError(msg || 'Failed to add vehicle. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
