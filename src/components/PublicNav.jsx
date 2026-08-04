@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const NAV_LINKS = [
   { label: 'About Us', path: '/about' },
-  { label: 'Pricing',  path: '/pricing' },
+  { label: 'Features', path: '/features' },
   { label: 'How It Works',     path: '/how-it-works' },
   { label: 'Contact Us', path: '/contact' },
 ]

@@ -411,15 +411,21 @@ export default function LandingPage() {
             <span className="gc-display" style={{ fontSize: 14, fontWeight: 700, color: 'var(--footer-name)' }}>Carfix-Connect</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: 'var(--footer-link)' }}>
-            {['about', 'pricing', 'how-it-works', 'contact'].map(p => (
+            {[
+              { label: 'About', href: '/about' },
+              { label: 'Features', href: '/features' },
+              { label: 'How It Works', href: '/how-it-works' },
+              { label: 'Get Started', href: '/auth/signup' },
+              { label: 'Contact', href: '/contact' },
+            ].map(item => (
               <button
-                key={p}
-                onClick={() => router.push(`/${p}`)}
-                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0, textTransform: 'capitalize' }}
+                key={item.label}
+                onClick={() => router.push(item.href)}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, padding: 0 }}
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--footer-link-hover)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--footer-link)'}
               >
-                {p === 'how-it-works' ? 'How It Works' : p.charAt(0).toUpperCase() + p.slice(1)}
+                {item.label}
               </button>
             ))}
           </div>
