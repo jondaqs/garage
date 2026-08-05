@@ -97,42 +97,6 @@ export default function AddVehiclePage() {
       const plate = vehicleForm.plateNumber.trim().toUpperCase()
       const vin = vehicleForm.vin.trim().toUpperCase()
 
-      // Pre-check: is this plate already registered to an active vehicle?
-      const { data: existingByPlate } = await supabase
-        .from('vehicles')
-        .select('id, is_active')
-        .eq('plate_number', plate)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (existingByPlate) {
-        setError(
-          `A vehicle with plate number ${plate} is already registered on the platform. ` +
-          'If this is your vehicle, it may already be linked to another account. ' +
-          'Please contact support if you believe this is an error.'
-        )
-        setLoading(false)
-        return
-      }
-
-      // Pre-check: is this VIN already registered to an active vehicle?
-      const { data: existingByVin } = await supabase
-        .from('vehicles')
-        .select('id, is_active')
-        .eq('vin', vin)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (existingByVin) {
-        setError(
-          `A vehicle with this VIN is already registered on the platform. ` +
-          'Each VIN can only be linked to one active vehicle record. ' +
-          'Please check the VIN and try again, or contact support for assistance.'
-        )
-        setLoading(false)
-        return
-      }
-
       const { data: result, error: rpcError } = await supabase.rpc('add_vehicle_with_ownership', {
         p_plate_number:        plate,
         p_make:                vehicleForm.make,
