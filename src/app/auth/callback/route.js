@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// ── Canonical origin ────────────────────────────────────────────────────
+// After OAuth, Supabase redirects to whatever domain is configured as its
+// Site URL.  If that is the Vercel preview/default domain, `request.url`
+// inherits it and every subsequent NextResponse.redirect stays on the
+// wrong domain.  Anchoring all redirects to NEXT_PUBLIC_APP_URL guarantees
+// users always land on the custom domain regardless of what Supabase sent.
+const ORIGIN = () =>
+  (process.env.NEXT_PUBLIC_APP_URL || 'https://www.carfix-connect.com').replace(/\/+$/, '')
+
+function redirectTo(path) {
+  return NextResponse.redirect(`${ORIGIN()}${path}`)
+}
+
 export async function GET(request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
@@ -10,16 +23,12 @@ export async function GET(request) {
 
   if (error) {
     console.error('OAuth Error:', error, error_description)
-    return NextResponse.redirect(
-      new URL(`/auth/login?error=${error_description || error}`, request.url)
-    )
+    return redirectTo(`/auth/login?error=${encodeURIComponent(error_description || error)}`)
   }
 
   if (!code) {
     console.error('No code in callback')
-    return NextResponse.redirect(
-      new URL('/auth/login?error=no_code', request.url)
-    )
+    return redirectTo('/auth/login?error=no_code')
   }
 
   try {
@@ -88,18 +97,18 @@ export async function GET(request) {
             console.log('User already has company account, redirecting to dashboard')
             // Already has company account - go to company dashboard
             if (existingCompany.status === 'active') {
-              return NextResponse.redirect(new URL('/company/dashboard', request.url))
+              return redirectTo('/company/dashboard')
             } else {
               console.log('Company account pending verification, redirecting to dashboard with pending status')
               // Pending verification
-              return NextResponse.redirect(new URL('/company/dashboard?status=pending', request.url))
+              return redirectTo('/company/dashboard?status=pending')
             }
           }
         }
         
         // No company account - continue with registration
         console.log('No company account found, continuing registration')
-        return NextResponse.redirect(new URL('/auth/company-signup', request.url))
+        return redirectTo('/auth/company-signup')
       }
 
       // ============================================
@@ -127,17 +136,17 @@ export async function GET(request) {
             console.log('User already has provider account, redirecting to dashboard')
             // Already has provider account - go to provider dashboard
             if (existingProvider.status === 'active') {
-              return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+              return redirectTo('/provider/dashboard')
             } else {
               // Pending verification
-              return NextResponse.redirect(new URL('/provider/dashboard?status=pending', request.url))
+              return redirectTo('/provider/dashboard?status=pending')
             }
           }
         }
         
         // No provider account - continue with registration
         console.log('No provider account found, continuing registration')
-        return NextResponse.redirect(new URL('/auth/provider-signup', request.url))
+        return redirectTo('/auth/provider-signup')
       }
 
       // ============================================
@@ -154,7 +163,7 @@ export async function GET(request) {
         !next.startsWith('//') &&
         next !== '/dashboard'
       if (isDeepLinkNext) {
-        return NextResponse.redirect(new URL(next, request.url))
+        return redirectTo(next)
       }
 
       // Check user role and redirect appropriately for non-provider/non-company flows
@@ -175,35 +184,33 @@ export async function GET(request) {
         // Check if admin
         const isAdmin = userProfile.user_roles?.some(ur => ur.role?.code === 'admin')
         if (isAdmin) {
-          return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+          return redirectTo('/admin/dashboard')
         }
 
         // Check if service provider
         const isProvider = userProfile.user_roles?.some(ur => ur.role?.code === 'service_provider_owner')
         if (isProvider) {
-          return NextResponse.redirect(new URL('/provider/dashboard', request.url))
+          return redirectTo('/provider/dashboard')
         }
 
         // Check if company owner
         const isCompany = userProfile.user_roles?.some(ur => ur.role?.code === 'company_owner')
         if (isCompany) {
           console.log('User is company owner, redirecting to company dashboard')
-          return NextResponse.redirect(new URL('/company/dashboard', request.url))
+          return redirectTo('/company/dashboard')
         }
       }
 
       // Default redirect based on 'next' parameter or fallback to dashboard
-      return NextResponse.redirect(new URL(next, request.url))
+      return redirectTo(next)
     }
 
     // No user data - redirect to login
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    return redirectTo('/auth/login')
     
   } catch (error) {
     console.error('OAuth Callback Error:', error.message)
     
-    return NextResponse.redirect(
-      new URL('/auth/login?error=oauth_callback_failed', request.url)
-    )
+    return redirectTo('/auth/login?error=oauth_callback_failed')
   }
 }
