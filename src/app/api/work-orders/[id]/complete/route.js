@@ -71,33 +71,87 @@ export async function POST(request, { params }) {
     let ownerPhone = null
     let ownerName  = null
 
-    if (owner?.id) {
-      // Get email from auth.users via profile link
-      const { data: profile } = await supabase
+    // Helper: resolve contact from a user_profiles.id (mirrors send-estimate)
+    const resolveProfile = async (profileId) => {
+      const { data: p } = await sc
         .from('user_profiles_secure')
-        .select('first_name, last_name, phone, auth_user_id')
-        .eq('id', owner.id).single()
-
-      ownerName  = profile ? `${profile.first_name} ${profile.last_name}`.trim() : null
-      ownerPhone = profile?.phone || owner.phone || null
-
-      if (profile?.auth_user_id) {
-        const { data: authUsers } = await supabase
-          .from('user_profiles_secure')
-          .select('auth_user_id')
-          .eq('id', owner.id).single()
-        // Fetch email via a workaround — check bookings for customer email
-        const { data: booking } = await supabase
-          .from('bookings_secure')
-          .select('customer_email')
-          .eq('work_order_id', workOrderId)
-          .maybeSingle()
-        ownerEmail = booking?.customer_email || null
+        .select('first_name, last_name, phone, email, auth_user_id')
+        .eq('id', profileId)
+        .maybeSingle()
+      if (!p) return {}
+      let email = p.email || null
+      // Fallback to auth.users email if not stored on profile
+      if (!email && p.auth_user_id) {
+        const { data: au } = await sc.auth.admin.getUserById(p.auth_user_id)
+        email = au?.user?.email || null
       }
-    } else if (owner?.walk_in_phone || owner?.walk_in_email) {
+      return {
+        name:  `${p.first_name || ''} ${p.last_name || ''}`.trim() || null,
+        phone: p.phone || null,
+        email,
+      }
+    }
+
+    // Case A: registered owner returned by RPC
+    if (owner?.id) {
+      const contact = await resolveProfile(owner.id)
+      ownerName  = contact.name
+      ownerPhone = contact.phone
+      ownerEmail = contact.email
+    }
+
+    // Case B: walk-in
+    if (!ownerEmail && !ownerPhone && (owner?.walk_in_email || owner?.walk_in_phone)) {
       ownerEmail = owner.walk_in_email || null
       ownerPhone = owner.walk_in_phone || null
       ownerName  = owner.walk_in_name  || null
+    }
+
+    // Case C: look up vehicle ownership directly (covers company fleet)
+    if (!ownerEmail && !ownerPhone) {
+      const { data: ownership } = await sc
+        .from('vehicle_ownership')
+        .select('owner_user_id, owner_company_id')
+        .eq('vehicle_id', vehicle_id)
+        .maybeSingle()
+
+      if (ownership?.owner_user_id) {
+        const contact = await resolveProfile(ownership.owner_user_id)
+        ownerName  = ownerName  || contact.name
+        ownerPhone = ownerPhone || contact.phone
+        ownerEmail = ownerEmail || contact.email
+      } else if (ownership?.owner_company_id) {
+        const { data: company } = await sc
+          .from('company_profiles_secure')
+          .select('owner_user_id')
+          .eq('id', ownership.owner_company_id)
+          .maybeSingle()
+        if (company?.owner_user_id) {
+          const contact = await resolveProfile(company.owner_user_id)
+          ownerName  = ownerName  || contact.name
+          ownerPhone = ownerPhone || contact.phone
+          ownerEmail = ownerEmail || contact.email
+        }
+      }
+    }
+
+    // Case D: fallback — booking customer
+    if (!ownerEmail && !ownerPhone) {
+      const { data: booking } = await sc
+        .from('bookings_secure')
+        .select('customer_user_id, customer_email, customer_phone')
+        .eq('work_order_id', workOrderId)
+        .maybeSingle()
+      if (booking) {
+        ownerEmail = booking.customer_email || null
+        ownerPhone = booking.customer_phone || null
+        if (!ownerEmail && !ownerPhone && booking.customer_user_id) {
+          const contact = await resolveProfile(booking.customer_user_id)
+          ownerName  = ownerName  || contact.name
+          ownerPhone = ownerPhone || contact.phone
+          ownerEmail = ownerEmail || contact.email
+        }
+      }
     }
 
     // ── 5. Send email (non-fatal) ─────────────────────────────────────────
