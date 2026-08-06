@@ -56,7 +56,7 @@ export function buildInvoiceHtml({
   const fmtD = (d) => d
     ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
     : '—'
-  const tax  = Math.round((taxRate || 0.16) * 100)
+  const tax  = Math.round((taxRate != null ? taxRate : 0) * 100)
 
   const renderItems = (items, label, color) => items.length === 0 ? '' : `
     <tr>

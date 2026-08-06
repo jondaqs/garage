@@ -77,7 +77,7 @@ function infoRow(label, value) {
   </tr>`
 }
 
-function estimateTable({ servicesTotal, partsTotal, tax, total, vatRate = 16, currency = 'KES' }) {
+function estimateTable({ servicesTotal, partsTotal, tax, total, vatRate = 0, currency = 'KES' }) {
   const fmt = (n) => `${currency} ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 0 })}`
   return `
   <table width="100%" cellpadding="0" cellspacing="0"
@@ -133,7 +133,7 @@ export async function sendEstimateApprovalEmail(supabase, {
       ${infoRow('Vehicle', vehiclePlate)}
       ${infoRow('Service Provider', providerName)}
     </table>
-    ${estimateTable({ servicesTotal: estimate?.services_total, partsTotal: estimate?.parts_total, tax: estimate?.tax, total: estimate?.total, vatRate: estimate?.vat_rate ?? 16 })}
+    ${estimateTable({ servicesTotal: estimate?.services_total, partsTotal: estimate?.parts_total, tax: estimate?.tax, total: estimate?.total, vatRate: estimate?.vat_rate ?? 0 })}
     <p style="color:#374151;font-size:14px;margin:0 0 12px;">
       Please review the estimate breakdown and either <strong>approve</strong> to authorise
       the work, <strong>reject</strong> to cancel, or <strong>request changes</strong> if
@@ -158,7 +158,7 @@ ${providerName} has prepared a service estimate for work order ${workOrderNumber
 
 Services: KES ${Number(estimate?.services_total||0).toLocaleString()}
 Parts:    KES ${Number(estimate?.parts_total||0).toLocaleString()}
-VAT ${estimate?.vat_rate ?? 16}%:  KES ${Number(estimate?.tax||0).toLocaleString()}
+VAT ${estimate?.vat_rate ?? 0}%:  KES ${Number(estimate?.tax||0).toLocaleString()}
 TOTAL:    KES ${Number(estimate?.total||0).toLocaleString()}
 
 Review and approve here: ${approveUrl}

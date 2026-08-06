@@ -263,7 +263,7 @@ export default function CompanyMemberWorkOrderDetailPage() {
 
   const services = wo.services || []
   const parts    = wo.parts    || []
-  const vatRate  = wo.vat_rate ?? 16
+  const vatRate  = wo.vat_rate ?? 0
   const subtotal = wo.subtotal || 0
   const tax      = wo.tax      || Math.round(subtotal * vatRate / 100 * 100) / 100
   const total    = wo.total_amount || (subtotal + tax)

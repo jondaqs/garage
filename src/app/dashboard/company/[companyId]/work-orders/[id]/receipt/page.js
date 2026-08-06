@@ -239,7 +239,7 @@ function ReceiptPageInner({ backPath }) {
   const isConfirmed = receipt.confirmed
   const services    = items.filter(i => i.item_type === 'service')
   const parts       = items.filter(i => i.item_type === 'part')
-  const tax         = Math.round((invoice.tax_rate || 0.16) * 100)
+  const tax         = Math.round((invoice.tax_rate != null ? invoice.tax_rate : 0) * 100)
   const custName    = customer ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim() : null
 
   return (

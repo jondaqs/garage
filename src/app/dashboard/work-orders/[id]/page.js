@@ -271,7 +271,7 @@ export default function CustomerWorkOrderPage() {
 
   const servicesTotal = services.reduce((s, sv) => s + Number(sv.actual_cost || sv.estimated_cost || 0), 0)
   const partsTotal    = parts.reduce((s, p) => s + (p.quantity * Number(p.unit_price || 0)), 0)
-  const vatRate        = wo.vat_rate ?? 16
+  const vatRate        = wo.vat_rate ?? 0
   const subtotal      = wo.subtotal || (servicesTotal + partsTotal)
   const tax           = wo.tax      || Math.round(subtotal * vatRate / 100 * 100) / 100
   const total         = wo.total_amount || (subtotal + tax)
