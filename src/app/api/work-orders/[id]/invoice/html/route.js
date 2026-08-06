@@ -36,7 +36,7 @@ function getServiceClient() {
   )
 }
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const limited = readLimiter.check(request)
   if (limited) return limited
 
