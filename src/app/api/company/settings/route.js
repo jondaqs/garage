@@ -4,13 +4,22 @@
  * sends in-app notifications (via RPC) and emails to admin + owner.
  */
 
-import { createClient }          from '@/lib/supabase/server'
-import { NextResponse }          from 'next/server'
+import { createClient }                        from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { NextResponse }                        from 'next/server'
 import {
   sendDetailsChangedAdminEmail,
   sendDetailsPendingEmail,
 }  from '@/lib/email/settingsEmails' 
 import { writeLimiter } from '@/lib/rateLimiters'
+
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function POST(request) {
   const limited = writeLimiter.check(request)
@@ -18,6 +27,7 @@ export async function POST(request) {
 
   try {
     const supabase = await createClient()
+    const sc       = getServiceClient()
     const body     = await request.json()
 
     const {
@@ -88,7 +98,7 @@ export async function POST(request) {
 
     // ── 4. Admin email (non-fatal) ────────────────────────────────────────────
     try {
-      await sendDetailsChangedAdminEmail(supabase, {
+      await sendDetailsChangedAdminEmail(sc, {
         entityType:     'company',
         entityName:     name.trim(),
         entityId:       companyId,
@@ -103,7 +113,7 @@ export async function POST(request) {
     // ── 5. Owner confirmation email (non-fatal) ───────────────────────────────
     if (ownerEmail) {
       try {
-        await sendDetailsPendingEmail(supabase, {
+        await sendDetailsPendingEmail(sc, {
           to:         ownerEmail,
           ownerName,
           entityName: name.trim(),

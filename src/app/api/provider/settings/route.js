@@ -27,6 +27,7 @@ export async function POST(request) {
 
   try {
     const supabase = await createClient()
+    const sc       = getServiceClient()
     const body     = await request.json()
     const {
       providerId, name, email, phone, description, website,
@@ -83,7 +84,7 @@ export async function POST(request) {
 
     // ── 4. Send admin email (non-fatal) ──────────────────────────────────────
     try {
-      await sendDetailsChangedAdminEmail(supabase, {
+      await sendDetailsChangedAdminEmail(sc, {
         entityType:     'provider',
         entityName:     name.trim(),
         entityId:       providerId,
@@ -98,7 +99,7 @@ export async function POST(request) {
     // ── 5. Send owner confirmation email (non-fatal) ─────────────────────────
     if (ownerEmail) {
       try {
-        await sendDetailsPendingEmail(supabase, {
+        await sendDetailsPendingEmail(sc, {
           to:         ownerEmail,
           ownerName,
           entityName: name.trim(),

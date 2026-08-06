@@ -156,10 +156,13 @@ export async function POST(request, { params }) {
     const vehiclePlate = woData?.vehicle?.plate_number || ''
 
     // ── 4. Send email (non-fatal) ─────────────────────────────────────────────
+    // NOTE: pass `sc` (service client), NOT `supabase` (authenticated client),
+    // because sendAndQueueEmail inserts/updates email_queue — whose RLS only
+    // allows the service_role to write.
     let emailSent = false
     if (ownerEmail) {
       try {
-        await sendEstimateApprovalEmail(supabase, {
+        await sendEstimateApprovalEmail(sc, {
           to:              ownerEmail,
           ownerName,
           workOrderNumber: work_order_number,
@@ -178,7 +181,7 @@ export async function POST(request, { params }) {
     let smsSent = false
     if (ownerPhone) {
       try {
-        const smsResult = await sendEstimateApprovalSms(supabase, {
+        const smsResult = await sendEstimateApprovalSms(sc, {
           phone:           ownerPhone,
           ownerName,
           workOrderNumber: work_order_number,
@@ -275,7 +278,7 @@ export async function POST(request, { params }) {
             // Send email
             if (memberEmail) {
               try {
-                await sendEstimateApprovalEmail(supabase, {
+                await sendEstimateApprovalEmail(sc, {
                   to:              memberEmail,
                   ownerName:       memberName,
                   workOrderNumber: work_order_number,
@@ -293,7 +296,7 @@ export async function POST(request, { params }) {
             // Send SMS
             if (u.phone) {
               try {
-                await sendEstimateApprovalSms(supabase, {
+                await sendEstimateApprovalSms(sc, {
                   phone:           u.phone,
                   ownerName:       memberName,
                   workOrderNumber: work_order_number,

@@ -4,11 +4,20 @@
  */
 
 import { createClient }                        from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendEstimateChangesRequestedEmail }   from '@/lib/email/workOrderEmails'
 import { sendEstimateChangesRequestedSms }     from '@/lib/sms/workOrderSms'
 import { commsLimiter } from '@/lib/rateLimiters'
 import { requireText, requireUUID } from '@/lib/validation'
+
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function POST(request, { params }) {
   const limited = commsLimiter.check(request)
@@ -16,6 +25,7 @@ export async function POST(request, { params }) {
 
   try {
     const supabase            = await createClient()
+    const sc                  = getServiceClient()
     const { id: workOrderId } = await params
     if (!requireUUID(workOrderId)) return NextResponse.json({ error: 'Invalid work order ID' }, { status: 400 })
     const body                = await request.json().catch(() => ({}))
@@ -66,7 +76,7 @@ export async function POST(request, { params }) {
     let emailSent = false
     if (providerEmail) {
       try {
-        await sendEstimateChangesRequestedEmail(supabase, {
+        await sendEstimateChangesRequestedEmail(sc, {
           to:              providerEmail,
           providerName,
           workOrderNumber: work_order_number,
@@ -83,7 +93,7 @@ export async function POST(request, { params }) {
     let smsSent = false
     if (providerPhone) {
       try {
-        const smsResult = await sendEstimateChangesRequestedSms(supabase, {
+        const smsResult = await sendEstimateChangesRequestedSms(sc, {
           phone:           providerPhone,
           providerName,
           workOrderNumber: work_order_number,

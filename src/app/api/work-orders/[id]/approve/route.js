@@ -112,7 +112,7 @@ export async function POST(request, { params }) {
     for (const r of recipients) {
       if (r.email) {
         try {
-          await sendEstimateApprovedEmail(supabase, {
+          await sendEstimateApprovedEmail(sc, {
             to:              r.email,
             providerName:    provider_name,
             workOrderNumber: work_order_number,
@@ -126,7 +126,7 @@ export async function POST(request, { params }) {
       }
       if (r.phone) {
         try {
-          const smsResult = await sendEstimateApprovedSms(supabase, {
+          const smsResult = await sendEstimateApprovedSms(sc, {
             phone:           r.phone,
             providerName:    provider_name,
             workOrderNumber: work_order_number,
