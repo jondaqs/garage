@@ -69,7 +69,7 @@ export default function MemberFleetPage() {
       // Mark vehicles with pending deletion requests so we can badge them.
       // RLS limits this to requests on the caller's company.
       const { data: pending } = await supabase
-        .from('fleet_deletion_requests')
+        .from('fleet_vehicle_deletion_requests')
         .select('vehicle_id')
         .eq('company_id', companyId)
         .eq('status', 'pending')

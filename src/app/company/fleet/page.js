@@ -56,7 +56,7 @@ export default function FleetPage() {
       // Pending deletion requests — used for the badge on active cards.
       if (owned?.id) {
         const { data: pending } = await supabase
-          .from('fleet_deletion_requests')
+          .from('fleet_vehicle_deletion_requests')
           .select('vehicle_id')
           .eq('company_id', owned.id)
           .eq('status', 'pending')

@@ -232,9 +232,9 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       // this to the caller's company. Used to drive the approval/cancel
       // UI panel inline with the detail view.
       const { data: pending } = await supabase
-        .from('fleet_deletion_requests')
+        .from('fleet_vehicle_deletion_requests')
         .select(`
-          id, status, requested_at, request_reason,
+          id, status, created_at, reason,
           requested_by_user_id,
           requester:user_profiles_secure!requested_by_user_id(first_name, last_name)
         `)
@@ -319,7 +319,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       if (data?.success === false) throw new Error(data.error || 'Failed')
 
       // Owner-initiated: the vehicle is already deactivated. Route back.
-      if (data?.status === 'approved') {
+      if (data?.auto_approved) {
         router.push(`${basePath}/fleet`)
         return
       }
@@ -329,9 +329,9 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
       setRequestReason('')
       // Re-fetch the request so the approval banner appears.
       const { data: pending } = await supabase
-        .from('fleet_deletion_requests')
+        .from('fleet_vehicle_deletion_requests')
         .select(`
-          id, status, requested_at, request_reason,
+          id, status, created_at, reason,
           requested_by_user_id,
           requester:user_profiles_secure!requested_by_user_id(first_name, last_name)
         `)
@@ -765,12 +765,12 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
                   {pendingRequest.requester?.first_name} {pendingRequest.requester?.last_name}
                 </span>
                 {' on '}
-                {new Date(pendingRequest.requested_at).toLocaleDateString('en-KE',
+                {new Date(pendingRequest.created_at).toLocaleDateString('en-KE',
                   { day: 'numeric', month: 'short', year: 'numeric' })}.
               </p>
-              {pendingRequest.request_reason && (
+              {pendingRequest.reason && (
                 <p className="text-sm text-amber-900 mt-2 italic">
-                  "{pendingRequest.request_reason}"
+                  "{pendingRequest.reason}"
                 </p>
               )}
             </div>
