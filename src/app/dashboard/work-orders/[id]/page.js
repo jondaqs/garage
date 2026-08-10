@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import CustomerCommentsCard from '@/components/CustomerCommentsCard'
 import CustomerRecommendationsCard from '@/components/CustomerRecommendationsCard'
+import DownloadWorkOrderReport from '@/components/DownloadWorkOrderReport'
 import {
   ArrowLeft, CheckCircle, XCircle, MessageSquare,
   Car, MapPin, Wrench, Package, Clock, AlertCircle,
@@ -356,6 +357,7 @@ export default function CustomerWorkOrderPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <DownloadWorkOrderReport wo={wo} />
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
               {wo.status?.display_name || statusCode}
             </span>

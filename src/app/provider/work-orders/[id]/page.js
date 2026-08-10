@@ -20,6 +20,7 @@ import ReceiptTab            from '@/components/ReceiptTab'
 import CheckoutTab           from '@/components/CheckoutTab'
 import RecommendationsTab    from './components/RecommendationsTab'
 import EstimateReviewPanel  from './components/EstimateReviewPanel'
+import DownloadWorkOrderReport from '@/components/DownloadWorkOrderReport'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const STATUS_COLORS = {
@@ -794,14 +795,17 @@ export default function WorkOrderDetailPage() {
               )}
             </p>
           </div>
-          <button
-            onClick={async () => { setRefreshing(true); await loadWorkOrder(); setRefreshing(false) }}
-            disabled={refreshing}
+          <div className="flex items-center gap-2">
+            <DownloadWorkOrderReport wo={wo} />
+            <button
+              onClick={async () => { setRefreshing(true); await loadWorkOrder(); setRefreshing(false) }}
+              disabled={refreshing}
             title="Refresh"
             className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
           >
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
           </button>
+          </div>
         </div>
 
         {/* Status timeline */}

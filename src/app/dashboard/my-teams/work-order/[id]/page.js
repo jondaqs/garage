@@ -18,6 +18,7 @@ import QualityCheckTab    from '@/app/provider/work-orders/[id]/components/Quali
 import RecommendationsTab from '@/app/provider/work-orders/[id]/components/RecommendationsTab'
 import InvoiceTab         from '@/app/provider/work-orders/[id]/components/InvoiceTab'
 import ReceiptTab         from '@/components/ReceiptTab'
+import DownloadWorkOrderReport from '@/components/DownloadWorkOrderReport'
 import EstimateReviewPanel from '@/app/provider/work-orders/[id]/components/EstimateReviewPanel'
 
 const STATUS_COLORS = {
@@ -576,7 +577,8 @@ export default function MechanicWorkOrderPage() {
             </div>
             <p className="text-sm text-gray-500 mt-1">{wo.service_provider?.name}</p>
           </div>
-          <div className="text-right text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-right text-sm text-gray-500">
+            <DownloadWorkOrderReport wo={wo} />
             <button
               onClick={async () => { setRefreshing(true); await load(); setRefreshing(false) }}
               disabled={refreshing}
