@@ -1,18 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Mail, MessageSquare, Bell, Loader2, Send } from 'lucide-react'
+import { X, Mail, MessageSquare, Bell, Loader2, Send, Zap } from 'lucide-react'
 
 /**
- * AdminContactModal — send email, SMS, or in-app notification to a user.
- *
- * Props:
- *   open        – boolean
- *   onClose     – () => void
- *   recipientName  – display name
- *   recipientEmail – email address (null if unknown)
- *   recipientPhone – phone number (null if unknown)
- *   recipientUserId – user_profiles.id (for in-app notification, null for providers/companies without direct user)
+ * AdminContactModal — send email, SMS, in-app notification, or all at once.
  */
 export default function AdminContactModal({
   open, onClose,
@@ -26,13 +18,21 @@ export default function AdminContactModal({
 
   if (!open) return null
 
+  const hasEmail = !!recipientEmail
+  const hasPhone = !!recipientPhone
+  const hasUser  = !!recipientUserId
+  const availableCount = [hasEmail, hasPhone, hasUser].filter(Boolean).length
+
   const channels = [
-    { id: 'email',        label: 'Email',        icon: Mail,           available: !!recipientEmail },
-    { id: 'sms',          label: 'SMS',           icon: MessageSquare,  available: !!recipientPhone },
-    { id: 'notification', label: 'In-App Alert',  icon: Bell,           available: !!recipientUserId },
+    { id: 'email',        label: 'Email',        icon: Mail,           available: hasEmail },
+    { id: 'sms',          label: 'SMS',           icon: MessageSquare,  available: hasPhone },
+    { id: 'notification', label: 'In-App',        icon: Bell,           available: hasUser },
+    { id: 'all',          label: 'Send All',      icon: Zap,            available: availableCount >= 2 },
   ]
 
-  const canSend = message.trim() && (channel !== 'email' || subject.trim())
+  const activeChannel = channels.find(c => c.id === channel)
+  const needsSubject  = channel === 'email' || channel === 'all'
+  const canSend       = message.trim() && (!needsSubject || subject.trim())
 
   const handleSend = async () => {
     if (!canSend) return
@@ -53,8 +53,17 @@ export default function AdminContactModal({
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to send')
-      setResult({ ok: true, text: data.message || 'Sent successfully' })
+      if (!res.ok && res.status !== 207) throw new Error(data.error || 'Failed to send')
+
+      // Build result summary
+      if (channel === 'all' && data.results) {
+        const lines = data.results.map(r =>
+          `${r.channel === 'notification' ? 'In-App' : r.channel.toUpperCase()}: ${r.ok ? '✓ Sent' : '✗ ' + r.detail}`
+        )
+        setResult({ ok: data.success, text: lines.join('\n') })
+      } else {
+        setResult({ ok: true, text: data.message || 'Sent successfully' })
+      }
       setSubject('')
       setMessage('')
     } catch (err) {
@@ -83,7 +92,7 @@ export default function AdminContactModal({
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Contact {recipientName || 'User'}</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              {recipientEmail || recipientPhone || 'No contact info'}
+              {[recipientEmail, recipientPhone].filter(Boolean).join(' · ') || 'No contact info'}
             </p>
           </div>
           <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
@@ -100,7 +109,9 @@ export default function AdminContactModal({
               disabled={!ch.available}
               className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors
                 ${channel === ch.id
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                  ? ch.id === 'all'
+                    ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50'
+                    : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
                   : ch.available
                     ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     : 'text-gray-300 cursor-not-allowed'
@@ -108,14 +119,22 @@ export default function AdminContactModal({
             >
               <ch.icon size={15} />
               {ch.label}
-              {!ch.available && <span className="text-[10px] text-gray-300 ml-0.5">(N/A)</span>}
+              {!ch.available && ch.id !== 'all' && <span className="text-[10px] text-gray-300 ml-0.5">(N/A)</span>}
             </button>
           ))}
         </div>
 
+        {/* "Send All" info banner */}
+        {channel === 'all' && (
+          <div className="mx-5 mt-3 p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-xs text-purple-700">
+            Will send via{' '}
+            {[hasEmail && 'Email', hasPhone && 'SMS', hasUser && 'In-App'].filter(Boolean).join(' + ')}
+          </div>
+        )}
+
         {/* Form */}
         <div className="px-5 py-4 space-y-3">
-          {channel === 'email' && (
+          {needsSubject && (
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
               <input
@@ -138,7 +157,8 @@ export default function AdminContactModal({
               rows={channel === 'sms' ? 3 : 5}
               maxLength={channel === 'sms' ? 480 : undefined}
               placeholder={
-                channel === 'email' ? 'Type your email message...'
+                channel === 'all' ? 'This message will be sent via all available channels...'
+                : channel === 'email' ? 'Type your email message...'
                 : channel === 'sms' ? 'Type your SMS message...'
                 : 'Type your notification message...'
               }
@@ -151,7 +171,7 @@ export default function AdminContactModal({
 
           {/* Result banner */}
           {result && (
-            <div className={`p-3 rounded-lg text-sm ${result.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            <div className={`p-3 rounded-lg text-sm whitespace-pre-line ${result.ok ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
               {result.text}
             </div>
           )}
@@ -168,11 +188,18 @@ export default function AdminContactModal({
           <button
             onClick={handleSend}
             disabled={!canSend || sending}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg
-              hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg
+              disabled:opacity-50 disabled:cursor-not-allowed transition-colors
+              ${channel === 'all'
+                ? 'bg-purple-600 hover:bg-purple-700'
+                : 'bg-blue-600 hover:bg-blue-700'}`}
           >
-            {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            {sending ? 'Sending...' : `Send ${channels.find(c => c.id === channel)?.label}`}
+            {sending ? <Loader2 size={15} className="animate-spin" /> : channel === 'all' ? <Zap size={15} /> : <Send size={15} />}
+            {sending
+              ? 'Sending...'
+              : channel === 'all'
+                ? 'Send All'
+                : `Send ${activeChannel?.label}`}
           </button>
         </div>
       </div>
