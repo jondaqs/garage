@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Search, CheckCircle, Clock, XCircle, AlertCircle, Store,
-  History, AlertTriangle, MoreVertical, ShieldOff, ShieldCheck, PowerOff,
+  History, AlertTriangle, MoreVertical, ShieldOff, ShieldCheck, PowerOff, Mail,
 } from 'lucide-react'
 import Link from 'next/link'
 import Pagination from '@/components/admin/Pagination'
+import AdminContactModal from '@/components/admin/AdminContactModal'
 import { banUser, unbanUser } from '@/lib/admin/banUser'
 
 const PAGE_SIZE = 20
@@ -108,6 +109,7 @@ export default function AllProvidersPage() {
   const [totalCount,   setTotalCount]   = useState(0)
   const [totalAll,     setTotalAll]     = useState(0)
   const [processing,   setProcessing]   = useState(null)
+  const [contactTarget, setContactTarget] = useState(null) // { name, email, phone, userId }
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -185,6 +187,17 @@ export default function AllProvidersPage() {
 
   // ── Admin actions ─────────────────────────────────────────────────────────
   const handleAction = async (providerId, action, providerName) => {
+    if (action === 'contact') {
+      const p = providers.find(pr => pr.id === providerId)
+      setContactTarget({
+        name: providerName,
+        email: p?.owner?.email || p?.email || null,
+        phone: p?.owner?.phone || p?.phone || null,
+        userId: p?.owner?.id || null,
+      })
+      return
+    }
+
     const labels = {
       suspend:    `Suspend ${providerName}? All staff will be deactivated and the listing goes offline.`,
       deactivate: `Deactivate ${providerName}? All staff will be deactivated.`,
@@ -222,12 +235,11 @@ export default function AllProvidersPage() {
 
   const getActions = (p) => {
     const actions = []
-    // Only show suspend/deactivate when truly active (both columns)
+    actions.push({ key: 'contact',    label: 'Contact',    icon: Mail,        cls: 'text-blue-700 hover:bg-blue-50' })
     if (p.status === 'active' && p.is_active !== false) {
       actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff,   cls: 'text-red-700 hover:bg-red-50' })
       actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,    cls: 'text-gray-700 hover:bg-gray-50' })
     }
-    // Show activate when suspended, deactivated, or is_active is false
     if (p.status === 'suspended' || p.status === 'deactivated' ||
         (p.is_active === false && p.status !== 'pending_verification' && p.status !== 'rejected')) {
       actions.push({ key: 'activate', label: 'Activate', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
@@ -413,6 +425,15 @@ export default function AllProvidersPage() {
 
         <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
       </div>
+
+      <AdminContactModal
+        open={!!contactTarget}
+        onClose={() => setContactTarget(null)}
+        recipientName={contactTarget?.name}
+        recipientEmail={contactTarget?.email}
+        recipientPhone={contactTarget?.phone}
+        recipientUserId={contactTarget?.userId}
+      />
     </div>
   )
 }

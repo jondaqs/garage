@@ -3,8 +3,9 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Search, Users, MoreVertical, ShieldOff, ShieldCheck, Power, PowerOff } from 'lucide-react'
+import { Search, Users, MoreVertical, ShieldOff, ShieldCheck, Power, PowerOff, Mail } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
+import AdminContactModal from '@/components/admin/AdminContactModal'
 import { banUser, unbanUser } from '@/lib/admin/banUser'
 
 const PAGE_SIZE = 20
@@ -85,6 +86,7 @@ export default function AdminUsersPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [totalAll,   setTotalAll]   = useState(0)
   const [processing, setProcessing] = useState(null)
+  const [contactTarget, setContactTarget] = useState(null)
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -154,6 +156,17 @@ export default function AdminUsersPage() {
     u.user_roles?.map(ur => ur.role?.display_name).filter(Boolean).join(', ') || 'User'
 
   const handleAction = async (userId, action, userName) => {
+    if (action === 'contact') {
+      const u = users.find(usr => usr.id === userId)
+      setContactTarget({
+        name: userName,
+        email: u?.email || null,
+        phone: u?.phone || null,
+        userId: u?.id || null,
+      })
+      return
+    }
+
     const labels = {
       suspend:    `Suspend ${userName}?`,
       unsuspend:  `Unsuspend ${userName}?`,
@@ -192,6 +205,7 @@ export default function AdminUsersPage() {
 
   const getActions = (u) => {
     const actions = []
+    actions.push({ key: 'contact', label: 'Contact', icon: Mail, cls: 'text-blue-700 hover:bg-blue-50' })
     if (u.is_suspended) {
       actions.push({ key: 'unsuspend', label: 'Unsuspend', icon: ShieldCheck, cls: 'text-green-700 hover:bg-green-50' })
     } else if (u.is_active) {
@@ -300,6 +314,15 @@ export default function AdminUsersPage() {
 
         <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
       </div>
+
+      <AdminContactModal
+        open={!!contactTarget}
+        onClose={() => setContactTarget(null)}
+        recipientName={contactTarget?.name}
+        recipientEmail={contactTarget?.email}
+        recipientPhone={contactTarget?.phone}
+        recipientUserId={contactTarget?.userId}
+      />
     </div>
   )
 }

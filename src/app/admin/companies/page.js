@@ -2,8 +2,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck, PowerOff } from 'lucide-react'
+import { Building2, Users, Truck, Clock, MoreVertical, ShieldOff, ShieldCheck, PowerOff, Mail } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
+import AdminContactModal from '@/components/admin/AdminContactModal'
 import { banUser, unbanUser } from '@/lib/admin/banUser'
 
 const PAGE_SIZE = 20
@@ -82,6 +83,7 @@ export default function AdminCompaniesPage() {
   const [page,       setPage]       = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [processing, setProcessing] = useState(null)
+  const [contactTarget, setContactTarget] = useState(null)
 
   useEffect(() => { setPage(1) }, [filter])
   useEffect(() => { fetchCompanies() }, [filter, page])
@@ -135,6 +137,17 @@ export default function AdminCompaniesPage() {
 
   // ── Admin actions ─────────────────────────────────────────────────────────
   const handleAction = async (companyId, action, companyName) => {
+    if (action === 'contact') {
+      const c = companies.find(co => co.id === companyId)
+      setContactTarget({
+        name: companyName,
+        email: c?.owner?.email || null,
+        phone: c?.owner?.phone || null,
+        userId: c?.owner_user_id || null,
+      })
+      return
+    }
+
     const labels = {
       suspend:    `Suspend ${companyName}? All team members will be deactivated.`,
       deactivate: `Deactivate ${companyName}? The company and all team members will be deactivated.`,
@@ -210,7 +223,7 @@ export default function AdminCompaniesPage() {
 
   const getActions = (c) => {
     const actions = []
-    // Only show suspend/deactivate when truly active (both columns)
+    actions.push({ key: 'contact',    label: 'Contact',    icon: Mail,      cls: 'text-blue-700 hover:bg-blue-50' })
     if (c.status === 'active' && c.is_active !== false) {
       actions.push({ key: 'suspend',    label: 'Suspend',    icon: ShieldOff, cls: 'text-red-700 hover:bg-red-50' })
       actions.push({ key: 'deactivate', label: 'Deactivate', icon: PowerOff,  cls: 'text-gray-700 hover:bg-gray-50' })
@@ -359,6 +372,15 @@ export default function AdminCompaniesPage() {
           <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
         </div>
       )}
+
+      <AdminContactModal
+        open={!!contactTarget}
+        onClose={() => setContactTarget(null)}
+        recipientName={contactTarget?.name}
+        recipientEmail={contactTarget?.email}
+        recipientPhone={contactTarget?.phone}
+        recipientUserId={contactTarget?.userId}
+      />
     </div>
   )
 }
