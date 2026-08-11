@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap, Download } from 'lucide-react'
+import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap, Download, ChevronDown, ChevronUp, QrCode } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
 import { createClient } from '@/lib/supabase/client'
 
@@ -11,6 +11,7 @@ export default function LandingPage() {
   const canvasRef = useRef(null)
   const [theme, setTheme] = useState('dark')
   const [social, setSocial] = useState({})
+  const [qrOpen, setQrOpen] = useState(false)
 
   // Fetch social links
   useEffect(() => {
@@ -454,31 +455,74 @@ export default function LandingPage() {
               </div>
             )}
 
-            {/* QR Code */}
+            {/* QR Code — collapsible */}
             {social.qr_url && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  Scan & Share
-                </span>
-                <img src={social.qr_url} alt="QR Code" style={{
-                  width: 100, height: 100, borderRadius: 12,
-                  border: '1px solid var(--card-border)',
-                  background: '#fff', padding: 4, objectFit: 'contain',
-                }} />
-                <a href={social.qr_url} download="Carfix-Connect-QR.png"
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+                <button
+                  onClick={() => setQrOpen(o => !o)}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    fontSize: 11, color: 'var(--footer-link)', textDecoration: 'none',
-                    padding: '4px 10px', borderRadius: 6,
-                    border: '1px solid var(--card-border)',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
                     background: 'var(--feat-bg)',
-                    cursor: 'pointer', transition: 'border-color 0.2s',
+                    border: '1px solid var(--card-border)',
+                    borderRadius: 10, padding: '8px 16px',
+                    cursor: 'pointer', transition: 'border-color 0.2s, transform 0.2s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-teal)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--card-border)'}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-teal)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.transform = 'translateY(0)' }}
                 >
-                  <Download size={12} /> Download QR
-                </a>
+                  <QrCode size={14} />
+                  Scan & Share
+                  {qrOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateRows: qrOpen ? '1fr' : '0fr',
+                  transition: 'grid-template-rows 0.3s ease',
+                }}>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                      paddingTop: 12,
+                    }}>
+                      <img src={social.qr_url} alt="QR Code" style={{
+                        width: 100, height: 100, borderRadius: 12,
+                        border: '1px solid var(--card-border)',
+                        background: '#fff', padding: 4, objectFit: 'contain',
+                      }} />
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(social.qr_url)
+                            const blob = await res.blob()
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = 'Carfix-Connect-QR.png'
+                            document.body.appendChild(a)
+                            a.click()
+                            a.remove()
+                            URL.revokeObjectURL(url)
+                          } catch { /* fallback: open in new tab */ window.open(social.qr_url, '_blank') }
+                        }}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 11, color: 'var(--footer-link)', textDecoration: 'none',
+                          padding: '4px 10px', borderRadius: 6,
+                          border: '1px solid var(--card-border)',
+                          background: 'var(--feat-bg)',
+                          cursor: 'pointer', transition: 'border-color 0.2s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-teal)'}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--card-border)'}
+                      >
+                        <Download size={12} /> Download QR
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
