@@ -8,7 +8,7 @@ import {
   Loader2, ToggleLeft, ToggleRight, Store, Wrench, DollarSign,
   Calendar, ClipboardList, ChevronDown, ChevronRight, CreditCard, Smartphone,
   Upload, Key, RefreshCw, Wifi, Eye, EyeOff, Copy, Shield,
-  MessageSquare, Send, Phone,
+  MessageSquare, Send, Phone, Share2,
 } from 'lucide-react'
 
 const TABS = [
@@ -20,6 +20,7 @@ const TABS = [
   { id: 'payment_accounts', label: 'Payment Accounts', icon: CreditCard },
   { id: 'mpesa_setup',    label: 'M-Pesa Setup',       icon: Smartphone },
   { id: 'sms_setup',      label: 'SMS Setup',           icon: MessageSquare },
+  { id: 'social_qr',      label: 'Social & QR',        icon: Share2 },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -436,6 +437,167 @@ export default function AdminSettingsPage() {
       {tab === 'sms_setup' && (
         <SmsSetupEditor />
       )}
+
+      {tab === 'social_qr' && (
+        <SocialQrEditor />
+      )}
+    </div>
+  )
+}
+
+/* ── Social Links & QR Code Editor ─────────────────────────────────────────── */
+function SocialQrEditor() {
+  const supabase = createClient()
+  const [data, setData]       = useState({ whatsapp: '', facebook: '', instagram: '', qr_url: '' })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]   = useState(false)
+  const [msg, setMsg]         = useState({ type: '', text: '' })
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => { load() }, [])
+
+  const load = async () => {
+    setLoading(true)
+    const { data: row } = await supabase
+      .from('platform_settings')
+      .select('setting_value')
+      .eq('setting_key', 'social_links')
+      .maybeSingle()
+    if (row?.setting_value) {
+      setData(typeof row.setting_value === 'string' ? JSON.parse(row.setting_value) : row.setting_value)
+    }
+    setLoading(false)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    setMsg({ type: '', text: '' })
+    try {
+      const { data: existing } = await supabase
+        .from('platform_settings')
+        .select('id')
+        .eq('setting_key', 'social_links')
+        .maybeSingle()
+
+      if (existing) {
+        const { error } = await supabase
+          .from('platform_settings')
+          .update({ setting_value: data, updated_at: new Date().toISOString() })
+          .eq('setting_key', 'social_links')
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('platform_settings')
+          .insert({ setting_key: 'social_links', setting_value: data })
+        if (error) throw error
+      }
+      setMsg({ type: 'success', text: 'Social links saved' })
+      setTimeout(() => setMsg({ type: '', text: '' }), 3000)
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleQrUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setMsg({ type: '', text: '' })
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `public/qr-code.${ext}`
+
+      // Remove old file if exists
+      await supabase.storage.from('platform-assets').remove([path])
+
+      const { error: uploadErr } = await supabase.storage
+        .from('platform-assets')
+        .upload(path, file, { upsert: true, cacheControl: '3600' })
+      if (uploadErr) throw uploadErr
+
+      const { data: urlData } = supabase.storage
+        .from('platform-assets')
+        .getPublicUrl(path)
+
+      setData(prev => ({ ...prev, qr_url: urlData.publicUrl }))
+      setMsg({ type: 'success', text: 'QR code uploaded — click Save to apply' })
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Upload failed: ' + err.message })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center py-8">
+      <Loader2 className="animate-spin text-blue-600" size={24} />
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {msg.text && (
+        <div className={`p-3 rounded-lg text-sm ${msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <Section title="Social Media Links" description="These links appear in the website footer. Leave blank to hide a platform.">
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">WhatsApp</label>
+            <input className={inp} value={data.whatsapp || ''} onChange={e => setData(d => ({ ...d, whatsapp: e.target.value }))}
+              placeholder="https://wa.me/254700000000" />
+            <p className="text-[10px] text-gray-400 mt-1">Format: https://wa.me/254XXXXXXXXX (country code, no +)</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Facebook</label>
+            <input className={inp} value={data.facebook || ''} onChange={e => setData(d => ({ ...d, facebook: e.target.value }))}
+              placeholder="https://facebook.com/carfixconnect" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Instagram</label>
+            <input className={inp} value={data.instagram || ''} onChange={e => setData(d => ({ ...d, instagram: e.target.value }))}
+              placeholder="https://instagram.com/carfixconnect" />
+          </div>
+        </div>
+      </Section>
+
+      <Section title="QR Code" description="Upload a QR code image that visitors can download and share. Appears in the website footer.">
+        <div className="space-y-4">
+          {data.qr_url && (
+            <div className="flex items-start gap-4">
+              <img src={data.qr_url} alt="QR Code" className="w-32 h-32 rounded-lg border border-gray-200 object-contain bg-white p-1" />
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500">Current QR code</p>
+                <button
+                  onClick={() => setData(d => ({ ...d, qr_url: '' }))}
+                  className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
+                >
+                  <Trash2 size={12} /> Remove
+                </button>
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer text-sm font-medium transition-colors">
+              {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {uploading ? 'Uploading...' : data.qr_url ? 'Replace QR Code' : 'Upload QR Code'}
+              <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" disabled={uploading} />
+            </label>
+            <p className="text-[10px] text-gray-400 mt-2">PNG or SVG recommended. Will be displayed at ~120px in the footer.</p>
+          </div>
+        </div>
+      </Section>
+
+      <div className="flex justify-end">
+        <button onClick={save} disabled={saving}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Social & QR Settings
+        </button>
+      </div>
     </div>
   )
 }
