@@ -453,6 +453,7 @@ function SocialQrEditor() {
   const [saving, setSaving]   = useState(false)
   const [msg, setMsg]         = useState({ type: '', text: '' })
   const [uploading, setUploading] = useState(false)
+  const [qrJustUploaded, setQrJustUploaded] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -491,6 +492,7 @@ function SocialQrEditor() {
           .insert({ setting_key: 'social_links', setting_value: data })
         if (error) throw error
       }
+      setQrJustUploaded(false)
       setMsg({ type: 'success', text: 'Social links saved' })
       setTimeout(() => setMsg({ type: '', text: '' }), 3000)
     } catch (err) {
@@ -505,24 +507,26 @@ function SocialQrEditor() {
     if (!file) return
     setUploading(true)
     setMsg({ type: '', text: '' })
+    setQrJustUploaded(false)
     try {
       const ext = file.name.split('.').pop()
       const path = `public/qr-code.${ext}`
 
-      // Remove old file if exists
       await supabase.storage.from('platform-assets').remove([path])
 
       const { error: uploadErr } = await supabase.storage
         .from('platform-assets')
-        .upload(path, file, { upsert: true, cacheControl: '3600' })
+        .upload(path, file, { upsert: true, cacheControl: '60' })
       if (uploadErr) throw uploadErr
 
       const { data: urlData } = supabase.storage
         .from('platform-assets')
         .getPublicUrl(path)
 
-      setData(prev => ({ ...prev, qr_url: urlData.publicUrl }))
-      setMsg({ type: 'success', text: 'QR code uploaded — click Save to apply' })
+      // Cache-bust so the preview shows immediately
+      const freshUrl = urlData.publicUrl + '?t=' + Date.now()
+      setData(prev => ({ ...prev, qr_url: freshUrl }))
+      setQrJustUploaded(true)
     } catch (err) {
       setMsg({ type: 'error', text: 'Upload failed: ' + err.message })
     } finally {
@@ -569,11 +573,25 @@ function SocialQrEditor() {
         <div className="space-y-4">
           {data.qr_url && (
             <div className="flex items-start gap-4">
-              <img src={data.qr_url} alt="QR Code" className="w-32 h-32 rounded-lg border border-gray-200 object-contain bg-white p-1" />
+              <div className="relative">
+                <img src={data.qr_url} alt="QR Code" className="w-32 h-32 rounded-lg border border-gray-200 object-contain bg-white p-1" />
+                {qrJustUploaded && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-0.5">
+                    <CheckCircle size={16} />
+                  </div>
+                )}
+              </div>
               <div className="space-y-2">
-                <p className="text-xs text-gray-500">Current QR code</p>
+                {qrJustUploaded ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+                    <p className="font-semibold">QR code uploaded!</p>
+                    <p className="mt-0.5">Click <strong>Save Social & QR Settings</strong> below to apply.</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">Current QR code</p>
+                )}
                 <button
-                  onClick={() => setData(d => ({ ...d, qr_url: '' }))}
+                  onClick={() => { setData(d => ({ ...d, qr_url: '' })); setQrJustUploaded(false) }}
                   className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
                 >
                   <Trash2 size={12} /> Remove
