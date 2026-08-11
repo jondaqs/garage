@@ -509,22 +509,19 @@ function SocialQrEditor() {
     setMsg({ type: '', text: '' })
     setQrJustUploaded(false)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `public/qr-code.${ext}`
+      const formData = new FormData()
+      formData.append('file', file)
 
-      await supabase.storage.from('platform-assets').remove([path])
+      const res = await fetch('/api/admin/upload-qr', {
+        method: 'POST',
+        body: formData,
+      })
 
-      const { error: uploadErr } = await supabase.storage
-        .from('platform-assets')
-        .upload(path, file, { upsert: true, cacheControl: '60' })
-      if (uploadErr) throw uploadErr
-
-      const { data: urlData } = supabase.storage
-        .from('platform-assets')
-        .getPublicUrl(path)
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Upload failed')
 
       // Cache-bust so the preview shows immediately
-      const freshUrl = urlData.publicUrl + '?t=' + Date.now()
+      const freshUrl = result.url + '?t=' + Date.now()
       setData(prev => ({ ...prev, qr_url: freshUrl }))
       setQrJustUploaded(true)
     } catch (err) {
