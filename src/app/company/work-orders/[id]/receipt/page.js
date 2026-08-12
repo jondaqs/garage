@@ -56,6 +56,7 @@ function ReceiptPageInner({ backPath }) {
   const [workOrder,   setWorkOrder]   = useState(null)
   // Work order's billing currency, surfaced by /api/work-orders/[id]/invoice.
   const [currency,    setCurrency]    = useState(null)
+  const [branding,    setBranding]    = useState({ headerUrl: null, footerUrl: null })
   const [items,       setItems]       = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState('')
@@ -76,6 +77,26 @@ function ReceiptPageInner({ backPath }) {
       setProvider(data.provider || null)
       setCurrency(data.currency || null)
       setWorkOrder(data.work_order || null)
+
+      // Fetch provider branding images (header/footer)
+      if (data.provider?.id) {
+        try {
+          const { data: brandingFiles } = await supabase
+            .from('uploaded_files')
+            .select('reference_type, storage_path, storage_bucket')
+            .eq('reference_id', data.provider.id)
+            .in('reference_type', ['provider_branding_header', 'provider_branding_footer'])
+          if (brandingFiles && brandingFiles.length > 0) {
+            const b = { headerUrl: null, footerUrl: null }
+            for (const row of brandingFiles) {
+              const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${row.storage_bucket}/${row.storage_path}`
+              if (row.reference_type === 'provider_branding_header') b.headerUrl = url
+              else b.footerUrl = url
+            }
+            setBranding(b)
+          }
+        } catch { /* non-fatal */ }
+      }
 
       // Receipt (with confirmed fields — direct query since policy covers this user)
       const { data: rct } = await supabase
@@ -262,6 +283,9 @@ function ReceiptPageInner({ backPath }) {
 
       {/* Printable area */}
       <div ref={printRef} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {branding.headerUrl && (
+          <img src={branding.headerUrl} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
+        )}
         <ReceiptContent
           receipt={receipt}
           invoice={invoice}
@@ -279,6 +303,9 @@ function ReceiptPageInner({ backPath }) {
           fmtDs={fmtDs}
           isConfirmed={isConfirmed}
         />
+        {branding.footerUrl && (
+          <img src={branding.footerUrl} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
+        )}
       </div>
     </div>
   )

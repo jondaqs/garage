@@ -24,6 +24,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { sendAndQueueSms, normalisePhone }     from '@/lib/sms/transport'
 import { buildInvoiceHtml }                    from '@/lib/invoice/buildInvoiceHtml'
+import { getProviderBranding }                  from '@/lib/branding/getProviderBranding'
 import { commsLimiter } from '@/lib/rateLimiters'
 import { requireUUID } from '@/lib/validation'
 
@@ -264,6 +265,10 @@ export async function POST(request, { params }) {
     // in the email *body* below, which is what they'll actually click.
     const APP        = APP_URL().replace(/\/+$/, '')   // strip trailing slash defensively
     const baseWoUrl  = `${APP}/dashboard/work-orders/${workOrderId}`
+
+    // Fetch provider branding images (header/footer) if uploaded.
+    const branding = await getProviderBranding(sc, wo.service_provider_id)
+
     const invoiceHtml = buildInvoiceHtml({
       invoiceNumber: inv.invoice_number,
       workOrderNumber: wo.work_order_number,
@@ -280,6 +285,8 @@ export async function POST(request, { params }) {
       totalAmount:   inv.total_amount,
       notes:         inv.notes,
       woUrl:         baseWoUrl,
+      headerImageUrl: branding.headerUrl,
+      footerImageUrl: branding.footerUrl,
     })
 
     // ── 8. Fan-out: email + SMS + in-app notification per recipient ───────

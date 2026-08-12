@@ -12,9 +12,29 @@
  *   services, parts, and optionally owner, shop, problem_description,
  *   opened_at, completed_at, initial_mileage, final_mileage, vat_rate,
  *   subtotal, tax, total_amount, issues, sessions, currency_obj.
+ *
+ * Optional branding parameter:
+ *   { headerUrl: string|null, footerUrl: string|null }
+ *   When provided, header/footer images are added to every page.
  */
 
-export async function generateWorkOrderReport(wo) {
+/** Load an image URL as a base64 data URL for jsPDF. Returns null on failure. */
+async function loadImageAsDataUrl(url) {
+  if (!url) return null
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+export async function generateWorkOrderReport(wo, branding = {}) {
   const { default: jsPDF } = await import('jspdf')
 
   const pdf   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -24,6 +44,12 @@ export async function generateWorkOrderReport(wo) {
   const contentW = pageW - margin * 2
 
   let y = margin
+
+  // ── Load branding images (if available) ───────────────────────────
+  const [headerDataUrl, footerDataUrl] = await Promise.all([
+    loadImageAsDataUrl(branding.headerUrl),
+    loadImageAsDataUrl(branding.footerUrl),
+  ])
 
   // ── Helpers ──────────────────────────────────────────────────────────
   const ensureSpace = (needed) => {
@@ -51,6 +77,17 @@ export async function generateWorkOrderReport(wo) {
   const woNum = wo.work_order_number || wo.number || 'N/A'
   const statusName = wo.status?.display_name || wo.status?.code || '—'
   const providerName = wo.service_provider?.name || '—'
+
+  // ── Header branding image ─────────────────────────────────────────
+  if (headerDataUrl) {
+    try {
+      // Render header image across the full content width, auto-height
+      const imgProps = pdf.getImageProperties(headerDataUrl)
+      const imgH = (contentW / imgProps.width) * imgProps.height
+      pdf.addImage(headerDataUrl, 'WEBP', margin, y, contentW, imgH)
+      y += imgH + 4
+    } catch { /* skip if image can't be rendered */ }
+  }
 
   // ── Header ───────────────────────────────────────────────────────────
   setFont(20, 'bold'); rgb(20, 20, 20)
@@ -294,6 +331,19 @@ export async function generateWorkOrderReport(wo) {
       y += 5
     })
     y += 2; grayLine(); y += 6
+  }
+
+  // ── Footer branding image (last page only) ─────────────────────────
+  if (footerDataUrl) {
+    try {
+      const imgProps = pdf.getImageProperties(footerDataUrl)
+      const imgH = (contentW / imgProps.width) * imgProps.height
+      // Place at the bottom of the last page, above the page number
+      const footerY = pageH - margin - imgH - 8
+      if (y < footerY) {
+        pdf.addImage(footerDataUrl, 'WEBP', margin, footerY, contentW, imgH)
+      }
+    } catch { /* skip if image can't be rendered */ }
   }
 
   // ── Page numbers ─────────────────────────────────────────────────────

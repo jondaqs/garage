@@ -34,6 +34,8 @@ const BRAND = 'Carfix-Connect'
  * @param {number} args.totalAmount
  * @param {string|null} [args.notes]
  * @param {string} args.woUrl
+ * @param {string|null} [args.headerImageUrl]  Provider header branding image
+ * @param {string|null} [args.footerImageUrl]  Provider footer branding image
  */
 export function buildInvoiceHtml({
   invoiceNumber,
@@ -51,6 +53,8 @@ export function buildInvoiceHtml({
   totalAmount,
   notes,
   woUrl,
+  headerImageUrl = null,
+  footerImageUrl = null,
 }) {
   const fmt  = (n) => `KES ${Number(n || 0).toLocaleString('en-KE')}`
   const fmtD = (d) => d
@@ -87,6 +91,13 @@ export function buildInvoiceHtml({
 <table width="620" cellpadding="0" cellspacing="0"
   style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:620px;width:100%;
          box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+  ${headerImageUrl ? `<!-- Provider header branding -->
+  <tr>
+    <td style="padding:0;text-align:center;background:#ffffff;">
+      <img src="${headerImageUrl}" alt="" style="width:100%;max-width:620px;height:auto;display:block;" />
+    </td>
+  </tr>` : ''}
 
   <!-- Dark header -->
   <tr>
@@ -222,6 +233,13 @@ export function buildInvoiceHtml({
       </p>
     </td>
   </tr>
+
+  ${footerImageUrl ? `<!-- Provider footer branding -->
+  <tr>
+    <td style="padding:0;text-align:center;background:#ffffff;">
+      <img src="${footerImageUrl}" alt="" style="width:100%;max-width:620px;height:auto;display:block;" />
+    </td>
+  </tr>` : ''}
 </table>
 </td></tr>
 </table>

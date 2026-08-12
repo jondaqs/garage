@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Settings, User, Store, Lock, CheckCircle, AlertCircle,
   Loader2, Save, Clock, Info, Wrench, Plus, X, Camera,
-  FileText, Upload, Trash2, ExternalLink, RefreshCw,
+  FileText, Upload, Trash2, ExternalLink, RefreshCw, Palette,
 } from 'lucide-react'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
 import useProviderAccess from '@/hooks/useProviderAccess'
@@ -13,11 +13,12 @@ import WriteGate from '@/components/WriteGate'
 import ProviderAccessBanner from '@/components/ProviderAccessBanner'
 
 const TABS = [
-  { id: 'business',  label: 'Business Profile', icon: Store    },
-  { id: 'services',  label: 'Services Offered', icon: Wrench   },
-  { id: 'documents', label: 'Documents',        icon: FileText },
-  { id: 'personal',  label: 'My Profile',       icon: User     },
-  { id: 'security',  label: 'Security',          icon: Lock    },
+  { id: 'business',  label: 'Business Profile', icon: Store     },
+  { id: 'services',  label: 'Services Offered', icon: Wrench    },
+  { id: 'documents', label: 'Documents',        icon: FileText  },
+  { id: 'branding',  label: 'Branding',         icon: Palette   },
+  { id: 'personal',  label: 'My Profile',       icon: User      },
+  { id: 'security',  label: 'Security',         icon: Lock      },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent'
@@ -69,6 +70,11 @@ export default function ProviderSettingsPage() {
   const [uploadingType, setUploadingType] = useState(null)   // doc-type currently uploading
   const [docError,      setDocError]      = useState('')
 
+  // Branding state
+  const [headerUrl,         setHeaderUrl]         = useState(null)
+  const [footerUrl,         setFooterUrl]         = useState(null)
+  const [brandingUploading, setBrandingUploading] = useState(null) // 'header'|'footer'|null
+
   useEffect(() => { load() }, [])
 
   const load = async () => {
@@ -119,6 +125,24 @@ export default function ProviderSettingsPage() {
           .select('service_id')
           .eq('service_provider_id', sp.id)
         setSelectedServices(new Set((sps || []).map(s => s.service_id)))
+
+        // Load branding images (non-blocking)
+        supabase
+          .from('uploaded_files')
+          .select('reference_type, storage_path, storage_bucket')
+          .eq('reference_id', sp.id)
+          .in('reference_type', ['provider_branding_header', 'provider_branding_footer'])
+          .then(({ data: brandingFiles }) => {
+            if (brandingFiles) {
+              for (const row of brandingFiles) {
+                const { data: { publicUrl } } = supabase.storage
+                  .from(row.storage_bucket)
+                  .getPublicUrl(row.storage_path)
+                if (row.reference_type === 'provider_branding_header') setHeaderUrl(publicUrl)
+                else setFooterUrl(publicUrl)
+              }
+            }
+          })
       }
 
       // Load reference data
@@ -510,6 +534,45 @@ export default function ProviderSettingsPage() {
     return `${(b / (1024 * 1024)).toFixed(1)} MB`
   }
   // ─── /DOCUMENTS ────────────────────────────────────────────────────────
+
+  // ─── BRANDING ──────────────────────────────────────────────────────────
+  const handleBrandingUpload = async (type, e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Please select a PNG or JPG image.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be under 5 MB.'); return }
+    setBrandingUploading(type)
+    setError(''); setSuccess('')
+    try {
+      const webpFile = await convertToWebP(file)
+      const formData = new FormData()
+      formData.append('file', webpFile)
+      formData.append('type', type)
+      const res = await fetch('/api/provider/branding', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      if (type === 'header') setHeaderUrl(data.url)
+      else setFooterUrl(data.url)
+      setSuccess(`${type === 'header' ? 'Header' : 'Footer'} image uploaded.`)
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) { setError(err.message) }
+    finally { setBrandingUploading(null) }
+  }
+
+  const handleBrandingDelete = async (type) => {
+    if (!window.confirm(`Remove the ${type} image? This will also remove it from future PDF downloads.`)) return
+    setError(''); setSuccess('')
+    try {
+      const res = await fetch(`/api/provider/branding?type=${type}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Delete failed')
+      if (type === 'header') setHeaderUrl(null)
+      else setFooterUrl(null)
+      setSuccess(`${type === 'header' ? 'Header' : 'Footer'} image removed.`)
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) { setError(err.message) }
+  }
+  // ─── /BRANDING ─────────────────────────────────────────────────────────
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -1020,6 +1083,146 @@ export default function ProviderSettingsPage() {
                 No documents on file yet.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Branding ── */}
+      {tab === 'branding' && (
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">PDF Branding</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Upload header and footer images to brand your invoices, receipts, and work order reports.
+              Use PNG or JPG — images are converted to WebP automatically.
+            </p>
+          </div>
+
+          {/* Header image */}
+          <div className="space-y-2">
+            <label className={lbl}>Header Image</label>
+            <p className="text-[11px] text-gray-400 -mt-1">
+              Appears at the very top of every PDF. Ideal for your logo and business name.
+            </p>
+            {headerUrl ? (
+              <div className="space-y-2">
+                <div className="border border-gray-200 rounded-lg bg-gray-50 p-2 overflow-hidden">
+                  <img
+                    src={headerUrl}
+                    alt="Header preview"
+                    className="w-full max-h-32 object-contain rounded"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 cursor-pointer">
+                    <Upload size={12} />
+                    {brandingUploading === 'header' ? 'Uploading…' : 'Replace'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/png,image/jpeg,image/jpg"
+                      disabled={!!brandingUploading}
+                      onChange={(e) => { handleBrandingUpload('header', e); e.target.value = '' }}
+                    />
+                  </label>
+                  <button
+                    onClick={() => handleBrandingDelete('header')}
+                    disabled={!!brandingUploading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 size={12} /> Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className={`block border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                brandingUploading === 'header'
+                  ? 'border-green-300 bg-green-50'
+                  : 'border-gray-300 hover:border-green-400 hover:bg-green-50'
+              }`}>
+                <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+                <p className="text-xs font-medium text-gray-700">
+                  {brandingUploading === 'header' ? 'Uploading…' : 'Click to upload header image'}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">PNG or JPG · up to 5 MB · recommended width: 620px</p>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/png,image/jpeg,image/jpg"
+                  disabled={!!brandingUploading}
+                  onChange={(e) => { handleBrandingUpload('header', e); e.target.value = '' }}
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-100" />
+
+          {/* Footer image */}
+          <div className="space-y-2">
+            <label className={lbl}>Footer Image</label>
+            <p className="text-[11px] text-gray-400 -mt-1">
+              Appears at the bottom of every PDF. Great for contact info, certifications, or payment details.
+            </p>
+            {footerUrl ? (
+              <div className="space-y-2">
+                <div className="border border-gray-200 rounded-lg bg-gray-50 p-2 overflow-hidden">
+                  <img
+                    src={footerUrl}
+                    alt="Footer preview"
+                    className="w-full max-h-32 object-contain rounded"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 cursor-pointer">
+                    <Upload size={12} />
+                    {brandingUploading === 'footer' ? 'Uploading…' : 'Replace'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/png,image/jpeg,image/jpg"
+                      disabled={!!brandingUploading}
+                      onChange={(e) => { handleBrandingUpload('footer', e); e.target.value = '' }}
+                    />
+                  </label>
+                  <button
+                    onClick={() => handleBrandingDelete('footer')}
+                    disabled={!!brandingUploading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 size={12} /> Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className={`block border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                brandingUploading === 'footer'
+                  ? 'border-green-300 bg-green-50'
+                  : 'border-gray-300 hover:border-green-400 hover:bg-green-50'
+              }`}>
+                <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+                <p className="text-xs font-medium text-gray-700">
+                  {brandingUploading === 'footer' ? 'Uploading…' : 'Click to upload footer image'}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">PNG or JPG · up to 5 MB · recommended width: 620px</p>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/png,image/jpeg,image/jpg"
+                  disabled={!!brandingUploading}
+                  onChange={(e) => { handleBrandingUpload('footer', e); e.target.value = '' }}
+                />
+              </label>
+            )}
+          </div>
+
+          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+            <Info size={14} className="flex-shrink-0 mt-0.5" />
+            <span>
+              These images appear at the top and bottom of your PDF invoices, receipts, and work order reports.
+              If no images are uploaded, documents remain unchanged.
+            </span>
           </div>
         </div>
       )}

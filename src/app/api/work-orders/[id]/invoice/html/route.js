@@ -23,6 +23,7 @@ import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
 import { buildInvoiceHtml }                    from '@/lib/invoice/buildInvoiceHtml'
+import { getProviderBranding }                  from '@/lib/branding/getProviderBranding'
 import { readLimiter } from '@/lib/rateLimiters'
 import { requireUUID } from '@/lib/validation'
 
@@ -172,6 +173,9 @@ export async function GET(request, { params }) {
       ownerName = woWalkin?.walk_in_owner_name || null
     }
 
+    // Fetch provider branding images (header/footer) if uploaded.
+    const branding = await getProviderBranding(sc, wo.service_provider_id)
+
     // Build the document.
     const woUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
     const html = buildInvoiceHtml({
@@ -190,6 +194,8 @@ export async function GET(request, { params }) {
       totalAmount:     inv.total_amount,
       notes:           inv.notes,
       woUrl,
+      headerImageUrl:  branding.headerUrl,
+      footerImageUrl:  branding.footerUrl,
     })
 
     return new NextResponse(html, {

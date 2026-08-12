@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
 import { generateWorkOrderReport } from '@/lib/reports/workOrderReport'
+import { createClient } from '@/lib/supabase/client'
 
 /**
  * Drop-in button that downloads a Work Order PDF report.
@@ -18,7 +19,27 @@ export default function DownloadWorkOrderReport({ wo, className = '' }) {
     if (!wo) return
     setDownloading(true)
     try {
-      await generateWorkOrderReport(wo)
+      // Fetch provider branding images (header/footer) if available
+      let branding = {}
+      const providerId = wo.service_provider?.id || wo.service_provider_id
+      if (providerId) {
+        try {
+          const supabase = createClient()
+          const { data } = await supabase
+            .from('uploaded_files')
+            .select('reference_type, storage_path, storage_bucket')
+            .eq('reference_id', providerId)
+            .in('reference_type', ['provider_branding_header', 'provider_branding_footer'])
+          if (data && data.length > 0) {
+            for (const row of data) {
+              const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${row.storage_bucket}/${row.storage_path}`
+              if (row.reference_type === 'provider_branding_header') branding.headerUrl = url
+              else branding.footerUrl = url
+            }
+          }
+        } catch { /* non-fatal, continue without branding */ }
+      }
+      await generateWorkOrderReport(wo, branding)
     } catch (err) {
       console.error('WO report PDF error:', err)
     } finally {
