@@ -1,21 +1,26 @@
 // src/app/dashboard/vehicles/add/page.js
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle, CheckCircle, Car, Lock, Sparkles, ArrowRight } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import PendingVehicleClaimBanner from '@/components/PendingVehicleClaimBanner'
 
 const supabase = createClient()
 
-export default function AddVehiclePage() {
+function AddVehiclePageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const claimId = searchParams.get('claim_id')
+
   const [user, setUser] = useState(null)
   const [profileId, setProfileId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [claimLoading, setClaimLoading] = useState(false)
   const [vehicleForm, setVehicleForm] = useState({
     plateNumber: '',
     make: '',
@@ -62,6 +67,41 @@ export default function AddVehiclePage() {
     init()
   }, [router])
 
+  // ── Pre-fill from vehicle claim ────────────────────────────────────────
+  useEffect(() => {
+    if (!claimId) return
+    const loadClaim = async () => {
+      setClaimLoading(true)
+      try {
+        const { data, error } = await supabase.rpc('get_pending_vehicle_claims')
+        if (error) throw error
+        let parsed = []
+        if (typeof data === 'string') {
+          try { parsed = JSON.parse(data) } catch { parsed = [] }
+        } else if (Array.isArray(data)) {
+          parsed = data
+        }
+        const claim = parsed.find(c => c.claim_id === claimId)
+        if (claim?.vehicle_details) {
+          const d = claim.vehicle_details
+          setVehicleForm({
+            plateNumber: d.plate_number || '',
+            make: d.make || '',
+            model: d.model || '',
+            year: d.year ? String(d.year) : '',
+            color: d.color || '',
+            vin: d.vin || '',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to load claim:', err)
+      } finally {
+        setClaimLoading(false)
+      }
+    }
+    loadClaim()
+  }, [claimId])
+
   const validatePlateNumber = (plate) => {
     const trimmed = plate.trim()
     return trimmed.length > 0 && /[A-Za-z0-9]/.test(trimmed)
@@ -105,6 +145,7 @@ export default function AddVehiclePage() {
         p_color:               vehicleForm.color || null,
         p_vin:                 vin,
         p_owner_user_id:       profileId,
+        p_claim_id:            claimId || null,
       })
 
       if (rpcError) throw rpcError
@@ -122,7 +163,10 @@ export default function AddVehiclePage() {
         : []
       let message = 'Vehicle added successfully!'
       let redirectDelay = 1800
-      if (result?.reactivated) {
+      if (result?.claimed) {
+        message = 'Vehicle successfully added to your profile from the service provider\'s suggestion.'
+        redirectDelay = 2500
+      } else if (result?.reactivated) {
         message =
           'This vehicle has been re-registered under your account. ' +
           'Its full service history from previous ownership has been preserved.'
@@ -225,6 +269,26 @@ export default function AddVehiclePage() {
           </div>
         </div>
       ) : (
+        <>
+        {claimId && claimLoading && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+            Loading vehicle details from claim…
+          </div>
+        )}
+
+        {claimId && !claimLoading && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-sm font-medium text-amber-800">
+              Vehicle details pre-filled from a service provider&apos;s suggestion.
+              Review the information below and click Save to add it to your profile.
+            </p>
+          </div>
+        )}
+
+        {!claimId && (
+          <PendingVehicleClaimBanner />
+        )}
+
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
@@ -349,7 +413,16 @@ export default function AddVehiclePage() {
             </div>
           </form>
         </div>
+        </>
       )}
     </div>
+  )
+}
+
+export default function AddVehiclePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <AddVehiclePageInner />
+    </Suspense>
   )
 }

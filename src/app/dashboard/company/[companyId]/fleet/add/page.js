@@ -1,19 +1,23 @@
 // src/app/dashboard/company/[companyId]/fleet/add/page.js
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle, CheckCircle, Truck } from 'lucide-react'
+import PendingVehicleClaimBanner from '@/components/PendingVehicleClaimBanner'
 
 // ✅ Client outside component — preserves session across renders
 const supabase = createClient()
 
-export default function AddCompanyFleetVehiclePage() {
+function AddCompanyFleetVehicleInner() {
   const { companyId } = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const claimId = searchParams.get('claim_id')
 
   const [profileId, setProfileId] = useState(null)
+  const [claimLoading, setClaimLoading] = useState(false)
   // canManage: caller can add a fleet vehicle. True for the company owner,
   // for any active company_user with is_admin OR can_manage_fleet. The
   // server-side gate on add_fleet_vehicle_with_ownership enforces the same
@@ -88,6 +92,42 @@ export default function AddCompanyFleetVehiclePage() {
     checkPermission()
   }, [companyId, router])
 
+  // ── Pre-fill from vehicle claim ──────────────────────────────────────────
+  useEffect(() => {
+    if (!claimId) return
+    const loadClaim = async () => {
+      setClaimLoading(true)
+      try {
+        const { data, error } = await supabase.rpc('get_pending_vehicle_claims')
+        if (error) throw error
+        let parsed = []
+        if (typeof data === 'string') {
+          try { parsed = JSON.parse(data) } catch { parsed = [] }
+        } else if (Array.isArray(data)) {
+          parsed = data
+        }
+        const claim = parsed.find(c => c.claim_id === claimId)
+        if (claim?.vehicle_details) {
+          const d = claim.vehicle_details
+          setForm(prev => ({
+            ...prev,
+            plateNumber: d.plate_number || '',
+            make: d.make || '',
+            model: d.model || '',
+            year: d.year ? String(d.year) : prev.year,
+            color: d.color || '',
+            vin: d.vin || '',
+          }))
+        }
+      } catch (err) {
+        console.error('Failed to load claim:', err)
+      } finally {
+        setClaimLoading(false)
+      }
+    }
+    loadClaim()
+  }, [claimId])
+
   const field = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -123,6 +163,7 @@ export default function AddCompanyFleetVehiclePage() {
         p_mileage:             form.mileage ? parseInt(form.mileage) : null,
         p_owner_user_id:       profileId,
         p_owner_company_id:    companyId,
+        p_claim_id:            claimId || null,
       })
 
       if (rpcError) throw rpcError
@@ -207,6 +248,28 @@ export default function AddCompanyFleetVehiclePage() {
           <p className="text-sm text-gray-500">Register a new vehicle for this company</p>
         </div>
       </div>
+
+      {claimId && claimLoading && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+          Loading vehicle details from claim…
+        </div>
+      )}
+
+      {claimId && !claimLoading && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-sm font-medium text-amber-800">
+            Vehicle details pre-filled from a service provider&apos;s suggestion.
+            Review the information below and click Add Vehicle to add it to your fleet.
+          </p>
+        </div>
+      )}
+
+      {!claimId && (
+        <PendingVehicleClaimBanner
+          companyId={companyId}
+          basePath={`/dashboard/company/${companyId}/fleet/add`}
+        />
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         {error && (
@@ -355,5 +418,13 @@ export default function AddCompanyFleetVehiclePage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function AddCompanyFleetVehiclePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <AddCompanyFleetVehicleInner />
+    </Suspense>
   )
 }

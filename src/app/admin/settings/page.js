@@ -21,6 +21,7 @@ const TABS = [
   { id: 'mpesa_setup',    label: 'M-Pesa Setup',       icon: Smartphone },
   { id: 'sms_setup',      label: 'SMS Setup',           icon: MessageSquare },
   { id: 'social_qr',      label: 'Social & QR',        icon: Share2 },
+  { id: 'work_orders',    label: 'Work Orders',         icon: ClipboardList },
 ]
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -441,6 +442,118 @@ export default function AdminSettingsPage() {
       {tab === 'social_qr' && (
         <SocialQrEditor />
       )}
+
+      {tab === 'work_orders' && (
+        <WorkOrderSettings supabase={supabase} />
+      )}
+    </div>
+  )
+}
+
+/* ── Work Order Settings (estimate approval default) ──────────────────────── */
+function WorkOrderSettings({ supabase }) {
+  const [enabled, setEnabled]   = useState(false)
+  const [loading, setLoading]   = useState(true)
+  const [saving, setSaving]     = useState(false)
+  const [msg, setMsg]           = useState({ type: '', text: '' })
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: row } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'default_require_estimate_approval')
+        .maybeSingle()
+      if (row?.setting_value) {
+        const val = typeof row.setting_value === 'string'
+          ? JSON.parse(row.setting_value)
+          : row.setting_value
+        setEnabled(val.enabled === true)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [supabase])
+
+  const save = async () => {
+    setSaving(true)
+    setMsg({ type: '', text: '' })
+    try {
+      const { data: existing } = await supabase
+        .from('platform_settings')
+        .select('id')
+        .eq('setting_key', 'default_require_estimate_approval')
+        .maybeSingle()
+
+      const payload = { enabled }
+
+      if (existing) {
+        const { error } = await supabase
+          .from('platform_settings')
+          .update({ setting_value: payload, updated_at: new Date().toISOString() })
+          .eq('setting_key', 'default_require_estimate_approval')
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('platform_settings')
+          .insert({ setting_key: 'default_require_estimate_approval', setting_value: payload, is_public: true })
+        if (error) throw error
+      }
+      setMsg({ type: 'success', text: 'Default estimate approval setting saved.' })
+      setTimeout(() => setMsg({ type: '', text: '' }), 3000)
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+
+  return (
+    <div className="space-y-6">
+      {msg.text && (
+        <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${
+          msg.type === 'success'
+            ? 'bg-green-50 border border-green-200 text-green-700'
+            : 'bg-red-50 border border-red-200 text-red-700'
+        }`}>
+          {msg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {msg.text}
+        </div>
+      )}
+
+      <Section
+        title="Default Estimate Approval"
+        description="Controls whether new users and companies must approve service estimates before work begins. Individual users and companies can override this in their profile settings."
+      >
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button onClick={() => setEnabled(!enabled)} className="text-gray-500">
+              {enabled
+                ? <ToggleRight size={32} className="text-blue-600" />
+                : <ToggleLeft size={32} />
+              }
+            </button>
+            <div>
+              <span className="text-sm font-medium text-gray-700">
+                {enabled ? 'Enabled — new accounts require estimate approval' : 'Disabled — providers can proceed without digital approval'}
+              </span>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Changing this only affects newly registered users and companies. Existing accounts keep their current setting.
+              </p>
+            </div>
+          </label>
+        </div>
+      </Section>
+
+      <div className="flex justify-end">
+        <button onClick={save} disabled={saving}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          Save Work Order Settings
+        </button>
+      </div>
     </div>
   )
 }

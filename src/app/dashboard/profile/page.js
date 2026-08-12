@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Camera, ArrowLeft, Shield, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import TwoFactorSetup from '@/components/TwoFactorSetup'
+import EstimateApprovalToggle from '@/components/EstimateApprovalToggle'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -361,6 +362,17 @@ export default function ProfilePage() {
           Account Security
         </h3>
         <TwoFactorSetup accentColor="blue" />
+      </div>
+
+      {/* ── Service Preferences ── */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Preferences</h3>
+        {profileId && (
+          <EstimateApprovalToggle
+            profileId={profileId}
+            tableName="user_profiles"
+          />
+        )}
       </div>
     </div>
   )

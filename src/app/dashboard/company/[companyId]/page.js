@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import useCompanyAccess from '@/hooks/useCompanyAccess'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
+import PendingVehicleClaimBanner from '@/components/PendingVehicleClaimBanner'
 
 export default function MemberCompanyOverviewPage() {
   const { companyId } = useParams()
@@ -188,6 +189,11 @@ export default function MemberCompanyOverviewPage() {
           </div>
         </>
       )}
+
+      <PendingVehicleClaimBanner
+        companyId={companyId}
+        basePath={`/dashboard/company/${companyId}/fleet/add`}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

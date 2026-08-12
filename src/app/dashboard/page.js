@@ -13,6 +13,7 @@ import MobileQuickActions from '../../components/MobileQuickActions'
 import MobileBottomNav from '../../components/MobileBottomNav'
 import TrialBanner from '@/components/TrialBanner'
 import useTrialStatus from '@/hooks/useTrialStatus'
+import PendingVehicleClaimBanner from '@/components/PendingVehicleClaimBanner'
 
 
 
@@ -274,6 +275,8 @@ export default function DashboardPage() {
           </Link>
         )}
 
+        <PendingVehicleClaimBanner />
+
         {/* Vehicles */}
         <section>
           <div className="flex justify-between items-center mb-4">
@@ -420,6 +423,8 @@ export default function DashboardPage() {
             </Link>
           </div>
         )}
+
+        <PendingVehicleClaimBanner />
 
         {/* Stats strip — 1 real stat + 3 navigation cards */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
