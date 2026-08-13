@@ -172,7 +172,20 @@ function AddCompanyFleetVehicleInner() {
       const overrides = Array.isArray(result?.immutable_overrides) ? result.immutable_overrides : []
       let message = 'Vehicle added to fleet successfully!'
       let redirectDelay = 1800
-      if (result?.reactivated) {
+      if (result?.claimed) {
+        message = 'Vehicle successfully added to your fleet from the service provider\'s suggestion.'
+        redirectDelay = 2500
+      } else if (result?.adopted_orphan) {
+        message =
+          'This vehicle was already in our system from a garage visit. ' +
+          'It has been registered to your fleet.'
+        if (overrides.length > 0) {
+          message +=
+            ' Note: ' + overrides.join(', ').replace('year_of_manufacture', 'year') +
+            ' could not be changed — these are tied to the original record.'
+        }
+        redirectDelay = 3000
+      } else if (result?.reactivated) {
         message =
           'This vehicle has been re-registered to your fleet. ' +
           'Its full service history from previous ownership has been preserved.'

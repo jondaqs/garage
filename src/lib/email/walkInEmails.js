@@ -297,7 +297,7 @@ export async function sendWalkInOwnerEmail(supabase, {
       <p style="margin:0;color:#1e40af;font-size:13px;">
         Wasn't expecting this? If someone else dropped your vehicle off (chauffeur, family member, etc.),
         this is normal — you can track everything from your dashboard. If you didn't authorise this service,
-        please contact the provider immediately.
+        please contact the provider or contact support immediately.
       </p>
     </div>
 
