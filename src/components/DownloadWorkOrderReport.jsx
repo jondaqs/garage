@@ -32,9 +32,11 @@ export default function DownloadWorkOrderReport({ wo, className = '' }) {
             .in('reference_type', ['provider_branding_header', 'provider_branding_footer'])
           if (data && data.length > 0) {
             for (const row of data) {
-              const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${row.storage_bucket}/${row.storage_path}`
-              if (row.reference_type === 'provider_branding_header') branding.headerUrl = url
-              else branding.footerUrl = url
+              const { data: { publicUrl } } = supabase.storage
+                .from(row.storage_bucket)
+                .getPublicUrl(row.storage_path)
+              if (row.reference_type === 'provider_branding_header') branding.headerUrl = publicUrl
+              else branding.footerUrl = publicUrl
             }
           }
         } catch { /* non-fatal, continue without branding */ }

@@ -81,10 +81,10 @@ export async function generateWorkOrderReport(wo, branding = {}) {
   // ── Header branding image ─────────────────────────────────────────
   if (headerDataUrl) {
     try {
-      // Render header image across the full content width, auto-height
       const imgProps = pdf.getImageProperties(headerDataUrl)
       const imgH = (contentW / imgProps.width) * imgProps.height
-      pdf.addImage(headerDataUrl, 'WEBP', margin, y, contentW, imgH)
+      const fmt = (headerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
+      pdf.addImage(headerDataUrl, fmt, margin, y, contentW, imgH)
       y += imgH + 4
     } catch { /* skip if image can't be rendered */ }
   }
@@ -338,10 +338,10 @@ export async function generateWorkOrderReport(wo, branding = {}) {
     try {
       const imgProps = pdf.getImageProperties(footerDataUrl)
       const imgH = (contentW / imgProps.width) * imgProps.height
-      // Place at the bottom of the last page, above the page number
+      const fmt = (footerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
       const footerY = pageH - margin - imgH - 8
       if (y < footerY) {
-        pdf.addImage(footerDataUrl, 'WEBP', margin, footerY, contentW, imgH)
+        pdf.addImage(footerDataUrl, fmt, margin, footerY, contentW, imgH)
       }
     } catch { /* skip if image can't be rendered */ }
   }
