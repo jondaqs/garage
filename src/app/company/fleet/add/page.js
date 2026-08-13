@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
+import PendingVehicleClaimBanner from '@/components/PendingVehicleClaimBanner'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 
 // ✅ Client outside component — preserves session across renders
@@ -217,6 +218,8 @@ export default function AddFleetVehiclePage() {
           <h1 className="text-3xl font-bold mb-1">Add Vehicle to Fleet</h1>
           <p className="text-gray-500">Register a new company vehicle</p>
         </div>
+
+        <PendingVehicleClaimBanner companyId={companyId} />
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           {error && (

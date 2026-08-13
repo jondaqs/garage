@@ -19,9 +19,26 @@ export default function CompanySidebar({ company, userRole }) {
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const [recommendationsCount, setRecommendationsCount] = useState(0)
   const [unreadMessages,       setUnreadMessages]       = useState(0)
+  const [pendingClaimsCount,   setPendingClaimsCount]   = useState(0)
 
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false) }, [pathname])
+
+  // Pending vehicle claims count — drives the Fleet badge
+  useEffect(() => {
+    if (!company?.id) return
+    const loadClaims = async () => {
+      try {
+        const { data } = await supabase.rpc('get_pending_vehicle_claims')
+        if (data) {
+          const parsed = typeof data === 'string' ? JSON.parse(data) : data
+          const companyClaims = parsed.filter(c => c.target_company_id === company.id)
+          setPendingClaimsCount(companyClaims.length)
+        }
+      } catch { /* non-fatal */ }
+    }
+    loadClaims()
+  }, [company?.id])
 
   const loadUnreadMessages = useCallback(async () => {
     try {
@@ -111,7 +128,8 @@ export default function CompanySidebar({ company, userRole }) {
 
   const navigation = [
     { name: 'Dashboard',         href: '/company/dashboard',   icon: Home         },
-    { name: 'Fleet',             href: '/company/fleet',              icon: Truck        },
+    { name: 'Fleet',             href: '/company/fleet',              icon: Truck,
+      badge: pendingClaimsCount > 0 ? pendingClaimsCount : null },
     { name: 'Fleet Assignments', href: '/company/fleet-assignments',  icon: UserCheck    },
     { name: 'Team',              href: '/company/team',               icon: Users        },
     { name: 'Bookings',          href: '/company/bookings',     icon: Calendar     },

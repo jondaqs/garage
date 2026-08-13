@@ -41,6 +41,8 @@ export default function Sidebar({ user }) {
   const [woActionCount,        setWoActionCount]        = useState(0)
   const [companyWoActionCount,  setCompanyWoActionCount] = useState(0)
   const [isAdminUser,           setIsAdminUser]          = useState(false)
+  const [pendingClaimsCount,    setPendingClaimsCount]   = useState(0)
+  const [companyClaimsCount,    setCompanyClaimsCount]   = useState(0)
   // Phase: per-provider upcoming-bookings count for the Calendar badge.
   // Keyed by providerId: { '<uuid>': <count>, ... }
   const [providerUpcomingByProvider, setProviderUpcomingByProvider] = useState({})
@@ -68,6 +70,25 @@ export default function Sidebar({ user }) {
   }, [])
 
   // ── Loaders (now keyed off profileId) ───────────────────────────────────
+
+  // Pending vehicle claims count — drives the Add Vehicle badge
+  useEffect(() => {
+    if (!profileId) return
+    const loadClaims = async () => {
+      try {
+        const { data } = await supabase.rpc('get_pending_vehicle_claims')
+        if (data) {
+          const parsed = typeof data === 'string' ? JSON.parse(data) : data
+          const personal = parsed.filter(c => c.claim_type === 'individual' || !c.target_company_id)
+          const company  = parsed.filter(c => c.claim_type === 'company' && c.target_company_id)
+          setPendingClaimsCount(personal.length)
+          setCompanyClaimsCount(company.length)
+        }
+      } catch { /* non-fatal */ }
+    }
+    loadClaims()
+  }, [profileId])
+
   const loadUnreadMessages = useCallback(async () => {
     if (!profileId) return
     try {
@@ -616,7 +637,8 @@ export default function Sidebar({ user }) {
   // ── Personal nav items ────────────────────────────────────────────────────
   const personalItems = [
     { icon: User,          label: 'Dashboard',              path: '/dashboard' },
-    { icon: Plus,          label: 'Add Vehicle',            path: '/dashboard/vehicles/add' },
+    { icon: Plus,          label: 'Add Vehicle',            path: '/dashboard/vehicles/add',
+      badge: pendingClaimsCount > 0 ? pendingClaimsCount : null },
     { icon: Search,        label: 'Search Providers',       path: '/dashboard/providers' },
     { icon: Calendar,      label: 'Bookings',               path: '/dashboard/bookings' },
     { icon: DollarSign,    label: 'Budget',                 path: '/dashboard/budget' },
@@ -641,7 +663,8 @@ export default function Sidebar({ user }) {
     const canChat = membership.is_admin || membership.can_chat
     const items = [
       { icon: Building2,    label: 'Overview',    path: base,                       everyone: true  },
-      { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true  },
+      { icon: Truck,        label: 'Fleet',       path: `${base}/fleet`,            everyone: true,
+        badge: companyClaimsCount > 0 ? companyClaimsCount : null },
       { icon: UserCheck,    label: 'Fleet Assignments', path: `${base}/fleet-assignments`, everyone: true },
       { icon: Calendar,     label: 'Bookings',    path: `${base}/bookings`,         everyone: true  },
       { icon: ClipboardList,label: 'Work Orders', path: `${base}/work-orders`,      everyone: true,
