@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import CompanySubscriptionGate from '@/components/CompanySubscriptionGate'
@@ -14,6 +14,8 @@ const supabase = createClient()
 
 export default function AddFleetVehiclePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const claimId = searchParams.get('claim_id')
   const ownerAccess = useOwnerCompanyAccess()
 
   const [user, setUser]           = useState(null)
@@ -23,6 +25,7 @@ export default function AddFleetVehiclePage() {
   const [checking, setChecking]   = useState(true)
   const [error, setError]         = useState('')
   const [success, setSuccess]     = useState('')
+  const [claimLoading, setClaimLoading] = useState(false)
 
   const [formData, setFormData] = useState({
     plateNumber: '',
@@ -88,6 +91,42 @@ export default function AddFleetVehiclePage() {
     init()
   }, [router])
 
+  // ── Pre-fill from vehicle claim ──────────────────────────────────────────
+  useEffect(() => {
+    if (!claimId) return
+    const loadClaim = async () => {
+      setClaimLoading(true)
+      try {
+        const { data, error } = await supabase.rpc('get_pending_vehicle_claims')
+        if (error) throw error
+        let parsed = []
+        if (typeof data === 'string') {
+          try { parsed = JSON.parse(data) } catch { parsed = [] }
+        } else if (Array.isArray(data)) {
+          parsed = data
+        }
+        const claim = parsed.find(c => c.claim_id === claimId)
+        if (claim?.vehicle_details) {
+          const d = claim.vehicle_details
+          setFormData(prev => ({
+            ...prev,
+            plateNumber: d.plate_number || '',
+            make: d.make || '',
+            model: d.model || '',
+            year: d.year ? String(d.year) : prev.year,
+            color: d.color || '',
+            vin: d.vin || '',
+          }))
+        }
+      } catch (err) {
+        console.error('Failed to load claim:', err)
+      } finally {
+        setClaimLoading(false)
+      }
+    }
+    loadClaim()
+  }, [claimId])
+
   const field = (key, value) => setFormData(prev => ({ ...prev, [key]: value }))
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -125,6 +164,7 @@ export default function AddFleetVehiclePage() {
         p_mileage:             formData.mileage ? parseInt(formData.mileage) : null,
         p_owner_user_id:       profileId,
         p_owner_company_id:    companyId,
+        p_claim_id:            claimId || null,
       })
 
       if (rpcError) throw rpcError
@@ -219,7 +259,24 @@ export default function AddFleetVehiclePage() {
           <p className="text-gray-500">Register a new company vehicle</p>
         </div>
 
-        <PendingVehicleClaimBanner companyId={companyId} basePath="/company/fleet/add" />
+        {claimId && claimLoading && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+            Loading vehicle details from claim…
+          </div>
+        )}
+
+        {claimId && !claimLoading && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-sm font-medium text-amber-800">
+              Vehicle details pre-filled from a service provider&apos;s suggestion.
+              Review the information below and click Add Vehicle to add it to your fleet.
+            </p>
+          </div>
+        )}
+
+        {!claimId && (
+          <PendingVehicleClaimBanner companyId={companyId} basePath="/company/fleet/add" />
+        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           {error && (
