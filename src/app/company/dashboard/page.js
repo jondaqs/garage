@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import useOwnerCompanyAccess from '@/hooks/useOwnerCompanyAccess'
 import CompanyAccessBanner from '@/components/CompanyAccessBanner'
+import PendingVehicleClaimBanner from '@/components/PendingVehicleClaimBanner'
 
 export default function CompanyDashboard() {
   const router = useRouter()
@@ -329,6 +330,14 @@ export default function CompanyDashboard() {
             <CompanyAccessBanner {...ownerAccess} companyId={ownerAccess.companyId} compact />
           </div>
         </>
+      )}
+
+      {/* Pending vehicle claims banner */}
+      {companyId && (
+        <PendingVehicleClaimBanner
+          companyId={companyId}
+          basePath="/company/fleet/add"
+        />
       )}
 
       {/* Stat cards */}

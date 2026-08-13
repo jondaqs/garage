@@ -83,7 +83,7 @@ export default function PendingVehicleClaimBanner({
           : null
 
         const addUrl = companyId
-          ? `/dashboard/company/${companyId}/fleet/add?claim_id=${claim.claim_id}`
+          ? `${basePath || `/dashboard/company/${companyId}/fleet/add`}?claim_id=${claim.claim_id}`
           : `${basePath}?claim_id=${claim.claim_id}`
 
         return (

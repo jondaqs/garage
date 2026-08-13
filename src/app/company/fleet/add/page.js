@@ -219,7 +219,7 @@ export default function AddFleetVehiclePage() {
           <p className="text-gray-500">Register a new company vehicle</p>
         </div>
 
-        <PendingVehicleClaimBanner companyId={companyId} />
+        <PendingVehicleClaimBanner companyId={companyId} basePath="/company/fleet/add" />
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           {error && (
