@@ -51,6 +51,9 @@ const TYPE_CONFIG = {
   // Walk-in work order notifications (provider-side)
   walk_in_wo_created:          { icon: ClipboardList,  bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Walk-In WO'    },
 
+  // Estimate auto-approved (owner opted out of approval)
+  estimate_auto_approved:      { icon: CheckCircle,   bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Estimate Approved' },
+
   // Existing types
   company:                     { icon: Building2,     bg: 'bg-indigo-100', iconCls: 'text-indigo-600', label: 'Company'        },
   provider:                    { icon: Store,         bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Provider'       },

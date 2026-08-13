@@ -45,7 +45,7 @@ export async function POST(request, { params }) {
     if (rpcErr) return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
 
-    const { work_order_number, provider_name, estimate, owner } = result
+    const { work_order_number, provider_name, estimate, owner, auto_approved } = result
 
     // ── 2. Resolve owner contact via service client ───────────────────────────
     const sc = getServiceClient()
@@ -318,6 +318,7 @@ export async function POST(request, { params }) {
     return NextResponse.json({
       success:           true,
       work_order_number,
+      auto_approved:     !!auto_approved,
       notification_sent: true,
       email_sent:        emailSent,
       sms_sent:          smsSent,

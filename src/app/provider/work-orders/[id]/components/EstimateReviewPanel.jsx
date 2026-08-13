@@ -37,6 +37,9 @@ export default function EstimateReviewPanel({
   // inline editing state: { id, field, value }
   const [editing,         setEditing]         = useState(null)
   const [saving,          setSaving]          = useState(false)
+  // owner's approval preference
+  const [ownerRequiresApproval, setOwnerRequiresApproval] = useState(true)
+  const [approvalCheckDone,     setApprovalCheckDone]     = useState(false)
 
   const [vatRate, setVatRate] = useState(workOrder?.vat_rate ?? 16)
 
@@ -94,6 +97,54 @@ export default function EstimateReviewPanel({
     if (statusCode === 'internal_review') fetchBreakdown()
   }, [statusCode, fetchBreakdown])
 
+  // ── Check owner's approval preference ─────────────────────────────────
+  useEffect(() => {
+    if (statusCode !== 'internal_review' || !workOrder?.vehicle_id) return
+    const checkApproval = async () => {
+      try {
+        // Get vehicle ownership
+        const { data: ownership } = await supabase
+          .from('vehicle_ownership')
+          .select('owner_user_id, owner_company_id')
+          .eq('vehicle_id', workOrder.vehicle_id)
+          .maybeSingle()
+
+        if (!ownership) {
+          // Walk-in with no ownership → auto-approve
+          setOwnerRequiresApproval(false)
+          setApprovalCheckDone(true)
+          return
+        }
+
+        if (ownership.owner_company_id) {
+          // Company fleet → check company_profiles
+          const { data: company } = await supabase
+            .from('company_profiles')
+            .select('require_estimate_approval')
+            .eq('id', ownership.owner_company_id)
+            .maybeSingle()
+          setOwnerRequiresApproval(company?.require_estimate_approval ?? false)
+        } else if (ownership.owner_user_id) {
+          // Individual owner → check user_profiles
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('require_estimate_approval')
+            .eq('id', ownership.owner_user_id)
+            .maybeSingle()
+          setOwnerRequiresApproval(profile?.require_estimate_approval ?? false)
+        } else {
+          setOwnerRequiresApproval(false)
+        }
+      } catch {
+        // Default to requiring approval on error
+        setOwnerRequiresApproval(true)
+      } finally {
+        setApprovalCheckDone(true)
+      }
+    }
+    checkApproval()
+  }, [statusCode, workOrder?.vehicle_id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Inline price edit handlers ────────────────────────────────────────────
   const startEdit = (id, field, currentValue) => {
     setEditing({ id, field, value: String(currentValue ?? '') })
@@ -140,7 +191,10 @@ export default function EstimateReviewPanel({
 
   // ── Send estimate ─────────────────────────────────────────────────────────
   const handleSend = async () => {
-    if (!window.confirm('Send this estimate to the customer for approval?')) return
+    const confirmMsg = ownerRequiresApproval
+      ? 'Send this estimate to the customer for approval?'
+      : 'The vehicle owner has opted out of estimate approval.\n\nThis will auto-approve the estimate and the work order will move to "Approved" status. The owner will be notified that work is proceeding.\n\nContinue?'
+    if (!window.confirm(confirmMsg)) return
     setSending(true); setError(''); setSuccess('')
     try {
       const resp = await fetch(`/api/work-orders/${workOrder.id}/send-estimate`, {
@@ -150,7 +204,11 @@ export default function EstimateReviewPanel({
       })
       const data = await resp.json()
       if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to send estimate')
-      setSuccess(`Estimate sent to customer for approval.${data.email_sent ? ' Email delivered.' : ''}${data.sms_sent ? ' SMS delivered.' : ''}`)
+      if (data.auto_approved) {
+        setSuccess('Estimate auto-approved — work order moved to Approved. Owner notified.')
+      } else {
+        setSuccess(`Estimate sent to customer for approval.${data.email_sent ? ' Email delivered.' : ''}${data.sms_sent ? ' SMS delivered.' : ''}`)
+      }
       onSent?.()
     } catch (err) {
       setError(err.message)
@@ -484,17 +542,29 @@ export default function EstimateReviewPanel({
           </div>
         )}
 
+        {/* Auto-approve info banner */}
+        {canSend && approvalCheckDone && !ownerRequiresApproval && !success && (
+          <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <CheckCircle size={12} />
+            The vehicle owner has opted out of estimate approval. Sending will auto-approve and move the work order to &ldquo;Approved&rdquo; status.
+          </div>
+        )}
+
         {/* Send button */}
         {canSend && !success && (
           <button
             onClick={handleSend}
             disabled={sending || total === 0}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors ${
+              ownerRequiresApproval
+                ? 'bg-yellow-500 hover:bg-yellow-600'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
             {sending ? (
-              <><Loader2 size={14} className="animate-spin" /> Sending to customer…</>
+              <><Loader2 size={14} className="animate-spin" /> {ownerRequiresApproval ? 'Sending to customer…' : 'Auto-approving…'}</>
             ) : (
-              <><Send size={14} /> Send Estimates to Customer</>
+              <><Send size={14} /> {ownerRequiresApproval ? 'Send Estimates to Customer' : 'Auto-Approve & Notify Owner'}</>
             )}
           </button>
         )}
