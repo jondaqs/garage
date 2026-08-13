@@ -42,6 +42,15 @@ const TYPE_CONFIG = {
   internal_review_needed:      { icon: ClipboardList, bg: 'bg-violet-100', iconCls: 'text-violet-600', label: 'Review Needed'    },
   booking_accepted:            { icon: Car,           bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Booking Accepted' },
 
+  // Vehicle claims
+  vehicle_claim_available:     { icon: Car,           bg: 'bg-amber-100',  iconCls: 'text-amber-600',  label: 'Vehicle Claim'  },
+
+  // Walk-in work order notifications (customer-side)
+  walk_in_wo_opened:           { icon: Wrench,        bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Vehicle at Garage' },
+
+  // Walk-in work order notifications (provider-side)
+  walk_in_wo_created:          { icon: ClipboardList,  bg: 'bg-blue-100',   iconCls: 'text-blue-600',   label: 'Walk-In WO'    },
+
   // Existing types
   company:                     { icon: Building2,     bg: 'bg-indigo-100', iconCls: 'text-indigo-600', label: 'Company'        },
   provider:                    { icon: Store,         bg: 'bg-green-100',  iconCls: 'text-green-600',  label: 'Provider'       },
@@ -67,6 +76,16 @@ function getNotificationHref(n, isProvider, isCompany) {
   const type    = n.notification_type || n.type || ''
 
   if (!refId) return null
+
+  // Vehicle claim → add vehicle page with pre-fill
+  if (refType === 'vehicle_claim' || type === 'vehicle_claim_available') {
+    if (isCompany) return `/dashboard/company/${refId}/fleet/add?claim_id=${refId}`
+    return `/dashboard/vehicles/add?claim_id=${refId}`
+  }
+  // Pending vehicle claims table reference → add vehicle page
+  if (refType === 'pending_vehicle_claims') {
+    return `/dashboard/vehicles/add?claim_id=${refId}`
+  }
 
   if (refType === 'recommendation' || type === 'maintenance_recommendation') {
     if (isCompany) return `/company/reminders`

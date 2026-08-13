@@ -141,8 +141,19 @@ export async function POST(request) {
       )
     }
 
-    // ── Walk-in invitation email (existing behaviour) ─────────────────
-    if (result.invitation_id && walk_in_owner_email) {
+    // ── Resolve effective owner ─────────────────────────────────────
+    // The RPC now returns resolved_owner_user_id when walk_in_owner_email
+    // matches an existing user. In that case the email belongs to a
+    // registered user whose car just isn't in the system yet — so we
+    // send the registered-owner notification flow, NOT the invite email.
+    const effectiveOwnerId =
+      owner_user_id || result.resolved_owner_user_id || null
+
+    // ── Walk-in invitation email (only for truly unregistered owners) ──
+    // The RPC no longer creates an invitation when the email resolves to
+    // an existing user, so invitation_id will be null in that case.
+    // Guard with both invitation_id AND no resolved owner for safety.
+    if (result.invitation_id && walk_in_owner_email && !result.resolved_owner_user_id) {
       try {
         await sendWalkInInviteEmail({
           toEmail:          walk_in_owner_email,
@@ -155,14 +166,15 @@ export async function POST(request) {
         })
       } catch (emailErr) {
         console.error('Walk-in invite email failed (non-fatal):', emailErr.message)
-        // Don't early-return — we still want to send the SMS path and notify
-        // owner/admins. Just flag the failure in the response.
         result.email_warning = 'Work order created but invitation email failed to send. You can resend from the work order page.'
       }
     }
 
     // ── Customer comms ────────────────────────────────────────────────
-    // Same awaited pattern as the owner/admin fan-out above.
+    // Pass effectiveOwnerId so that when walk_in_owner_email resolved
+    // to an existing user, notifyCustomerBackground enters Path A
+    // (registered owner: email + SMS + in-app) instead of falling
+    // through to the unregistered SMS-only path.
     backgroundTasks.push(
       notifyCustomerBackground({
         result,
@@ -171,7 +183,7 @@ export async function POST(request) {
           phone: walk_in_owner_phone,
           email: walk_in_owner_email,
         },
-        registeredOwnerUserId:    owner_user_id,
+        registeredOwnerUserId:    effectiveOwnerId,
         registeredOwnerCompanyId: owner_company_id,
         plateNumber:              plate_number.trim().toUpperCase(),
         problemDescription:       problem_description,
@@ -183,14 +195,12 @@ export async function POST(request) {
     )
 
     // Await all comms together so they actually run in serverless.
-    // Each one already swallows its own errors via .catch() so this
-    // resolves cleanly even on partial failures.
     await Promise.all(backgroundTasks)
 
     return NextResponse.json({
       ...result,
-      email_sent:        !!result.invitation_id && !result.email_warning,
-      customer_notified: !!(walk_in_owner_email || walk_in_owner_phone || owner_user_id || owner_company_id),
+      email_sent:        !!(result.invitation_id && !result.email_warning) || !!effectiveOwnerId,
+      customer_notified: !!(walk_in_owner_email || walk_in_owner_phone || effectiveOwnerId || owner_company_id),
     })
 
   } catch (err) {
