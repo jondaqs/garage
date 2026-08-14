@@ -176,6 +176,27 @@ export async function GET(request, { params }) {
     // Fetch provider branding images (header/footer) if uploaded.
     const branding = await getProviderBranding(sc, wo.service_provider_id)
 
+    // Convert branding URLs to base64 data URLs so html2canvas can render
+    // them without CORS issues when the client captures the HTML to PDF.
+    const toDataUrl = async (url) => {
+      if (!url) return null
+      try {
+        const resp = await fetch(url)
+        if (!resp.ok) return null
+        const buf = await resp.arrayBuffer()
+        const contentType = resp.headers.get('content-type') || 'image/png'
+        const base64 = Buffer.from(buf).toString('base64')
+        return `data:${contentType};base64,${base64}`
+      } catch {
+        return url // fallback to original URL
+      }
+    }
+
+    const [headerDataUrl, footerDataUrl] = await Promise.all([
+      toDataUrl(branding.headerUrl),
+      toDataUrl(branding.footerUrl),
+    ])
+
     // Build the document.
     const woUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
     const html = buildInvoiceHtml({
@@ -194,8 +215,8 @@ export async function GET(request, { params }) {
       totalAmount:     inv.total_amount,
       notes:           inv.notes,
       woUrl,
-      headerImageUrl:  branding.headerUrl,
-      footerImageUrl:  branding.footerUrl,
+      headerImageUrl:  headerDataUrl,
+      footerImageUrl:  footerDataUrl,
     })
 
     return new NextResponse(html, {

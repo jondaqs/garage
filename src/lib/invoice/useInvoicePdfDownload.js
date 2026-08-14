@@ -71,13 +71,31 @@ export function useInvoicePdfDownload() {
       idoc.write(html)
       idoc.close()
 
-      // 4. Wait for the iframe to finish layout. The email HTML has no
-      // external scripts or remote images, so layout is essentially instant.
-      // A two-frame delay after readyState 'complete' gives the browser a
-      // chance to flush styles.
+      // 4. Wait for the iframe to finish layout AND all images to load.
+      // Branding images may be remote URLs or base64 data URIs — either way
+      // we must wait for them before html2canvas captures.
       await new Promise((resolve) => {
         const ready = () => {
-          requestAnimationFrame(() => requestAnimationFrame(resolve))
+          // Wait for all <img> elements inside the iframe to finish loading
+          const imgs = Array.from(idoc.querySelectorAll('img'))
+          const pending = imgs.filter(img => !img.complete || img.naturalWidth === 0)
+          if (pending.length === 0) {
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          } else {
+            let loaded = 0
+            const onDone = () => {
+              loaded++
+              if (loaded >= pending.length) {
+                requestAnimationFrame(() => requestAnimationFrame(resolve))
+              }
+            }
+            pending.forEach(img => {
+              img.addEventListener('load', onDone, { once: true })
+              img.addEventListener('error', onDone, { once: true })
+            })
+            // Safety timeout — don't block forever if an image fails silently
+            setTimeout(() => resolve(), 5000)
+          }
         }
         if (idoc.readyState === 'complete') ready()
         else iframe.addEventListener('load', ready, { once: true })
