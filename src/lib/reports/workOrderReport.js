@@ -66,17 +66,17 @@ export async function generateWorkOrderReport(wo, branding = {}) {
   }
   const fmtDate = (d) => d
     ? new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—'
+    : 'N/A'
   const fmtMoney = (n) => {
     const cur = wo.currency_obj
     const code = cur?.code || cur?.currency_code || 'KES'
     return code + ' ' + Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 0 })
   }
 
-  const plate = wo.vehicle?.plate_number || '—'
+  const plate = wo.vehicle?.plate_number || '-'
   const woNum = wo.work_order_number || wo.number || 'N/A'
-  const statusName = wo.status?.display_name || wo.status?.code || '—'
-  const providerName = wo.service_provider?.name || '—'
+  const statusName = wo.status?.display_name || wo.status?.code || '-'
+  const providerName = wo.service_provider?.name || '-'
 
   // ── Header branding image ─────────────────────────────────────────
   if (headerDataUrl) {
@@ -124,21 +124,22 @@ export async function generateWorkOrderReport(wo, branding = {}) {
     ['Work Order',       woNum],
     ['Status',           statusName],
     ['Vehicle',          plate],
-    ['Make / Model',     [wo.vehicle?.make, wo.vehicle?.model, wo.vehicle?.year_of_manufacture].filter(Boolean).join(' ') || '—'],
-    ['Color',            wo.vehicle?.color || '—'],
+    ['Make / Model',     [wo.vehicle?.make, wo.vehicle?.model, wo.vehicle?.year_of_manufacture].filter(Boolean).join(' ') || '-'],
+    ['Color',            wo.vehicle?.color || '-'],
     ['Service Provider', providerName],
-    ['Shop',             wo.shop?.name || wo.shop?.town || '—'],
+    ['Shop',             wo.shop?.name || wo.shop?.town || '-'],
   ]
   if (ownerName) details.push(['Owner', ownerName])
   if (wo.mechanic?.user) {
     const mech = wo.mechanic.user
-    details.push(['Assigned Mechanic', [mech.first_name, mech.last_name].filter(Boolean).join(' ') || '—'])
+    details.push(['Assigned Mechanic', [mech.first_name, mech.last_name].filter(Boolean).join(' ') || '-'])
   }
   details.push(['Opened', fmtDate(wo.opened_at || wo.created_at)])
   if (wo.completed_at) details.push(['Completed', fmtDate(wo.completed_at)])
   if (wo.initial_mileage) {
-    let mileageStr = Number(wo.initial_mileage).toLocaleString() + ' km'
-    if (wo.final_mileage) mileageStr += '  →  ' + Number(wo.final_mileage).toLocaleString() + ' km'
+    const fmtNum = (n) => Number(n).toLocaleString('en-US')
+    let mileageStr = fmtNum(wo.initial_mileage) + ' km'
+    if (wo.final_mileage) mileageStr += '  ->  ' + fmtNum(wo.final_mileage) + ' km'
     details.push(['Mileage', mileageStr])
   }
 
@@ -214,7 +215,7 @@ export async function generateWorkOrderReport(wo, branding = {}) {
     // Table header
     setFont(8, 'bold'); rgb(100, 100, 100)
     pdf.text('SERVICE', margin, y)
-    pdf.text('EST. COST', pageW - margin - 30, y)
+    pdf.text('EST. COST', pageW - margin - 32, y, { align: 'right' })
     pdf.text('ACTUAL', pageW - margin, y, { align: 'right' })
     y += 4
 
@@ -222,10 +223,13 @@ export async function generateWorkOrderReport(wo, branding = {}) {
       ensureSpace(8)
       setFont(9, 'normal'); rgb(30, 30, 30)
       const name = svc.service?.name || svc.service_name || svc.name || 'Service'
-      const truncName = name.length > 50 ? name.slice(0, 47) + '...' : name
+      const maxNameW = pageW - margin * 2 - 70
+      const truncName = pdf.getTextWidth(name) > maxNameW
+        ? name.slice(0, 40) + '...'
+        : name
       pdf.text(truncName, margin, y)
       setFont(9, 'normal'); rgb(100, 100, 100)
-      pdf.text(fmtMoney(svc.estimated_cost), pageW - margin - 30, y)
+      pdf.text(fmtMoney(svc.estimated_cost), pageW - margin - 32, y, { align: 'right' })
       setFont(9, 'normal'); rgb(30, 30, 30)
       pdf.text(fmtMoney(svc.actual_cost || svc.estimated_cost), pageW - margin, y, { align: 'right' })
       y += 5
@@ -245,8 +249,8 @@ export async function generateWorkOrderReport(wo, branding = {}) {
 
     setFont(8, 'bold'); rgb(100, 100, 100)
     pdf.text('PART', margin, y)
-    pdf.text('QTY', pageW - margin - 50, y)
-    pdf.text('UNIT PRICE', pageW - margin - 25, y)
+    pdf.text('QTY', pageW - margin - 55, y, { align: 'right' })
+    pdf.text('UNIT PRICE', pageW - margin - 28, y, { align: 'right' })
     pdf.text('TOTAL', pageW - margin, y, { align: 'right' })
     y += 4
 
@@ -254,11 +258,14 @@ export async function generateWorkOrderReport(wo, branding = {}) {
       ensureSpace(8)
       setFont(9, 'normal'); rgb(30, 30, 30)
       const name = p.part_name || p.name || 'Part'
-      const truncName = name.length > 40 ? name.slice(0, 37) + '...' : name
+      const maxNameW = pageW - margin * 2 - 70
+      const truncName = pdf.getTextWidth(name) > maxNameW
+        ? name.slice(0, 30) + '...'
+        : name
       pdf.text(truncName, margin, y)
       setFont(9, 'normal'); rgb(100, 100, 100)
-      pdf.text(String(p.quantity || 1), pageW - margin - 50, y)
-      pdf.text(fmtMoney(p.unit_price), pageW - margin - 25, y)
+      pdf.text(String(p.quantity || 1), pageW - margin - 55, y, { align: 'right' })
+      pdf.text(fmtMoney(p.unit_price), pageW - margin - 28, y, { align: 'right' })
       setFont(9, 'normal'); rgb(30, 30, 30)
       pdf.text(fmtMoney((p.quantity || 1) * Number(p.unit_price || 0)), pageW - margin, y, { align: 'right' })
       y += 5
