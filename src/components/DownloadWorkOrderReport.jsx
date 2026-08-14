@@ -19,12 +19,67 @@ export default function DownloadWorkOrderReport({ wo, className = '' }) {
     if (!wo) return
     setDownloading(true)
     try {
-      // Fetch provider branding images (header/footer) if available
+      const supabase = createClient()
+
+      // ── Enrich wo with services, parts, issues if missing ───────────
+      // The customer-side RPC returns these nested in the wo object, but
+      // the provider-side direct query doesn't. Fetch them separately so
+      // the report is complete regardless of which page triggers it.
+      const enriched = { ...wo }
+
+      if (!enriched.services || enriched.services.length === 0) {
+        try {
+          const { data } = await supabase
+            .from('work_order_services')
+            .select(`
+              id, estimated_cost, actual_cost,
+              service:services(name),
+              status:work_order_services_statuses!status_id(code)
+            `)
+            .eq('work_order_id', wo.id)
+          if (data) {
+            enriched.services = data
+              .filter(s => s.status?.code !== 'cancelled')
+              .map(s => ({
+                ...s,
+                service_name: s.service?.name || 'Service',
+              }))
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      if (!enriched.parts || enriched.parts.length === 0) {
+        try {
+          const { data } = await supabase
+            .from('work_order_parts')
+            .select(`
+              id, part_name, quantity, unit_price,
+              status:work_order_parts_statuses!status_id(code)
+            `)
+            .eq('work_order_id', wo.id)
+          if (data) {
+            enriched.parts = data.filter(p =>
+              ['reserved', 'in_use', 'used'].includes(p.status?.code)
+            )
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      if (!enriched.issues || enriched.issues.length === 0) {
+        try {
+          const { data } = await supabase
+            .from('vehicle_issues')
+            .select('id, title, description, severity')
+            .eq('work_order_id', wo.id)
+          if (data) enriched.issues = data
+        } catch { /* non-fatal */ }
+      }
+
+      // ── Fetch provider branding images (header/footer) ──────────────
       let branding = {}
       const providerId = wo.service_provider?.id || wo.service_provider_id
       if (providerId) {
         try {
-          const supabase = createClient()
           const { data } = await supabase
             .from('uploaded_files')
             .select('reference_type, storage_path, storage_bucket')
@@ -41,7 +96,8 @@ export default function DownloadWorkOrderReport({ wo, className = '' }) {
           }
         } catch { /* non-fatal, continue without branding */ }
       }
-      await generateWorkOrderReport(wo, branding)
+
+      await generateWorkOrderReport(enriched, branding)
     } catch (err) {
       console.error('WO report PDF error:', err)
     } finally {
