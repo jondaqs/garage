@@ -34,7 +34,7 @@ export default function DownloadWorkOrderReport({ wo, className = '' }) {
             .select(`
               id, estimated_cost, actual_cost,
               service:services(name),
-              status:work_order_services_statuses!status_id(code)
+              status:work_order_services_statuses(code)
             `)
             .eq('work_order_id', wo.id)
           if (data) {
@@ -53,14 +53,18 @@ export default function DownloadWorkOrderReport({ wo, className = '' }) {
           const { data } = await supabase
             .from('work_order_parts')
             .select(`
-              id, part_name, quantity, unit_price,
-              status:work_order_parts_statuses!status_id(code)
+              id, quantity, unit_price,
+              status:work_order_parts_statuses(code),
+              part:spare_parts(name)
             `)
             .eq('work_order_id', wo.id)
           if (data) {
-            enriched.parts = data.filter(p =>
-              ['reserved', 'in_use', 'used'].includes(p.status?.code)
-            )
+            enriched.parts = data
+              .filter(p => ['reserved', 'in_use', 'used'].includes(p.status?.code))
+              .map(p => ({
+                ...p,
+                part_name: p.part?.name || 'Part',
+              }))
           }
         } catch { /* non-fatal */ }
       }
