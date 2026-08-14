@@ -140,7 +140,7 @@ export async function generateWorkOrderReport(wo, branding = {}) {
     const fmtNum = (n) => Number(n).toLocaleString('en-US')
     let mileageStr = fmtNum(wo.initial_mileage) + ' km'
     if (wo.final_mileage) mileageStr += '  ->  ' + fmtNum(wo.final_mileage) + ' km'
-    details.push(['Mileage', mileageStr])
+    details.push(['Mileage (in-out)', mileageStr])
   }
 
   const colW = contentW / 2
@@ -347,9 +347,13 @@ export async function generateWorkOrderReport(wo, branding = {}) {
       const imgH = (contentW / imgProps.width) * imgProps.height
       const fmt = (footerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
       const footerY = pageH - margin - imgH - 8
-      if (y < footerY) {
-        pdf.addImage(footerDataUrl, fmt, margin, footerY, contentW, imgH)
+
+      if (y >= footerY) {
+        // Content extends past where the footer would go — add a new page
+        pdf.addPage()
       }
+      // Place footer at the bottom of the current (or new) page
+      pdf.addImage(footerDataUrl, fmt, margin, pageH - margin - imgH - 8, contentW, imgH)
     } catch { /* skip if image can't be rendered */ }
   }
 
