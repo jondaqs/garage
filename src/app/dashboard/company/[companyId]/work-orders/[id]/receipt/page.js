@@ -155,6 +155,27 @@ function ReceiptPageInner({ backPath }) {
       const el = printRef.current
       if (!el) return
 
+      // ── Load branding as base64 data URLs ──────────────────────────
+      let headerDataUrl = null
+      let footerDataUrl = null
+      const loadImg = async (url) => {
+        if (!url) return null
+        try {
+          const resp = await fetch(url)
+          if (!resp.ok) return null
+          const blob = await resp.blob()
+          return new Promise(resolve => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result)
+            reader.onerror = () => resolve(null)
+            reader.readAsDataURL(blob)
+          })
+        } catch { return null }
+      }
+      if (branding.headerUrl) headerDataUrl = await loadImg(branding.headerUrl)
+      if (branding.footerUrl) footerDataUrl = await loadImg(branding.footerUrl)
+
+      // ── Capture receipt HTML ───────────────────────────────────────
       const A4_PX = 794
       const wrapper = document.createElement('div')
       wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
@@ -183,24 +204,62 @@ function ReceiptPageInner({ backPath }) {
         const pageH  = pdf.internal.pageSize.getHeight()
         const margin = 8
         const pdfW   = pageW - margin * 2
-        const pdfH   = (canvas.height / canvas.width) * pdfW
 
-        if (pdfH <= pageH - margin * 2) {
-          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
+        // ── Header branding ──────────────────────────────────────────
+        let headerH = 0
+        if (headerDataUrl) {
+          try {
+            const hProps = pdf.getImageProperties(headerDataUrl)
+            headerH = (pdfW / hProps.width) * hProps.height
+            const fmt = (headerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
+            pdf.addImage(headerDataUrl, fmt, margin, margin, pdfW, headerH)
+            headerH += 2
+          } catch { headerH = 0 }
+        }
+
+        // ── Receipt content ──────────────────────────────────────────
+        const contentTop = margin + headerH
+        const pdfH = (canvas.height / canvas.width) * pdfW
+
+        if (pdfH <= pageH - contentTop - margin) {
+          pdf.addImage(imgData, 'PNG', margin, contentTop, pdfW, pdfH)
         } else {
           const pxPerMm = canvas.width / pdfW
+          const firstSliceMm = pageH - contentTop - margin
           const slicePx = Math.floor((pageH - margin * 2) * pxPerMm)
+          const firstSlicePx = Math.floor(firstSliceMm * pxPerMm)
           let srcY = 0
+          let pageIdx = 0
+
           while (srcY < canvas.height) {
-            if (srcY > 0) pdf.addPage()
-            const h = Math.min(slicePx, canvas.height - srcY)
+            if (pageIdx > 0) pdf.addPage()
+            const maxH = pageIdx === 0 ? firstSlicePx : slicePx
+            const h = Math.min(maxH, canvas.height - srcY)
             const slice = document.createElement('canvas')
             slice.width  = canvas.width
             slice.height = h
             slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
-            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, h / pxPerMm)
-            srcY += slicePx
+            const yPos = pageIdx === 0 ? contentTop : margin
+            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, yPos, pdfW, h / pxPerMm)
+            srcY += maxH
+            pageIdx++
           }
+        }
+
+        // ── Footer branding (last page) ──────────────────────────────
+        if (footerDataUrl) {
+          try {
+            const fProps = pdf.getImageProperties(footerDataUrl)
+            const footerH = (pdfW / fProps.width) * fProps.height
+            const fmt = (footerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
+
+            if (pdfH <= pageH - contentTop - margin && contentTop + pdfH >= pageH - margin - footerH) {
+              pdf.addPage()
+            }
+            const lastPage = pdf.internal.getNumberOfPages()
+            pdf.setPage(lastPage)
+            pdf.addImage(footerDataUrl, fmt, margin, pageH - margin - footerH, pdfW, footerH)
+          } catch { /* skip */ }
         }
 
         pdf.save('Receipt-' + (receipt?.receipt_number || params.id) + '.pdf')
