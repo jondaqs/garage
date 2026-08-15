@@ -154,21 +154,32 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       if (!resolvedCustomer && inv.vehicle_id) {
         const { data: vo } = await supabase
           .from('vehicle_ownership')
-          .select(`
-            owner_user_id, owner_company_id,
-            user_profiles_secure!vehicle_ownership_owner_user_id_fkey(first_name, last_name, email, phone),
-            company_profiles_secure!vehicle_ownership_owner_company_id_fkey(name, phone, email)
-          `)
+          .select('owner_user_id, owner_company_id')
           .eq('vehicle_id', inv.vehicle_id)
           .maybeSingle()
-        if (vo?.user_profiles?.first_name || vo?.user_profiles?.last_name) {
-          resolvedCustomer = vo.user_profiles
-        } else if (vo?.company_profiles?.name) {
-          resolvedCustomer = {
-            first_name: vo.company_profiles.name,
-            last_name:  '',
-            phone:      vo.company_profiles.phone || null,
-            email:      vo.company_profiles.email || null,
+
+        if (vo?.owner_user_id) {
+          const { data: ownerProfile } = await supabase
+            .from('user_profiles_secure')
+            .select('first_name, last_name, email, phone')
+            .eq('id', vo.owner_user_id)
+            .maybeSingle()
+          if (ownerProfile?.first_name || ownerProfile?.last_name) {
+            resolvedCustomer = ownerProfile
+          }
+        } else if (vo?.owner_company_id) {
+          const { data: companyProfile } = await supabase
+            .from('company_profiles_secure')
+            .select('name, phone, email')
+            .eq('id', vo.owner_company_id)
+            .maybeSingle()
+          if (companyProfile?.name) {
+            resolvedCustomer = {
+              first_name: companyProfile.name,
+              last_name:  '',
+              phone:      companyProfile.phone || null,
+              email:      companyProfile.email || null,
+            }
           }
         }
       }
