@@ -244,8 +244,44 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
       const el = printRef.current
       if (!el) return
 
-      // Render into a fixed A4-width (794px @96dpi) off-screen container so the
-      // capture is never constrained by the on-screen column layout
+      // ── Load branding images ────────────────────────────────────────
+      const supabase = createClient()
+      let headerDataUrl = null
+      let footerDataUrl = null
+      const providerId = workOrder.service_provider_id || workOrder.service_provider?.id
+      if (providerId) {
+        try {
+          const { data: brandingRows } = await supabase
+            .from('uploaded_files')
+            .select('reference_type, storage_path, storage_bucket')
+            .eq('reference_id', providerId)
+            .in('reference_type', ['provider_branding_header', 'provider_branding_footer'])
+          if (brandingRows?.length) {
+            const loadImg = async (row) => {
+              try {
+                const { data: { publicUrl } } = supabase.storage
+                  .from(row.storage_bucket).getPublicUrl(row.storage_path)
+                const resp = await fetch(publicUrl)
+                if (!resp.ok) return null
+                const blob = await resp.blob()
+                return new Promise(resolve => {
+                  const reader = new FileReader()
+                  reader.onload = () => resolve(reader.result)
+                  reader.onerror = () => resolve(null)
+                  reader.readAsDataURL(blob)
+                })
+              } catch { return null }
+            }
+            for (const row of brandingRows) {
+              const dataUrl = await loadImg(row)
+              if (row.reference_type === 'provider_branding_header') headerDataUrl = dataUrl
+              else footerDataUrl = dataUrl
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      // ── Capture receipt HTML ─────────────────────────────────────────
       const A4_PX = 794
       const wrapper = document.createElement('div')
       wrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + A4_PX + 'px;background:#ffffff;overflow:visible;'
@@ -274,27 +310,69 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         const pageH  = pdf.internal.pageSize.getHeight()  // 297mm
         const margin = 8
         const pdfW   = pageW - margin * 2                 // 194mm
-        const pdfH   = (canvas.height / canvas.width) * pdfW
 
-        if (pdfH <= pageH - margin * 2) {
-          // Single page — centre vertically
-          pdf.addImage(imgData, 'PNG', margin, (pageH - pdfH) / 2, pdfW, pdfH)
+        // ── Header branding ─────────────────────────────────────────
+        let headerH = 0
+        if (headerDataUrl) {
+          try {
+            const hProps = pdf.getImageProperties(headerDataUrl)
+            headerH = (pdfW / hProps.width) * hProps.height
+            const fmt = (headerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
+            pdf.addImage(headerDataUrl, fmt, margin, margin, pdfW, headerH)
+            headerH += 2 // small gap
+          } catch { headerH = 0 }
+        }
+
+        // ── Receipt content ─────────────────────────────────────────
+        const contentTop = margin + headerH
+        const pdfH = (canvas.height / canvas.width) * pdfW
+
+        if (pdfH <= pageH - contentTop - margin) {
+          // Single page — position below header
+          pdf.addImage(imgData, 'PNG', margin, contentTop, pdfW, pdfH)
         } else {
           // Multi-page: slice canvas row by row
           const pxPerMm  = canvas.width / pdfW
+          const firstSliceMm = pageH - contentTop - margin
           const slicePx  = Math.floor((pageH - margin * 2) * pxPerMm)
+          const firstSlicePx = Math.floor(firstSliceMm * pxPerMm)
           let srcY = 0
+          let pageIdx = 0
+
           while (srcY < canvas.height) {
-            if (srcY > 0) pdf.addPage()
-            const h = Math.min(slicePx, canvas.height - srcY)
+            if (pageIdx > 0) pdf.addPage()
+            const maxH = pageIdx === 0 ? firstSlicePx : slicePx
+            const h = Math.min(maxH, canvas.height - srcY)
             const slice = document.createElement('canvas')
             slice.width  = canvas.width
             slice.height = h
             slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h)
             const slicePdfH = (h / pxPerMm)
-            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, pdfW, slicePdfH)
-            srcY += slicePx
+            const yPos = pageIdx === 0 ? contentTop : margin
+            pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, yPos, pdfW, slicePdfH)
+            srcY += maxH
+            pageIdx++
           }
+        }
+
+        // ── Footer branding (last page) ──────────────────────────────
+        if (footerDataUrl) {
+          try {
+            const fProps = pdf.getImageProperties(footerDataUrl)
+            const footerH = (pdfW / fProps.width) * fProps.height
+            const fmt = (footerDataUrl.match(/^data:image\/(\w+)/) || [])[1]?.toUpperCase() || 'PNG'
+            const footerY = pageH - margin - footerH
+            const lastPageContentBottom = margin + headerH + pdfH
+
+            if (pdfH <= pageH - contentTop - margin && lastPageContentBottom >= footerY) {
+              // Content fits on one page but overlaps footer position — add page
+              pdf.addPage()
+            }
+            // Place at bottom of current last page
+            const lastPage = pdf.internal.getNumberOfPages()
+            pdf.setPage(lastPage)
+            pdf.addImage(footerDataUrl, fmt, margin, pageH - margin - footerH, pdfW, footerH)
+          } catch { /* skip */ }
         }
 
         pdf.save('Receipt-' + (receipt?.receipt_number || workOrder.work_order_number) + '.pdf')
