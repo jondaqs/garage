@@ -431,7 +431,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
   const isConfirmed  = receipt.confirmed
   const services     = items.filter(i => i.item_type === 'service')
   const parts        = items.filter(i => i.item_type === 'part')
-  const tax          = Math.round((invoice.tax_rate || 0.16) * 100)
+  const tax          = workOrder.vat_rate ?? (invoice.tax_rate ? Math.round(invoice.tax_rate * (invoice.tax_rate < 1 ? 100 : 1)) : 0)
   const custName     = customer ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim() : null
 
   return (
