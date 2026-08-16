@@ -230,7 +230,7 @@ export default function SubscriptionManager({ subscriberType, subscriberId, subs
         subscriberType === 'individual'
           ? supabase.from('user_profiles_secure').select('first_name, last_name, email, phone').eq('id', subscriberId).maybeSingle()
           : subscriberType === 'company'
-            ? supabase.from('company_profiles_secure').select('name, email, phone').eq('id', subscriberId).maybeSingle()
+            ? supabase.from('company_profiles_secure').select('name, phone').eq('id', subscriberId).maybeSingle()
             : supabase.from('service_providers_secure').select('name, email, phone').eq('id', subscriberId).maybeSingle(),
       ])
 

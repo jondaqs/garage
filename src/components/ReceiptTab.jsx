@@ -136,10 +136,28 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         setProvider(sp)
       }
 
-      // 6. Customer — use local variable (not state) to track resolution across steps
+      // 6. Customer — use local variable (not state) to track resolution across steps.
+      //
+      // The work order prop may already carry resolved owner data from the
+      // get_work_order_with_details RPC (as workOrder.owner). Use that first
+      // so we don't re-query data the parent already fetched — and, critically,
+      // so company-vehicle customers are available even when the caller can't
+      // read vehicle_ownership via RLS.
       let resolvedCustomer = null
 
-      if (inv.issued_to_user_id) {
+      // Priority 1: owner data already on the work order (RPC result)
+      const wo_owner = workOrder.owner || workOrder.customer
+      if (wo_owner && (wo_owner.first_name || wo_owner.last_name || wo_owner.company_name)) {
+        resolvedCustomer = {
+          first_name: wo_owner.first_name || wo_owner.company_name || '',
+          last_name:  wo_owner.last_name || '',
+          phone:      wo_owner.phone || null,
+          email:      wo_owner.email || null,
+        }
+      }
+
+      // Priority 2: issued_to_user_id on the invoice → user profile
+      if (!resolvedCustomer && inv.issued_to_user_id) {
         const { data: cust } = await supabase
           .from('user_profiles_secure')
           .select('first_name, last_name, email, phone')
@@ -150,7 +168,8 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         }
       }
 
-      // Fallback: resolve from vehicle_ownership (individual owner or company fleet)
+      // Priority 3: vehicle_ownership (works for car owners viewing their own
+      // receipt; providers are blocked by RLS so this is a soft fallback)
       if (!resolvedCustomer && inv.vehicle_id) {
         const { data: vo } = await supabase
           .from('vehicle_ownership')
@@ -170,7 +189,7 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         } else if (vo?.owner_company_id) {
           const { data: companyProfile } = await supabase
             .from('company_profiles_secure')
-            .select('name, phone, email')
+            .select('name, phone')
             .eq('id', vo.owner_company_id)
             .maybeSingle()
           if (companyProfile?.name) {
@@ -178,15 +197,14 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
               first_name: companyProfile.name,
               last_name:  '',
               phone:      companyProfile.phone || null,
-              email:      companyProfile.email || null,
+              email:      null,
             }
           }
         }
       }
 
-      // API fallback — providers can't read vehicle_ownership via RLS,
-      // so when client-side resolution fails, use the API route which
-      // resolves customer server-side with service role.
+      // Priority 4: API fallback — the API route uses the service role and
+      // resolves through vehicle_ownership, bookings, and walk-in fields.
       if (!resolvedCustomer) {
         try {
           const resp = await fetch(`/api/work-orders/${workOrder.id}/invoice`)

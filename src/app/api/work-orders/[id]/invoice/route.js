@@ -161,15 +161,25 @@ export async function GET(request, { params }) {
       } else if (voRow?.owner_company_id) {
         const { data: companyProfile } = await sc
           .from('company_profiles_secure')
-          .select('name, phone, email')
+          .select('name, phone, owner_user_id')
           .eq('id', voRow.owner_company_id)
           .maybeSingle()
         if (companyProfile?.name) {
+          // Company has no email column — resolve from the company owner's profile
+          let companyEmail = null
+          if (companyProfile.owner_user_id) {
+            const { data: ownerP } = await sc
+              .from('user_profiles_secure')
+              .select('email')
+              .eq('id', companyProfile.owner_user_id)
+              .maybeSingle()
+            companyEmail = ownerP?.email || null
+          }
           customer = {
             first_name: companyProfile.name,
             last_name:  '',
             phone:      companyProfile.phone || null,
-            email:      companyProfile.email || null,
+            email:      companyEmail,
           }
         }
       }
