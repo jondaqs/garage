@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Trash2, CheckCircle, PlayCircle, SkipForward,
@@ -725,9 +725,11 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                   min="0"
                   max="100"
                   step="0.5"
-                  value={estimate.vat_rate ?? 16}
-                  onChange={async (e) => {
+                  defaultValue={estimate.vat_rate ?? 16}
+                  key={`vat-${estimate.vat_rate}`}
+                  onBlur={async (e) => {
                     const rate = parseFloat(e.target.value) || 0
+                    if (rate === (estimate.vat_rate ?? 16)) return
                     const { error } = await supabase
                       .from('work_orders')
                       .update({ vat_rate: rate, updated_at: new Date().toISOString() })

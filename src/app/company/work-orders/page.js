@@ -33,7 +33,7 @@ const needsPayment          = (wo) => {
   // Tolerant of either shape PostgREST returns for the one-to-one invoice.
   const inv = Array.isArray(wo.invoice) ? wo.invoice[0] : wo.invoice
   if (!inv) return false
-  return ['sent', 'overdue'].includes(inv.status) && !inv.paid_at
+  return ['issued', 'sent', 'overdue'].includes(inv.status) && !inv.paid_at
 }
 const needsAnyAction = (wo) =>
   needsEstimateApproval(wo) || needsCheckoutReview(wo) || needsPayment(wo)

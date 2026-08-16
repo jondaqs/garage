@@ -1522,7 +1522,14 @@ export default function WorkOrderDetailPage() {
           {activeTab === 'services' && (
             <ServicesTab
               workOrder={woWithProvider}
-              onEstimateChange={setEstimate}
+              onEstimateChange={(est) => {
+                setEstimate(est)
+                // Sync vat_rate into the work order state so InvoiceTab
+                // and other tabs see the latest value without a full reload.
+                if (est?.vat_rate != null && est.vat_rate !== wo?.vat_rate) {
+                  setWo(prev => prev ? { ...prev, vat_rate: est.vat_rate } : prev)
+                }
+              }}
               onServiceAdded={() => setServiceCount(c => (c || 0) + 1)}
                 onReApprovalNeeded={handleReApprovalNeeded}
               isAdminOrOwner={isAdminOrOwner}

@@ -100,22 +100,29 @@ export default function CompanyMemberWorkOrderDetailPage() {
       if (!result.success) throw new Error(result.error)
       setWo(result.data)
 
-      // Invoice status
-      const { data: invRow } = await supabase
-        .from('invoices').select('id, status').eq('work_order_id', workOrderId).maybeSingle()
-      setInvoiceStatus(invRow?.status || null)
+      // Invoice status — use API route (service-role backed, bypasses RLS)
+      // so company members see the invoice banner even when invoices_select
+      // RLS doesn't cover their company_users path.
+      try {
+        const invResp = await fetch(`/api/work-orders/${workOrderId}/invoice`)
+        if (invResp.ok) {
+          const invData = await invResp.json()
+          const invStatus = invData.invoice?.status || null
+          setInvoiceStatus(invStatus)
 
-      // Check if receipt is confirmed by provider
-      if (invRow?.status === 'paid' && invRow?.id) {
-        const { data: receiptRow } = await supabase
-          .from('receipts')
-          .select('confirmed')
-          .eq('invoice_id', invRow.id)
-          .order('paid_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        setReceiptConfirmed(receiptRow?.confirmed ?? null)
-      }
+          // Check if receipt is confirmed by provider
+          if (invStatus === 'paid' && invData.invoice?.id) {
+            const { data: receiptRow } = await supabase
+              .from('receipts')
+              .select('confirmed')
+              .eq('invoice_id', invData.invoice.id)
+              .order('paid_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            setReceiptConfirmed(receiptRow?.confirmed ?? null)
+          }
+        }
+      } catch (_) {}
 
       // Check if provider has submitted checkout
       const { data: checkoutRow } = await supabase
