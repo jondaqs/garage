@@ -125,6 +125,12 @@ export async function GET(request, { params }) {
 
     // Resolve customer — uses service role so it works regardless of caller
     // (providers can't read vehicle_ownership via RLS, so we resolve here).
+    // Resolution chain mirrors send-invoice and invoice/html routes:
+    //   1. issued_to_user_id → user profile
+    //   2. vehicle_ownership → individual owner profile
+    //   3. vehicle_ownership → company profile (fleet vehicle)
+    //   4. booking → booking customer profile
+    //   5. work order → walk-in owner name
     let customer = null
     if (inv.issued_to_user_id) {
       const { data: cust } = await sc
@@ -165,6 +171,36 @@ export async function GET(request, { params }) {
             phone:      companyProfile.phone || null,
             email:      companyProfile.email || null,
           }
+        }
+      }
+    }
+    // Fallback: booking customer
+    if (!customer) {
+      const { data: booking } = await sc
+        .from('bookings_secure')
+        .select('customer:user_profiles_secure!customer_user_id(first_name, last_name, email, phone)')
+        .eq('work_order_id', workOrderId)
+        .maybeSingle()
+      if (booking?.customer) {
+        const bc = booking.customer
+        if (bc.first_name || bc.last_name || bc.email || bc.phone) {
+          customer = bc
+        }
+      }
+    }
+    // Fallback: walk-in owner name
+    if (!customer) {
+      const { data: woWalkin } = await sc
+        .from('work_orders_secure')
+        .select('walk_in_owner_name')
+        .eq('id', workOrderId)
+        .maybeSingle()
+      if (woWalkin?.walk_in_owner_name) {
+        customer = {
+          first_name: woWalkin.walk_in_owner_name,
+          last_name:  '',
+          phone:      null,
+          email:      null,
         }
       }
     }

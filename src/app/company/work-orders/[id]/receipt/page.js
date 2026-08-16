@@ -334,11 +334,10 @@ function ReceiptPageInner({ backPath }) {
         </button>
       </div>
 
-      {/* Printable area */}
+      {/* Printable area — branding header/footer are added during PDF
+          generation only; they must NOT be inside printRef or html2canvas
+          captures them and the download adds them again (double). */}
       <div ref={printRef} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {branding.headerUrl && (
-          <img src={branding.headerUrl} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
-        )}
         <ReceiptContent
           receipt={receipt}
           invoice={invoice}
@@ -356,9 +355,6 @@ function ReceiptPageInner({ backPath }) {
           fmtDs={fmtDs}
           isConfirmed={isConfirmed}
         />
-        {branding.footerUrl && (
-          <img src={branding.footerUrl} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
-        )}
       </div>
     </div>
   )
