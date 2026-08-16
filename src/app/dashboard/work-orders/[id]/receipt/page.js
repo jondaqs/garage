@@ -78,13 +78,17 @@ function ReceiptPageInner({ backPath }) {
       setCurrency(data.currency || null)
       setWorkOrder(data.work_order || null)
 
+      // Customer — resolved server-side by the API route (bypasses RLS)
+      if (data.customer) setCustomer(data.customer)
+
       // Fetch provider branding images (header/footer)
-      if (data.provider?.id) {
+      const providerId = data.provider?.id
+      if (providerId) {
         try {
           const { data: brandingFiles } = await supabase
             .from('uploaded_files')
             .select('reference_type, storage_path, storage_bucket')
-            .eq('reference_id', data.provider.id)
+            .eq('reference_id', providerId)
             .in('reference_type', ['provider_branding_header', 'provider_branding_footer'])
           if (brandingFiles && brandingFiles.length > 0) {
             const b = { headerUrl: null, footerUrl: null }
@@ -107,16 +111,6 @@ function ReceiptPageInner({ backPath }) {
         .limit(1)
         .maybeSingle()
       setReceipt(rct || null)
-
-      // Customer
-      if (data.invoice.issued_to_user_id) {
-        const { data: cust } = await supabase
-          .from('user_profiles_secure')
-          .select('first_name, last_name, email, phone')
-          .eq('id', data.invoice.issued_to_user_id)
-          .maybeSingle()
-        setCustomer(cust)
-      }
 
     } catch (e) {
       setError(e.message)

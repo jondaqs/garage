@@ -184,6 +184,19 @@ export default function ReceiptTab({ workOrder, canConfirm = false }) {
         }
       }
 
+      // API fallback — providers can't read vehicle_ownership via RLS,
+      // so when client-side resolution fails, use the API route which
+      // resolves customer server-side with service role.
+      if (!resolvedCustomer) {
+        try {
+          const resp = await fetch(`/api/work-orders/${workOrder.id}/invoice`)
+          if (resp.ok) {
+            const apiData = await resp.json()
+            if (apiData.customer) resolvedCustomer = apiData.customer
+          }
+        } catch { /* non-fatal */ }
+      }
+
       if (resolvedCustomer) setCustomer(resolvedCustomer)
 
     } catch (e) {

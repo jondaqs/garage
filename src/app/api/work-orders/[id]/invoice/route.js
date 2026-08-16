@@ -97,7 +97,7 @@ export async function GET(request, { params }) {
     // Load invoice
     const { data: inv } = await sc
       .from('invoices')
-      .select('id, invoice_number, status, subtotal, tax_rate, tax_amount, discount, total_amount, notes, due_date, issued_at, paid_at')
+      .select('id, invoice_number, status, subtotal, tax_rate, tax_amount, discount, total_amount, notes, due_date, issued_at, paid_at, issued_to_user_id, vehicle_id, service_provider_id')
       .eq('work_order_id', workOrderId).maybeSingle()
 
     if (!inv) return NextResponse.json({ success: true, invoice: null })
@@ -120,8 +120,54 @@ export async function GET(request, { params }) {
 
     // Load vehicle & provider names
     const { data: vehicle }  = await sc.from('vehicles_secure').select('plate_number, make, model').eq('id', wo.vehicle_id).maybeSingle()
-    const { data: provider } = await sc.from('service_providers_secure').select('name, phone, email').eq('id', wo.service_provider_id).maybeSingle()
+    const { data: provider } = await sc.from('service_providers_secure').select('id, name, phone, email').eq('id', wo.service_provider_id).maybeSingle()
     const { data: woDetails } = await sc.from('work_orders_secure').select('work_order_number').eq('id', workOrderId).maybeSingle()
+
+    // Resolve customer — uses service role so it works regardless of caller
+    // (providers can't read vehicle_ownership via RLS, so we resolve here).
+    let customer = null
+    if (inv.issued_to_user_id) {
+      const { data: cust } = await sc
+        .from('user_profiles_secure')
+        .select('first_name, last_name, email, phone')
+        .eq('id', inv.issued_to_user_id)
+        .maybeSingle()
+      if (cust?.first_name || cust?.last_name || cust?.email || cust?.phone) {
+        customer = cust
+      }
+    }
+    // Fallback: resolve from vehicle_ownership (individual owner or company fleet)
+    if (!customer && wo.vehicle_id) {
+      const { data: voRow } = await sc
+        .from('vehicle_ownership')
+        .select('owner_user_id, owner_company_id')
+        .eq('vehicle_id', wo.vehicle_id)
+        .maybeSingle()
+      if (voRow?.owner_user_id) {
+        const { data: ownerProfile } = await sc
+          .from('user_profiles_secure')
+          .select('first_name, last_name, email, phone')
+          .eq('id', voRow.owner_user_id)
+          .maybeSingle()
+        if (ownerProfile?.first_name || ownerProfile?.last_name) {
+          customer = ownerProfile
+        }
+      } else if (voRow?.owner_company_id) {
+        const { data: companyProfile } = await sc
+          .from('company_profiles_secure')
+          .select('name, phone, email')
+          .eq('id', voRow.owner_company_id)
+          .maybeSingle()
+        if (companyProfile?.name) {
+          customer = {
+            first_name: companyProfile.name,
+            last_name:  '',
+            phone:      companyProfile.phone || null,
+            email:      companyProfile.email || null,
+          }
+        }
+      }
+    }
 
     return NextResponse.json({
       success:    true,
@@ -130,6 +176,7 @@ export async function GET(request, { params }) {
       receipt:    receipt || null,
       vehicle,
       provider,
+      customer,
       // Currency resolved from work_orders.currency_id. Falls through to null
       // if the work order has no billing currency set.
       currency:   wo.currency || null,
