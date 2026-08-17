@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Search, Users, MoreVertical, ShieldOff, ShieldCheck, Power, PowerOff, Mail } from 'lucide-react'
+import { Search, Users, MoreVertical, ShieldOff, ShieldCheck, Power, PowerOff, Mail, Car } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 import AdminContactModal from '@/components/admin/AdminContactModal'
 import { banUser, unbanUser } from '@/lib/admin/banUser'
@@ -87,6 +87,7 @@ export default function AdminUsersPage() {
   const [totalAll,   setTotalAll]   = useState(0)
   const [processing, setProcessing] = useState(null)
   const [contactTarget, setContactTarget] = useState(null)
+  const [vehicleCounts, setVehicleCounts] = useState({})  // { userId: count }
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -145,6 +146,21 @@ export default function AdminUsersPage() {
       setUsers(data)
       setTotalCount(count)
       if (page === 1 && !debouncedSearch) setTotalAll(count)
+
+      // Fetch vehicle counts for each user
+      if (userIds.length > 0) {
+        const { data: voRows } = await supabase
+          .from('vehicle_ownership')
+          .select('owner_user_id')
+          .in('owner_user_id', userIds)
+        const counts = {}
+        ;(voRows || []).forEach(r => {
+          counts[r.owner_user_id] = (counts[r.owner_user_id] || 0) + 1
+        })
+        setVehicleCounts(counts)
+      } else {
+        setVehicleCounts({})
+      }
     } catch (err) {
       console.error('Error loading users:')
     } finally {
@@ -251,6 +267,7 @@ export default function AdminUsersPage() {
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Phone</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cars</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Joined</th>
                 <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
               </tr>
@@ -258,7 +275,7 @@ export default function AdminUsersPage() {
             <tbody className="bg-white divide-y divide-gray-100">
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
+                  <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
                     <Users className="w-10 h-10 mx-auto mb-2 text-gray-200" />
                     No users found
                   </td>
@@ -290,6 +307,16 @@ export default function AdminUsersPage() {
                           <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">Active</span>
                         ) : (
                           <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">Inactive</span>
+                        )}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-center">
+                        {vehicleCounts[u.id] ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full font-medium">
+                            <Car size={12} />
+                            {vehicleCounts[u.id]}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">0</span>
                         )}
                       </td>
                       <td className="px-4 sm:px-6 py-4 text-sm text-gray-500 hidden lg:table-cell">

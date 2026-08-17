@@ -8,10 +8,10 @@ import {
   CheckCircle, XCircle, FileText, Store,
   Users, ArrowLeft, Clock, AlertCircle, AlertTriangle,
   ExternalLink, Mail, Phone, Globe, MapPin, Wrench,
-  History, Calendar, DollarSign, Loader,
+  History, Calendar, DollarSign, Loader, BarChart3, Car,
 } from 'lucide-react'
 
-const TABS = ['Overview', 'Documents', 'Shops', 'Services', 'Change History']
+const TABS = ['Overview', 'Documents', 'Shops', 'Services', 'Statistics', 'Change History']
 
 // Human-readable labels for fields we track in provider_change_history.
 const FIELD_LABELS = {
@@ -98,6 +98,8 @@ export default function ProviderDetailPage({ params }) {
   const [shops,          setShops]          = useState([])
   const [services,       setServices]       = useState([])
   const [history,        setHistory]        = useState([])
+  const [stats,          setStats]          = useState(null)    // provider statistics
+  const [statsLoading,   setStatsLoading]   = useState(false)
   const [pendingDiff,    setPendingDiff]    = useState(null)   // most recent change_history entry while pending
   const [fkLookups,      setFkLookups]      = useState({})     // uuid -> label resolutions for diff
   const [loading,        setLoading]        = useState(true)
@@ -317,6 +319,88 @@ export default function ProviderDetailPage({ params }) {
     }
     setFkLookups(lookups)
   }
+
+  // ── Provider statistics ──────────────────────────────────────────────────
+  const loadStats = async (providerId) => {
+    setStatsLoading(true)
+    try {
+      // Total work orders
+      const { count: totalWO } = await supabase
+        .from('work_orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_provider_id', providerId)
+
+      // Work orders by status
+      const { data: woByStatus } = await supabase
+        .from('work_orders')
+        .select('status:work_order_statuses(code, display_name)')
+        .eq('service_provider_id', providerId)
+
+      const statusCounts = {}
+      ;(woByStatus || []).forEach(wo => {
+        const label = wo.status?.display_name || wo.status?.code || 'Unknown'
+        statusCounts[label] = (statusCounts[label] || 0) + 1
+      })
+
+      // Unique vehicles handled
+      const { data: vehicleRows } = await supabase
+        .from('work_orders')
+        .select('vehicle_id')
+        .eq('service_provider_id', providerId)
+      const uniqueVehicles = new Set((vehicleRows || []).map(r => r.vehicle_id).filter(Boolean)).size
+
+      // Total revenue from invoices
+      const { data: invoiceRows } = await supabase
+        .from('invoices')
+        .select('total_amount, status')
+        .eq('service_provider_id', providerId)
+
+      const totalRevenue = (invoiceRows || [])
+        .filter(inv => inv.status === 'paid')
+        .reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0)
+      const totalInvoiced = (invoiceRows || [])
+        .reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0)
+      const invoiceCount = (invoiceRows || []).length
+      const paidCount = (invoiceRows || []).filter(inv => inv.status === 'paid').length
+
+      // Mechanics count
+      const { count: mechanicCount } = await supabase
+        .from('mechanics')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_provider_id', providerId)
+        .eq('is_active', true)
+
+      // Team members (SPU) count
+      const { count: teamCount } = await supabase
+        .from('service_provider_users')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_provider_id', providerId)
+        .eq('is_active', true)
+
+      setStats({
+        totalWO: totalWO || 0,
+        statusCounts,
+        uniqueVehicles,
+        totalRevenue,
+        totalInvoiced,
+        invoiceCount,
+        paidCount,
+        mechanicCount: mechanicCount || 0,
+        teamCount: teamCount || 0,
+      })
+    } catch (err) {
+      console.error('Error loading stats:', err)
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
+  // Lazy-load stats when the tab is first activated
+  useEffect(() => {
+    if (activeTab === 'Statistics' && !stats && provider?.id) {
+      loadStats(provider.id)
+    }
+  }, [activeTab, provider?.id])
 
   // ── Action handlers ───────────────────────────────────────────────────────
   const handleApprove = async () => {
@@ -1085,6 +1169,92 @@ export default function ProviderDetailPage({ params }) {
                   {svc.description && <p className="text-xs text-gray-500 mt-1">{svc.description}</p>}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── STATISTICS TAB ── */}
+      {activeTab === 'Statistics' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            <h2 className="text-base font-semibold">Provider Statistics</h2>
+          </div>
+
+          {statsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          ) : stats ? (
+            <div className="p-6 space-y-6">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700">{stats.totalWO}</p>
+                  <p className="text-xs text-blue-600 mt-1">Total Work Orders</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-green-700">{stats.uniqueVehicles}</p>
+                  <p className="text-xs text-green-600 mt-1">Unique Cars Handled</p>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-700">{stats.mechanicCount}</p>
+                  <p className="text-xs text-purple-600 mt-1">Active Mechanics</p>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-700">{stats.teamCount}</p>
+                  <p className="text-xs text-amber-600 mt-1">Team Members</p>
+                </div>
+              </div>
+
+              {/* Invoice / Revenue summary */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Invoicing</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <p className="text-lg font-bold text-gray-900">{stats.invoiceCount}</p>
+                    <p className="text-xs text-gray-500">Invoices Generated</p>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <p className="text-lg font-bold text-gray-900">{stats.paidCount}</p>
+                    <p className="text-xs text-gray-500">Invoices Paid</p>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <p className="text-lg font-bold text-gray-900">
+                      KES {Number(stats.totalInvoiced).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">Total Invoiced</p>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <p className="text-lg font-bold text-green-700">
+                      KES {Number(stats.totalRevenue).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">Revenue (Paid)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Work orders by status */}
+              {Object.keys(stats.statusCounts).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Work Orders by Status</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {Object.entries(stats.statusCounts)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([status, count]) => (
+                        <div key={status} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
+                          <span className="text-sm text-gray-700 truncate">{status}</span>
+                          <span className="text-sm font-bold text-gray-900 ml-2">{count}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              No statistics available
             </div>
           )}
         </div>
