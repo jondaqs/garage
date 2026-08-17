@@ -170,6 +170,7 @@ export async function POST(request, { params }) {
           vehiclePlate,
           estimate,
           workOrderId,
+          autoApproved:    !!auto_approved,
         })
         emailSent = true
       } catch (e) {
@@ -188,6 +189,7 @@ export async function POST(request, { params }) {
           providerName:    provider_name,
           estimateTotal:   estimate?.total,
           workOrderId,
+          autoApproved:    !!auto_approved,
         })
         smsSent = smsResult?.sent || false
       } catch (e) {
@@ -286,6 +288,7 @@ export async function POST(request, { params }) {
                   vehiclePlate,
                   estimate,
                   workOrderId,
+                  autoApproved:    !!auto_approved,
                 })
                 companyMembersNotified++
               } catch (e) {
@@ -303,6 +306,7 @@ export async function POST(request, { params }) {
                   providerName:    provider_name,
                   estimateTotal:   estimate?.total,
                   workOrderId,
+                  autoApproved:    !!auto_approved,
                 })
               } catch (e) {
                 console.error(`Estimate SMS to company member ${u.id} failed:`, e.message)

@@ -20,12 +20,14 @@ const BRAND   = 'Carfix-Connect'
  *   providerName, estimateTotal, workOrderId })
  */
 export async function sendEstimateApprovalSms(supabase, {
-  phone, ownerName, workOrderNumber, providerName, estimateTotal, workOrderId,
+  phone, ownerName, workOrderNumber, providerName, estimateTotal, workOrderId, autoApproved = false,
 }) {
   const url     = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
   const name    = ownerName ? `${ownerName}, ` : ''
   const total   = `KES ${Number(estimateTotal || 0).toLocaleString()}`
-  const message = `${BRAND}: ${name}${providerName} has sent a service estimate of ${total} for WO ${workOrderNumber}. Approve/reject here: ${url}`
+  const message = autoApproved
+    ? `${BRAND}: ${name}${providerName} has sent a service estimate of ${total} for WO ${workOrderNumber}. Auto-approved per your preferences — no action needed. View: ${url}`
+    : `${BRAND}: ${name}${providerName} has sent a service estimate of ${total} for WO ${workOrderNumber}. Approve/reject here: ${url}`
 
   return sendAndQueueSms(supabase, {
     to:             phone,

@@ -115,12 +115,23 @@ function estimateTable({ servicesTotal, partsTotal, tax, total, vatRate = 0, cur
  */
 export async function sendEstimateApprovalEmail(supabase, {
   to, ownerName, workOrderNumber, providerName,
-  vehiclePlate, estimate, workOrderId,
+  vehiclePlate, estimate, workOrderId, autoApproved = false,
 }) {
   // ── HTML-escape user-supplied values ──
   ownerName = h(ownerName); providerName = h(providerName); vehiclePlate = h(vehiclePlate)
   const approveUrl = `${APP_URL()}/dashboard/work-orders/${workOrderId}`
   const greeting   = ownerName ? `Hello ${ownerName},` : 'Hello,'
+
+  const autoApprovedNote = autoApproved
+    ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 16px;margin:0 0 16px;">
+        <p style="color:#15803d;font-size:13px;font-weight:600;margin:0 0 4px;">✅ No action required</p>
+        <p style="color:#166534;font-size:13px;margin:0;">
+          You have opted out of manual estimate approval in your profile preferences.
+          This estimate has been <strong>automatically approved</strong> and work will proceed.
+          You can still review the details in your dashboard.
+        </p>
+      </div>`
+    : ''
 
   const bodyHtml = `
     <p style="color:#374151;font-size:16px;margin:0 0 20px;">${greeting}</p>
@@ -139,17 +150,20 @@ export async function sendEstimateApprovalEmail(supabase, {
       the work, <strong>reject</strong> to cancel, or <strong>request changes</strong> if
       you need adjustments.
     </p>
+    ${autoApprovedNote}
     <p style="color:#dc2626;font-size:13px;font-weight:500;margin:0;">
-      ⏰ Please respond within 24 hours to avoid delays to your service.
+      ${autoApproved ? '' : '⏰ Please respond within 24 hours to avoid delays to your service.'}
     </p>`
 
   const html = emailWrapper({
-    title:       'Service Estimate Ready for Approval',
+    title:       autoApproved ? 'Service Estimate — Auto-Approved' : 'Service Estimate Ready for Approval',
     previewText: `${providerName} has sent an estimate of KES ${Number(estimate?.total||0).toLocaleString()} for your vehicle`,
     bodyHtml,
     ctaHref:     approveUrl,
-    ctaLabel:    'Review &amp; Approve Estimate',
-    footerNote:  `You can approve, reject, or request changes from your Carfix-Connect dashboard.`,
+    ctaLabel:    autoApproved ? 'View Estimate Details' : 'Review &amp; Approve Estimate',
+    footerNote:  autoApproved
+      ? `This estimate was auto-approved based on your preferences. You can review the details in your dashboard.`
+      : `You can approve, reject, or request changes from your Carfix-Connect dashboard.`,
   })
 
   const text = `${greeting}
@@ -160,15 +174,16 @@ Services: KES ${Number(estimate?.services_total||0).toLocaleString()}
 Parts:    KES ${Number(estimate?.parts_total||0).toLocaleString()}
 VAT ${estimate?.vat_rate ?? 0}%:  KES ${Number(estimate?.tax||0).toLocaleString()}
 TOTAL:    KES ${Number(estimate?.total||0).toLocaleString()}
-
-Review and approve here: ${approveUrl}
-
-Please respond within 24 hours.
+${autoApproved ? '\nNo action required — this estimate was auto-approved based on your profile preferences. Work will proceed.\n' : ''}
+Review ${autoApproved ? 'details' : 'and approve'} here: ${approveUrl}
+${autoApproved ? '' : '\nPlease respond within 24 hours.'}
 — ${BRAND_NAME}`
 
   return sendAndQueueEmail(supabase, {
     to:             [{ Email: to, Name: ownerName || to }],
-    subject:        `Service Estimate Ready — ${workOrderNumber} (KES ${Number(estimate?.total||0).toLocaleString()})`,
+    subject:        autoApproved
+      ? `Service Estimate (Auto-Approved) — ${workOrderNumber} (KES ${Number(estimate?.total||0).toLocaleString()})`
+      : `Service Estimate Ready — ${workOrderNumber} (KES ${Number(estimate?.total||0).toLocaleString()})`,
     html,
     text,
     referenceTable: 'work_orders',
