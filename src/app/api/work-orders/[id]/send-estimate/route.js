@@ -9,8 +9,8 @@
 import { createClient }                        from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { NextResponse }                        from 'next/server'
-import { sendEstimateApprovalEmail }           from '@/lib/email/workOrderEmails'
-import { sendEstimateApprovalSms }             from '@/lib/sms/workOrderSms'
+import { sendEstimateApprovalEmail, sendEstimateApprovedEmail } from '@/lib/email/workOrderEmails'
+import { sendEstimateApprovalSms, sendEstimateApprovedSms }    from '@/lib/sms/workOrderSms'
 import { commsLimiter } from '@/lib/rateLimiters'
 import { requireUUID } from '@/lib/validation'
 
@@ -315,6 +315,79 @@ export async function POST(request, { params }) {
       console.error('Company member estimate notification (non-fatal):', e.message)
     }
 
+    // ── 7. Notify assigned mechanic when auto-approved (email + SMS) ─────────
+    // The mechanic needs to know the estimate was approved and work can begin.
+    let mechanicNotified = false
+    if (auto_approved) {
+      try {
+        const { data: woMech } = await sc
+          .from('work_orders')
+          .select('assigned_mechanic_id, total_amount')
+          .eq('id', workOrderId)
+          .maybeSingle()
+
+        if (woMech?.assigned_mechanic_id) {
+          const { data: mechanic } = await sc
+            .from('mechanics')
+            .select('user_id, user_profiles_secure!user_id(first_name, last_name, email, phone, auth_user_id)')
+            .eq('id', woMech.assigned_mechanic_id)
+            .eq('is_active', true)
+            .maybeSingle()
+
+          if (mechanic?.user_id && mechanic.user_id !== user.id) {  // skip if mechanic is the one who approved internally and sent the estimate
+            const mu = mechanic.user_profiles_secure || mechanic.user_profiles
+            const mechName = mu ? `${mu.first_name || ''} ${mu.last_name || ''}`.trim() : 'Mechanic'
+
+            // Resolve email
+            let mechEmail = mu?.email || null
+            if (!mechEmail && mu?.auth_user_id) {
+              try {
+                const { data: au } = await sc.auth.admin.getUserById(mu.auth_user_id)
+                mechEmail = au?.user?.email || null
+              } catch {}
+            }
+
+            // Send email
+            if (mechEmail) {
+              try {
+                await sendEstimateApprovedEmail(sc, {
+                  to:              mechEmail,
+                  providerName:    mechName,
+                  workOrderNumber: work_order_number,
+                  customerName:    ownerName || 'Customer',
+                  vehiclePlate,
+                  estimateTotal:   woMech.total_amount || estimate?.total || 0,
+                  workOrderId,
+                })
+                mechanicNotified = true
+              } catch (e) {
+                console.error('[send-estimate] mechanic email failed (non-fatal):', e.message)
+              }
+            }
+
+            // Send SMS
+            if (mu?.phone) {
+              try {
+                await sendEstimateApprovedSms(sc, {
+                  phone:           mu.phone,
+                  providerName:    mechName,
+                  workOrderNumber: work_order_number,
+                  vehiclePlate,
+                  estimateTotal:   woMech.total_amount || estimate?.total || 0,
+                  workOrderId,
+                })
+                mechanicNotified = true
+              } catch (e) {
+                console.error('[send-estimate] mechanic SMS failed (non-fatal):', e.message)
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[send-estimate] mechanic notification (non-fatal):', e.message)
+      }
+    }
+
     return NextResponse.json({
       success:           true,
       work_order_number,
@@ -325,6 +398,7 @@ export async function POST(request, { params }) {
       owner_has_email:   !!ownerEmail,
       owner_has_phone:   !!ownerPhone,
       company_members_notified: companyMembersNotified,
+      mechanic_notified: mechanicNotified,
     })
 
   } catch (err) {

@@ -107,6 +107,32 @@ export async function POST(request, { params }) {
       addR({ user_id: m.user_id, first_name: m.user_profiles?.first_name, last_name: m.user_profiles?.last_name, email: m.user_profiles?.email, phone: m.user_profiles?.phone })
     }
 
+    // ★ Also include the assigned mechanic (even without can_approve_work)
+    if (wo) {
+      const { data: woFull } = await sc
+        .from('work_orders')
+        .select('assigned_mechanic_id')
+        .eq('id', workOrderId)
+        .maybeSingle()
+      if (woFull?.assigned_mechanic_id) {
+        const { data: assignedMech } = await sc
+          .from('mechanics')
+          .select('user_id, user_profiles_secure!user_id(first_name, last_name, email, phone)')
+          .eq('id', woFull.assigned_mechanic_id)
+          .eq('is_active', true)
+          .maybeSingle()
+        if (assignedMech) {
+          addR({
+            user_id:    assignedMech.user_id,
+            first_name: assignedMech.user_profiles_secure?.first_name || assignedMech.user_profiles?.first_name,
+            last_name:  assignedMech.user_profiles_secure?.last_name  || assignedMech.user_profiles?.last_name,
+            email:      assignedMech.user_profiles_secure?.email      || assignedMech.user_profiles?.email,
+            phone:      assignedMech.user_profiles_secure?.phone      || assignedMech.user_profiles?.phone,
+          })
+        }
+      }
+    }
+
     // ── 4. Send email + SMS to all recipients ────────────────────────────
     let emailsSent = 0, smsSent = 0
     for (const r of recipients) {
