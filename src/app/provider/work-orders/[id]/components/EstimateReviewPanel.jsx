@@ -41,7 +41,7 @@ export default function EstimateReviewPanel({
   const [ownerRequiresApproval, setOwnerRequiresApproval] = useState(true)
   const [approvalCheckDone,     setApprovalCheckDone]     = useState(false)
 
-  const [vatRate, setVatRate] = useState(workOrder?.vat_rate ?? 16)
+  const [vatRate, setVatRate] = useState(workOrder?.vat_rate ?? 0)
 
   // Sync VAT rate when estimate prop updates (e.g. ServicesTab changed it)
   useEffect(() => {
