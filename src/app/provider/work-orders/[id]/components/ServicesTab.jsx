@@ -125,6 +125,11 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
     }
   }, [providerSvcId])
 
+  // Track the most recent user-set VAT rate so that refreshEstimate()
+  // doesn't overwrite it with stale DB data (race condition when the user
+  // sets VAT and immediately adds a service before the DB update commits).
+  const pendingVatRef = useRef(null)
+
   const refreshEstimate = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -133,6 +138,15 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
         p_provider_user_id: user.id,
       })
       if (data?.success) {
+        // If the user recently changed the VAT rate and the RPC returned
+        // stale data (DB update still in flight), use the local rate.
+        const localRate = pendingVatRef.current
+        if (localRate != null && localRate !== data.vat_rate) {
+          const newTax = Math.round(data.subtotal * localRate / 100 * 100) / 100
+          data.vat_rate = localRate
+          data.tax      = newTax
+          data.total    = Math.round((data.subtotal + newTax) * 100) / 100
+        }
         setEstimate(data)
         onEstimateChange?.(data)
       }
@@ -730,11 +744,15 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                   onBlur={async (e) => {
                     const rate = parseFloat(e.target.value) || 0
                     if (rate === (estimate.vat_rate ?? 0)) return
+                    // Mark the new rate as pending so refreshEstimate() won't overwrite it
+                    pendingVatRef.current = rate
                     const { error } = await supabase
                       .from('work_orders')
                       .update({ vat_rate: rate, updated_at: new Date().toISOString() })
                       .eq('id', workOrder.id)
                     if (!error) {
+                      // DB committed — clear the pending flag so future refreshes read from DB
+                      pendingVatRef.current = null
                       const newTax = Math.round(estimate.subtotal * rate / 100 * 100) / 100
                       const updated = {
                         ...estimate,
@@ -744,6 +762,9 @@ export default function ServicesTab({ workOrder, onEstimateChange, onServiceAdde
                       }
                       setEstimate(updated)
                       onEstimateChange?.(updated)
+                    } else {
+                      // DB update failed — clear the pending flag
+                      pendingVatRef.current = null
                     }
                   }}
                   className="w-12 px-1 py-0.5 border border-blue-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500"
