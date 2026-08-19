@@ -144,7 +144,7 @@ export default function PublicGaragesPage() {
             margin: '0 auto 24px',
             lineHeight: 1.6,
           }}>
-            Browse verified garages and mechanics across Kenya. Book a service or chat directly with a provider.
+            Browse verified garages and mechanics across the globe. Book a service or chat directly with a provider.
           </p>
           <p style={{ fontSize: 13, color: 'var(--text-muted, #6b7280)' }}>
             {total} provider{total !== 1 ? 's' : ''} available

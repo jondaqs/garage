@@ -246,7 +246,7 @@ export default function DocsPage() {
 
               <div className="grid sm:grid-cols-2 gap-3 mt-2">
                 <Feature icon={Car} title="Dashboard & Vehicles">
-                  View all your vehicles at a glance, see upcoming bookings, active work orders, and spending summaries. Add new vehicles with Kenyan plate number validation and manage ownership.
+                  View all your vehicles at a glance, see upcoming bookings, active work orders, and spending summaries. Add new vehicles with plate number validation and manage ownership.
                 </Feature>
                 <Feature icon={Search} title="Search Providers">
                   Find verified garages, workshops, and mobile mechanics. Filter by services offered, location, ratings, and verification status. View provider profiles with shop details, team size, and customer reviews.

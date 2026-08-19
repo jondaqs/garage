@@ -50,7 +50,7 @@ export default function Image() {
           fontSize: 28, color: '#94a3b8', textAlign: 'center',
           maxWidth: 800, lineHeight: 1.4, marginBottom: 40,
         }}>
-          Find Trusted Mechanics & Garages in Kenya
+          Find Trusted Mechanics & Garages
         </div>
 
         <div style={{ display: 'flex', gap: 16 }}>

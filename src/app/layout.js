@@ -99,7 +99,7 @@ export const metadata = {
 
   // ── Verification (add your codes once you register with each console) ──
   verification: {
-    // google: 'your-google-verification-code',
+    // google: 'GoogleVerificationCode by HTML',
     // yandex: 'your-yandex-code',
   },
 
