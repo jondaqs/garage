@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
 import VerificationScore from '@/components/VerificationScore'
+import PublicProviderModal from '@/components/PublicProviderModal'
 
 const ITEMS_PER_PAGE = 12
 
@@ -26,6 +27,7 @@ export default function PublicGaragesPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [session,     setSession]     = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState(null)
 
   // Filters
   const [search,      setSearch]      = useState('')
@@ -93,11 +95,7 @@ export default function PublicGaragesPage() {
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE)
 
   const handleProviderClick = (provider) => {
-    if (session) {
-      router.push(`/dashboard/providers/${provider.id}`)
-    } else {
-      router.push(`/auth/login?redirect=/dashboard/providers/${provider.id}`)
-    }
+    setSelectedProvider(provider)
   }
 
   const handleChat = (e, provider) => {
@@ -320,7 +318,7 @@ export default function PublicGaragesPage() {
               marginBottom: 16,
               color: '#fff',
             }}>
-              Find a vehicle service provide <span style={{ color: '#60a5fa' }}>near you</span>
+              Find a garage <span style={{ color: '#60a5fa' }}>near you</span>
             </h1>
             <p style={{
               fontSize: 17, lineHeight: 1.7,
@@ -520,6 +518,15 @@ export default function PublicGaragesPage() {
           </p>
         </footer>
       </div>
+
+      {/* Provider Detail Modal */}
+      {selectedProvider && (
+        <PublicProviderModal
+          provider={selectedProvider}
+          isLoggedIn={!!session}
+          onClose={() => setSelectedProvider(null)}
+        />
+      )}
     </>
   )
 }
