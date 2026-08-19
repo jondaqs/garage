@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   Search, MapPin, Star, BadgeCheck, X, ChevronRight,
   Loader2, Wrench, MessageSquare, Building2,
-  LogIn, Calendar, SlidersHorizontal, ArrowLeft,
+  LogIn, Calendar, SlidersHorizontal, ArrowLeft, Globe,
 } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
 import VerificationScore from '@/components/VerificationScore'
@@ -32,6 +32,7 @@ export default function PublicGaragesPage() {
   const [descSearch,  setDescSearch]  = useState('')
   const [typeFilter,  setTypeFilter]  = useState('')
   const [locationFilter, setLocationFilter] = useState('')
+  const [countryFilter, setCountryFilter] = useState('')
   const [verifiedOnly,   setVerifiedOnly]   = useState(false)
 
   // Check auth once
@@ -50,6 +51,7 @@ export default function PublicGaragesPage() {
         p_description:      descSearch   || null,
         p_provider_type_id: typeFilter   || null,
         p_location:         locationFilter || null,
+        p_country:          countryFilter || null,
         p_verified_only:    verifiedOnly,
         p_limit:            ITEMS_PER_PAGE,
         p_offset:           page * ITEMS_PER_PAGE,
@@ -74,7 +76,7 @@ export default function PublicGaragesPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, descSearch, typeFilter, locationFilter, verifiedOnly, page])
+  }, [search, descSearch, typeFilter, locationFilter, countryFilter, verifiedOnly, page])
 
   useEffect(() => { load() }, [load])
 
@@ -86,7 +88,7 @@ export default function PublicGaragesPage() {
       .then(({ data }) => setTypes(data || []))
   }, [])
 
-  useEffect(() => { setPage(0) }, [search, descSearch, typeFilter, locationFilter, verifiedOnly])
+  useEffect(() => { setPage(0) }, [search, descSearch, typeFilter, locationFilter, countryFilter, verifiedOnly])
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE)
 
@@ -356,6 +358,15 @@ export default function PublicGaragesPage() {
                 className="search-input"
               />
             </div>
+            <div style={{ flex: '1 1 180px', position: 'relative' }}>
+              <Globe size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
+              <input
+                value={countryFilter}
+                onChange={e => setCountryFilter(e.target.value)}
+                placeholder="Country…"
+                className="search-input"
+              />
+            </div>
             <button
               onClick={() => setFiltersOpen(o => !o)}
               className={`filter-btn ${filtersOpen ? 'filter-btn-active' : ''}`}
@@ -407,7 +418,7 @@ export default function PublicGaragesPage() {
                 Verified only
               </label>
               <button onClick={() => {
-                setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setVerifiedOnly(false)
+                setSearch(''); setDescSearch(''); setTypeFilter(''); setLocationFilter(''); setCountryFilter(''); setVerifiedOnly(false)
               }} style={{
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: '8px 14px', borderRadius: 8,

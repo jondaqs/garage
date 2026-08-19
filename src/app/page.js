@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap, Download, ChevronDown, ChevronUp, QrCode, Star, BadgeCheck, MapPin, ChevronLeft } from 'lucide-react'
+import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap, Download, ChevronDown, ChevronUp, QrCode, Star, BadgeCheck, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
 import { createClient } from '@/lib/supabase/client'
 
