@@ -318,7 +318,7 @@ export default function PublicGaragesPage() {
               marginBottom: 16,
               color: '#fff',
             }}>
-              Find a garage <span style={{ color: '#60a5fa' }}>near you</span>
+              Find a service provider <span style={{ color: '#60a5fa' }}>near you</span>
             </h1>
             <p style={{
               fontSize: 17, lineHeight: 1.7,
@@ -326,7 +326,7 @@ export default function PublicGaragesPage() {
               maxWidth: 620,
               marginBottom: 8,
             }}>
-              Browse verified garages and mechanics across the globe.
+              Browse verified vehicle service providers, garages and mechanics across the globe.
               Book a service or chat directly with a provider.
             </p>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 32 }}>
