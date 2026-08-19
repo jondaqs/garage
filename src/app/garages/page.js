@@ -320,7 +320,7 @@ export default function PublicGaragesPage() {
               marginBottom: 16,
               color: '#fff',
             }}>
-              Find a garage <span style={{ color: '#60a5fa' }}>near you</span>
+              Find a vehicle service provide <span style={{ color: '#60a5fa' }}>near you</span>
             </h1>
             <p style={{
               fontSize: 17, lineHeight: 1.7,
