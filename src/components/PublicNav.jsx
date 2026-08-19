@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV_LINKS = [
+  { label: 'Garages', path: '/garages' },
   { label: 'About Us', path: '/about' },
   { label: 'Features', path: '/features' },
   { label: 'How It Works',     path: '/how-it-works' },

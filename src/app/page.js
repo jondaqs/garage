@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap, Download, ChevronDown, ChevronUp, QrCode } from 'lucide-react'
+import { Car, Wrench, Building2, User, Calendar, History, Bell, ArrowRight, Shield, Zap, Download, ChevronDown, ChevronUp, QrCode, Star, BadgeCheck, MapPin, ChevronLeft } from 'lucide-react'
 import PublicNav from '@/components/PublicNav'
 import { createClient } from '@/lib/supabase/client'
 
@@ -12,6 +12,9 @@ export default function LandingPage() {
   const [theme, setTheme] = useState('dark')
   const [social, setSocial] = useState({})
   const [qrOpen, setQrOpen] = useState(false)
+  const [featuredProviders, setFeaturedProviders] = useState([])
+  const sliderRef = useRef(null)
+  const autoPlayRef = useRef(null)
 
   // Fetch social links
   useEffect(() => {
@@ -27,6 +30,59 @@ export default function LandingPage() {
         }
       })
   }, [])
+
+  // Fetch featured providers for the slider
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.rpc('search_providers_public', {
+      p_verified_only: false,
+      p_limit: 20,
+      p_offset: 0,
+    }).then(({ data }) => {
+      const results = (data || []).map(p => ({
+        ...p,
+        shops: typeof p.shops === 'string' ? JSON.parse(p.shops) : (p.shops || []),
+        services: typeof p.services === 'string' ? JSON.parse(p.services) : (p.services || []),
+        provider_type: typeof p.provider_type === 'string' ? JSON.parse(p.provider_type) : p.provider_type,
+        avgRating: Number(p.avg_rating) || 0,
+        reviewCount: Number(p.review_count) || 0,
+      }))
+      setFeaturedProviders(results)
+    })
+  }, [])
+
+  // Autoplay slider
+  useEffect(() => {
+    if (featuredProviders.length === 0) return
+    const el = sliderRef.current
+    if (!el) return
+
+    const scroll = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (el.scrollLeft >= maxScroll - 2) {
+        el.scrollTo({ left: 0, behavior: 'smooth' })
+      } else {
+        el.scrollBy({ left: 320, behavior: 'smooth' })
+      }
+    }
+
+    autoPlayRef.current = setInterval(scroll, 3500)
+    const pause = () => clearInterval(autoPlayRef.current)
+    const resume = () => { autoPlayRef.current = setInterval(scroll, 3500) }
+
+    el.addEventListener('mouseenter', pause)
+    el.addEventListener('mouseleave', resume)
+    el.addEventListener('touchstart', pause, { passive: true })
+    el.addEventListener('touchend', resume)
+
+    return () => {
+      clearInterval(autoPlayRef.current)
+      el.removeEventListener('mouseenter', pause)
+      el.removeEventListener('mouseleave', resume)
+      el.removeEventListener('touchstart', pause)
+      el.removeEventListener('touchend', resume)
+    }
+  }, [featuredProviders])
 
   // Sync with theme set by PublicNav
   useEffect(() => {
@@ -391,6 +447,150 @@ export default function LandingPage() {
             })}
           </div>
         </div>
+
+        {/* ── FEATURED SERVICE PROVIDERS SLIDER ── */}
+        {featuredProviders.length > 0 && (
+          <div style={{
+            position: 'relative', zIndex: 1,
+            maxWidth: 1200, margin: '0 auto',
+            padding: '0 24px 60px',
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 32 }}>
+              <p className="gc-display" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+                Trusted Partners
+              </p>
+              <h2 className="gc-display" style={{ fontSize: 'clamp(24px, 3.5vw, 32px)', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 8 }}>
+                Our Service Providers
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', maxWidth: 500, margin: '0 auto' }}>
+                Verified garages and workshops ready to serve your vehicle
+              </p>
+            </div>
+
+            {/* Slider controls */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => sliderRef.current?.scrollBy({ left: -320, behavior: 'smooth' })}
+                style={{
+                  position: 'absolute', left: -16, top: '50%', transform: 'translateY(-50%)', zIndex: 10,
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'var(--surface, #111827)', border: '1px solid var(--border, #374151)',
+                  color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => sliderRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
+                style={{
+                  position: 'absolute', right: -16, top: '50%', transform: 'translateY(-50%)', zIndex: 10,
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'var(--surface, #111827)', border: '1px solid var(--border, #374151)',
+                  color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+
+              {/* Scrolling track */}
+              <div
+                ref={sliderRef}
+                style={{
+                  display: 'flex', gap: 16,
+                  overflowX: 'auto', overflowY: 'hidden',
+                  scrollSnapType: 'x mandatory',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  WebkitOverflowScrolling: 'touch',
+                  paddingBottom: 8,
+                }}
+              >
+                <style>{`.slider-track::-webkit-scrollbar { display: none; }`}</style>
+                {featuredProviders.map(p => {
+                  const shop = p.shops?.[0]
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => router.push('/garages')}
+                      style={{
+                        flex: '0 0 300px', scrollSnapAlign: 'start',
+                        background: 'var(--card-bg)', border: '1px solid var(--card-border)',
+                        borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-teal)'; e.currentTarget.style.transform = 'translateY(-3px)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.transform = 'translateY(0)' }}
+                    >
+                      <div style={{ height: 3, background: 'linear-gradient(90deg, var(--accent-teal), var(--accent-purple))' }} />
+                      <div style={{ padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                          <div style={{
+                            width: 40, height: 40, borderRadius: 10,
+                            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', fontWeight: 700, fontSize: 16, flexShrink: 0,
+                            overflow: 'hidden',
+                          }}>
+                            {p.owner_profile_picture_url
+                              ? <img src={p.owner_profile_picture_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : p.name?.[0]?.toUpperCase()
+                            }
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                              {p.is_verified && <BadgeCheck size={13} style={{ color: '#2563eb', flexShrink: 0 }} />}
+                            </div>
+                            <span style={{ fontSize: 11, color: 'var(--accent-teal)', fontWeight: 500 }}>{p.provider_type?.display_name}</span>
+                          </div>
+                        </div>
+                        {p.avgRating > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                            {[1,2,3,4,5].map(n => (
+                              <Star key={n} size={10} style={{ color: n <= Math.round(p.avgRating) ? '#facc15' : '#4b5563' }} fill={n <= Math.round(p.avgRating) ? '#facc15' : '#4b5563'} />
+                            ))}
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginLeft: 2 }}>{p.avgRating.toFixed(1)}</span>
+                          </div>
+                        )}
+                        {shop && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)' }}>
+                            <MapPin size={10} /> {[shop.town, shop.county].filter(Boolean).join(', ')}
+                          </div>
+                        )}
+                        {p.services?.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 8 }}>
+                            {p.services.slice(0, 3).map(s => (
+                              <span key={s.id} style={{ padding: '1px 6px', background: 'var(--feat-bg)', color: 'var(--text-secondary)', borderRadius: 5, fontSize: 10, fontWeight: 500 }}>{s.name}</span>
+                            ))}
+                            {p.services.length > 3 && (
+                              <span style={{ padding: '1px 6px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', borderRadius: 5, fontSize: 10, fontWeight: 500 }}>+{p.services.length - 3}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* View all link */}
+            <div style={{ textAlign: 'center', marginTop: 24 }}>
+              <button
+                onClick={() => router.push('/garages')}
+                className="gc-btn-primary"
+                style={{
+                  background: 'var(--accent-teal)', color: 'var(--brand-dark)',
+                  fontWeight: 700,
+                }}
+              >
+                View All Service Providers <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── CTA BANNER ── */}
         <div style={{

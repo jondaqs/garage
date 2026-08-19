@@ -1,0 +1,20 @@
+# Carfix-Connect — Robots.txt
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /features
+Allow: /how-it-works
+Allow: /contact
+Allow: /auth/login
+Allow: /auth/signup
+
+# Block private/authenticated routes from indexing
+Disallow: /dashboard/
+Disallow: /provider/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/callback
+Disallow: /auth/reset-password
+
+# Sitemap location
+Sitemap: https://carfix-connect.com/sitemap.xml
