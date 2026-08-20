@@ -684,41 +684,34 @@ function InvitationsTab({ supabase, assessment }) {
     setSending(true); setResult(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      let sent = 0, skipped = 0, failed = 0
+      const res = await fetch('/api/admin/assessment-invitations/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: emailList,
+          assessmentId: assessment.id,
+          assessmentName: assessment.name,
+          description: assessment.description || '',
+          timeLimitMins: Math.round((assessment.time_limit_secs || 0) / 60),
+          opensAt: assessment.opens_at || null,
+          closesAt: assessment.closes_at || null,
+          emailSubject,
+          emailBody,
+        }),
+      })
 
-      for (const email of emailList) {
-        const existing = invitations.find(i => i.email === email)
-        if (existing && ['pending', 'sent', 'accepted'].includes(existing.status)) { skipped++; continue }
+      const data = await res.json()
 
-        const { error } = await supabase.from('assessment_invitations').upsert({
-          assessment_id: assessment.id,
-          email,
-          invited_by: user.id,
-          email_subject: emailSubject,
-          email_body: emailBody,
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-        }, { onConflict: 'assessment_id,email' })
-
-        if (error) {
-          console.error(`Invite failed for ${email}:`, error.message)
-          failed++
-          if (error.code === '42501') {
-            setResult({ sent, skipped, failed, total: emailList.length, error: error.message })
-            break
-          }
-          continue
-        }
-        sent++
+      if (!res.ok) {
+        setResult({ sent: 0, skipped: 0, failed: 0, total: emailList.length, error: data.error || 'Request failed' })
+      } else {
+        setResult(data)
+        setEmails('')
       }
-
-      if (!result) setResult({ sent, skipped, failed, total: emailList.length })
-      setEmails('')
       await loadInvitations()
     } catch (err) {
       console.error('Send invites error:', err)
-      setResult({ sent: 0, skipped: 0, failed: 0, total: 0, error: err?.message || 'Unexpected error' })
+      setResult({ sent: 0, skipped: 0, failed: 0, total: 0, error: err?.message || 'Network error' })
     }
     setSending(false)
   }
