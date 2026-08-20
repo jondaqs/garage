@@ -23,15 +23,36 @@ export default function AdminAssessmentsPage() {
   const [selectedAssessment, setSelectedAssessment] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const [setupError, setSetupError] = useState(null)
+
   // ── Load assessments ──
   const loadAssessments = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('assessments')
-      .select('*, assessment_sections(id, title, marks, sort_order, assessment_questions(id))')
-      .order('created_at', { ascending: false })
-    setAssessments(data || [])
-    if (data?.length && !selectedAssessment) setSelectedAssessment(data[0])
+    setSetupError(null)
+    try {
+      const { data, error } = await supabase
+        .from('assessments')
+        .select('*, assessment_sections(id, title, marks, sort_order, assessment_questions(id))')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        // Table doesn't exist or permission issue
+        if (error.code === '42P01' || error.message?.includes('relation') || error.code === 'PGRST204') {
+          setSetupError('tables_missing')
+        } else {
+          console.error('Error loading assessments:', error)
+          setSetupError('error')
+        }
+        setLoading(false)
+        return
+      }
+
+      setAssessments(data || [])
+      if (data?.length && !selectedAssessment) setSelectedAssessment(data[0])
+    } catch (err) {
+      console.error('Failed to load assessments:', err)
+      setSetupError('error')
+    }
     setLoading(false)
   }, [])
 
@@ -39,6 +60,42 @@ export default function AdminAssessmentsPage() {
 
   const currentAssessment = selectedAssessment
   const assessmentOptions = assessments.map(a => ({ id: a.id, name: a.name, status: a.status }))
+
+  // ── Setup error screen ──
+  if (setupError) {
+    return (
+      <div className="p-4 md:p-6 max-w-2xl mx-auto">
+        <div className="bg-white border border-orange-200 rounded-xl p-8 text-center">
+          <AlertTriangle size={40} className="text-orange-400 mx-auto mb-4" />
+          <h1 className="text-lg font-bold text-gray-900 mb-2">
+            {setupError === 'tables_missing' ? 'Database Setup Required' : 'Something went wrong'}
+          </h1>
+          {setupError === 'tables_missing' ? (
+            <>
+              <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                The assessment tables haven't been created yet. Run the <strong>assessment_system_redesign.sql</strong> migration
+                in your Supabase SQL Editor, then come back and refresh this page.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 font-mono mb-4">
+                <p>Tables needed:</p>
+                <p className="text-gray-700 mt-1">• assessments</p>
+                <p className="text-gray-700">• assessment_sections</p>
+                <p className="text-gray-700">• assessment_questions</p>
+                <p className="text-gray-700">• assessment_invitations</p>
+                <p className="text-gray-700">• assessment_submissions</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 mb-4">Failed to load assessments. Please check the browser console for details.</p>
+          )}
+          <button onClick={() => { setSetupError(null); loadAssessments() }}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
