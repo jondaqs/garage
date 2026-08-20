@@ -656,6 +656,7 @@ function InvitationsTab({ supabase, assessment }) {
     }
     body += `\n\nDuration: ${timeMins} minutes`
     body += `\n\nTo begin, click the link below or copy it into your browser:\n${assessmentLink}`
+    body += `\n\nIf you don't have a Carfix-Connect account yet, please register at:\n${baseUrl}/auth/signup\nUse this same email address when signing up so your invitation is linked automatically.`
     body += '\n\nGood luck!'
     return body
   }
@@ -682,48 +683,43 @@ function InvitationsTab({ supabase, assessment }) {
     if (emailList.length === 0) return
     setSending(true); setResult(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    let sent = 0, skipped = 0
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      let sent = 0, skipped = 0, failed = 0
 
-    for (const email of emailList) {
-      // Check if already invited
-      const existing = invitations.find(i => i.email === email)
-      if (existing && ['pending', 'sent', 'accepted'].includes(existing.status)) { skipped++; continue }
+      for (const email of emailList) {
+        const existing = invitations.find(i => i.email === email)
+        if (existing && ['pending', 'sent', 'accepted'].includes(existing.status)) { skipped++; continue }
 
-      // Find user by email if they exist
-      const { data: authUsers } = await supabase.rpc('admin_lookup_user_by_email', { p_email: email }).catch(() => ({ data: null }))
-      const userId = authUsers?.user_id || null
+        const { error } = await supabase.from('assessment_invitations').upsert({
+          assessment_id: assessment.id,
+          email,
+          invited_by: user.id,
+          email_subject: emailSubject,
+          email_body: emailBody,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        }, { onConflict: 'assessment_id,email' })
 
-      const { error } = await supabase.from('assessment_invitations').upsert({
-        assessment_id: assessment.id,
-        email,
-        user_id: userId,
-        invited_by: user.id,
-        email_subject: emailSubject,
-        email_body: emailBody,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      }, { onConflict: 'assessment_id,email' })
-
-      if (!error) {
-        // Create notification if user exists
-        if (userId) {
-          await supabase.rpc('create_notification', {
-            p_recipient_user_id: userId,
-            p_notification_type: 'assessment_invitation',
-            p_title: 'Assessment Invitation',
-            p_message: `You have been invited to take the "${assessment.name}" assessment. Please visit the assessment page to begin.`,
-            p_reference_id: assessment.id,
-            p_reference_type: 'assessment',
-          }).catch(() => {})
+        if (error) {
+          console.error(`Invite failed for ${email}:`, error.message)
+          failed++
+          if (error.code === '42501') {
+            setResult({ sent, skipped, failed, total: emailList.length, error: error.message })
+            break
+          }
+          continue
         }
         sent++
       }
-    }
 
-    setResult({ sent, skipped, total: emailList.length })
-    setEmails('')
-    await loadInvitations()
+      if (!result) setResult({ sent, skipped, failed, total: emailList.length })
+      setEmails('')
+      await loadInvitations()
+    } catch (err) {
+      console.error('Send invites error:', err)
+      setResult({ sent: 0, skipped: 0, failed: 0, total: 0, error: err?.message || 'Unexpected error' })
+    }
     setSending(false)
   }
 
@@ -754,8 +750,11 @@ function InvitationsTab({ supabase, assessment }) {
         </div>
 
         {result && (
-          <div className={`mb-3 p-3 rounded-lg text-sm ${result.sent > 0 ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-            {result.sent} invitation{result.sent !== 1 ? 's' : ''} sent{result.skipped > 0 ? `, ${result.skipped} already invited` : ''}
+          <div className={`mb-3 p-3 rounded-lg text-sm ${result.error ? 'bg-red-50 text-red-700' : result.sent > 0 ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
+            {result.error
+              ? `Failed: ${result.error}${result.sent > 0 ? ` (${result.sent} sent before error)` : ''}`
+              : `${result.sent} invitation${result.sent !== 1 ? 's' : ''} sent${result.skipped > 0 ? `, ${result.skipped} already invited` : ''}${result.failed > 0 ? `, ${result.failed} failed` : ''}`
+            }
           </div>
         )}
 
