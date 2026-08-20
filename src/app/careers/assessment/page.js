@@ -1,7 +1,7 @@
 // src/app/careers/assessment/page.js
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -13,6 +13,18 @@ import {
 const AUTOSAVE_INTERVAL = 30_000
 
 export default function AssessmentPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#0a1628 0%,#1e3a8a 60%,#1e40af 100%)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <Loader2 size={32} style={{ animation:'spin 1s linear infinite', color:'#60a5fa' }} />
+      </div>
+    }>
+      <AssessmentContent />
+    </Suspense>
+  )
+}
+
+function AssessmentContent() {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -138,6 +150,21 @@ export default function AssessmentPage() {
 
       if (aError || !aData) {
         setAccessError('Assessment not found or no longer available.')
+        setDataLoading(false)
+        return
+      }
+
+      // Check availability window
+      const now = new Date()
+      if (aData.opens_at && new Date(aData.opens_at) > now) {
+        const opensDate = new Date(aData.opens_at).toLocaleString('en-KE', { dateStyle: 'full', timeStyle: 'short' })
+        setAccessError(`This assessment is not yet open. It opens on ${opensDate}. Please come back then.`)
+        setDataLoading(false)
+        return
+      }
+      if (aData.closes_at && new Date(aData.closes_at) < now) {
+        const closedDate = new Date(aData.closes_at).toLocaleString('en-KE', { dateStyle: 'full', timeStyle: 'short' })
+        setAccessError(`This assessment closed on ${closedDate}. It is no longer accepting submissions.`)
         setDataLoading(false)
         return
       }
@@ -472,10 +499,17 @@ export default function AssessmentPage() {
                       <div>
                         <h3 className="asmnt-display" style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>{a.name}</h3>
                         {a.description && <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', lineHeight:1.6, marginBottom:8 }}>{a.description}</p>}
-                        <div style={{ display:'flex', gap:12, fontSize:11, color:'rgba(255,255,255,0.4)' }}>
+                        <div style={{ display:'flex', gap:12, fontSize:11, color:'rgba(255,255,255,0.4)', flexWrap:'wrap' }}>
                           <span><Clock size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {Math.round(a.time_limit_secs / 60)} min</span>
                           <span>{a.total_marks} marks</span>
                           {a.invited && <span style={{ color:'#60a5fa' }}>✉ Invited</span>}
+                          {(() => {
+                            const now = new Date()
+                            if (a.closes_at && new Date(a.closes_at) < now) return <span style={{ color:'#f87171' }}>🔴 Closed</span>
+                            if (a.opens_at && new Date(a.opens_at) > now) return <span style={{ color:'#fbbf24' }}>🕐 Opens {new Date(a.opens_at).toLocaleDateString('en-KE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
+                            if (a.closes_at) return <span style={{ color:'#34d399' }}>⏳ Closes {new Date(a.closes_at).toLocaleDateString('en-KE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
+                            return null
+                          })()}
                         </div>
                       </div>
                       <ChevronRight size={18} style={{ color:'rgba(255,255,255,0.3)', flexShrink:0, marginTop:4 }} />

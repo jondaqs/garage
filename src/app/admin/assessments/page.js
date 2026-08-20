@@ -100,12 +100,15 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name:'', description:'', instructions:'', time_limit_mins:120, passing_pct:50, require_invite:true })
+  const [form, setForm] = useState({ name:'', description:'', instructions:'', time_limit_mins:120, passing_pct:50, require_invite:true, opens_at:'', closes_at:'' })
 
-  const resetForm = () => { setForm({ name:'', description:'', instructions:'', time_limit_mins:120, passing_pct:50, require_invite:true }); setEditing(null); setShowForm(false) }
+  const resetForm = () => { setForm({ name:'', description:'', instructions:'', time_limit_mins:120, passing_pct:50, require_invite:true, opens_at:'', closes_at:'' }); setEditing(null); setShowForm(false) }
+
+  // Convert ISO to datetime-local input format
+  const toLocalInput = (iso) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset()*60000).toISOString().slice(0,16) : ''
 
   const openEdit = (a) => {
-    setForm({ name:a.name, description:a.description||'', instructions:a.instructions||'', time_limit_mins: Math.round(a.time_limit_secs/60), passing_pct: a.passing_pct||50, require_invite: a.require_invite !== false })
+    setForm({ name:a.name, description:a.description||'', instructions:a.instructions||'', time_limit_mins: Math.round(a.time_limit_secs/60), passing_pct: a.passing_pct||50, require_invite: a.require_invite !== false, opens_at: toLocalInput(a.opens_at), closes_at: toLocalInput(a.closes_at) })
     setEditing(a.id)
     setShowForm(true)
   }
@@ -122,6 +125,8 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
       time_limit_secs: (form.time_limit_mins || 120) * 60,
       passing_pct: form.passing_pct || 50,
       require_invite: form.require_invite,
+      opens_at: form.opens_at ? new Date(form.opens_at).toISOString() : null,
+      closes_at: form.closes_at ? new Date(form.closes_at).toISOString() : null,
     }
 
     if (editing) {
@@ -191,6 +196,21 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
             <textarea value={form.instructions} onChange={e => setForm(p => ({...p, instructions: e.target.value}))} rows={3}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Read each question carefully..." />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Opens At <span className="text-gray-300">(leave blank = immediately)</span></label>
+              <input type="datetime-local" value={form.opens_at} onChange={e => setForm(p => ({...p, opens_at: e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Closes At <span className="text-gray-300">(leave blank = no deadline)</span></label>
+              <input type="datetime-local" value={form.closes_at} onChange={e => setForm(p => ({...p, closes_at: e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          {form.opens_at && form.closes_at && new Date(form.closes_at) <= new Date(form.opens_at) && (
+            <p className="text-xs text-red-500 mb-3">⚠ Closing date must be after opening date.</p>
+          )}
           <div className="flex items-center gap-4 mb-4">
             <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
               <input type="checkbox" checked={form.require_invite} onChange={e => setForm(p => ({...p, require_invite: e.target.checked}))} className="accent-blue-600" />
@@ -228,6 +248,13 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
                   <span>{a.total_marks} marks</span>
                   <span><Clock size={10} className="inline -mt-0.5" /> {Math.round(a.time_limit_secs/60)} min</span>
                   <span>{a.require_invite ? '🔒 Invite only' : '🌐 Open'}</span>
+                  {a.opens_at && <span>Opens: {new Date(a.opens_at).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}</span>}
+                  {a.closes_at && (
+                    <span style={{ color: new Date(a.closes_at) < new Date() ? '#ef4444' : undefined }}>
+                      {new Date(a.closes_at) < new Date() ? '🔴 Closed' : `Closes: ${new Date(a.closes_at).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}`}
+                    </span>
+                  )}
+                  {!a.opens_at && !a.closes_at && <span>📅 Always open</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
