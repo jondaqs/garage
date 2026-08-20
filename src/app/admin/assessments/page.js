@@ -406,7 +406,7 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
             </div>
           )
         })}
-        {assessments.length === 0 && !loading && (
+        {assessments.length === 0 && (
           <div className="text-center py-12 text-gray-400">
             <FileText size={36} className="mx-auto mb-2 opacity-30" />
             <p className="text-sm">No assessments yet. Create your first one above.</p>
