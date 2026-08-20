@@ -13,6 +13,7 @@ import {
   CreditCard,
   LifeBuoy,
   Megaphone,
+  GraduationCap,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ADMIN_ROLES, PERMISSIONS, ADMIN_ROLE_CODES, getHighestAdminRole } from '@/lib/admin/permissions'
@@ -90,6 +91,7 @@ export default function AdminSidebar({ isOpen = false, onClose = () => {} }) {
     { name: 'Admin Management', href: '/admin/admins',       icon: Shield,         show: can('manage_admins') || adminRole != null },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCard, show: can('manage_subscriptions') },
     { name: 'Reports',          href: '/admin/reports',      icon: FileText,       show: can('view_reports') },
+    { name: 'Assessments',      href: '/admin/assessments',  icon: GraduationCap,  show: can('manage_users') },
     { name: 'Settings',         href: '/admin/settings',     icon: Settings,       show: can('system_settings') },
   ].filter(item => item.show)
 
