@@ -487,12 +487,17 @@ function QuestionsTab({ supabase, assessment, reload }) {
     if (!questionForm.question_text.trim()) return
     setSaving(true)
     const sec = sections.find(s => s.id === sectionId)
-    await supabase.from('assessment_questions').insert({
+    const { error } = await supabase.from('assessment_questions').insert({
       section_id: sectionId,
       question_text: questionForm.question_text.trim(),
       marks: questionForm.marks || 5,
       sort_order: sec?.assessment_questions?.length || 0,
     })
+    if (error) {
+      alert(`Failed to add question: ${error.message}`)
+      setSaving(false)
+      return
+    }
     setQuestionForm({ question_text:'', marks:5 })
     setEditingQuestion(null)
     await loadSections(); await reload()
@@ -633,7 +638,29 @@ function InvitationsTab({ supabase, assessment }) {
   const [loading, setLoading] = useState(true)
   const [emails, setEmails] = useState('')
   const [emailSubject, setEmailSubject] = useState(`You're invited to take the ${assessment.name}`)
-  const [emailBody, setEmailBody] = useState(`Hello,\n\nYou have been invited to complete the "${assessment.name}" assessment on Carfix-Connect.\n\nPlease log in to your account and navigate to the assessment page to begin. You have ${Math.round(assessment.time_limit_secs/60)} minutes to complete it.\n\nGood luck!`)
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com'
+  const assessmentLink = `${baseUrl}/careers/assessment?id=${assessment.id}`
+  const timeMins = Math.round((assessment.time_limit_secs || 0) / 60)
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-KE', { weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : null
+  const opensAt = fmtDate(assessment.opens_at)
+  const closesAt = fmtDate(assessment.closes_at)
+
+  const buildEmailBody = () => {
+    let body = `Hello,\n\nYou have been invited to complete the "${assessment.name}" assessment on Carfix-Connect.`
+    if (assessment.description) body += `\n\n${assessment.description}`
+    if (opensAt || closesAt) {
+      body += '\n\nSchedule:'
+      if (opensAt) body += `\n  Opens: ${opensAt}`
+      if (closesAt) body += `\n  Closes: ${closesAt}`
+    }
+    body += `\n\nDuration: ${timeMins} minutes`
+    body += `\n\nTo begin, click the link below or copy it into your browser:\n${assessmentLink}`
+    body += '\n\nGood luck!'
+    return body
+  }
+
+  const [emailBody, setEmailBody] = useState(buildEmailBody())
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
 
@@ -995,7 +1022,13 @@ function UploadTab({ supabase, assessment, reload }) {
         marks: q.marks || 5,
         sort_order: i,
       }))
-      await supabase.from('assessment_questions').insert(qs)
+      const { error: qError } = await supabase.from('assessment_questions').insert(qs)
+      if (qError) {
+        setResult({ type:'error', msg:`Section created but questions failed: ${qError.message}` })
+        await reload()
+        setSaving(false)
+        return
+      }
     }
 
     setResult({ type:'success', msg:`Added section "${sectionTitle}" with ${questions.filter(q=>q.text.trim()).length} questions` })
@@ -1037,7 +1070,13 @@ function UploadTab({ supabase, assessment, reload }) {
     }
 
     if (questionsToInsert.length > 0) {
-      await supabase.from('assessment_questions').insert(questionsToInsert)
+      const { error: qError } = await supabase.from('assessment_questions').insert(questionsToInsert)
+      if (qError) {
+        setResult({ type:'error', msg:`Sections created but questions failed: ${qError.message}` })
+        await reload()
+        setSaving(false)
+        return
+      }
     }
 
     setResult({ type:'success', msg:`Created ${sectionsCreated} sections with ${questionsToInsert.length} questions` })
