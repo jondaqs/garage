@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   FileText, Plus, Edit3, Trash2, Send, Users, BarChart3, Upload, Search,
   Clock, CheckCircle, XCircle, AlertTriangle, Eye, ChevronDown, ChevronUp,
-  Loader2, Copy, ExternalLink, Mail, Save, GripVertical, X, Archive,
+  Loader2, Save, X, Archive,
 } from 'lucide-react'
 
 const TAB_ITEMS = [
@@ -24,83 +24,33 @@ export default function AdminAssessmentsPage() {
   const [loading, setLoading] = useState(true)
 
   const [setupError, setSetupError] = useState(null)
-  const [debugInfo, setDebugInfo] = useState(null)
 
   // ── Load assessments ──
   const loadAssessments = useCallback(async () => {
     setLoading(true)
     setSetupError(null)
-    setDebugInfo(null)
-
-    const debug = { steps: [], timestamp: new Date().toISOString() }
 
     try {
-      // Step 1: Check auth
-      debug.steps.push('1. Checking auth...')
-      const { data: authData, error: authError } = await supabase.auth.getUser()
-      if (authError) {
-        debug.steps.push(`❌ Auth error: ${JSON.stringify(authError)}`)
-        debug.authError = authError
-        setDebugInfo(debug)
-        setSetupError('error')
-        setLoading(false)
-        return
-      }
-      debug.steps.push(`✅ Auth OK — user: ${authData.user?.email}`)
-      debug.userId = authData.user?.id
-      debug.userEmail = authData.user?.email
+      const { error: authError } = await supabase.auth.getUser()
+      if (authError) { setSetupError('error'); setLoading(false); return }
 
-      // Step 2: Check if assessments table exists (simple count)
-      debug.steps.push('2. Testing assessments table (SELECT count)...')
-      const { count, error: countError } = await supabase
+      const { error: countError } = await supabase
         .from('assessments')
         .select('*', { count: 'exact', head: true })
 
-      if (countError) {
-        debug.steps.push(`❌ Table query failed: ${JSON.stringify(countError)}`)
-        debug.tableError = countError
-        setDebugInfo(debug)
-        setSetupError('tables_missing')
-        setLoading(false)
-        return
-      }
-      debug.steps.push(`✅ assessments table exists — ${count} rows`)
+      if (countError) { setSetupError('tables_missing'); setLoading(false); return }
 
-      // Step 3: Full query with joins
-      debug.steps.push('3. Loading assessments with sections + questions...')
-      const { data, error, status, statusText } = await supabase
+      const { data, error } = await supabase
         .from('assessments')
         .select('*, assessment_sections(id, title, marks, sort_order, assessment_questions(id))')
         .order('created_at', { ascending: false })
 
-      debug.queryStatus = status
-      debug.queryStatusText = statusText
+      if (error) { setSetupError('error'); setLoading(false); return }
 
-      if (error) {
-        debug.steps.push(`❌ Query error: code=${error.code}, message=${error.message}, details=${error.details}, hint=${error.hint}`)
-        debug.queryError = error
-        setDebugInfo(debug)
-        setSetupError('error')
-        setLoading(false)
-        return
-      }
-
-      debug.steps.push(`✅ Loaded ${data?.length || 0} assessments`)
-      debug.assessmentCount = data?.length || 0
-
-      if (data?.length > 0) {
-        debug.steps.push(`   First: "${data[0].name}" (${data[0].status}) — ${data[0].assessment_sections?.length || 0} sections`)
-      }
-
-      setDebugInfo(debug)
       setAssessments(data || [])
       if (data?.length && !selectedAssessment) setSelectedAssessment(data[0])
 
     } catch (err) {
-      debug.steps.push(`❌ Uncaught exception: ${err?.message || err}`)
-      debug.exception = { message: err?.message, stack: err?.stack, name: err?.name }
-      console.error('Assessment load crash:', err)
-      setDebugInfo(debug)
       setSetupError('error')
     }
     setLoading(false)
@@ -121,56 +71,18 @@ export default function AdminAssessmentsPage() {
             <h1 className="text-lg font-bold text-gray-900 mb-2">
               {setupError === 'tables_missing' ? 'Database Setup Required' : 'Failed to Load Assessments'}
             </h1>
-            <p className="text-sm text-gray-500">See debug details below to identify the issue.</p>
+            <p className="text-sm text-gray-500">
+              {setupError === 'tables_missing'
+                ? 'The assessments table could not be found. Please check the database setup.'
+                : 'Something went wrong while loading assessments. Please try again.'}
+            </p>
           </div>
 
-          {/* Debug output */}
-          {debugInfo && (
-            <div className="bg-gray-900 rounded-lg p-4 text-xs font-mono text-gray-300 mb-6 overflow-x-auto max-h-96 overflow-y-auto">
-              <p className="text-gray-500 mb-2">── Debug Log ({debugInfo.timestamp}) ──</p>
-              {debugInfo.steps.map((step, i) => (
-                <p key={i} className={`mb-0.5 ${step.startsWith('❌') ? 'text-red-400' : step.startsWith('✅') ? 'text-green-400' : 'text-gray-400'}`}>
-                  {step}
-                </p>
-              ))}
-              {debugInfo.tableError && (
-                <div className="mt-3 pt-3 border-t border-gray-700">
-                  <p className="text-yellow-400 mb-1">Table Error Details:</p>
-                  <pre className="text-red-300 whitespace-pre-wrap">{JSON.stringify(debugInfo.tableError, null, 2)}</pre>
-                </div>
-              )}
-              {debugInfo.queryError && (
-                <div className="mt-3 pt-3 border-t border-gray-700">
-                  <p className="text-yellow-400 mb-1">Query Error Details:</p>
-                  <pre className="text-red-300 whitespace-pre-wrap">{JSON.stringify(debugInfo.queryError, null, 2)}</pre>
-                </div>
-              )}
-              {debugInfo.authError && (
-                <div className="mt-3 pt-3 border-t border-gray-700">
-                  <p className="text-yellow-400 mb-1">Auth Error:</p>
-                  <pre className="text-red-300 whitespace-pre-wrap">{JSON.stringify(debugInfo.authError, null, 2)}</pre>
-                </div>
-              )}
-              {debugInfo.exception && (
-                <div className="mt-3 pt-3 border-t border-gray-700">
-                  <p className="text-yellow-400 mb-1">Exception:</p>
-                  <pre className="text-red-300 whitespace-pre-wrap">{JSON.stringify(debugInfo.exception, null, 2)}</pre>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-3 justify-center">
-            <button onClick={() => { setSetupError(null); setDebugInfo(null); loadAssessments() }}
+          <div className="flex justify-center">
+            <button onClick={() => { setSetupError(null); loadAssessments() }}
               className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
               Retry
             </button>
-            {debugInfo && (
-              <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2)); alert('Debug info copied to clipboard') }}
-                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-1.5">
-                <Copy size={14} /> Copy Debug Info
-              </button>
-            )}
           </div>
         </div>
       </div>
