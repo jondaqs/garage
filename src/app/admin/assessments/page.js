@@ -668,7 +668,7 @@ function InvitationsTab({ supabase, assessment }) {
   const loadInvitations = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
-      .from('assessment_invitations')
+      .from('assessment_invitations_secure')
       .select('*')
       .eq('assessment_id', assessment.id)
       .order('created_at', { ascending: false })
@@ -812,7 +812,7 @@ function SubmissionsTab({ supabase, assessment }) {
   const load = useCallback(async () => {
     setLoading(true)
     const { data: subs } = await supabase
-      .from('assessment_submissions')
+      .from('assessment_submissions_secure')
       .select('*')
       .eq('assessment_id', assessment.id)
       .order('submitted_at', { ascending: false })

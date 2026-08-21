@@ -58,9 +58,9 @@ export async function POST(request) {
     const errors = []
 
     for (const email of emails) {
-      // Check if already invited (using caller's supabase so RLS applies)
+      // Check if already invited (read from secure view)
       const { data: existing } = await supabase
-        .from('assessment_invitations')
+        .from('assessment_invitations_secure')
         .select('id, status')
         .eq('assessment_id', assessmentId)
         .eq('email', email)

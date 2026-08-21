@@ -115,7 +115,7 @@ function AssessmentContent() {
       if (!assessmentId) {
         // Find invitations for this user's email
         const { data: invites } = await supabase
-          .from('assessment_invitations')
+          .from('assessment_invitations_secure')
           .select('*, assessments:assessment_id(id, name, description, status, time_limit_secs, total_marks)')
           .or(`user_id.eq.${session.user.id},email.eq.${session.user.email}`)
           .in('status', ['sent', 'pending', 'accepted'])
@@ -175,7 +175,7 @@ function AssessmentContent() {
       // Check invitation if required
       if (aData.require_invite) {
         const { data: inv } = await supabase
-          .from('assessment_invitations')
+          .from('assessment_invitations_secure')
           .select('*')
           .eq('assessment_id', assessmentId)
           .or(`user_id.eq.${session.user.id},email.eq.${session.user.email}`)
@@ -201,7 +201,7 @@ function AssessmentContent() {
 
       // Check for existing in-progress submission (resume)
       const { data: existing } = await supabase
-        .from('assessment_submissions')
+        .from('assessment_submissions_secure')
         .select('*')
         .eq('assessment_id', assessmentId)
         .eq('user_id', session.user.id)
@@ -237,7 +237,7 @@ function AssessmentContent() {
 
       // Check for already-submitted
       const { data: submitted } = await supabase
-        .from('assessment_submissions')
+        .from('assessment_submissions_secure')
         .select('id')
         .eq('assessment_id', assessmentId)
         .eq('user_id', session.user.id)
