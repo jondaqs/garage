@@ -551,7 +551,7 @@ function InvitationsTab({ supabase, assessment }) {
   const [emails, setEmails] = useState('')
   const [emailSubject, setEmailSubject] = useState(`You're invited to take the ${assessment.name}`)
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com'
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com').replace(/\/+$/, '')
   const assessmentLink = `${baseUrl}/careers/assessment?id=${assessment.id}`
   const timeMins = Math.round((assessment.time_limit_secs || 0) / 60)
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-KE', { weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : null

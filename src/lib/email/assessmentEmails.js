@@ -12,7 +12,7 @@ import { sendAndQueueEmail } from './transport.js'
 import { escapeHtml } from '@/lib/validation'
 const h = (v) => escapeHtml(v ?? '')
 
-const APP_URL    = () => process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com'
+const APP_URL    = () => (process.env.NEXT_PUBLIC_APP_URL || 'https://carfix-connect.com').replace(/\/+$/, '')
 const BRAND_NAME = 'Carfix-Connect'
 
 const fmtDate = (d) =>
