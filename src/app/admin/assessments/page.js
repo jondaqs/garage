@@ -723,6 +723,7 @@ function SubmissionsTab({ supabase, assessment }) {
   const [scores, setScores] = useState({})
   const [saving, setSaving] = useState(false)
   const [adminName, setAdminName] = useState('')
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -742,15 +743,19 @@ function SubmissionsTab({ supabase, assessment }) {
       ...s, assessment_questions: (s.assessment_questions || []).sort((a, b) => a.sort_order - b.sort_order)
     })))
 
-    // Get admin name
+    // Get admin name and check if platform_admin
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profile } = await supabase
         .from('user_profiles_secure')
-        .select('first_name, last_name')
+        .select('first_name, last_name, user_roles(role:user_roles_lookup(code))')
         .eq('auth_user_id', user.id)
         .single()
-      if (profile) setAdminName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim())
+      if (profile) {
+        setAdminName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim())
+        const codes = profile.user_roles?.map(ur => ur.role?.code).filter(Boolean) ?? []
+        setIsPlatformAdmin(codes.includes('platform_admin'))
+      }
     }
 
     setLoading(false)
@@ -806,6 +811,14 @@ function SubmissionsTab({ supabase, assessment }) {
     }
     await load()
     setSaving(false)
+  }
+
+  const deleteSubmission = async (e, subId) => {
+    e.stopPropagation()
+    if (!confirm('Permanently delete this submission? This cannot be undone.')) return
+    const { error } = await supabase.from('assessment_submissions').delete().eq('id', subId)
+    if (error) { alert(`Delete failed: ${error.message}`); return }
+    load()
   }
 
   const filtered = filter === 'all' ? submissions : submissions.filter(s => s.status === filter || s.result === filter)
@@ -1037,7 +1050,17 @@ function SubmissionsTab({ supabase, assessment }) {
                   ) : <span className="text-xs text-gray-300">—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-gray-400">{sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '—'}</td>
-                <td className="px-4 py-2.5"><Eye size={14} className="text-gray-300" /></td>
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Eye size={14} className="text-gray-300" />
+                    {isPlatformAdmin && (
+                      <button onClick={(e) => deleteSubmission(e, sub.id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors" title="Delete submission">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
