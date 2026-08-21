@@ -588,6 +588,11 @@ function AssessmentContent() {
                   <p style={{ fontSize:13, color:'rgba(255,255,255,0.65)', lineHeight:1.6 }}>{item.text}</p>
                 </div>
               ))}
+              <div style={{ marginTop:16, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+                <p style={{ fontSize:12, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>
+                  By undertaking this assessment, you agree to have your personal data — including your name, contact details, and responses — collected and processed for evaluation purposes. Your information will be handled in accordance with our privacy policy and will only be used for recruitment and assessment activities.
+                </p>
+              </div>
             </div>
 
             {/* Candidate form */}
