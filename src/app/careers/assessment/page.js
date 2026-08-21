@@ -673,8 +673,8 @@ function AssessmentContent() {
 
         <div className="asmnt-root" style={bgStyle}>
           {/* Top bar */}
-          <div style={{ position:'sticky', top:0, zIndex:100, background:'rgba(10,22,40,0.85)', backdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,0.08)', padding:'10px 24px' }}>
-            <div style={{ maxWidth:900, margin:'0 auto', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+          <div style={{ position:'sticky', top:0, zIndex:100, background:'rgba(10,22,40,0.85)', backdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,0.08)', padding:'10px 16px' }}>
+            <div style={{ maxWidth:900, margin:'0 auto', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
               <span className="asmnt-display" style={{ fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.4)', flexShrink:0, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {assessment.name}
               </span>

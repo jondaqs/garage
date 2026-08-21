@@ -7,6 +7,7 @@ import {
   Clock, CheckCircle, XCircle, AlertTriangle, Eye, ChevronDown, ChevronUp,
   Loader2, Save, X, Archive,
 } from 'lucide-react'
+import Pagination from '@/components/admin/Pagination'
 
 const TAB_ITEMS = [
   { id:'assessments', label:'Assessments', icon: FileText },
@@ -150,6 +151,8 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name:'', description:'', instructions:'', time_limit_mins:120, passing_pct:50, require_invite:true, opens_at:'', closes_at:'' })
+  const [asmtPage, setAsmtPage] = useState(1)
+  const ASMT_PAGE_SIZE = 10
 
   const resetForm = () => { setForm({ name:'', description:'', instructions:'', time_limit_mins:120, passing_pct:50, require_invite:true, opens_at:'', closes_at:'' }); setEditing(null); setShowForm(false) }
 
@@ -277,7 +280,7 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
 
       {/* List */}
       <div className="space-y-3">
-        {assessments.map(a => {
+        {assessments.slice((asmtPage - 1) * ASMT_PAGE_SIZE, asmtPage * ASMT_PAGE_SIZE).map(a => {
           const qCount = a.assessment_sections?.reduce((t, s) => t + (s.assessment_questions?.length || 0), 0) || 0
           const sCount = a.assessment_sections?.length || 0
           return (
@@ -325,6 +328,7 @@ function AssessmentsTab({ supabase, assessments, reload, onSelect }) {
           </div>
         )}
       </div>
+      <Pagination page={asmtPage} pageSize={ASMT_PAGE_SIZE} totalCount={assessments.length} onPageChange={setAsmtPage} />
     </div>
   )
 }
@@ -633,6 +637,10 @@ function InvitationsTab({ supabase, assessment }) {
     loadInvitations()
   }
 
+  const [invPage, setInvPage] = useState(1)
+  const INV_PAGE_SIZE = 15
+  const paginatedInvs = invitations.slice((invPage - 1) * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE)
+
   return (
     <div>
       <h2 className="text-sm font-semibold text-gray-700 mb-4">Invite Candidates — {assessment.name}</h2>
@@ -671,20 +679,20 @@ function InvitationsTab({ supabase, assessment }) {
 
       {/* Invitation list */}
       <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sent Invitations ({invitations.length})</h3>
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+        <table className="w-full text-sm min-w-[400px]">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
             <tr>
               <th className="text-left px-4 py-2.5">Email</th>
               <th className="text-left px-4 py-2.5">Status</th>
-              <th className="text-left px-4 py-2.5">Sent</th>
+              <th className="text-left px-4 py-2.5 hidden sm:table-cell">Sent</th>
               <th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {invitations.map(inv => (
+            {paginatedInvs.map(inv => (
               <tr key={inv.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2.5 text-gray-800">{inv.email}</td>
+                <td className="px-4 py-2.5 text-gray-800 break-all">{inv.email}</td>
                 <td className="px-4 py-2.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                     inv.status === 'sent' ? 'bg-blue-100 text-blue-700' :
@@ -693,7 +701,7 @@ function InvitationsTab({ supabase, assessment }) {
                     'bg-gray-100 text-gray-500'
                   }`}>{inv.status}</span>
                 </td>
-                <td className="px-4 py-2.5 text-xs text-gray-400">{inv.sent_at ? new Date(inv.sent_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-400 hidden sm:table-cell">{inv.sent_at ? new Date(inv.sent_at).toLocaleDateString() : '—'}</td>
                 <td className="px-4 py-2.5 text-right">
                   {inv.status === 'sent' && (
                     <button onClick={() => revokeInvite(inv.id)} className="text-xs text-red-400 hover:text-red-600">Revoke</button>
@@ -706,6 +714,7 @@ function InvitationsTab({ supabase, assessment }) {
             )}
           </tbody>
         </table>
+        <Pagination page={invPage} pageSize={INV_PAGE_SIZE} totalCount={invitations.length} onPageChange={setInvPage} />
       </div>
     </div>
   )
@@ -724,6 +733,8 @@ function SubmissionsTab({ supabase, assessment }) {
   const [saving, setSaving] = useState(false)
   const [adminName, setAdminName] = useState('')
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 15
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -822,6 +833,10 @@ function SubmissionsTab({ supabase, assessment }) {
   }
 
   const filtered = filter === 'all' ? submissions : submissions.filter(s => s.status === filter || s.result === filter)
+  const paginatedSubs = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Reset page when filter changes
+  const setFilterAndReset = (f) => { setFilter(f); setPage(1) }
 
   if (loading) return <div className="text-center py-12"><Loader2 size={24} className="animate-spin text-blue-500 mx-auto" /></div>
 
@@ -839,12 +854,12 @@ function SubmissionsTab({ supabase, assessment }) {
 
         {/* Candidate info */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="font-semibold text-gray-900">{sub.full_name}</h3>
-              <p className="text-xs text-gray-400">{sub.email} · {sub.phone} · {sub.territory || '—'}</p>
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-gray-900 truncate">{sub.full_name}</h3>
+              <p className="text-xs text-gray-400 truncate">{sub.email} · {sub.phone} · {sub.territory || '—'}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {['pass', 'shortlist', 'fail'].map(r => (
                 <button key={r} onClick={() => saveScores(r)} disabled={saving}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
@@ -867,7 +882,7 @@ function SubmissionsTab({ supabase, assessment }) {
         </div>
 
         {/* Score summary table */}
-        <div className="bg-white border border-gray-200 rounded-xl mb-4 overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-xl mb-4 overflow-x-auto">
           <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
             <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider">Score Summary</h4>
           </div>
@@ -994,7 +1009,7 @@ function SubmissionsTab({ supabase, assessment }) {
         <h2 className="text-sm font-semibold text-gray-700">Submissions — {assessment.name} ({submissions.length})</h2>
         <div className="flex gap-1">
           {['all','submitted','scored','pass','shortlist','fail'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
+            <button key={f} onClick={() => setFilterAndReset(f)}
               className={`px-2.5 py-1 text-xs rounded-lg ${filter === f ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-400 hover:text-gray-600'}`}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -1002,27 +1017,27 @@ function SubmissionsTab({ supabase, assessment }) {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
             <tr>
               <th className="text-left px-4 py-2.5">Candidate</th>
-              <th className="text-left px-4 py-2.5">Territory</th>
+              <th className="text-left px-4 py-2.5 hidden sm:table-cell">Territory</th>
               <th className="text-right px-4 py-2.5">Score</th>
               <th className="text-left px-4 py-2.5">Status</th>
-              <th className="text-left px-4 py-2.5">Result</th>
-              <th className="text-left px-4 py-2.5">Submitted</th>
+              <th className="text-left px-4 py-2.5 hidden sm:table-cell">Result</th>
+              <th className="text-left px-4 py-2.5 hidden md:table-cell">Submitted</th>
               <th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map(sub => (
+            {paginatedSubs.map(sub => (
               <tr key={sub.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewing(sub.id)}>
                 <td className="px-4 py-2.5">
                   <p className="font-medium text-gray-800">{sub.full_name}</p>
                   <p className="text-xs text-gray-400">{sub.email || sub.phone}</p>
                 </td>
-                <td className="px-4 py-2.5 text-xs text-gray-500">{sub.territory || '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{sub.territory || '—'}</td>
                 <td className="px-4 py-2.5 text-right">
                   {sub.total_score != null ? (
                     <span className="text-xs font-semibold text-gray-700">
@@ -1040,7 +1055,7 @@ function SubmissionsTab({ supabase, assessment }) {
                     'bg-yellow-100 text-yellow-700'
                   }`}>{sub.status}</span>
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 hidden sm:table-cell">
                   {sub.result ? (
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                       sub.result === 'pass' ? 'bg-green-100 text-green-700' :
@@ -1049,7 +1064,7 @@ function SubmissionsTab({ supabase, assessment }) {
                     }`}>{sub.result}</span>
                   ) : <span className="text-xs text-gray-300">—</span>}
                 </td>
-                <td className="px-4 py-2.5 text-xs text-gray-400">{sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '—'}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <Eye size={14} className="text-gray-300" />
@@ -1068,6 +1083,7 @@ function SubmissionsTab({ supabase, assessment }) {
             )}
           </tbody>
         </table>
+        <Pagination page={page} pageSize={PAGE_SIZE} totalCount={filtered.length} onPageChange={setPage} />
       </div>
     </div>
   )
