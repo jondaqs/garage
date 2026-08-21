@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   FileText, Plus, Edit3, Trash2, Send, Users, BarChart3, Upload, Search,
   Clock, CheckCircle, XCircle, AlertTriangle, Eye, ChevronDown, ChevronUp,
-  Loader2, Save, X, Archive,
+  Loader2, Save, X, Archive, Download,
 } from 'lucide-react'
 import Pagination from '@/components/admin/Pagination'
 
@@ -824,6 +824,156 @@ function SubmissionsTab({ supabase, assessment }) {
     setSaving(false)
   }
 
+  const exportSubmissionPDF = async (sub) => {
+    const { default: jsPDF } = await import('jspdf')
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const pageW = pdf.internal.pageSize.getWidth()
+    const pageH = pdf.internal.pageSize.getHeight()
+    const margin = 14
+    const contentW = pageW - margin * 2
+    let y = margin
+
+    const ensureSpace = (needed) => { if (y + needed > pageH - margin) { pdf.addPage(); y = margin } }
+    const setFont = (size, weight = 'normal') => { pdf.setFont('helvetica', weight); pdf.setFontSize(size) }
+    const rgb = (r, g, b) => pdf.setTextColor(r, g, b)
+    const grayLine = () => { pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.2); pdf.line(margin, y, pageW - margin, y) }
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'
+
+    const answers = sub.answers || {}
+    const subScores = sub.scores || scores
+    const sectionSummary = sections.map(s => {
+      const qs = s.assessment_questions || []
+      const sc = qs.reduce((sum, q) => sum + (parseFloat(subScores[q.id]) || 0), 0)
+      const mx = qs.reduce((sum, q) => sum + (q.marks || 0), 0)
+      return { title: s.title, score: sc, max: mx }
+    })
+    const total = sectionSummary.reduce((s, r) => s + r.score, 0)
+    const maxTotal = sectionSummary.reduce((s, r) => s + r.max, 0)
+    const pct = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0
+
+    // ── Header ──
+    setFont(18, 'bold'); rgb(20, 20, 20)
+    pdf.text('Assessment Submission Report', margin, y + 6)
+    setFont(9); rgb(120, 120, 120)
+    pdf.text('Generated ' + fmtDate(new Date()), pageW - margin, y + 6, { align: 'right' })
+    y += 12
+
+    setFont(13, 'bold'); rgb(30, 64, 175)
+    pdf.text(assessment.name, margin, y)
+    y += 8
+
+    // ── Candidate info ──
+    grayLine(); y += 6
+    setFont(10, 'bold'); rgb(60, 60, 60)
+    pdf.text('Candidate Details', margin, y); y += 6
+    setFont(9); rgb(80, 80, 80)
+    const info = [
+      ['Name', sub.full_name || '—'],
+      ['Email', sub.email || '—'],
+      ['Phone', sub.phone || '—'],
+      ['ID / Passport', sub.id_number || '—'],
+      ['Territory', sub.territory || '—'],
+      ['Submitted', fmtDate(sub.submitted_at)],
+      ['Time Used', sub.time_used_secs ? `${Math.floor(sub.time_used_secs/60)}m ${sub.time_used_secs%60}s` : '—'],
+      ['Status', (sub.status || '—').toUpperCase()],
+      ['Result', (sub.result || '—').toUpperCase()],
+    ]
+    info.forEach(([label, value]) => {
+      ensureSpace(5)
+      setFont(8, 'bold'); rgb(140, 140, 140); pdf.text(label + ':', margin, y)
+      setFont(9); rgb(60, 60, 60); pdf.text(String(value), margin + 32, y)
+      y += 5
+    })
+    y += 4
+
+    // ── Score summary table ──
+    ensureSpace(20)
+    grayLine(); y += 6
+    setFont(10, 'bold'); rgb(60, 60, 60)
+    pdf.text('Score Summary', margin, y); y += 7
+
+    // Table header
+    setFont(8, 'bold'); rgb(100, 100, 100)
+    pdf.text('Section', margin, y)
+    pdf.text('Score', margin + contentW * 0.65, y, { align: 'right' })
+    pdf.text('Out of', margin + contentW * 0.8, y, { align: 'right' })
+    pdf.text('%', margin + contentW, y, { align: 'right' })
+    y += 2; grayLine(); y += 5
+
+    sectionSummary.forEach((r) => {
+      ensureSpace(6)
+      setFont(9); rgb(60, 60, 60)
+      pdf.text(r.title.substring(0, 50), margin, y)
+      setFont(9, 'bold'); pdf.text(String(r.score), margin + contentW * 0.65, y, { align: 'right' })
+      setFont(9); rgb(120, 120, 120); pdf.text(String(r.max), margin + contentW * 0.8, y, { align: 'right' })
+      pdf.text(r.max > 0 ? Math.round((r.score / r.max) * 100) + '%' : '—', margin + contentW, y, { align: 'right' })
+      y += 6
+    })
+
+    // Total row
+    ensureSpace(10)
+    y += 1; grayLine(); y += 5
+    setFont(10, 'bold'); rgb(20, 20, 20)
+    pdf.text('TOTAL', margin, y)
+    pdf.text(String(total), margin + contentW * 0.65, y, { align: 'right' })
+    rgb(100, 100, 100); pdf.text(String(maxTotal), margin + contentW * 0.8, y, { align: 'right' })
+    rgb(pct >= 70 ? 34 : pct >= 50 ? 180 : 220, pct >= 70 ? 139 : pct >= 50 ? 130 : 50, pct >= 70 ? 34 : pct >= 50 ? 0 : 50)
+    setFont(10, 'bold'); pdf.text(pct + '%', margin + contentW, y, { align: 'right' })
+    y += 6
+    setFont(8); rgb(160, 160, 160)
+    pdf.text(`Assessed by: ${adminName || '—'}${sub.scored_at ? '  •  ' + fmtDate(sub.scored_at) : ''}`, margin, y)
+    y += 8
+
+    // ── Answers by section ──
+    sections.forEach((s, si) => {
+      ensureSpace(16)
+      grayLine(); y += 6
+      setFont(10, 'bold'); rgb(30, 64, 175)
+      pdf.text(`${String.fromCharCode(65 + si)}. ${s.title}`, margin, y)
+      setFont(8); rgb(160, 160, 160)
+      pdf.text(`${s.marks} marks`, pageW - margin, y, { align: 'right' })
+      y += 8
+
+      ;(s.assessment_questions || []).forEach((q, qi) => {
+        const answer = answers[q.id] || ''
+        const qScore = subScores[q.id]
+
+        // Question text
+        ensureSpace(14)
+        setFont(9, 'bold'); rgb(80, 80, 80)
+        const qLines = pdf.splitTextToSize(`${qi + 1}. ${q.question_text}`, contentW - 20)
+        qLines.forEach(line => { ensureSpace(5); pdf.text(line, margin + 4, y); y += 4.5 })
+
+        // Score badge
+        setFont(8); rgb(100, 100, 180)
+        pdf.text(`[${qScore != null && qScore !== '' ? qScore : '—'} / ${q.marks}]`, pageW - margin, y - 4.5, { align: 'right' })
+        y += 2
+
+        // Answer text
+        if (answer.trim()) {
+          setFont(9); rgb(60, 60, 60)
+          const aLines = pdf.splitTextToSize(answer.trim(), contentW - 8)
+          aLines.forEach(line => { ensureSpace(5); pdf.text(line, margin + 6, y); y += 4.5 })
+        } else {
+          setFont(9, 'italic'); rgb(200, 100, 100)
+          pdf.text('No answer provided', margin + 6, y); y += 5
+        }
+        y += 4
+      })
+    })
+
+    // ── Footer ──
+    const pageCount = pdf.internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i)
+      setFont(7); rgb(180, 180, 180)
+      pdf.text(`Carfix-Connect  •  Assessment Report  •  Page ${i} of ${pageCount}`, pageW / 2, pageH - 8, { align: 'center' })
+    }
+
+    const safeName = (sub.full_name || 'submission').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40)
+    pdf.save(`Assessment_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`)
+  }
+
   const deleteSubmission = async (e, subId) => {
     e.stopPropagation()
     if (!confirm('Permanently delete this submission? This cannot be undone.')) return
@@ -931,8 +1081,12 @@ function SubmissionsTab({ supabase, assessment }) {
           </table>
         </div>
 
-        {/* Save button */}
-        <div className="flex justify-end mb-4">
+        {/* Save & Export buttons */}
+        <div className="flex justify-end gap-2 mb-4">
+          <button onClick={() => exportSubmissionPDF(sub)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white text-gray-600 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">
+            <Download size={14} /> Export PDF
+          </button>
           <button onClick={() => saveScores()} disabled={saving}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -991,7 +1145,11 @@ function SubmissionsTab({ supabase, assessment }) {
         ))}
 
         {/* Bottom save */}
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={() => exportSubmissionPDF(sub)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white text-gray-600 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">
+            <Download size={14} /> Export PDF
+          </button>
           <button onClick={() => saveScores()} disabled={saving}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -1068,6 +1226,10 @@ function SubmissionsTab({ supabase, assessment }) {
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <Eye size={14} className="text-gray-300" />
+                    <button onClick={(e) => { e.stopPropagation(); exportSubmissionPDF(sub) }}
+                      className="text-gray-300 hover:text-blue-500 transition-colors" title="Export PDF">
+                      <Download size={14} />
+                    </button>
                     {isPlatformAdmin && (
                       <button onClick={(e) => deleteSubmission(e, sub.id)}
                         className="text-gray-300 hover:text-red-500 transition-colors" title="Delete submission">
