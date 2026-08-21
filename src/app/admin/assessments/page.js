@@ -720,6 +720,9 @@ function SubmissionsTab({ supabase, assessment }) {
   const [viewing, setViewing] = useState(null)
   const [sections, setSections] = useState([])
   const [filter, setFilter] = useState('all')
+  const [scores, setScores] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [adminName, setAdminName] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -738,27 +741,78 @@ function SubmissionsTab({ supabase, assessment }) {
     setSections((secs || []).map(s => ({
       ...s, assessment_questions: (s.assessment_questions || []).sort((a, b) => a.sort_order - b.sort_order)
     })))
+
+    // Get admin name
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('user_profiles_secure')
+        .select('first_name, last_name')
+        .eq('auth_user_id', user.id)
+        .single()
+      if (profile) setAdminName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim())
+    }
+
     setLoading(false)
   }, [assessment.id])
 
   useEffect(() => { load() }, [load])
 
-  const updateResult = async (subId, result) => {
+  // When viewing a submission, initialise scores from saved data
+  useEffect(() => {
+    if (viewing) {
+      const sub = submissions.find(s => s.id === viewing)
+      setScores(sub?.scores || {})
+    }
+  }, [viewing, submissions])
+
+  const setScore = (questionId, value) => {
+    setScores(prev => ({ ...prev, [questionId]: value }))
+  }
+
+  // Compute section and total scores
+  const computeSummary = () => {
+    return sections.map(s => {
+      const qs = s.assessment_questions || []
+      const sectionScore = qs.reduce((sum, q) => sum + (parseFloat(scores[q.id]) || 0), 0)
+      const sectionMax = qs.reduce((sum, q) => sum + (q.marks || 0), 0)
+      return { id: s.id, title: s.title, score: sectionScore, max: sectionMax }
+    })
+  }
+
+  const summary = viewing ? computeSummary() : []
+  const totalScore = summary.reduce((s, r) => s + r.score, 0)
+  const totalMax = summary.reduce((s, r) => s + r.max, 0)
+  const percentage = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0
+
+  const saveScores = async (resultOverride) => {
+    setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('assessment_submissions').update({
-      result,
+    const updatePayload = {
+      scores,
+      total_score: totalScore,
       scored_by: user.id,
       scored_at: new Date().toISOString(),
       status: 'scored',
-    }).eq('id', subId)
-    load()
+    }
+    if (resultOverride) updatePayload.result = resultOverride
+
+    const { error } = await supabase.from('assessment_submissions')
+      .update(updatePayload)
+      .eq('id', viewing)
+
+    if (error) {
+      alert(`Save failed: ${error.message}`)
+    }
+    await load()
+    setSaving(false)
   }
 
   const filtered = filter === 'all' ? submissions : submissions.filter(s => s.status === filter || s.result === filter)
 
   if (loading) return <div className="text-center py-12"><Loader2 size={24} className="animate-spin text-blue-500 mx-auto" /></div>
 
-  // View detail
+  // ── Detail / scoring view ──
   if (viewing) {
     const sub = submissions.find(s => s.id === viewing)
     if (!sub) return null
@@ -769,6 +823,8 @@ function SubmissionsTab({ supabase, assessment }) {
     return (
       <div>
         <button onClick={() => setViewing(null)} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-4">← Back to list</button>
+
+        {/* Candidate info */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -777,7 +833,7 @@ function SubmissionsTab({ supabase, assessment }) {
             </div>
             <div className="flex items-center gap-2">
               {['pass', 'shortlist', 'fail'].map(r => (
-                <button key={r} onClick={() => updateResult(sub.id, r)}
+                <button key={r} onClick={() => saveScores(r)} disabled={saving}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
                     sub.result === r
                       ? r === 'pass' ? 'bg-green-600 text-white border-green-600'
@@ -797,7 +853,66 @@ function SubmissionsTab({ supabase, assessment }) {
           </div>
         </div>
 
-        {/* Answers by section */}
+        {/* Score summary table */}
+        <div className="bg-white border border-gray-200 rounded-xl mb-4 overflow-hidden">
+          <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
+            <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider">Score Summary</h4>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th className="text-left px-4 py-2">Section</th>
+                <th className="text-right px-4 py-2 w-20">Score</th>
+                <th className="text-right px-4 py-2 w-20">Out of</th>
+                <th className="text-right px-4 py-2 w-20">%</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {summary.map((r, i) => (
+                <tr key={r.id}>
+                  <td className="px-4 py-2 text-gray-700">
+                    <span className="text-xs font-bold text-blue-600 mr-1.5">{String.fromCharCode(65+i)}</span>
+                    {r.title}
+                  </td>
+                  <td className="px-4 py-2 text-right font-semibold text-gray-800">{r.score}</td>
+                  <td className="px-4 py-2 text-right text-gray-500">{r.max}</td>
+                  <td className="px-4 py-2 text-right text-gray-500">{r.max > 0 ? Math.round((r.score / r.max) * 100) : 0}%</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+              <tr className="font-bold">
+                <td className="px-4 py-2.5 text-gray-900">Total</td>
+                <td className="px-4 py-2.5 text-right text-gray-900">{totalScore}</td>
+                <td className="px-4 py-2.5 text-right text-gray-600">{totalMax}</td>
+                <td className="px-4 py-2.5 text-right">
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${
+                    percentage >= 70 ? 'bg-green-100 text-green-700' :
+                    percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-600'
+                  }`}>{percentage}%</span>
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={4} className="px-4 py-2 text-xs text-gray-400">
+                  Assessor: {adminName || '—'}
+                  {sub.scored_at && ` · Scored: ${new Date(sub.scored_at).toLocaleString()}`}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Save button */}
+        <div className="flex justify-end mb-4">
+          <button onClick={() => saveScores()} disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Save Scores
+          </button>
+        </div>
+
+        {/* Answers by section with scoring inputs */}
         {sections.map((s, si) => (
           <div key={s.id} className="bg-white border border-gray-200 rounded-xl mb-3 overflow-hidden">
             <div className="px-4 py-2.5 bg-gray-50 flex items-center gap-2">
@@ -808,12 +923,32 @@ function SubmissionsTab({ supabase, assessment }) {
             <div className="p-4 space-y-4">
               {s.assessment_questions?.map((q, qi) => {
                 const answer = answers[q.id] || ''
+                const qScore = scores[q.id]
                 return (
                   <div key={q.id}>
                     <div className="flex items-start gap-2 mb-1">
                       <span className="text-[10px] font-bold text-gray-400 mt-0.5">{qi+1}</span>
                       <p className="text-sm text-gray-600 flex-1">{q.question_text}</p>
-                      <span className="text-[10px] text-blue-500 font-semibold flex-shrink-0">{q.marks}mk</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max={q.marks}
+                          step="0.5"
+                          value={qScore ?? ''}
+                          onChange={e => {
+                            const v = e.target.value
+                            if (v === '') { setScore(q.id, ''); return }
+                            const num = parseFloat(v)
+                            if (!isNaN(num) && num >= 0 && num <= q.marks) setScore(q.id, num)
+                          }}
+                          placeholder="—"
+                          className={`w-14 text-center text-sm border rounded-lg px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 ${
+                            qScore !== undefined && qScore !== '' ? 'border-blue-300 bg-blue-50 font-semibold text-blue-700' : 'border-gray-200 text-gray-400'
+                          }`}
+                        />
+                        <span className="text-[10px] text-gray-400">/ {q.marks}</span>
+                      </div>
                     </div>
                     <div className={`ml-4 p-3 rounded-lg text-sm leading-relaxed whitespace-pre-line ${
                       answer.trim() ? 'bg-gray-50 text-gray-800 border border-gray-100' : 'bg-red-50 text-red-300 border border-red-100 italic'
@@ -826,11 +961,20 @@ function SubmissionsTab({ supabase, assessment }) {
             </div>
           </div>
         ))}
+
+        {/* Bottom save */}
+        <div className="flex justify-end mt-4">
+          <button onClick={() => saveScores()} disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Save Scores
+          </button>
+        </div>
       </div>
     )
   }
 
-  // List
+  // ── List view ──
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -851,6 +995,7 @@ function SubmissionsTab({ supabase, assessment }) {
             <tr>
               <th className="text-left px-4 py-2.5">Candidate</th>
               <th className="text-left px-4 py-2.5">Territory</th>
+              <th className="text-right px-4 py-2.5">Score</th>
               <th className="text-left px-4 py-2.5">Status</th>
               <th className="text-left px-4 py-2.5">Result</th>
               <th className="text-left px-4 py-2.5">Submitted</th>
@@ -865,6 +1010,16 @@ function SubmissionsTab({ supabase, assessment }) {
                   <p className="text-xs text-gray-400">{sub.email || sub.phone}</p>
                 </td>
                 <td className="px-4 py-2.5 text-xs text-gray-500">{sub.territory || '—'}</td>
+                <td className="px-4 py-2.5 text-right">
+                  {sub.total_score != null ? (
+                    <span className="text-xs font-semibold text-gray-700">
+                      {sub.total_score}/{sub.max_score || totalMax}
+                      <span className="text-gray-400 ml-1">
+                        ({sub.max_score > 0 ? Math.round((sub.total_score / sub.max_score) * 100) : 0}%)
+                      </span>
+                    </span>
+                  ) : <span className="text-xs text-gray-300">—</span>}
+                </td>
                 <td className="px-4 py-2.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                     sub.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
@@ -886,7 +1041,7 @@ function SubmissionsTab({ supabase, assessment }) {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">No submissions yet</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">No submissions yet</td></tr>
             )}
           </tbody>
         </table>
