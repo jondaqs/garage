@@ -639,7 +639,11 @@ function InvitationsTab({ supabase, assessment }) {
 
   const [invPage, setInvPage] = useState(1)
   const INV_PAGE_SIZE = 15
-  const paginatedInvs = invitations.slice((invPage - 1) * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE)
+  const [invSearch, setInvSearch] = useState('')
+  const filteredInvs = invSearch.trim()
+    ? invitations.filter(i => i.email?.toLowerCase().includes(invSearch.toLowerCase()))
+    : invitations
+  const paginatedInvs = filteredInvs.slice((invPage - 1) * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE)
 
   return (
     <div>
@@ -678,7 +682,15 @@ function InvitationsTab({ supabase, assessment }) {
       </div>
 
       {/* Invitation list */}
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sent Invitations ({invitations.length})</h3>
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sent Invitations ({filteredInvs.length}{invSearch ? ` of ${invitations.length}` : ''})</h3>
+      <div className="mb-3">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+          <input value={invSearch} onChange={e => { setInvSearch(e.target.value); setInvPage(1) }}
+            placeholder="Search by email..."
+            className="w-full sm:w-64 pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        </div>
+      </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
         <table className="w-full text-sm min-w-[400px]">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
@@ -709,12 +721,12 @@ function InvitationsTab({ supabase, assessment }) {
                 </td>
               </tr>
             ))}
-            {invitations.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400 text-sm">No invitations sent yet</td></tr>
+            {filteredInvs.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400 text-sm">{invSearch ? 'No invitations match your search' : 'No invitations sent yet'}</td></tr>
             )}
           </tbody>
         </table>
-        <Pagination page={invPage} pageSize={INV_PAGE_SIZE} totalCount={invitations.length} onPageChange={setInvPage} />
+        <Pagination page={invPage} pageSize={INV_PAGE_SIZE} totalCount={filteredInvs.length} onPageChange={setInvPage} />
       </div>
     </div>
   )
@@ -982,11 +994,23 @@ function SubmissionsTab({ supabase, assessment }) {
     load()
   }
 
-  const filtered = filter === 'all' ? submissions : submissions.filter(s => s.status === filter || s.result === filter)
+  const [subSearch, setSubSearch] = useState('')
+
+  const filtered = (() => {
+    let list = filter === 'all' ? submissions : submissions.filter(s => s.status === filter || s.result === filter)
+    if (subSearch.trim()) {
+      const q = subSearch.toLowerCase()
+      list = list.filter(s =>
+        s.full_name?.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q) ||
+        s.phone?.toLowerCase().includes(q)
+      )
+    }
+    return list
+  })()
   const paginatedSubs = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  // Reset page when filter changes
-  const setFilterAndReset = (f) => { setFilter(f); setPage(1) }
+  const setFilterAndReset = (f) => { setFilter(f); setPage(1); setSubSearch('') }
 
   if (loading) return <div className="text-center py-12"><Loader2 size={24} className="animate-spin text-blue-500 mx-auto" /></div>
 
@@ -1164,14 +1188,22 @@ function SubmissionsTab({ supabase, assessment }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">Submissions — {assessment.name} ({submissions.length})</h2>
-        <div className="flex gap-1">
+        <h2 className="text-sm font-semibold text-gray-700">Submissions — {assessment.name} ({filtered.length}{subSearch ? ` of ${submissions.length}` : ''})</h2>
+        <div className="flex gap-1 overflow-x-auto">
           {['all','submitted','scored','pass','shortlist','fail'].map(f => (
             <button key={f} onClick={() => setFilterAndReset(f)}
-              className={`px-2.5 py-1 text-xs rounded-lg ${filter === f ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-400 hover:text-gray-600'}`}>
+              className={`px-2.5 py-1 text-xs rounded-lg whitespace-nowrap ${filter === f ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-400 hover:text-gray-600'}`}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
+        </div>
+      </div>
+      <div className="mb-3">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+          <input value={subSearch} onChange={e => { setSubSearch(e.target.value); setPage(1) }}
+            placeholder="Search by name, email, or phone..."
+            className="w-full sm:w-72 pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
         </div>
       </div>
 
