@@ -8,7 +8,7 @@ const authLimiter = rateLimit({ windowMs: 60_000, max: 20, message: 'Too many re
 // Exchange rate / pricing: 10 requests per minute per IP
 const rateLimiter = rateLimit({ windowMs: 60_000, max: 10, message: 'Too many rate lookups. Please try again shortly.' })
 
-export async function middleware(request) {
+export async function proxy(request) {
   const { pathname } = request.nextUrl
 
   // ============================================================
