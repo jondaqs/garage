@@ -668,7 +668,7 @@ export default function FleetVehicleDetailView({ basePath = '/company', companyI
     <div className="max-w-3xl mx-auto">
       {/* Back */}
       <button
-        onClick={() => router.back()}
+        onClick={() => router.push(`${basePath}/fleet`)}
         className="mb-6 flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
       >
         <ArrowLeft size={18} />

@@ -215,7 +215,7 @@ function AddVehiclePageInner() {
   return (
     <div className="max-w-3xl mx-auto">
       <button
-        onClick={() => router.back()}
+        onClick={() => router.push('/dashboard')}
         className="mb-6 text-blue-600 hover:text-blue-700 font-medium flex items-center"
       >
         <ArrowLeft size={20} className="mr-2" />
@@ -408,7 +408,7 @@ function AddVehiclePageInner() {
             <div className="flex gap-4">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={() => router.push('/dashboard')}
                 className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition font-medium"
               >
                 Cancel

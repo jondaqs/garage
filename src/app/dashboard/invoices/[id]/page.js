@@ -83,9 +83,9 @@ export default function CustomerInvoicePage() {
 
   if (!invoice) return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <button onClick={() => router.back()}
+      <button onClick={() => router.push('/dashboard/work-orders')}
         className="flex items-center text-gray-500 hover:text-gray-800 mb-6 text-sm">
-        <ArrowLeft size={16} className="mr-1" /> Back
+        <ArrowLeft size={16} className="mr-1" /> Work Orders
       </button>
       <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
         <AlertCircle className="mx-auto text-red-500 mb-3" size={40} />
@@ -107,9 +107,9 @@ export default function CustomerInvoicePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-      <button onClick={() => router.back()}
+      <button onClick={() => router.push('/dashboard/work-orders')}
         className="flex items-center text-gray-500 hover:text-gray-800 text-sm">
-        <ArrowLeft size={16} className="mr-1" /> Back
+        <ArrowLeft size={16} className="mr-1" /> Work Orders
       </button>
 
       {error && (

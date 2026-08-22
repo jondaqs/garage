@@ -129,9 +129,9 @@ export default function ProviderDetailPage() {
       {/* ── Hero ── */}
       <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white">
         <div className="max-w-4xl mx-auto px-4 pt-6 pb-8">
-          <button onClick={() => router.back()}
+          <button onClick={() => router.push('/company/providers')}
             className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-6 transition-colors">
-            <ArrowLeft size={16} /> Back
+            <ArrowLeft size={16} /> Providers
           </button>
 
           <div className="flex items-start gap-5">

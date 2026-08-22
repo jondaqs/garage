@@ -233,16 +233,16 @@ export default function CustomerWorkOrderPage() {
 
   if (!wo) return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <button onClick={() => router.back()} className="flex items-center text-gray-500 hover:text-gray-800 mb-6 text-sm">
-        <ArrowLeft size={16} className="mr-1" /> Back
+      <button onClick={() => router.push('/dashboard/work-orders')} className="flex items-center text-gray-500 hover:text-gray-800 mb-6 text-sm">
+        <ArrowLeft size={16} className="mr-1" /> Work Orders
       </button>
       <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
         <AlertCircle className="mx-auto text-red-500 mb-3" size={40} />
         <h2 className="text-lg font-semibold text-red-900 mb-2">Work Order Not Found</h2>
         <p className="text-red-700 text-sm mb-4">{error || 'This work order could not be found or you do not have access.'}</p>
-        <button onClick={() => router.push('/dashboard/bookings')}
+        <button onClick={() => router.push('/dashboard/work-orders')}
           className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-          My Bookings
+          Work Orders
         </button>
       </div>
     </div>
@@ -324,9 +324,9 @@ export default function CustomerWorkOrderPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-      <button onClick={() => router.push('/dashboard/bookings')}
+      <button onClick={() => router.push('/dashboard/work-orders')}
         className="flex items-center text-gray-500 hover:text-gray-800 text-sm">
-        <ArrowLeft size={16} className="mr-1" /> My Bookings
+        <ArrowLeft size={16} className="mr-1" /> Work Orders
       </button>
 
       {/* Alerts */}

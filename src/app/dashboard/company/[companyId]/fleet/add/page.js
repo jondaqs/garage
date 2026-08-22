@@ -232,7 +232,7 @@ function AddCompanyFleetVehicleInner() {
           <div>
             <p className="font-semibold text-red-800">Access Denied</p>
             <p className="text-red-600 text-sm mt-1">{error}</p>
-            <button onClick={() => router.back()} className="mt-3 text-sm text-red-700 underline">
+            <button onClick={() => router.push(`/dashboard/company/${companyId}/fleet`)} className="mt-3 text-sm text-red-700 underline">
               Go back
             </button>
           </div>
@@ -245,7 +245,7 @@ function AddCompanyFleetVehicleInner() {
   return (
     <div className="max-w-2xl mx-auto">
       <button
-        onClick={() => router.back()}
+        onClick={() => router.push(`/dashboard/company/${companyId}/fleet`)}
         className="mb-6 text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2"
       >
         <ArrowLeft size={18} />
@@ -410,7 +410,7 @@ function AddCompanyFleetVehicleInner() {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() => router.push(`/dashboard/company/${companyId}/fleet`)}
               className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition"
             >
               Cancel

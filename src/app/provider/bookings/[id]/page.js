@@ -171,7 +171,7 @@ export default function ManageBookingPage() {
 
   if (!booking) return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <button onClick={() => router.back()} className="flex items-center text-gray-600 hover:text-gray-900 mb-6">
+      <button onClick={() => router.push('/provider/bookings')} className="flex items-center text-gray-600 hover:text-gray-900 mb-6">
         <ArrowLeft size={20} className="mr-2" /> Back to Bookings
       </button>
       <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
@@ -190,7 +190,7 @@ export default function ManageBookingPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <button onClick={() => router.back()} className="flex items-center text-gray-600 hover:text-gray-900 mb-6">
+      <button onClick={() => router.push('/provider/bookings')} className="flex items-center text-gray-600 hover:text-gray-900 mb-6">
         <ArrowLeft size={20} className="mr-2" /> Back to Bookings
       </button>
 

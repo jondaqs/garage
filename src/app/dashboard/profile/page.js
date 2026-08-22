@@ -195,11 +195,11 @@ export default function ProfilePage() {
   return (
     <div className="max-w-3xl mx-auto">
       <button 
-        onClick={() => router.back()} 
+        onClick={() => router.push('/dashboard')} 
         className="mb-6 text-blue-600 hover:text-blue-700 font-medium flex items-center"
       >
         <ArrowLeft size={20} className="mr-2" />
-        Back
+        Dashboard
       </button>
 
       <h2 className="text-3xl font-bold text-gray-800 mb-8">Profile Settings</h2>

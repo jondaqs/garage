@@ -233,7 +233,7 @@ export default function AddFleetVehiclePage() {
           <div>
             <p className="font-semibold text-red-800">Access Denied</p>
             <p className="text-red-600 text-sm mt-1">{error}</p>
-            <button onClick={() => router.back()} className="mt-3 text-sm text-red-700 underline">
+            <button onClick={() => router.push('/company/fleet')} className="mt-3 text-sm text-red-700 underline">
               Go back
             </button>
           </div>
@@ -249,7 +249,7 @@ export default function AddFleetVehiclePage() {
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/company/fleet')}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-4"
           >
             <ArrowLeft size={18} />
@@ -424,7 +424,7 @@ export default function AddFleetVehiclePage() {
             <div className="border-t pt-6 flex gap-4">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={() => router.push('/company/fleet')}
                 className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition"
               >
                 Cancel

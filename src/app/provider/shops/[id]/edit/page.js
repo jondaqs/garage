@@ -156,7 +156,7 @@ export default function EditShopPage() {
     <ProviderSubscriptionGate featureName="Edit Shop">
     <div className="max-w-3xl mx-auto px-4 py-8">
       <button
-        onClick={() => router.back()}
+        onClick={() => router.push('/provider/shops')}
         className="mb-6 text-blue-600 hover:text-blue-700 font-medium flex items-center"
       >
         <ArrowLeft size={20} className="mr-2" />
@@ -475,7 +475,7 @@ export default function EditShopPage() {
           <div className="flex gap-4">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() => router.push('/provider/shops')}
               className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
             >
               Cancel

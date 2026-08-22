@@ -150,7 +150,7 @@ export default function CompanyWorkOrderInvoicePage() {
   // ── No invoice ────────────────────────────────────────────────────────────
   if (!invoice) return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <button onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
+      <button onClick={() => router.push(`/company/work-orders/${params.id}`)}
         className="flex items-center text-gray-500 hover:text-gray-800 mb-6 text-sm">
         <ArrowLeft size={16} className="mr-1" /> Work Order
       </button>
@@ -162,7 +162,7 @@ export default function CompanyWorkOrderInvoicePage() {
         <p className="text-sm text-gray-500 mb-4">
           {error || 'The service provider has not issued an invoice for this work order yet.'}
         </p>
-        <button onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
+        <button onClick={() => router.push(`/company/work-orders/${params.id}`)}
           className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">
           Back to Work Order
         </button>
@@ -194,7 +194,7 @@ export default function CompanyWorkOrderInvoicePage() {
 
       {/* Top action row — back nav on the left, Download PDF on the right. */}
       <div className="flex items-center justify-between">
-        <button onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
+        <button onClick={() => router.push(`/company/work-orders/${params.id}`)}
           className="flex items-center text-gray-500 hover:text-gray-800 text-sm">
           <ArrowLeft size={16} className="mr-1" /> Work Order
         </button>
@@ -294,7 +294,7 @@ export default function CompanyWorkOrderInvoicePage() {
         {wo?.id && (
           <div className="px-6 py-3 border-b border-gray-100">
             <button
-              onClick={() => router.push(`/dashboard/company/${params.companyId}/work-orders/${params.id}`)}
+              onClick={() => router.push(`/company/work-orders/${params.id}`)}
               className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium">
               <ExternalLink size={12} />
               View Work Order {wo.number}
